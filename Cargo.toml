@@ -1,0 +1,9 @@
+[package]
+name = "physics"
+version = "0.1.0"
+authors = ["Erlend Hofstad Langseth <3rlendhl@gmail.com>"]
+
+[dependencies]
+tile_net = "1"
+tilenet_render = { path = "../tilenet_render"}
+glium = "*"

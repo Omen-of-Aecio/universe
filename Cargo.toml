@@ -5,5 +5,5 @@ authors = ["Erlend Hofstad Langseth <3rlendhl@gmail.com>"]
 
 [dependencies]
 tile_net = "1"
-tilenet_render = { path = "../tilenet_render"}
+tilenet_ren = { path = "../tilenet-ren" }
 glium = "*"

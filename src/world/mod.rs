@@ -1,9 +1,15 @@
+pub mod gen;
+
+use std::vec::Vec;
+
 use tile_net::TileNet;
 
-pub type Tile = u8;
+use global::Tile;
+use geometry::polygon::Polygon;
 
 pub struct World {
     pub tiles: TileNet<Tile>,
+    pub polygons: Vec<Polygon>,
     width: usize,
     height: usize,
 }
@@ -12,6 +18,7 @@ impl World {
     pub fn new(width: usize, height: usize) -> World {
         World {
             tiles: TileNet::<Tile>::new(width, height),
+            polygons: Vec::new(),
             width: width,
             height: height,
         }

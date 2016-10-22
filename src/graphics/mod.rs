@@ -1,30 +1,40 @@
-use tilenet_render::renderer::Renderer as TileNetRenderer;
+// use tilenet_render::renderer::Renderer as TileNetRenderer;
+use tilenet_ren;
+use self::ren::polygons;
+
 use glium;
-use glium::{ Display };
+use glium::{ Display, Surface };
 
+use global::Tile;
 use world::World;
-use world::Tile;
+
+pub mod ren;
 
 
-pub struct Graphics<'a> {
-    display: &'a Display,
-    world: &'a World,
-    tilenet_renderer: TileNetRenderer<'a, Tile>,
 
+pub struct Graphics {
+    display: Display,
+    tilenet_renderer: tilenet_ren::Ren,
+    poly_renderer: polygons::Ren,
 }
 
-impl<'a> Graphics<'a> {
+impl Graphics {
 
-    pub fn new(display: &'a Display, world: &'a World) -> Graphics<'a>
+    pub fn new(display: Display, world: &World) -> Graphics
     {
         Graphics {
-            display: display,
-            world: world,
-            tilenet_renderer: TileNetRenderer::new(display, &world.tiles),
+            display: display.clone(),
+            tilenet_renderer: tilenet_ren::Ren::new(display.clone(), &world.tiles),
+            poly_renderer: polygons::Ren::new(display.clone(), &world.polygons),
         }
     }
 
-    pub fn render(&mut self, left: f32, top: f32, width: u32, height: u32) {
-        self.tilenet_renderer.render(left, top, width, height);
+    pub fn render(&mut self, center_x: f32, center_y: f32, zoom: f32, width: u32, height: u32) {
+        let mut target = self.display.draw();        // target: glium::Frame
+        target.clear_color(0.0, 0.0, 0.0, 1.0);
+        self.tilenet_renderer.render(&mut target, center_x, center_y, zoom, width, height);
+        self.poly_renderer.render(&mut target, center_x, center_y, zoom, width, height);
+
+        target.finish().unwrap();
     }
 }

@@ -6,7 +6,7 @@ use glium::glutin;
 use tile_net::TileNet;
 
 
-pub fn proc1(tiles: &mut TileNet<u8>) { // TODO I'm here
+pub fn proc1(tiles: &mut TileNet<u8>) {
     let display = glutin::WindowBuilder::new().build_glium().unwrap();
     
     let vert_src = include_str!("../../shaders/proc1.vert");
@@ -32,7 +32,19 @@ pub fn proc1(tiles: &mut TileNet<u8>) { // TODO I'm here
     };
 
     fbo.draw(&quad_vbo, &ebo, &shader_prg, &uniforms, &Default::default()).unwrap();
+
+    // Download map from GPU.
+    let texture_data: Vec<Vec<(u8,u8,u8,u8)>> = texture.read();
+    print!("texture data size: {}, {}\n", texture_data.len(), texture_data[0].len());
+    for i in 0..texture_data.len() {
+        for j in 0..texture_data[i].len() {
+            tiles.set(&texture_data[i][j].0, (i, j));
+        }
+    }
+    // CURRENT PROBLEM: the texture we get back only has alpha channel non-zero
 }
+
+
 
 #[derive(Copy, Clone)]
 struct Vertex {

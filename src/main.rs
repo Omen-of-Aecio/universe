@@ -2,6 +2,9 @@ extern crate tile_net;
 extern crate tilenet_ren;
 #[macro_use]
 extern crate glium;
+extern crate rand;
+
+use std::time::{Duration, SystemTime};
 
 use std::f32::consts::PI;
 use std::f32;
@@ -47,9 +50,6 @@ struct Main {
 
 impl Main {
     fn run(&mut self) {
-
-
-
         loop {
             for ev in self.display.clone().poll_events() {
                 match ev {

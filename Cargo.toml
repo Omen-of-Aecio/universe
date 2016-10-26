@@ -7,3 +7,4 @@ authors = ["Erlend Hofstad Langseth <3rlendhl@gmail.com>"]
 tile_net = "1"
 tilenet_ren = { path = "../tilenet-ren" }
 glium = "*"
+rand = "*"

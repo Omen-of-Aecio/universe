@@ -3,6 +3,9 @@
 in vec2 texpos;
 out vec4 Color;
 
+uniform float width;
+uniform vec3 rand_seed;
+
 // Hash function: http://amindforeverprogramming.blogspot.com/2013/07/random-floats-in-glsl-330.html
 uint hash( uint x ) {
     x += ( x << 10u );
@@ -82,15 +85,16 @@ float perlin(vec3 pos, out float dnx, out float dny, out float dnz) {
     return k0 + k1*u + k2*v + k3*w + k4*u*v + k5*v*w + k6*w*u + k7*u*v*w;
 }
 
+// Note: It starts (octave 1) with the highest frequency, `width`
 float FBM(vec3 pos, int octaves) {
     float a, b, c;
     float result = 0;
     float p;
 
-    // pos *= scale; // Frequency = pixel
-    pos *= 1000;
+    pos *= width; // Frequency = pixel
+    /* pos *= 1000; */
 
-    const float power = 2; // Higher -> lower frequencies dominate. Normal: 2
+    const float power = 3;  // Higher -> lower frequencies dominate. Normally 2.
     float pos_factor = 1.f;
     float strength_factor = 1.f / pow(power, octaves);
     for (int i = 0; i < octaves; i ++)
@@ -107,9 +111,9 @@ float FBM(vec3 pos, int octaves) {
 
 void main()
 {
-    int octaves = 9;
+    int octaves = 8;
     float r;
-    r = FBM(vec3(texpos,0), octaves);
+    r = FBM(vec3(texpos,0) + rand_seed, octaves);
     r = step(0.5, r);
     Color = vec4(vec3(r), 1);
 }

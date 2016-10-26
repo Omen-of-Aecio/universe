@@ -3,10 +3,17 @@ use glium;
 use glium::{Display, Surface, DisplayBuild};
 use glium::glutin;
 
+use rand;
+use rand::Rng;
+
 use tile_net::TileNet;
 
 
 pub fn proc1(tiles: &mut TileNet<u8>) {
+    let mut rng = rand::thread_rng();
+    let random_number = rng.gen::<f32>();
+    println!("rand number = {}", random_number);
+
     let display = glutin::WindowBuilder::new().build_glium().unwrap();
     
     let vert_src = include_str!("../../shaders/proc1.vert");
@@ -29,6 +36,9 @@ pub fn proc1(tiles: &mut TileNet<u8>) {
     let mut fbo = glium::framebuffer::SimpleFrameBuffer::new(&display, &texture).unwrap();
 
     let uniforms = uniform!{
+        width: tiles.get_size().0 as f32,
+        // Different world on each run:
+        rand_seed: [rng.gen::<f32>(),rng.gen::<f32>(),rng.gen::<f32>()]
     };
 
     fbo.draw(&quad_vbo, &ebo, &shader_prg, &uniforms, &Default::default()).unwrap();

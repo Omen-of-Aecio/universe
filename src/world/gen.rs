@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 use glium;
-use glium::{Display, Surface, DisplayBuild};
+use glium::{Surface, DisplayBuild};
 use glium::glutin;
 
 use rand;
@@ -51,7 +51,6 @@ pub fn proc1(tiles: &mut TileNet<u8>) {
             tiles.set(&texture_data[i][j].0, (i, j));
         }
     }
-    // CURRENT PROBLEM: the texture we get back only has alpha channel non-zero
 }
 
 

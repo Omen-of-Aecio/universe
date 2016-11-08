@@ -1,22 +1,6 @@
 pub mod polygons;
-use glium;
-use std::fs::File;
-use std::io::Read;
 
 //// Helpers ////
-fn create_program<F>(display: &F, name: &'static str) -> glium::Program
-    where F: glium::backend::Facade
-{
-    let mut f = File::open("shaders/".to_string() + name + ".vert").unwrap();
-    let mut vert_src = String::new();
-    let _ = f.read_to_string(&mut vert_src);
-    let _ = f = File::open("shaders/".to_string() + name + ".frag").unwrap();
-    let mut frag_src = String::new();
-    let _ = f.read_to_string(&mut frag_src);
-
-    glium::Program::from_source(display, vert_src.as_str(), frag_src.as_str(), None).unwrap()
-}
-
 
 pub fn view_matrix(center_x: f32, center_y: f32, scale_x: f32, scale_y: f32) -> [[f32; 4]; 4] {
     // data views the transpose of the actual matrix

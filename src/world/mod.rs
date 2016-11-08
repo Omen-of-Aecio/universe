@@ -31,17 +31,37 @@ impl World {
     pub fn update(&mut self, input: &Input) {
         // Ad hoc: input to control first polygon
         if input.key_down(VirtualKeyCode::Left) {
+            self.polygons[0].vel.x -= 1.0;
+        }
+        if input.key_down(VirtualKeyCode::Right) {
             self.polygons[0].vel.x += 1.0;
+        }
+        if input.key_down(VirtualKeyCode::Up) {
+            self.polygons[0].vel.y += 1.0;
+        }
+        if input.key_down(VirtualKeyCode::Down) {
+            self.polygons[0].vel.y -= 1.0;
         }
 
         for p in &mut self.polygons {
-            let supercover = p.tiles();
-            let tiles = self.tilenet.collide_set(supercover);
-            if p.resolve(tiles) {
-                // println!["Able to move"];
-            } else {
-                // println!["Unable to move"];
+            let mut i = 0;
+            const MAX_ITER: i32 = 10;
+            loop {
+                let supercover = p.tiles();
+                let tiles = self.tilenet.collide_set(supercover);
+                if p.resolve(tiles) {
+                    break;
+                } else {
+                }
+                i += 1;
+                if i > MAX_ITER {
+                    println!("WARNING: max iterations reached.");
+                    break;
+                }
             }
+        }
+        for p in &mut self.polygons {
+            p.vel = p.vel * 0.9;
         }
     }
 

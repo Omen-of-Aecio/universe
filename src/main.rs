@@ -117,14 +117,14 @@ impl Main {
             // Render
             info!["Elapsed Update"; "time" => elapsed];
             let elapsed = time_ns! {
-				let window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
-				self.graphics.render(self.center.x,
-														 self.center.y,
-														 self.zoom,
-														 window_size.0,
-														 window_size.1,
-														 &self.world);
-			};
+              let window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
+              self.graphics.render(self.center.x,
+                                   self.center.y,
+                                   self.zoom,
+                                   window_size.0,
+                                   window_size.1,
+                                   &self.world);
+            };
             info!["Elapsed Render"; "time" => elapsed];
 
             thread::sleep_ms(15);

@@ -16,18 +16,18 @@ extern crate slog_stream;
 extern crate slog_term;
 extern crate isatty;
 
-use slog::DrainExt;
+use slog::{DrainExt, Level};
 
 fn setup_logger() {
     let logger = if isatty::stderr_isatty() {
-        slog::Logger::root(slog_term::streamer()
-                               .async()
-                               .stderr()
-                               .full()
-                               .use_utc_timestamp()
-                               .build()
-                               .ignore_err(),
-                           o![])
+        let drain = slog_term::streamer()
+            .async()
+            .stderr()
+            .full()
+            .use_utc_timestamp()
+            .build();
+        let d = slog::level_filter(Level::Debug, drain);
+        slog::Logger::root(d.fuse(), o![])
     } else {
         slog::Logger::root(slog_stream::stream(std::io::stderr(), slog_json::default()).fuse(),
                            o![])
@@ -91,6 +91,7 @@ macro_rules! time_ns {
 
 impl Main {
     fn run(&mut self) {
+        let mut oldpos = Vec2::null_vec();
         loop {
             self.input.update();
             // Handle input events
@@ -117,7 +118,7 @@ impl Main {
 
             // Render
             let window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
-            info!["Elapsed Update"; "time" => elapsed];
+            trace!["Elapsed Update"; "time" => elapsed];
             let elapsed = time_ns! {
               self.graphics.render(self.center.x,
                                    self.center.y,
@@ -126,11 +127,18 @@ impl Main {
                                    window_size.1,
                                    &self.world);
             };
-            info!["Elapsed Render"; "time" => elapsed];
+            trace!["Elapsed Render"; "time" => elapsed];
 
             // TEST
-            let pos = screen_to_world(self.mouse_pos, Vec2::new(self.center.x, self.center.y), self.zoom, window_size.0, window_size.1);
-            debug!["Position in world"; "x" => pos.x, "y" => pos.y];
+            let pos = screen_to_world(self.mouse_pos,
+                                      Vec2::new(self.center.x, self.center.y),
+                                      self.zoom,
+                                      window_size.0,
+                                      window_size.1);
+            if pos != oldpos {
+                debug!["Position in world"; "x" => pos.x, "y" => pos.y];
+            }
+            oldpos = pos;
 
             thread::sleep_ms(15);
         }

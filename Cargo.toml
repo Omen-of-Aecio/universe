@@ -7,7 +7,7 @@ authors = ["Erlend Hofstad Langseth <3rlendhl@gmail.com>", "Kevin Robert Straver
 tile_net = "1"
 tilenet_ren = "0.1.0"
 isatty = "0.1"
-slog = "1"
+slog = { version = "1", features = ["max_level_trace", "release_max_level_warn"] }
 slog-json = "1"
 slog-scope = "0"
 slog-stream = "1"

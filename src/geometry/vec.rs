@@ -136,6 +136,15 @@ impl Div<f32> for Vec2 {
         }
     }
 }
+
+impl PartialEq for Vec2 {
+    fn eq(&self, other: &Vec2) -> bool {
+        self.x == other.x && self.y == other.y
+    }
+    fn ne(&self, other: &Vec2) -> bool {
+        self.x != other.x || self.y != other.y
+    }
+}
 // impl MulAssign for Vec2 {
 // fn mul_assign(&mut self, other: f32) {
 // self.x *= other;
@@ -145,8 +154,8 @@ impl Div<f32> for Vec2 {
 
 
 // TODO
-/* impl slog::Serialize for Vec3 {
-   fn serialize(&self, _: &Record, key: &str, serializer: &mut Serializer) => Result<(), Error> {
-       serializer.emit_arguments(key, &format_args!["{:?}", *self])
-   }
-} */
+// impl slog::Serialize for Vec3 {
+// fn serialize(&self, _: &Record, key: &str, serializer: &mut Serializer) => Result<(), Error> {
+// serializer.emit_arguments(key, &format_args!["{:?}", *self])
+// }
+// }

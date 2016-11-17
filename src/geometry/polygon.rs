@@ -15,14 +15,14 @@ impl Polygon {
     pub fn new_quad(start_x: f32, start_y: f32, width: f32, height: f32) -> Polygon {
         let mut result = Polygon {
             points: Vec::new(),
-            pos: Vec2::null_vec(),
+            pos: Vec2::new(start_x, start_y),
             ori: 0.0,
             vel: Vec2::null_vec(),
         };
-        result.points.push((start_x, start_y));
-        result.points.push((start_x, start_y + height));
-        result.points.push((start_x + width, start_y + height));
-        result.points.push((start_x + width, start_y));
+        result.points.push((0.0, 0.0));
+        result.points.push((0.0, height));
+        result.points.push((width, height));
+        result.points.push((width, 0.0));
         result
     }
 }
@@ -41,7 +41,6 @@ impl Collable<u8> for Polygon {
     {
         if set.all(|x| *x == 0) {  // If there is no collision (we only collide with non-zero tiles)
             self.pos += self.vel;
-            self.vel = Vec2::new(0.0,0.0);
             println!("No collision.");
             true
         } else if self.vel.length_squared() > 1e-6 {  // There was collision, but our speed isn't tiny

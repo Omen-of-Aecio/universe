@@ -6,6 +6,7 @@ extern crate rand;
 
 
 use std::f32;
+use std::thread;
 
 use glium::{ DisplayBuild, glutin };
 use glium::glutin::{MouseScrollDelta, ElementState, MouseButton};
@@ -74,6 +75,8 @@ impl Main {
             // Render
             let window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
             self.graphics.render(self.center.x, self.center.y, self.zoom, window_size.0, window_size.1, &self.world);
+
+            thread::sleep_ms(15);
         }
     }
 

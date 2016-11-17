@@ -119,13 +119,13 @@ impl Main {
             let window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
             info!["Elapsed Update"; "time" => elapsed];
             let elapsed = time_ns! {
-				self.graphics.render(self.center.x,
-														 self.center.y,
-														 self.zoom,
-														 window_size.0,
-														 window_size.1,
-														 &self.world);
-			};
+              self.graphics.render(self.center.x,
+                                   self.center.y,
+                                   self.zoom,
+                                   window_size.0,
+                                   window_size.1,
+                                   &self.world);
+            };
             info!["Elapsed Render"; "time" => elapsed];
 
             // TEST

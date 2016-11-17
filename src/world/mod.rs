@@ -44,25 +44,24 @@ impl World {
         }
 
         for p in &mut self.polygons {
-            //p.queued = p.vel;
+            // p.queued = p.vel;
             let mut i = 0;
             const MAX_ITER: i32 = 10;
             p.solve(&self.tilenet);
-            /*
-            loop {
-                let supercover = p.tiles();
-                let tiles = self.tilenet.collide_set(supercover);
-                if p.resolve(tiles) {
-                    break;
-                } else {
-                }
-                i += 1;
-                if i > MAX_ITER {
-                    println!("WARNING: max iterations reached.");
-                    break;
-                }
-            }
-            */
+            // loop {
+            // let supercover = p.tiles();
+            // let tiles = self.tilenet.collide_set(supercover);
+            // if p.resolve(tiles) {
+            // break;
+            // } else {
+            // }
+            // i += 1;
+            // if i > MAX_ITER {
+            // println!("WARNING: max iterations reached.");
+            // break;
+            // }
+            // }
+            //
         }
         // Friction
         for p in &mut self.polygons {

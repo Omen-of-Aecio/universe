@@ -1,13 +1,13 @@
 use glium::glutin;
 use glium::glutin::ElementState;
 // use glium::glutin::VirtualKeyCode;
-use glium::glutin::Event::{KeyboardInput};
+use glium::glutin::Event::KeyboardInput;
 
 const NUM_KEYS: usize = 150;
 
 pub struct Input {
     key_down: [bool; NUM_KEYS],
-    key_toggled: [bool; NUM_KEYS]
+    key_toggled: [bool; NUM_KEYS],
 }
 
 
@@ -28,12 +28,13 @@ impl Input {
 
     pub fn register_key(&mut self, input: glutin::Event) {
         match input {
-            KeyboardInput(ElementState::Pressed, _, Some(keycode))
-                => self.register_key_down(keycode),
-            KeyboardInput(ElementState::Released, _, Some(keycode))
-                => self.register_key_up(keycode),
-            _
-                => () // Do nothing. Should probably log the error.
+            KeyboardInput(ElementState::Pressed, _, Some(keycode)) => {
+                self.register_key_down(keycode)
+            }
+            KeyboardInput(ElementState::Released, _, Some(keycode)) => {
+                self.register_key_up(keycode)
+            }
+            _ => (), // Do nothing. Should probably log the error.
         }
     }
 

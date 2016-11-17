@@ -2,7 +2,7 @@
 use tilenet_ren;
 use self::ren::polygons;
 
-use glium::{ Display, Surface };
+use glium::{Display, Surface};
 
 use world::World;
 
@@ -21,9 +21,7 @@ pub struct Graphics {
 }
 
 impl Graphics {
-
-    pub fn new(display: Display, world: &World) -> Graphics
-    {
+    pub fn new(display: Display, world: &World) -> Graphics {
         Graphics {
             display: display.clone(),
             tilenet_renderer: tilenet_ren::Ren::new(display.clone(), &world.tilenet),
@@ -32,7 +30,13 @@ impl Graphics {
     }
 
 
-    pub fn render(&mut self, center_x: f32, center_y: f32, zoom: f32, width: u32, height: u32, world: &World) {
+    pub fn render(&mut self,
+                  center_x: f32,
+                  center_y: f32,
+                  zoom: f32,
+                  width: u32,
+                  height: u32,
+                  world: &World) {
         let mut target = self.display.draw();        // target: glium::Frame
         target.clear_color(0.0, 0.0, 0.0, 1.0);
         self.tilenet_renderer.render(&mut target, center_x, center_y, zoom, width, height);

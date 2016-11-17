@@ -25,10 +25,11 @@ impl Ren {
         let frag_src = include_str!("../../../shaders/xy_tr.frag");
         let prg = glium::Program::from_source(&display, vert_src, frag_src, None).unwrap();
         let mut vertices = Vec::new();
-        //// Upload vertices
+        /// / Upload vertices
         for p in polygons {
-            for v in &p.points { // v: (f32, f32)
-                vertices.push(Vertex{pos: [v.0, v.1]});
+            for v in &p.points {
+                // v: (f32, f32)
+                vertices.push(Vertex { pos: [v.0, v.1] });
                 print!("{}, {}\n", v.0, v.1);
             }
             end_indices.push(vertices.len() - 1);
@@ -45,7 +46,14 @@ impl Ren {
 
     }
 
-    pub fn render(&self, target: &mut glium::Frame, center_x: f32, center_y: f32, zoom: f32, width: u32, height: u32, world: &World) {
+    pub fn render(&self,
+                  target: &mut glium::Frame,
+                  center_x: f32,
+                  center_y: f32,
+                  zoom: f32,
+                  width: u32,
+                  height: u32,
+                  world: &World) {
         let index_buffer = glium::index::NoIndices(glium::index::PrimitiveType::TriangleFan);
         for i in 0..self.end_indices.len() {
 
@@ -57,7 +65,12 @@ impl Ren {
                 view: super::view_matrix(center_x, center_y, zoom, zoom),
             };
 
-            target.draw(&self.vertex_buffer, &index_buffer, &self.prg, &uniforms, &Default::default()).unwrap();
+            target.draw(&self.vertex_buffer,
+                      &index_buffer,
+                      &self.prg,
+                      &uniforms,
+                      &Default::default())
+                .unwrap();
         }
     }
 }

@@ -22,6 +22,11 @@ impl Vec2 {
     pub fn length_squared(&self) -> f32 {
         (self.x * self.x + self.y * self.y)
     }
+    /// TODO make clear that it clones?
+    pub fn scale(&self, s: f32) -> Vec2 {
+        Vec2::new(self.x * s, self.y * s)
+    }
+
     pub fn dot(a: Vec2, b: Vec2) -> f32 {
         a.x * b.x + a.y * b.y
     }
@@ -137,3 +142,11 @@ impl Div<f32> for Vec2 {
 // self.y *= other;
 // }
 // }
+
+
+// TODO
+/* impl slog::Serialize for Vec3 {
+   fn serialize(&self, _: &Record, key: &str, serializer: &mut Serializer) => Result<(), Error> {
+       serializer.emit_arguments(key, &format_args!["{:?}", *self])
+   }
+} */

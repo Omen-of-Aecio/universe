@@ -43,6 +43,7 @@ use glium::glutin::{MouseScrollDelta, ElementState, MouseButton};
 
 use input::Input;
 use world::World;
+use graphics::screen_to_world;
 use graphics::Graphics;
 use geometry::polygon::Polygon;
 use geometry::vec::Vec2;
@@ -115,9 +116,9 @@ impl Main {
             let elapsed = time_ns![self.world.update(&self.input)];
 
             // Render
+            let window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
             info!["Elapsed Update"; "time" => elapsed];
             let elapsed = time_ns! {
-				let window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
 				self.graphics.render(self.center.x,
 														 self.center.y,
 														 self.zoom,
@@ -126,6 +127,10 @@ impl Main {
 														 &self.world);
 			};
             info!["Elapsed Render"; "time" => elapsed];
+
+            // TEST
+            let pos = screen_to_world(self.mouse_pos, Vec2::new(self.center.x, self.center.y), self.zoom, window_size.0, window_size.1);
+            debug!["Position in world"; "x" => pos.x, "y" => pos.y];
 
             thread::sleep_ms(15);
         }

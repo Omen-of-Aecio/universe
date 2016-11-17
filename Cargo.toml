@@ -1,10 +1,17 @@
 [package]
 name = "universe"
 version = "0.1.0"
-authors = ["Erlend Hofstad Langseth <3rlendhl@gmail.com>"]
+authors = ["Erlend Hofstad Langseth <3rlendhl@gmail.com>", "Kevin Robert Stravers <macocio@gmail.com>"]
 
 [dependencies]
 tile_net = "1"
 tilenet_ren = "0.1.0"
+isatty = "0.1"
+slog = "1"
+slog-json = "1"
+slog-scope = "0"
+slog-stream = "1"
+slog-term = "1"
+time = "0"
 glium = "*"
 rand = "*"

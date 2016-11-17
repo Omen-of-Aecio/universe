@@ -1,9 +1,39 @@
+#![cfg_attr(feature = "dev", allow(unstable_features))]
+#![cfg_attr(feature = "dev", feature(plugin))]
+#![cfg_attr(feature = "dev", plugin(clippy))]
 extern crate tile_net;
 extern crate tilenet_ren;
+extern crate time;
 #[macro_use]
 extern crate glium;
 extern crate rand;
+#[macro_use (o, slog_log, slog_trace, slog_debug, slog_info, slog_warn, slog_error)]
+extern crate slog;
+extern crate slog_json;
+#[macro_use]
+extern crate slog_scope;
+extern crate slog_stream;
+extern crate slog_term;
+extern crate isatty;
 
+use slog::DrainExt;
+
+fn setup_logger() {
+    let logger = if isatty::stderr_isatty() {
+        slog::Logger::root(slog_term::streamer()
+                               .async()
+                               .stderr()
+                               .full()
+                               .use_utc_timestamp()
+                               .build()
+                               .ignore_err(),
+                           o![])
+    } else {
+        slog::Logger::root(slog_stream::stream(std::io::stderr(), slog_json::default()).fuse(),
+                           o![])
+    };
+    slog_scope::set_global_logger(logger);
+}
 
 use std::f32;
 use std::thread;
@@ -25,6 +55,8 @@ pub mod geometry;
 pub mod input;
 
 fn main() {
+    setup_logger();
+    info!["Logger initialized"];
     let mut ctrl: Main = Main::new();
     ctrl.run();
 }
@@ -43,6 +75,17 @@ struct Main {
     mouse_down: bool,
     mouse_pos: Vec2,
     mouse_pos_past: Vec2,
+}
+
+macro_rules! time_ns {
+	($($e:tt)*) => {
+		{
+			let begin = time::precise_time_ns();
+			$($e)*;
+			let end = time::precise_time_ns();
+			end - begin
+		}
+	};
 }
 
 impl Main {
@@ -69,11 +112,20 @@ impl Main {
             }
 
             // Logic
-            self.world.update(&self.input);
+            let elapsed = time_ns![self.world.update(&self.input)];
 
             // Render
-            let window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
-            self.graphics.render(self.center.x, self.center.y, self.zoom, window_size.0, window_size.1, &self.world);
+            info!["Elapsed Update"; "time" => elapsed];
+            let elapsed = time_ns! {
+				let window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
+				self.graphics.render(self.center.x,
+														 self.center.y,
+														 self.zoom,
+														 window_size.0,
+														 window_size.1,
+														 &self.world);
+			};
+            info!["Elapsed Render"; "time" => elapsed];
 
             thread::sleep_ms(15);
         }

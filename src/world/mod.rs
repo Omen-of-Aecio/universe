@@ -31,21 +31,23 @@ impl World {
     pub fn update(&mut self, input: &Input) {
         // Ad hoc: input to control first polygon
         if input.key_down(VirtualKeyCode::Left) {
-            self.polygons[0].vel.x -= 1.0;
+            self.polygons[0].vel.x -= 0.1;
         }
         if input.key_down(VirtualKeyCode::Right) {
-            self.polygons[0].vel.x += 1.0;
+            self.polygons[0].vel.x += 0.1;
         }
         if input.key_down(VirtualKeyCode::Up) {
-            self.polygons[0].vel.y += 1.0;
+            self.polygons[0].vel.y += 0.1;
         }
         if input.key_down(VirtualKeyCode::Down) {
-            self.polygons[0].vel.y -= 1.0;
+            self.polygons[0].vel.y -= 0.1;
         }
 
         for p in &mut self.polygons {
             let mut i = 0;
             const MAX_ITER: i32 = 10;
+            p.solve(&self.tilenet);
+            /*
             loop {
                 let supercover = p.tiles();
                 let tiles = self.tilenet.collide_set(supercover);
@@ -59,7 +61,9 @@ impl World {
                     break;
                 }
             }
+            */
         }
+        // Friction
         for p in &mut self.polygons {
             p.vel = p.vel * 0.9;
         }

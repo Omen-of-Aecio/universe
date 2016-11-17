@@ -47,6 +47,7 @@ impl Input {
 
 
     fn register_key_down(&mut self, keycode: glutin::VirtualKeyCode) {
+        println!("Key down: {}", keycode as i32);
         let keycode = keycode as usize;
         if !self.key_down[keycode] {
             // If this toggles the key...

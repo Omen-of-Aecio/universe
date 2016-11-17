@@ -41,6 +41,7 @@ impl Collable<u8> for Polygon {
     {
         if set.all(|x| *x == 0) {  // If there is no collision (we only collide with non-zero tiles)
             self.pos += self.vel;
+            self.vel = Vec2::new(0.0,0.0);
             println!("No collision.");
             true
         } else if self.vel.length_squared() > 1e-6 {  // There was collision, but our speed isn't tiny
@@ -50,6 +51,8 @@ impl Collable<u8> for Polygon {
         } else {  // This may happen if we generate a world where we're stuck in a tile,
                   // normally this will never happen, this library can preserve consistently
                   // perfectly.
+            self.vel = Vec2::new(0.0,0.0);
+            println!("??");
             true
         }       
     }

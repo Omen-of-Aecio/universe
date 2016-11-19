@@ -26,7 +26,13 @@ impl Polygon {
     }
 }
 
-impl Collable<u8, ()> for Polygon {
+#[derive(Default)]
+pub struct PolygonState {
+    current_try: usize,
+    original_move: Vec2,
+}
+
+impl Collable<u8, PolygonState> for Polygon {
     fn points(&self) -> Points {
         Points::new(Vector(self.pos.x, self.pos.y), &self.points)
     }
@@ -36,7 +42,11 @@ impl Collable<u8, ()> for Polygon {
         Vector(self.vel.x, self.vel.y)
     }
 
-    fn resolve<I>(&mut self, mut set: TileSet<Tile, I>, _state: &mut ()) -> bool
+    fn presolve(&mut self, state: &mut PolygonState) {
+        state.original_move = self.vel;
+    }
+
+    fn resolve<I>(&mut self, mut set: TileSet<Tile, I>, state: &mut PolygonState) -> bool
         where I: Iterator<Item = (i32, i32)>
     {
         if set.all(|x| *x == 0) {
@@ -46,6 +56,12 @@ impl Collable<u8, ()> for Polygon {
         } else if self.vel.length_squared() > 1e-6 {
             // There was collision, but our speed isn't tiny
             self.vel = self.vel * 0.9;
+            if state.current_try == 3 {
+                self.vel = Vec2::new(state.original_move.x, 0.0);
+            } else if state.current_try == 6 {
+                self.vel = Vec2::new(0.0, state.original_move.y);
+            }
+            state.current_try += 1;
             false
         } else {
             // This may happen if we generate a world where we're stuck in a tile,

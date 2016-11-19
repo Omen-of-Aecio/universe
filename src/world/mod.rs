@@ -8,7 +8,7 @@ use tile_net::TileNet;
 use tile_net::Collable;
 
 use global::Tile;
-use geometry::polygon::Polygon;
+use geometry::polygon::{Polygon, PolygonState};
 use geometry::vec::Vec2;
 use input::Input;
 
@@ -69,7 +69,7 @@ impl World {
             // p.queued = p.vel;
             let mut i = 0;
             const MAX_ITER: i32 = 10;
-            p.solve(&self.tilenet, &mut ());
+            p.solve(&self.tilenet, &mut PolygonState::default());
         }
         // Friction
         for p in &mut self.polygons {

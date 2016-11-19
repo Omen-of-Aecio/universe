@@ -46,9 +46,9 @@ pub fn proc1(tiles: &mut TileNet<u8>) {
     // Download map from GPU.
     let texture_data: Vec<Vec<(u8, u8, u8, u8)>> = texture.read();
     debug!("texture data size"; "x" => texture_data.len(), "y" => texture_data[0].len());
-    for i in 0..texture_data.len() {
-        for j in 0..texture_data[i].len() {
-            tiles.set(&texture_data[i][j].0, (i, j));
+    for (i, texdata) in texture_data.iter().enumerate() {
+        for (j, texdata) in texdata.iter().enumerate() {
+            tiles.set(&texdata.0, (i, j));
         }
     }
 }

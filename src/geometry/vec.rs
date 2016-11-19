@@ -45,6 +45,7 @@ impl Add for Vec2 {
         }
     }
 }
+
 impl Sub for Vec2 {
     type Output = Vec2;
     fn sub(self, other: Vec2) -> Vec2 {
@@ -54,6 +55,7 @@ impl Sub for Vec2 {
         }
     }
 }
+
 impl Mul for Vec2 {
     type Output = Vec2;
     fn mul(self, other: Vec2) -> Vec2 {
@@ -63,6 +65,7 @@ impl Mul for Vec2 {
         }
     }
 }
+
 impl Div for Vec2 {
     type Output = Vec2;
     fn div(self, other: Vec2) -> Vec2 {
@@ -72,24 +75,28 @@ impl Div for Vec2 {
         }
     }
 }
+
 impl AddAssign for Vec2 {
     fn add_assign(&mut self, other: Vec2) {
         self.x += other.x;
         self.y += other.y;
     }
 }
+
 impl SubAssign for Vec2 {
     fn sub_assign(&mut self, other: Vec2) {
         self.x -= other.x;
         self.y -= other.y;
     }
 }
+
 impl MulAssign for Vec2 {
     fn mul_assign(&mut self, other: Vec2) {
         self.x *= other.x;
         self.y *= other.y;
     }
 }
+
 impl DivAssign for Vec2 {
     fn div_assign(&mut self, other: Vec2) {
         self.x /= other.x;
@@ -109,6 +116,7 @@ impl Add<f32> for Vec2 {
         }
     }
 }
+
 impl Sub<f32> for Vec2 {
     type Output = Vec2;
     fn sub(self, n: f32) -> Vec2 {
@@ -118,6 +126,7 @@ impl Sub<f32> for Vec2 {
         }
     }
 }
+
 impl Mul<f32> for Vec2 {
     type Output = Vec2;
     fn mul(self, n: f32) -> Vec2 {
@@ -140,9 +149,6 @@ impl Div<f32> for Vec2 {
 impl PartialEq for Vec2 {
     fn eq(&self, other: &Vec2) -> bool {
         self.x == other.x && self.y == other.y
-    }
-    fn ne(&self, other: &Vec2) -> bool {
-        self.x != other.x || self.y != other.y
     }
 }
 // impl MulAssign for Vec2 {

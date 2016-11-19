@@ -10,13 +10,18 @@ pub struct Input {
     key_toggled: [bool; NUM_KEYS],
 }
 
-
-impl Input {
-    pub fn new() -> Input {
+impl Default for Input {
+    fn default() -> Input {
         Input {
             key_down: [false; NUM_KEYS],
             key_toggled: [false; NUM_KEYS],
         }
+    }
+}
+
+impl Input {
+    pub fn new() -> Input {
+        Input::default()
     }
 
     // Mainly resets key_toggled
@@ -39,11 +44,11 @@ impl Input {
     }
 
     pub fn key_down(&self, keycode: glutin::VirtualKeyCode) -> bool {
-        return self.key_down[keycode as usize];
+        self.key_down[keycode as usize]
     }
 
     pub fn key_toggled(&self, keycode: glutin::VirtualKeyCode) -> bool {
-        return self.key_toggled[keycode as usize];
+        self.key_toggled[keycode as usize]
     }
 
 

@@ -1,4 +1,3 @@
-// use tilenet_render::renderer::Renderer as TileNetRenderer;
 use tilenet_ren;
 use self::ren::polygons;
 
@@ -12,7 +11,10 @@ pub mod ren;
 // Thoughts...
 // It makes more sense to keep a reference to World rather than pass as argument
 // because it is erroneous to ever use different worlds for rendering, than that
-// used in construction.
+// used in construction. - Erlend
+
+// The problem with this is that we have aliasing of references. World isn't something that
+// `Graphics` owns. You won't be able to hold a &mut outside of Graphics. - Kevin
 
 
 pub struct Graphics {
@@ -32,16 +34,15 @@ impl Graphics {
 
 
     pub fn render(&mut self,
-                  center_x: f32,
-                  center_y: f32,
+                  center: (f32, f32),
                   zoom: f32,
                   width: u32,
                   height: u32,
                   world: &World) {
         let mut target = self.display.draw();        // target: glium::Frame
         target.clear_color(0.0, 0.0, 0.0, 1.0);
-        self.tilenet_renderer.render(&mut target, center_x, center_y, zoom, width, height);
-        self.poly_renderer.render(&mut target, center_x, center_y, zoom, width, height, world);
+        self.tilenet_renderer.render(&mut target, center, zoom, width, height);
+        self.poly_renderer.render(&mut target, center, zoom, width, height, world);
 
         target.finish().unwrap();
     }

@@ -15,7 +15,7 @@ pub struct Ren {
 }
 
 impl Ren {
-    pub fn new(display: Display, polygons: &Vec<Polygon>) -> Ren {
+    pub fn new(display: Display, polygons: &[Polygon]) -> Ren {
         let mut end_indices = Vec::new();
         let mut pos = Vec::new();
         let mut ori = Vec::new();
@@ -48,8 +48,7 @@ impl Ren {
 
     pub fn render(&self,
                   target: &mut glium::Frame,
-                  center_x: f32,
-                  center_y: f32,
+                  center: (f32, f32),
                   zoom: f32,
                   width: u32,
                   height: u32,
@@ -62,7 +61,7 @@ impl Ren {
                 orientation: world.polygons[i].ori,
                 color: [0.5, 0.5, 0.5],
                 proj: super::proj_matrix(width as f32, height as f32, 0.0, 1.0),
-                view: super::view_matrix(center_x, center_y, zoom, zoom),
+                view: super::view_matrix(center.0, center.1, zoom, zoom),
             };
 
             target.draw(&self.vertex_buffer,

@@ -1,9 +1,10 @@
 [package]
 name = "universe"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Erlend Hofstad Langseth <3rlendhl@gmail.com>", "Kevin Robert Stravers <macocio@gmail.com>"]
 
 [dependencies]
+clippy = { version = "0.0", optional = true }
 tile_net = { git = "https://github.com/BourgondAries/TileNet" }
 tilenet_ren = { git = "https://github.com/Ploppz/tilenet-render" }
 isatty = "0.1"
@@ -15,3 +16,7 @@ slog-term = "1"
 time = "0"
 glium = "*"
 rand = "*"
+
+[features]
+default = []
+dev = ["clippy"]

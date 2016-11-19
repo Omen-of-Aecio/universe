@@ -1,12 +1,10 @@
 #![cfg_attr(feature = "dev", allow(unstable_features))]
 #![cfg_attr(feature = "dev", feature(plugin))]
 #![cfg_attr(feature = "dev", plugin(clippy))]
-extern crate isatty;
-extern crate tile_net;
-extern crate tilenet_ren;
-extern crate time;
+
 #[macro_use]
 extern crate glium;
+extern crate isatty;
 extern crate rand;
 #[macro_use (o, slog_log, slog_trace, slog_debug, slog_info, slog_warn, slog_error)]
 extern crate slog;
@@ -15,8 +13,27 @@ extern crate slog_json;
 extern crate slog_scope;
 extern crate slog_stream;
 extern crate slog_term;
+extern crate tile_net;
+extern crate tilenet_ren;
+extern crate time;
 
+pub mod geometry;
+pub mod global;
+pub mod graphics;
+pub mod input;
+pub mod world;
+
+use geometry::polygon::Polygon;
+use geometry::vec::Vec2;
+use glium::{DisplayBuild, glutin};
+use glium::glutin::{ElementState, MouseButton, MouseScrollDelta};
+use graphics::Graphics;
+use graphics::screen_to_world;
+use input::Input;
 use slog::{DrainExt, Level};
+use std::{f32, thread};
+use std::time::Duration;
+use world::World;
 
 fn setup_logger() {
     let logger = if isatty::stderr_isatty() {
@@ -34,25 +51,6 @@ fn setup_logger() {
     };
     slog_scope::set_global_logger(logger);
 }
-
-use std::f32;
-
-use glium::{DisplayBuild, glutin};
-use glium::glutin::{MouseScrollDelta, ElementState, MouseButton};
-
-use input::Input;
-use world::World;
-use graphics::screen_to_world;
-use graphics::Graphics;
-use geometry::polygon::Polygon;
-use geometry::vec::Vec2;
-
-
-pub mod global;
-pub mod world;
-pub mod graphics;
-pub mod geometry;
-pub mod input;
 
 fn main() {
     setup_logger();
@@ -119,8 +117,8 @@ impl Main {
             let window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
             trace!["Elapsed Update"; "time" => elapsed];
             let elapsed = time_ns! {
-              self.graphics.render(self.center.x,
-                                   self.center.y,
+              self.graphics.render((self.center.x,
+                                   self.center.y),
                                    self.zoom,
                                    window_size.0,
                                    window_size.1,
@@ -139,7 +137,7 @@ impl Main {
             }
             oldpos = pos;
 
-            std::thread::sleep_ms(15);
+            thread::sleep(Duration::from_millis(15));
         }
     }
 
@@ -167,16 +165,14 @@ impl Main {
     }
 
     fn mouse_press(&mut self, button: MouseButton) {
-        match button {
-            MouseButton::Left => self.mouse_down = true,
-            _ => (),
+        if let MouseButton::Left = button {
+            self.mouse_down = true;
         }
     }
 
     fn mouse_release(&mut self, button: MouseButton) {
-        match button {
-            MouseButton::Left => self.mouse_down = false,
-            _ => (),
+        if let MouseButton::Left = button {
+            self.mouse_down = false;
         }
     }
 

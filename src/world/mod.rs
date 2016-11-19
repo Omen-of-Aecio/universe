@@ -30,6 +30,21 @@ impl World {
         }
     }
 
+    pub fn get_normal(world_x: usize, world_y: usize) -> Vec2 {
+        static kernel = [[-1.0, 0.0, 1.0],
+                         [-2.0, 0.0, 2.0],
+                         [-1.0, 0.0, 1.0]];
+        let dx = 0;
+        let dy = 0;
+        for y in 0..3 {
+            for x in 0..3 {
+                dx += kernel[y][x] * tilenet.get((world_x + x - 1, world_y + y - 1));
+                dy += kernel[x][y] * tilenet.get((world_x + x - 1, world_y + y - 1));
+            }
+        }
+        Vec2::new(dx, dy)
+    }
+
     pub fn update(&mut self, input: &Input) {
         // Ad hoc: input to control first polygon
         if input.key_down(VirtualKeyCode::Escape) {

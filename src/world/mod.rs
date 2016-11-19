@@ -9,6 +9,7 @@ use tile_net::Collable;
 
 use global::Tile;
 use geometry::polygon::Polygon;
+use geometry::vec::Vec2;
 use input::Input;
 
 pub struct World {
@@ -30,16 +31,17 @@ impl World {
         }
     }
 
-    pub fn get_normal(world_x: usize, world_y: usize) -> Vec2 {
-        static kernel = [[-1.0, 0.0, 1.0],
-                         [-2.0, 0.0, 2.0],
-                         [-1.0, 0.0, 1.0]];
-        let dx = 0;
-        let dy = 0;
+    pub fn get_normal(&self, world_x: usize, world_y: usize) -> Vec2 {
+        let kernel = [[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]];
+        let mut dx = 0.0;
+        let mut dy = 0.0;
         for y in 0..3 {
             for x in 0..3 {
-                dx += kernel[y][x] * tilenet.get((world_x + x - 1, world_y + y - 1));
-                dy += kernel[x][y] * tilenet.get((world_x + x - 1, world_y + y - 1));
+                // Change the unwraps here
+                dx += kernel[y][x] *
+                      (*self.tilenet.get((world_x + x - 1, world_y + y - 1)).unwrap() as f32);
+                dy += kernel[x][y] *
+                      (*self.tilenet.get((world_x + x - 1, world_y + y - 1)).unwrap() as f32);
             }
         }
         Vec2::new(dx, dy)

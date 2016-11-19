@@ -69,7 +69,7 @@ impl World {
             // p.queued = p.vel;
             let mut i = 0;
             const MAX_ITER: i32 = 10;
-            p.solve(&self.tilenet);
+            p.solve(&self.tilenet, &mut ());
         }
         // Friction
         for p in &mut self.polygons {

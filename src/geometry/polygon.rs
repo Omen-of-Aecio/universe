@@ -26,7 +26,7 @@ impl Polygon {
     }
 }
 
-impl Collable<u8> for Polygon {
+impl Collable<u8, ()> for Polygon {
     fn points(&self) -> Points {
         Points::new(Vector(self.pos.x, self.pos.y), &self.points)
     }
@@ -36,7 +36,7 @@ impl Collable<u8> for Polygon {
         Vector(self.vel.x, self.vel.y)
     }
 
-    fn resolve<I>(&mut self, mut set: TileSet<Tile, I>) -> bool
+    fn resolve<I>(&mut self, mut set: TileSet<Tile, I>, _state: &mut ()) -> bool
         where I: Iterator<Item = (i32, i32)>
     {
         if set.all(|x| *x == 0) {

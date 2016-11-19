@@ -12,7 +12,7 @@ use tile_net::TileNet;
 pub fn proc1(tiles: &mut TileNet<u8>) {
     let mut rng = rand::thread_rng();
     let random_number = rng.gen::<f32>();
-    println!("rand number = {}", random_number);
+    debug!("rand number"; "value" => random_number);
 
     let display = glutin::WindowBuilder::new().build_glium().unwrap();
 
@@ -45,9 +45,7 @@ pub fn proc1(tiles: &mut TileNet<u8>) {
 
     // Download map from GPU.
     let texture_data: Vec<Vec<(u8, u8, u8, u8)>> = texture.read();
-    print!("texture data size: {}, {}\n",
-           texture_data.len(),
-           texture_data[0].len());
+    debug!("texture data size"; "x" => texture_data.len(), "y" => texture_data[0].len());
     for i in 0..texture_data.len() {
         for j in 0..texture_data[i].len() {
             tiles.set(&texture_data[i][j].0, (i, j));

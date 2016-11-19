@@ -27,9 +27,5 @@ pub fn ray_vs_unit_box(point: Vec2, dir: Vec2, box_x: usize, box_y: usize) -> Op
     tmin = tmin.max(ty1.min(ty2));
     tmax = tmax.min(ty1.max(ty2));
 
-    if tmax >= tmin {
-        Some(tmin)
-    } else {
-        None
-    }
+    if tmax >= tmin { Some(tmin) } else { None }
 }

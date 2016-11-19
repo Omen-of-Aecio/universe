@@ -92,7 +92,7 @@ macro_rules! time_ns {
 impl Main {
     fn run(&mut self) {
         let mut oldpos = Vec2::null_vec();
-        loop {
+        while !self.world.exit {
             self.input.update();
             // Handle input events
             for ev in self.display.clone().poll_events() {

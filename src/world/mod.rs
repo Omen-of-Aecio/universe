@@ -14,6 +14,7 @@ use input::Input;
 pub struct World {
     pub tilenet: TileNet<Tile>,
     pub polygons: Vec<Polygon>,
+    pub exit: bool,
     width: usize,
     height: usize,
 }
@@ -23,6 +24,7 @@ impl World {
         World {
             tilenet: TileNet::<Tile>::new(width, height),
             polygons: Vec::new(),
+            exit: false,
             width: width,
             height: height,
         }
@@ -30,16 +32,19 @@ impl World {
 
     pub fn update(&mut self, input: &Input) {
         // Ad hoc: input to control first polygon
-        if input.key_down(VirtualKeyCode::Left) {
+        if input.key_down(VirtualKeyCode::Escape) {
+            self.exit = true;
+        }
+        if input.key_down(VirtualKeyCode::Left) || input.key_down(VirtualKeyCode::A) {
             self.polygons[0].vel.x -= 1.0;
         }
-        if input.key_down(VirtualKeyCode::Right) {
+        if input.key_down(VirtualKeyCode::Right) || input.key_down(VirtualKeyCode::D) {
             self.polygons[0].vel.x += 1.0;
         }
-        if input.key_down(VirtualKeyCode::Up) {
+        if input.key_down(VirtualKeyCode::Up) || input.key_down(VirtualKeyCode::W) {
             self.polygons[0].vel.y += 1.0;
         }
-        if input.key_down(VirtualKeyCode::Down) {
+        if input.key_down(VirtualKeyCode::Down) || input.key_down(VirtualKeyCode::S) {
             self.polygons[0].vel.y -= 1.0;
         }
 
@@ -48,20 +53,6 @@ impl World {
             let mut i = 0;
             const MAX_ITER: i32 = 10;
             p.solve(&self.tilenet);
-            // loop {
-            // let supercover = p.tiles();
-            // let tiles = self.tilenet.collide_set(supercover);
-            // if p.resolve(tiles) {
-            // break;
-            // } else {
-            // }
-            // i += 1;
-            // if i > MAX_ITER {
-            // println!("WARNING: max iterations reached.");
-            // break;
-            // }
-            // }
-            //
         }
         // Friction
         for p in &mut self.polygons {
@@ -77,6 +68,6 @@ impl World {
     }
 
     pub fn print(&self) {
-        println!("{:?}", self.tilenet);
+        info!("TileNet"; "content" => format!["{:?}", self.tilenet]);
     }
 }

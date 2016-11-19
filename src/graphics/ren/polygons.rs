@@ -30,7 +30,7 @@ impl Ren {
             for v in &p.points {
                 // v: (f32, f32)
                 vertices.push(Vertex { pos: [v.0, v.1] });
-                print!("{}, {}\n", v.0, v.1);
+                debug!["Pushed vertex"; "x" => v.0, "y" => v.1];
             }
             end_indices.push(vertices.len() - 1);
             pos.push(p.pos);

@@ -1,7 +1,6 @@
 pub mod vec;
 pub mod polygon;
 
-use std::cmp::{min, max};
 use geometry::vec::Vec2;
 
 

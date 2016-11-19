@@ -66,9 +66,6 @@ impl World {
         }
 
         for p in &mut self.polygons {
-            // p.queued = p.vel;
-            let mut i = 0;
-            const MAX_ITER: i32 = 10;
             p.solve(&self.tilenet, &mut PolygonState::default());
         }
         // Friction

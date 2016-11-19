@@ -1,6 +1,7 @@
 #![cfg_attr(feature = "dev", allow(unstable_features))]
 #![cfg_attr(feature = "dev", feature(plugin))]
 #![cfg_attr(feature = "dev", plugin(clippy))]
+extern crate isatty;
 extern crate tile_net;
 extern crate tilenet_ren;
 extern crate time;
@@ -14,7 +15,6 @@ extern crate slog_json;
 extern crate slog_scope;
 extern crate slog_stream;
 extern crate slog_term;
-extern crate isatty;
 
 use slog::{DrainExt, Level};
 
@@ -36,7 +36,6 @@ fn setup_logger() {
 }
 
 use std::f32;
-use std::thread;
 
 use glium::{DisplayBuild, glutin};
 use glium::glutin::{MouseScrollDelta, ElementState, MouseButton};
@@ -140,7 +139,7 @@ impl Main {
             }
             oldpos = pos;
 
-            thread::sleep_ms(15);
+            std::thread::sleep_ms(15);
         }
     }
 

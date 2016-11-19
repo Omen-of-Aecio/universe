@@ -47,28 +47,23 @@ impl Collable<u8, PolygonState> for Polygon {
     }
 
     fn resolve<I>(&mut self, mut set: TileSet<Tile, I>, state: &mut PolygonState) -> bool
-        where I: Iterator<Item = (i32, i32)>
-    {
+        where I: Iterator<Item = (i32, i32)> {
         if set.all(|x| *x == 0) {
             // If there is no collision (we only collide with non-zero tiles)
             self.pos += self.vel;
             true
-        } else if self.vel.length_squared() > 1e-6 {
+        } else {
             // There was collision, but our speed isn't tiny
             self.vel = self.vel * 0.9;
-            if state.current_try == 3 {
+						/*
+            if state.current_try == 10 {
                 self.vel = Vec2::new(state.original_move.x, 0.0);
-            } else if state.current_try == 6 {
+            } else if state.current_try == 20 {
                 self.vel = Vec2::new(0.0, state.original_move.y);
             }
+						*/
             state.current_try += 1;
             false
-        } else {
-            // This may happen if we generate a world where we're stuck in a tile,
-            // normally this will never happen, this library can preserve consistently
-            // perfectly.
-            self.vel = Vec2::new(0.0, 0.0);
-            true
-        }
+				}
     }
 }

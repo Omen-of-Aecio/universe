@@ -53,12 +53,9 @@ impl Graphics {
         self.line_renderer.clear();
     }
     fn add_line_from_world(&mut self, world: &World) {
-        /*
-         * TODO
-        for (start, dir) in &world.vectors {
+        for &(start, dir) in &world.vectors {
             self.line_renderer.add_vector(start, dir);
         }
-        */
     }
 }
 

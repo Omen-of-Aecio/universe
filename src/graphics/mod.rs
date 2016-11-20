@@ -52,6 +52,14 @@ impl Graphics {
         
         self.line_renderer.clear();
     }
+    fn add_line_from_world(&mut self, world: &World) {
+        /*
+         * TODO
+        for (start, dir) in &world.vectors {
+            self.line_renderer.add_vector(start, dir);
+        }
+        */
+    }
 }
 
 pub fn screen_to_world(screen_pos: Vec2, center: Vec2, zoom: f32, width: u32, height: u32) -> Vec2 {

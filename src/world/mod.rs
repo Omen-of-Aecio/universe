@@ -18,6 +18,8 @@ pub struct World {
     pub exit: bool,
     width: usize,
     height: usize,
+    // Extra graphics data (for debugging/visualization)
+    pub vectors: Vec<(Vec2, Vec2)>,
 }
 
 impl World {
@@ -28,6 +30,7 @@ impl World {
             exit: false,
             width: width,
             height: height,
+            vectors: Vec::new(),
         }
     }
 
@@ -67,7 +70,11 @@ impl World {
 
         // Physics
         for p in &mut self.polygons {
-            p.solve(&self.tilenet, &mut PolygonState::default());
+            let mut polygon_state = PolygonState::default();
+            p.solve(&self.tilenet, &mut polygon_state);
+
+            // Add debug vectors
+            self.vectors.extend(polygon_state.debug_vectors.iter().cloned());
         }
         // Friction
         for p in &mut self.polygons {

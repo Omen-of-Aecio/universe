@@ -30,6 +30,7 @@ impl Polygon {
 pub struct PolygonState {
     current_try: usize,
     original_move: Vec2,
+    pub debug_vectors: Vec<(Vec2, Vec2)>,
 }
 
 impl Collable<u8, PolygonState> for Polygon {
@@ -61,7 +62,7 @@ impl Collable<u8, PolygonState> for Polygon {
             // } else if state.current_try == 20 {
             // self.vel = Vec2::new(0.0, state.original_move.y);
             // }
-            //
+
             state.current_try += 1;
             false
         }

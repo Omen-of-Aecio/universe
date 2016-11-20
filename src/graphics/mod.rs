@@ -42,6 +42,7 @@ impl Graphics {
                   width: u32,
                   height: u32,
                   world: &World) {
+        self.add_vectors_from_world(world);
         let mut target = self.display.draw();        // target: glium::Frame
         target.clear_color(0.0, 0.0, 0.0, 1.0);
         self.tilenet_renderer.render(&mut target, center, zoom, width, height);
@@ -52,7 +53,7 @@ impl Graphics {
         
         self.line_renderer.clear();
     }
-    fn add_line_from_world(&mut self, world: &World) {
+    fn add_vectors_from_world(&mut self, world: &World) {
         for &(start, dir) in &world.vectors {
             self.line_renderer.add_vector(start, dir);
         }

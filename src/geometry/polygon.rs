@@ -24,12 +24,18 @@ impl Polygon {
         result.points.push((width, 0.0));
         result
     }
+
+    /// Physical response to collision - i.e. bounce in direction of normal
+    pub fn collide(normal: Vec2) {
+    }
 }
 
 #[derive(Default)]
 pub struct PolygonState {
     current_try: usize,
     original_move: Vec2,
+    pub collision: bool,
+    pub poc: (i32, i32),
     pub debug_vectors: Vec<(Vec2, Vec2)>,
 }
 
@@ -59,7 +65,8 @@ impl Collable<u8, PolygonState> for Polygon {
             self.vel = self.vel * 0.9;
 
             // Find normal
-            let poc = set.get_coords(); // point of collision
+            state.poc = set.get_coords(); // point of collision
+            state.collision = true;
 
 
             /*

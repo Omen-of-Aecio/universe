@@ -34,23 +34,9 @@ impl World {
         }
     }
 
-    pub fn get_normal(&self, world_x: usize, world_y: usize) -> Vec2 {
-        let kernel = [[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]];
-        let mut dx = 0.0;
-        let mut dy = 0.0;
-        for y in 0..kernel.len() {
-            for x in 0..kernel.len() {
-                // Change the unwraps here
-                dx += kernel[y][x] *
-                      (*self.tilenet.get((world_x + x - 1, world_y + y - 1)).unwrap() as f32);
-                dy += kernel[x][y] *
-                      (*self.tilenet.get((world_x + x - 1, world_y + y - 1)).unwrap() as f32);
-            }
-        }
-        Vec2::new(dx, dy)
-    }
 
     pub fn update(&mut self, input: &Input) {
+        self.vectors.clear(); // clear debug geometry
         // Ad hoc: input to control first polygon
         if input.key_down(VirtualKeyCode::Escape) {
             self.exit = true;
@@ -69,9 +55,14 @@ impl World {
         }
 
         // Physics
-        for p in &mut self.polygons {
+        for p in &mut self.polygons.iter_mut() {
             let mut polygon_state = PolygonState::default();
             p.solve(&self.tilenet, &mut polygon_state);
+
+            if polygon_state.collision {
+                let normal = get_normal(&self.tilenet, polygon_state.poc.0 as usize, polygon_state.poc.1 as usize);
+                self.vectors.push( (Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32), normal));
+            }
 
             // Add debug vectors
             self.vectors.extend(polygon_state.debug_vectors.iter().cloned());
@@ -80,6 +71,7 @@ impl World {
         for p in &mut self.polygons {
             p.vel = p.vel * 0.9;
         }
+
     }
 
     pub fn get_width(&self) -> usize {
@@ -92,4 +84,19 @@ impl World {
     pub fn print(&self) {
         info!("TileNet"; "content" => format!["{:?}", self.tilenet]);
     }
+}
+pub fn get_normal(tilenet: &TileNet<Tile>, world_x: usize, world_y: usize) -> Vec2 {
+    let kernel = [[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]];
+    let mut dx = 0.0;
+    let mut dy = 0.0;
+    for y in 0..kernel.len() {
+        for x in 0..kernel.len() {
+            // Change the unwraps here
+            dx += kernel[y][x] *
+                  (*tilenet.get((world_x + x - 1, world_y + y - 1)).unwrap() as f32) / 255.0;
+            dy += kernel[x][y] *
+                  (*tilenet.get((world_x + x - 1, world_y + y - 1)).unwrap() as f32) / 255.0;
+        }
+    }
+    Vec2::new(dx, dy)
 }

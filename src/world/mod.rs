@@ -35,12 +35,12 @@ impl World {
         let kernel = [[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]];
         let mut dx = 0.0;
         let mut dy = 0.0;
-        for (y, kernel_y) in kernel.iter().enumerate() {
-            for (x, kernel_elem) in kernel_y.iter().enumerate() {
+        for y in 0..kernel.len() {
+            for x in 0..kernel.len() {
                 // Change the unwraps here
-                dx += kernel_elem *
+                dx += kernel[y][x] *
                       (*self.tilenet.get((world_x + x - 1, world_y + y - 1)).unwrap() as f32);
-                dy += kernel_elem *
+                dy += kernel[x][y] *
                       (*self.tilenet.get((world_x + x - 1, world_y + y - 1)).unwrap() as f32);
             }
         }
@@ -65,6 +65,7 @@ impl World {
             self.polygons[0].vel.y -= 1.0;
         }
 
+        // Physics
         for p in &mut self.polygons {
             p.solve(&self.tilenet, &mut PolygonState::default());
         }

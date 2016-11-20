@@ -7,6 +7,8 @@ use geometry::polygon::Polygon;
 use world::World;
 
 
+/// Renderer for polygons.
+/// The polygons are given in the constructor, and never changes. (for now)
 pub struct Ren {
     end_indices: Vec<usize>,
     // OpenGL
@@ -25,7 +27,7 @@ impl Ren {
         let frag_src = include_str!("../../../shaders/xy_tr.frag");
         let prg = glium::Program::from_source(&display, vert_src, frag_src, None).unwrap();
         let mut vertices = Vec::new();
-        /// / Upload vertices
+        // Upload vertices
         for p in polygons {
             for v in &p.points {
                 // v: (f32, f32)

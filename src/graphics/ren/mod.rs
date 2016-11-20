@@ -1,6 +1,7 @@
 pub mod polygons;
+pub mod lines;
 
-/// / Helpers ////
+// Helpers
 
 pub fn view_matrix(center_x: f32, center_y: f32, scale_x: f32, scale_y: f32) -> [[f32; 4]; 4] {
     // data views the transpose of the actual matrix

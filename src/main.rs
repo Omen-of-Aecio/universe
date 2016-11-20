@@ -126,12 +126,13 @@ impl Main {
             };
             trace!["Elapsed Render"; "time" => elapsed];
 
-            // TEST
+            // TEST screen to world.
             let pos = screen_to_world(self.mouse_pos,
                                       Vec2::new(self.center.x, self.center.y),
                                       self.zoom,
                                       window_size.0,
                                       window_size.1);
+
             if pos != oldpos {
                 debug!["Position in world"; "x" => pos.x, "y" => pos.y];
             }

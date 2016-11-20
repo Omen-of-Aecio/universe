@@ -1,5 +1,5 @@
 use tilenet_ren;
-use self::ren::polygons;
+use self::ren::{polygons, lines};
 
 use glium::{Display, Surface};
 
@@ -21,6 +21,8 @@ pub struct Graphics {
     display: Display,
     tilenet_renderer: tilenet_ren::Ren,
     poly_renderer: polygons::Ren,
+    pub line_renderer: lines::Ren,
+    // TODO: Maybe make line_renderer private and make interface for all renderers in Graphics
 }
 
 impl Graphics {
@@ -29,6 +31,7 @@ impl Graphics {
             display: display.clone(),
             tilenet_renderer: tilenet_ren::Ren::new(display.clone(), &world.tilenet),
             poly_renderer: polygons::Ren::new(display.clone(), &world.polygons),
+            line_renderer: lines::Ren::new(display.clone())
         }
     }
 
@@ -43,8 +46,11 @@ impl Graphics {
         target.clear_color(0.0, 0.0, 0.0, 1.0);
         self.tilenet_renderer.render(&mut target, center, zoom, width, height);
         self.poly_renderer.render(&mut target, center, zoom, width, height, world);
+        self.line_renderer.render(&mut target, center, zoom, width, height, world);
 
         target.finish().unwrap();
+        
+        self.line_renderer.clear();
     }
 }
 

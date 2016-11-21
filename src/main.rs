@@ -78,7 +78,7 @@ struct Main {
 
 impl Main {
     fn run(&mut self) {
-        let window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
+        let mut window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
         let mut oldpos = Vec2::null_vec();
         while !self.world.exit {
             self.input.update();
@@ -97,6 +97,7 @@ impl Main {
                         self.mouse_release(button)
                     }
                     glutin::Event::KeyboardInput(_, _, _) => self.input.register_key(ev),
+                    glutin::Event::Resized(w, h) => window_size = (w, h),
                     _ => (),
                 }
             }

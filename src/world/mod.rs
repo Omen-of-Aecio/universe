@@ -94,13 +94,13 @@ pub fn get_normal(tilenet: &TileNet<Tile>, world_x: usize, world_y: usize) -> Ve
     let kernel = [[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]];
     let mut dx = 0.0;
     let mut dy = 0.0;
-    for y in 0..kernel.len() {
-        for x in 0..kernel.len() {
-            // Change the unwraps here
-            dx += kernel[y][x] *
-                  (*tilenet.get((world_x + x - 1, world_y + y - 1)).unwrap() as f32) / 255.0;
-            dy += kernel[x][y] *
-                  (*tilenet.get((world_x + x - 1, world_y + y - 1)).unwrap() as f32) / 255.0;
+    for (y, row) in kernel.iter().enumerate() {
+        for (x, _) in row.iter().enumerate() {
+            if let (Some(x_coord), Some(y_coord)) = ((world_x + x).checked_sub(1),
+                                                     (world_y + y).checked_sub(1)) {
+                tilenet.get((x_coord, y_coord)).map(|&v| dx += kernel[y][x] * v as f32 / 255.0);
+                tilenet.get((x_coord, y_coord)).map(|&v| dy += kernel[x][y] * v as f32 / 255.0);
+            }
         }
     }
     Vec2::new(dx, dy)

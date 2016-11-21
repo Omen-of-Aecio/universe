@@ -2,6 +2,7 @@
 *.bk
 !.gitignore
 !rustfmt.toml
+!scripts/
 !src/
 !shaders/
 !Cargo.toml

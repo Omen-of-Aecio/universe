@@ -7,3 +7,7 @@ fast:
 .PHONY:
 clip:
 	cargo build --features dev
+.PHONY:
+perf:
+	cargo build --release
+	./scripts/flame.sh

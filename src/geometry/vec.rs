@@ -164,13 +164,14 @@ impl PartialEq for Vec2 {
 // }
 
 // TODO ...
-/*
-impl fmt::Display for Vec2 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Vec2({},{})", self.x, self.y)
-    }
-}
-*/
+//
+// impl fmt::Display for Vec2 {
+// fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+// write!(f, "Vec2({},{})", self.x, self.y)
+// }
+// }
+//
+
 
 // TODO
 // impl slog::Serialize for Vec3 {

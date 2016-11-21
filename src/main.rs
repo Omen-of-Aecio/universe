@@ -35,6 +35,7 @@ use std::{f32, thread};
 use std::time::Duration;
 use world::World;
 
+
 fn setup_logger() {
     let logger = if isatty::stderr_isatty() {
         let drain = slog_term::streamer()
@@ -43,7 +44,7 @@ fn setup_logger() {
             .full()
             .use_utc_timestamp()
             .build();
-        let d = slog::level_filter(Level::Debug, drain);
+        let d = slog::level_filter(Level::Trace, drain);
         slog::Logger::root(d.fuse(), o![])
     } else {
         slog::Logger::root(slog_stream::stream(std::io::stderr(), slog_json::default()).fuse(),
@@ -75,19 +76,9 @@ struct Main {
     mouse_pos_past: Vec2,
 }
 
-macro_rules! time_ns {
-	($($e:tt)*) => {
-		{
-			let begin = time::precise_time_ns();
-			$($e)*;
-			let end = time::precise_time_ns();
-			end - begin
-		}
-	};
-}
-
 impl Main {
     fn run(&mut self) {
+        let window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
         let mut oldpos = Vec2::null_vec();
         while !self.world.exit {
             self.input.update();
@@ -111,20 +102,15 @@ impl Main {
             }
 
             // Logic
-            let elapsed = time_ns![self.world.update(&self.input)];
+            prof!["Logic", self.world.update(&self.input)];
 
             // Render
-            let window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
-            trace!["Elapsed Update"; "time" => elapsed];
-            let elapsed = time_ns! {
-              self.graphics.render((self.center.x,
-                                   self.center.y),
-                                   self.zoom,
-                                   window_size.0,
-                                   window_size.1,
-                                   &self.world);
-            };
-            trace!["Elapsed Render"; "time" => elapsed];
+            prof!["Render",
+                  self.graphics.render((self.center.x, self.center.y),
+                                       self.zoom,
+                                       window_size.0,
+                                       window_size.1,
+                                       &self.world)];
 
             // TEST screen to world.
             let pos = screen_to_world(self.mouse_pos,
@@ -138,7 +124,7 @@ impl Main {
             }
             oldpos = pos;
 
-            thread::sleep(Duration::from_millis(15));
+            // thread::sleep(Duration::from_millis(15));
         }
     }
 

@@ -16,7 +16,6 @@ pub mod ren;
 // The problem with this is that we have aliasing of references. World isn't something that
 // `Graphics` owns. You won't be able to hold a &mut outside of Graphics. - Kevin
 
-
 pub struct Graphics {
     display: Display,
     tilenet_renderer: tilenet_ren::Ren,
@@ -42,16 +41,20 @@ impl Graphics {
                   width: u32,
                   height: u32,
                   world: &World) {
-        self.add_vectors_from_world(world);
+        prof!["Add vectors of world", self.add_vectors_from_world(world)];
         let mut target = self.display.draw();        // target: glium::Frame
-        target.clear_color(0.0, 0.0, 0.0, 1.0);
-        self.tilenet_renderer.render(&mut target, center, zoom, width, height);
-        self.poly_renderer.render(&mut target, center, zoom, width, height, world);
-        self.line_renderer.render(&mut target, center, zoom, width, height, world);
 
-        target.finish().unwrap();
+        prof![
+            "Just render",
+            target.clear_color(0.0, 0.0, 0.0, 1.0);
+            self.tilenet_renderer.render(&mut target, center, zoom, width, height);
+            self.poly_renderer.render(&mut target, center, zoom, width, height, world);
+            self.line_renderer.render(&mut target, center, zoom, width, height, world);
+        ];
 
-        self.line_renderer.clear();
+        prof!["Finish", target.finish().unwrap()];
+
+        prof!["Clear", self.line_renderer.clear()];
     }
     fn add_vectors_from_world(&mut self, world: &World) {
         for &(start, dir) in &world.vectors {

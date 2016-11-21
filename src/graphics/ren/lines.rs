@@ -30,34 +30,32 @@ impl Ren {
             vertex_buffer: vertex_buffer,
         }
     }
-    
+
     pub fn add_line(&mut self, start: Vec2, end: Vec2) {
-        self.geometry.push(
-            Vertex{
-                pos: [start.x, start.y],
-                col: [self.draw_col.0, self.draw_col.1, self.draw_col.2],
-            });
-        self.geometry.push(
-            Vertex{
-                pos: [end.x, end.y],
-                col: [self.draw_col.0, self.draw_col.1, self.draw_col.2],
-            });
+        self.geometry.push(Vertex {
+            pos: [start.x, start.y],
+            col: [self.draw_col.0, self.draw_col.1, self.draw_col.2],
+        });
+        self.geometry.push(Vertex {
+            pos: [end.x, end.y],
+            col: [self.draw_col.0, self.draw_col.1, self.draw_col.2],
+        });
     }
     pub fn add_vector(&mut self, mut start: Vec2, dir: Vec2) {
         let radius: f32 = dir.length() / 15.0;
         let arrow_angle: f32 = 2.7;
 
         let dir_angle: f32 = f32::atan2(dir.y, dir.x);
-        let a1: Vec2 = Vec2::new
-            ((dir_angle - arrow_angle).cos() * radius, (dir_angle - arrow_angle).sin() * radius);
-        let a2: Vec2 = Vec2::new
-            ((dir_angle + arrow_angle).cos() * radius, (dir_angle + arrow_angle).sin() * radius);
+        let a1: Vec2 = Vec2::new((dir_angle - arrow_angle).cos() * radius,
+                                 (dir_angle - arrow_angle).sin() * radius);
+        let a2: Vec2 = Vec2::new((dir_angle + arrow_angle).cos() * radius,
+                                 (dir_angle + arrow_angle).sin() * radius);
 
-        self.add_line(start, start+dir);
+        self.add_line(start, start + dir);
         start += dir;
-        self.add_line(start, start+a1);
-        self.add_line(start, start+a2);
-        
+        self.add_line(start, start + a1);
+        self.add_line(start, start + a2);
+
     }
     /// Clear all geometry.
     pub fn clear(&mut self) {
@@ -67,8 +65,11 @@ impl Ren {
         self.draw_col = col;
     }
     fn upload_vertices(&mut self) {
-        if self.geometry.len() == 0 { return; }
-        let slice = self.vertex_buffer.slice(0..(self.geometry.len())).unwrap(); // TODO: * VERTEX_SIZE?
+        if self.geometry.len() == 0 {
+            return;
+        }
+        // TODO: * VERTEX_SIZE?
+        let slice = self.vertex_buffer.slice(0..(self.geometry.len())).unwrap();
         slice.write(&self.geometry);
     }
     pub fn render(&mut self,

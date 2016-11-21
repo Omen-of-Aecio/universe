@@ -21,8 +21,8 @@ pub struct Graphics {
     display: Display,
     tilenet_renderer: tilenet_ren::Ren,
     poly_renderer: polygons::Ren,
-    pub line_renderer: lines::Ren,
-    // TODO: Maybe make line_renderer private and make interface for all renderers in Graphics
+    pub line_renderer: lines::Ren, /* TODO: Maybe make line_renderer private and make interface
+                                    * for all renderers in Graphics */
 }
 
 impl Graphics {
@@ -31,7 +31,7 @@ impl Graphics {
             display: display.clone(),
             tilenet_renderer: tilenet_ren::Ren::new(display.clone(), &world.tilenet),
             poly_renderer: polygons::Ren::new(display.clone(), &world.polygons),
-            line_renderer: lines::Ren::new(display.clone())
+            line_renderer: lines::Ren::new(display.clone()),
         }
     }
 
@@ -50,7 +50,7 @@ impl Graphics {
         self.line_renderer.render(&mut target, center, zoom, width, height, world);
 
         target.finish().unwrap();
-        
+
         self.line_renderer.clear();
     }
     fn add_vectors_from_world(&mut self, world: &World) {

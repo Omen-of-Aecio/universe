@@ -30,7 +30,8 @@ impl Polygon {
         // TODO can probably be optimized
         let normal = normal.normalize();
         let normal_90 = Vec2::new(-normal.y, normal.x);
-        self.vel = normal_90.scale(Vec2::dot(self.vel, normal)) - normal.scale(Vec2::dot(self.vel, normal));
+        self.vel = normal_90.scale(Vec2::dot(self.vel, normal)) -
+                   normal.scale(Vec2::dot(self.vel, normal));
     }
 }
 

@@ -12,6 +12,8 @@ use geometry::polygon::{Polygon, PolygonState};
 use geometry::vec::Vec2;
 use input::Input;
 
+const ACCELERATION: f32 = 0.5;
+
 pub struct World {
     pub tilenet: TileNet<Tile>,
     pub polygons: Vec<Polygon>,
@@ -42,16 +44,16 @@ impl World {
             self.exit = true;
         }
         if input.key_down(VirtualKeyCode::Left) || input.key_down(VirtualKeyCode::A) {
-            self.polygons[0].vel.x -= 1.0;
+            self.polygons[0].vel.x -= ACCELERATION;
         }
         if input.key_down(VirtualKeyCode::Right) || input.key_down(VirtualKeyCode::D) {
-            self.polygons[0].vel.x += 1.0;
+            self.polygons[0].vel.x += ACCELERATION;
         }
         if input.key_down(VirtualKeyCode::Up) || input.key_down(VirtualKeyCode::W) {
-            self.polygons[0].vel.y += 1.0;
+            self.polygons[0].vel.y += ACCELERATION;
         }
         if input.key_down(VirtualKeyCode::Down) || input.key_down(VirtualKeyCode::S) {
-            self.polygons[0].vel.y -= 1.0;
+            self.polygons[0].vel.y -= ACCELERATION;
         }
 
         // Physics

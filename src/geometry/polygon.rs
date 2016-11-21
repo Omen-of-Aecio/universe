@@ -27,31 +27,11 @@ impl Polygon {
 
     /// Physical response to collision - i.e. bounce in direction of normal
     pub fn collide_wall(&mut self, normal: Vec2) -> (Vec2, Vec2) {
-        // TODO can probably be optimized
-				/*
         let normal = normal.normalize();
-        let normal_90 = Vec2::new(-normal.y, normal.x);
-        self.vel = normal_90.scale(Vec2::dot(self.vel, normal)) -
+        let tangent = Vec2::new(-normal.y, normal.x);
+        self.vel = tangent.scale(Vec2::dot(self.vel, tangent)) -
                    normal.scale(Vec2::dot(self.vel, normal));
-				self.vel.scale(10.0)
-				*/
-        let normal = normal.normalize();
-        let tangent_90 = Vec2::new(-normal.y, normal.x);
-        let i_tangent_90 = Vec2::new(normal.y, -normal.x);
-				if Vec2::dot(self.vel, tangent_90) > 0.0 {
-					// Positive direction in this tangent, so we should move in this direction
-					// I think we need to check the angle on the tangents:
-					// 0. Normalize the tangents
-					// 1. Find tangent such that vel*tangent>0.0, then we move in:
-					//   1. 1 X to the left if vel.y > tangent.y && tangent.x < 0
-					//   2. Else move 1 X right if vel.y > tangent.y && tangent.x > 0
-					//   3. Move 1 Y down If vel.x > tangent.x && tangent.y < 0
-					//   3. Move 1 Y up If vel.x > tangent.x && tangent.y > 0
-					// self.vel = tangent_90;
-				} else if Vec2::dot(self.vel, i_tangent_90) > 0.0 {
-					// self.vel = i_tangent_90;
-				}
-				(tangent_90.scale(10.0), i_tangent_90.scale(10.0))
+        (tangent, tangent.scale(-1.0))
     }
 }
 

@@ -9,5 +9,5 @@ clip:
 	cargo build --features dev
 .PHONY:
 perf:
-	cargo build --release
+	cargo build
 	./scripts/flame.sh

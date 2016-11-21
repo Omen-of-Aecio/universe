@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 set -e
-./target/release/universe &
+./target/debug/universe &
 PROGRAM=$!
 sleep 4s
 sudo torch.sh -d 20 -o flamegraph.svg $PROGRAM && \

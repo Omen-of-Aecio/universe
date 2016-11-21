@@ -66,7 +66,13 @@ impl World {
                 self.vectors
                     .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32),
                            normal));
-                p.collide_wall(normal);
+                let (a, b) = p.collide_wall(normal);
+                self.vectors
+                    .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32),
+                           a));
+                self.vectors
+                    .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32),
+                           b));
             }
 
             // Add debug vectors

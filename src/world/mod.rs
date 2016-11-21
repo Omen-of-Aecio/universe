@@ -62,6 +62,7 @@ impl World {
             if polygon_state.collision {
                 let normal = get_normal(&self.tilenet, polygon_state.poc.0 as usize, polygon_state.poc.1 as usize);
                 self.vectors.push( (Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32), normal));
+                p.collide_wall(normal);
             }
 
             // Add debug vectors

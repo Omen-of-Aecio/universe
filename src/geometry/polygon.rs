@@ -26,14 +26,18 @@ impl Polygon {
     }
 
     /// Physical response to collision - i.e. bounce in direction of normal
-    pub fn collide(normal: Vec2) {
+    pub fn collide_wall(&mut self, normal: Vec2) {
+        // TODO can probably be optimized
+        let normal = normal.normalize();
+        let normal_90 = Vec2::new(-normal.y, normal.x);
+        self.vel = normal_90.scale(Vec2::dot(self.vel, normal)) - normal.scale(Vec2::dot(self.vel, normal));
     }
 }
 
 #[derive(Default)]
 pub struct PolygonState {
     current_try: usize,
-    original_move: Vec2,
+    vel_backup: Vec2,
     pub collision: bool,
     pub poc: (i32, i32),
     pub debug_vectors: Vec<(Vec2, Vec2)>,
@@ -50,7 +54,7 @@ impl Collable<u8, PolygonState> for Polygon {
     }
 
     fn presolve(&mut self, state: &mut PolygonState) {
-        state.original_move = self.vel;
+        state.vel_backup = self.vel;
     }
 
     fn resolve<I>(&mut self, mut set: TileSet<Tile, I>, state: &mut PolygonState) -> bool
@@ -72,14 +76,17 @@ impl Collable<u8, PolygonState> for Polygon {
             /*
             // Allow gliding on tiles
             if state.current_try == 10 {
-                self.vel = Vec2::new(state.original_move.x, 0.0);
+                self.vel = Vec2::new(state.vel_backup.x, 0.0);
             } else if state.current_try == 20 {
-                self.vel = Vec2::new(0.0, state.original_move.y);
+                self.vel = Vec2::new(0.0, state.vel_backup.y);
             }
             */
 
             state.current_try += 1;
             false
         }
+    }
+    fn postsolve(&mut self, collided_once: bool, resolved: bool, state: &mut PolygonState) {
+        self.vel = state.vel_backup;
     }
 }

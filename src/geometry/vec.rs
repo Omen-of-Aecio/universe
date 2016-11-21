@@ -1,6 +1,7 @@
 // All Vec2tors are of 2 dimentions
 
 use std::ops::{Add, Sub, Mul, Div, AddAssign, SubAssign, MulAssign, DivAssign};
+use std::fmt;
 
 #[allow(non_camel_case_types)]
 #[derive(Copy,Clone,Default)]
@@ -21,6 +22,10 @@ impl Vec2 {
     }
     pub fn length_squared(&self) -> f32 {
         (self.x * self.x + self.y * self.y)
+    }
+    pub fn normalize(&self) -> Vec2 {
+        let len = self.length();
+        return Vec2::new(self.x / len, self.y / len);
     }
     /// TODO make clear that it clones?
     pub fn scale(&self, s: f32) -> Vec2 {
@@ -158,6 +163,14 @@ impl PartialEq for Vec2 {
 // }
 // }
 
+// TODO ...
+/*
+impl fmt::Display for Vec2 {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Vec2({},{})", self.x, self.y)
+    }
+}
+*/
 
 // TODO
 // impl slog::Serialize for Vec3 {

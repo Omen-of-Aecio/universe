@@ -15,8 +15,11 @@ slog-stream = "1"
 slog-term = "1"
 time = "0"
 glium = "*"
-rand = "*"
+rand = "0"
 
 [features]
 default = []
 dev = ["clippy"]
+
+[profile.release]
+debug = true

@@ -88,7 +88,7 @@ impl Collable<u8, PolygonState> for Polygon {
         }
     }
 
-    fn postsolve(&mut self, collided_once: bool, resolved: bool, state: &mut PolygonState) {
+    fn postsolve(&mut self, _collided_once: bool, _resolved: bool, state: &mut PolygonState) {
         self.vel = state.vel_backup;
     }
 }

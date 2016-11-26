@@ -25,7 +25,7 @@ impl Vec2 {
     }
     pub fn normalize(&self) -> Vec2 {
         let len = self.length();
-        return Vec2::new(self.x / len, self.y / len);
+        Vec2::new(self.x / len, self.y / len)
     }
     /// TODO make clear that it clones?
     pub fn scale(&self, s: f32) -> Vec2 {

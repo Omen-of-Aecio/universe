@@ -14,7 +14,7 @@ slog-scope = "0"
 slog-stream = "1"
 slog-term = "1"
 time = "0"
-glium = "*"
+glium = "0"
 rand = "0"
 
 [features]

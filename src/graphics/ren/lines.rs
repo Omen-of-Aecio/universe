@@ -65,7 +65,7 @@ impl Ren {
         self.draw_col = col;
     }
     fn upload_vertices(&mut self) {
-        if self.geometry.len() == 0 {
+        if self.geometry.is_empty() {
             return;
         }
         // TODO: * VERTEX_SIZE?

@@ -2,6 +2,7 @@
 #![cfg_attr(feature = "dev", feature(plugin))]
 #![cfg_attr(feature = "dev", plugin(clippy))]
 
+extern crate bgjk;
 #[macro_use]
 extern crate glium;
 extern crate isatty;
@@ -23,6 +24,7 @@ pub mod graphics;
 pub mod input;
 pub mod world;
 
+use bgjk::{bgjk, Vec3};
 use geometry::polygon::Polygon;
 use geometry::vec::Vec2;
 use glium::{DisplayBuild, glutin};
@@ -60,79 +62,43 @@ fn main() {
     setup_logger();
     info!["Logger initialized"];
 
-    if false {
+		/*
+		Imagine a slope and a plane:
+		\__I_
+		where I is the character.
+		Walking left needs to attach you to the slope.
 
-        // Aabb simulating each object
-        struct Aabb {
-            x_min: f32,
-            y_min: f32,
-            x_max: f32,
-            y_max: f32,
-        }
+		When colliding with an object:
+			1. Check if it has a 'sticky' property
+			2. Use sticky to compute position (hover slightly)
+			3. When outside of domain, cause obj to fall
 
-        impl Aabb {
-            // Generate random AABB on [0, 2) for both x and y
-            fn random() -> Aabb {
-                let mut rng = rand::thread_rng();
-                let position = Range::new(0.0, 100000.0);
-                let size = Range::new(0.0, 100.0);
-                let x_min = position.ind_sample(&mut rng);
-                let y_min = position.ind_sample(&mut rng);
-                Aabb {
-                    x_min: x_min,
-                    y_min: y_min,
-                    x_max: x_min + size.ind_sample(&mut rng),
-                    y_max: y_min + size.ind_sample(&mut rng),
-                }
-            }
-        }
+		This solves the cases:
+		__
+		  \__
 
-        // How many bodies you want to test per iteration
-        static AABB_COUNT: usize = 10000;
-        // How many iterations we run
-        static ITERATIONS: usize = 1000;
+		At the top of the hill. Walk right. Gravity pulls you into the slope. Slope function activates.
+		Walk left, slope function unsticks, fall into plane.
+		At bottom, same idea.
 
-        let mut aabbs = vec![];
-        for _ in 0..ITERATIONS {
-            for _ in 0..AABB_COUNT {
-                aabbs.push(Aabb::random());
-            }
-            aabbs.sort_by(|a, b| if a.x_min < b.x_min {
-                Ordering::Less
-            } else {
-                Ordering::Greater
-            });
+		Could use function to compute next wall function
+		*/
+		let slope = [
+			Vec3(0.0, 0.0, 0.0),
+			Vec3(1.0, 1.0, 0.0),
+			Vec3(0.0, 0.0, 1.0),
+			Vec3(1.0, 1.0, 1.0),
+		];
+		let movement = [
+			Vec3(0.5, 0.6, 0.0),
+			Vec3(0.599, 0.6, 1.0),
+		];
+		print!["kek\n"];
+		for _ in 1..10000 {
+			info!["Collision"; "bgjk" => bgjk(&slope, &movement)];
+		}
+		return;
 
-            let mut collision_checks = 0usize;
-            for (index, comparer) in aabbs.iter().enumerate() {
-                let mut vert_sort = vec![];
-                vert_sort.reserve(100);
-                for comparee in aabbs.iter().skip(index + 1) {
-                    if comparee.x_min > comparer.x_max {
-                        break;
-                    }
-                    vert_sort.push(comparee);
-                }
-                vert_sort.sort_by(|a, b| if a.y_min < b.y_min {
-                    Ordering::Less
-                } else {
-                    Ordering::Greater
-                });
-                for (index, comparer) in vert_sort.iter().enumerate() {
-                    for comparee in vert_sort.iter().skip(index + 1) {
-                        if comparee.y_min > comparer.y_max {
-                            break;
-                        }
-                        collision_checks += 1;
-                    }
-                }
-            }
-
-            warn!["Collision checking calls"; "value" => collision_checks];
-            aabbs.clear();
-        }
-        return;
-    }
     let mut ctrl: Main = Main::new();
     ctrl.run();
 }

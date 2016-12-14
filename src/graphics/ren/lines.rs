@@ -4,7 +4,6 @@ use geometry::vec::Vec2;
 use world::World;
 
 const MAX_NUM_VERTICES: usize = 8000;
-const VERTEX_SIZE: usize = 5;
 
 /// Renderer for general lines in world space - e.g. for debugging vectors etc.
 /// The geometry can be updated any time. (TODO)

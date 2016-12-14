@@ -85,7 +85,8 @@ impl World {
                     let (a, b) = p.collide_wall(normal);
 
                     // Heuristic: move a bit away from wall
-                    // p.pos -= normal.normalize(); 
+                    // TODO: should be done via TileNet
+                    p.pos += normal.normalize(); 
 
                     // Debug vectors
                     self.vectors
@@ -98,11 +99,11 @@ impl World {
                 }
                 i += 1;
                 // condition of do-while loop..:
-                polygon_state.collision && polygon_state.toc < 0.9 && i <= 1
+                polygon_state.collision && polygon_state.toc < 0.9 && i <= 0
             } {}
             // TODO CURRENT PROBLEMS
+            // - PROHIBITIVE: needs PolygonState::queued() solution!
             // - Need to actually move with _less speed_/less time
-            // - Should also move slightly away via TileNet.
             //
             // - Further problem with allowing to move after collision:
             //    * if user continuously accelerates toward wall there's going to be a lot of jumping..

@@ -1,5 +1,4 @@
 use std::ops::{Add, Sub, Mul, Div, AddAssign, SubAssign, MulAssign, DivAssign};
-use std::fmt;
 
 #[allow(non_camel_case_types)]
 #[derive(Copy,Clone,Default)]

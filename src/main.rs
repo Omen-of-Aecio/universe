@@ -32,14 +32,9 @@ use glium::glutin::{ElementState, MouseButton, MouseScrollDelta};
 use graphics::Graphics;
 use graphics::screen_to_world;
 use input::Input;
-use rand::distributions::{IndependentSample, Range};
-use rand::Rng;
 use slog::{DrainExt, Level};
-use std::{f32, thread};
-use std::cmp::Ordering;
-use std::time::Duration;
+use std::f32;
 use world::World;
-
 
 fn setup_logger() {
     let logger = if isatty::stderr_isatty() {

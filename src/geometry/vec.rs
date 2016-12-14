@@ -1,5 +1,3 @@
-// All Vec2tors are of 2 dimentions
-
 use std::ops::{Add, Sub, Mul, Div, AddAssign, SubAssign, MulAssign, DivAssign};
 use std::fmt;
 

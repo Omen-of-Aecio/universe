@@ -27,21 +27,23 @@ impl Polygon {
 
     /// Physical response to collision - i.e. bounce in direction of normal
     pub fn collide_wall(&mut self, normal: Vec2) -> (Vec2, Vec2) {
+        const RESTITUTION: f32 = 0.7;
         let normal = normal.normalize();
         let tangent = Vec2::new(-normal.y, normal.x);
-        self.vel = tangent.scale(Vec2::dot(self.vel, tangent)) -
-                   normal.scale(Vec2::dot(self.vel, normal));
+        self.vel = tangent.scale(Vec2::dot(self.vel, tangent)) +
+                   normal.scale(Vec2::dot(self.vel, normal).abs() * RESTITUTION);
         (tangent, tangent.scale(-1.0))
     }
 }
 
 #[derive(Default)]
 pub struct PolygonState {
+    pub collision: bool,
+    pub poc: (i32, i32),    // point of collision
+    pub toc: f32,           // time of collision - between this and next frame
+    pub debug_vectors: Vec<(Vec2, Vec2)>,
     current_try: usize,
     vel_backup: Vec2,
-    pub collision: bool,
-    pub poc: (i32, i32),
-    pub debug_vectors: Vec<(Vec2, Vec2)>,
 }
 
 impl Collable<u8, PolygonState> for Polygon {
@@ -66,24 +68,16 @@ impl Collable<u8, PolygonState> for Polygon {
             self.pos += self.vel;
             true
         } else {
-            // There was collision, but our speed isn't tiny
+            // Collision.
+
+            info!(" - Collision!"; "vel.x" => self.vel.x, "vel.y" => self.vel.y);
             self.vel = self.vel * 0.9;
 
-            // Find normal
             state.poc = set.get_coords(); // point of collision
+            state.toc = self.vel.length() / state.vel_backup.length();
             state.collision = true;
-
-
-            /*
-            // Allow gliding on tiles
-            if state.current_try == 10 {
-                self.vel = Vec2::new(state.vel_backup.x, 0.0);
-            } else if state.current_try == 20 {
-                self.vel = Vec2::new(0.0, state.vel_backup.y);
-            }
-            */
-
             state.current_try += 1;
+
             false
         }
     }

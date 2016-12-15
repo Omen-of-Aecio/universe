@@ -77,7 +77,7 @@ impl Ren {
                   zoom: f32,
                   width: u32,
                   height: u32,
-                  world: &World) {
+                  _: &World) {
 
         self.upload_vertices();
         let uniforms = uniform! {

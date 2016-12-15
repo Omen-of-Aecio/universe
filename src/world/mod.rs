@@ -107,8 +107,17 @@ impl World {
 
                 i += 1;
                 time_left -= polygon_state.toc;
-                // condition of do-while loop..:
             }
+
+            if polygon_state.collision {
+                // One last physical response for the last collision
+                let normal = get_normal(&self.tilenet,
+                                        polygon_state.poc.0 as usize,
+                                        polygon_state.poc.1 as usize);
+                let _ = p.collide_wall(normal);
+            }
+
+
 
             // - Further problem with allowing to move after collision:
             //    * if user continuously accelerates toward wall there's going to be a lot of jumping..

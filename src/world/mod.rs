@@ -12,7 +12,7 @@ use geometry::polygon::{Polygon, PolygonState};
 use geometry::vec::Vec2;
 use input::Input;
 
-const ACCELERATION: f32 = 0.5;
+const ACCELERATION: f32 = 0.35;
 
 pub struct World {
     pub tilenet: TileNet<Tile>,
@@ -58,51 +58,57 @@ impl World {
 
         // Physics
         for p in &mut self.polygons.iter_mut() {
-            /* let mut polygon_state = PolygonState::default(); */
-            let mut polygon_state;
 
-
-            // WIP TEST AREA (committed in a state where it doesn't change behaviour) //
             // - Until we reach end of frame:
             // - Do collision with remaining time
-            // - If collision: move a bit away from the wall
+            // - While collision
+            //   * move a bit away from the wall
+            //   * try to move further
+            //   * negate that movement away from wall
 
 			let mut i = 0;
             let mut time_left = 1.0;
-            while {
+
+            let mut polygon_state = PolygonState::new(time_left, p.vel);
+            p.solve(&self.tilenet, &mut polygon_state);
+
+            while polygon_state.collision && time_left > 0.1 && i<= 10 {
+                let normal = get_normal(&self.tilenet,
+                                        polygon_state.poc.0 as usize,
+                                        polygon_state.poc.1 as usize);
+                assert!( !(normal.x == 0.0 && normal.y == 0.0));
+
+                debug!("Iteration"; "normal.x" => normal.x, "normal.y" => normal.y);
+                debug!("Iteration"; "vel.x" => p.vel.x, "vel.y" => p.vel.y);
+
+                // Physical response
+                let (a, b) = p.collide_wall(normal);
+
+                // Move away one unit from wall
+                let mut moveaway_state = PolygonState::new(1.0, normal.normalize());
+                p.solve(&self.tilenet, &mut moveaway_state);
+
+                // Try to move further with the current velocity
                 polygon_state = PolygonState::new(time_left, p.vel);
                 p.solve(&self.tilenet, &mut polygon_state);
 
-                if polygon_state.collision {
-                    let normal = get_normal(&self.tilenet,
-                                            polygon_state.poc.0 as usize,
-                                            polygon_state.poc.1 as usize);
-                    assert!( !(normal.x == 0.0 && normal.y == 0.0));
+                // Move back one unit
+                let mut moveback_state = PolygonState::new(1.0, normal.normalize().scale(-1.0));
+                p.solve(&self.tilenet, &mut moveback_state);
 
-                    debug!("Iteration"; "normal.x" => normal.x, "normal.y" => normal.y);
-                    debug!("Iteration"; "vel.x" => p.vel.x, "vel.y" => p.vel.y);
+                // Debug vectors
+                self.vectors
+                    .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32),
+                           normal));
+                self.vectors
+                    .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32), a));
+                self.vectors
+                    .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32), b));
 
-                    // Physical response
-                    let (a, b) = p.collide_wall(normal);
-
-                    // Heuristic: move a bit away from wall
-                    // TODO: should be done via TileNet
-                    p.pos += normal.normalize(); 
-
-                    // Debug vectors
-                    self.vectors
-                        .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32),
-                               normal));
-                    self.vectors
-                        .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32), a));
-                    self.vectors
-                        .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32), b));
-                }
                 i += 1;
                 time_left -= polygon_state.toc;
                 // condition of do-while loop..:
-                polygon_state.collision && time_left > 0.1 && i <= 10
-            } {}
+            }
 
             // - Further problem with allowing to move after collision:
             //    * if user continuously accelerates toward wall there's going to be a lot of jumping..

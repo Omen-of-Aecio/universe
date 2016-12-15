@@ -27,7 +27,7 @@ impl Polygon {
 
     /// Physical response to collision - i.e. bounce in direction of normal
     pub fn collide_wall(&mut self, normal: Vec2) -> (Vec2, Vec2) {
-        const RESTITUTION: f32 = 0.4;
+        const RESTITUTION: f32 = 0.0;
         let normal = normal.normalize();
         let tangent = Vec2::new(-normal.y, normal.x);
         self.vel = tangent.scale(Vec2::dot(self.vel, tangent)) +
@@ -82,8 +82,6 @@ impl Collable<u8, PolygonState> for Polygon {
             true
         } else {
             // Collision.
-
-            info!(" - Collision!"; "vel.x" => self.vel.x, "vel.y" => self.vel.y);
 
             state.collision = true;
             state.poc = set.get_coords();

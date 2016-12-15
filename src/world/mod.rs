@@ -73,13 +73,8 @@ impl World {
             p.solve(&self.tilenet, &mut polygon_state);
 
             while polygon_state.collision && time_left > 0.1 && i<= 10 {
-                let normal = get_normal(&self.tilenet,
-                                        polygon_state.poc.0 as usize,
-                                        polygon_state.poc.1 as usize);
+                let normal = get_normal(&self.tilenet, i32_to_usize(polygon_state.poc));
                 assert!( !(normal.x == 0.0 && normal.y == 0.0));
-
-                debug!("Iteration"; "normal.x" => normal.x, "normal.y" => normal.y);
-                debug!("Iteration"; "vel.x" => p.vel.x, "vel.y" => p.vel.y);
 
                 // Physical response
                 let (a, b) = p.collide_wall(normal);
@@ -111,9 +106,7 @@ impl World {
 
             if polygon_state.collision {
                 // One last physical response for the last collision
-                let normal = get_normal(&self.tilenet,
-                                        polygon_state.poc.0 as usize,
-                                        polygon_state.poc.1 as usize);
+                let normal = get_normal(&self.tilenet, i32_to_usize(polygon_state.poc));
                 let _ = p.collide_wall(normal);
             }
 
@@ -147,20 +140,24 @@ impl World {
         info!("TileNet"; "content" => format!["{:?}", self.tilenet]);
     }
 }
-pub fn get_normal(tilenet: &TileNet<Tile>, world_x: usize, world_y: usize) -> Vec2 {
+pub fn get_normal(tilenet: &TileNet<Tile>, coord: (usize, usize)) -> Vec2 {
     let kernel = [[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]];
     let mut dx = 0.0;
     let mut dy = 0.0;
     for (y, row) in kernel.iter().enumerate() {
         for (x, _) in row.iter().enumerate() {
-            if let (Some(x_coord), Some(y_coord)) = ((world_x + x).checked_sub(1),
-                                                     (world_y + y).checked_sub(1)) {
+            if let (Some(x_coord), Some(y_coord)) = ((coord.0 + x).checked_sub(1),
+                                                     (coord.1 + y).checked_sub(1)) {
                 tilenet.get((x_coord, y_coord)).map(|&v| dx -= kernel[y][x] * v as f32 / 255.0);
                 tilenet.get((x_coord, y_coord)).map(|&v| dy -= kernel[x][y] * v as f32 / 255.0);
-                // NOTE: -= just because I needed to flip the normal to be correct for white
-                // room/black matter.
+                // NOTE: -= just because I needed to flip the normal to be correct for white matter
             }
         }
     }
     Vec2::new(dx, dy)
+}
+fn i32_to_usize(mut from: (i32, i32)) -> (usize, usize) {
+    if from.0 < 0 { from.0 = 0; }
+    if from.1 < 0 { from.1 = 0; }
+    (from.0 as usize, from.1 as usize)
 }

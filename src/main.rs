@@ -209,12 +209,13 @@ impl Main {
 
     fn new() -> Main {
         let mut world = World::new(WORLD_SIZE, WORLD_SIZE);
-        // world::gen::rings(&mut world.tilenet, 2);
         world::gen::proc1(&mut world.tilenet);
-        world.tilenet.set_box(&0, (0, 0), (100, 100));
 
-        let collider = Polygon::new_quad(50.0, 50.0, 10.0, 10.0);
-        world.polygons.push(collider);
+        world.tilenet.set_box(&0, (0, 0), (100, 100));
+        world.polygons.push(Polygon::new_quad(50.0, 50.0, 10.0, 10.0));
+
+        world.tilenet.set_box(&0, (0, 0), (100, 100));
+        world.polygons.push(Polygon::new_quad(50.0, 50.0, 10.0, 10.0));
 
         let display = glutin::WindowBuilder::new().build_glium().unwrap();
         let graphics = Graphics::new(display.clone(), &world);

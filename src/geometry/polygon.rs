@@ -38,12 +38,32 @@ impl Polygon {
 
 #[derive(Default)]
 pub struct PolygonState {
+
+    /* Config / Algorithm */
+    pub queued_vel: Vec2,
+    current_try: usize,
+
+    /* Results */
     pub collision: bool,
     pub poc: (i32, i32),    // point of collision
     pub toc: f32,           // time of collision - between this and next frame
+
     pub debug_vectors: Vec<(Vec2, Vec2)>,
-    current_try: usize,
-    vel_backup: Vec2,
+}
+impl PolygonState {
+    /// start_toc is what fraction of the velocity we start the algorithm with
+    pub fn new(start_toc: f32, vel: Vec2) -> PolygonState {
+        let mut result = PolygonState::default();
+        result.toc = start_toc;
+        result.queued_vel = vel;
+        result
+    }
+}
+impl CollableState for PolygonState {
+    fn queued(&self) -> Vector {
+        (self.queued_vel * self.toc).into()
+    }
+
 }
 
 impl Collable<u8, PolygonState> for Polygon {
@@ -51,38 +71,28 @@ impl Collable<u8, PolygonState> for Polygon {
         Points::new(Vector(self.pos.x, self.pos.y), &self.points)
     }
 
-    fn queued(&self) -> Vector {
-        // Returns velocity vector (new name?)
-        Vector(self.vel.x, self.vel.y)
-    }
-
-    fn presolve(&mut self, state: &mut PolygonState) {
-        state.vel_backup = self.vel;
-    }
+    // fn presolve(&mut self, state: &mut PolygonState) { }
 
     fn resolve<I>(&mut self, mut set: TileSet<Tile, I>, state: &mut PolygonState) -> bool
         where I: Iterator<Item = (i32, i32)>
     {
         if set.all(|x| *x == 0) {
             // If there is no collision (we only collide with non-zero tiles)
-            self.pos += self.vel;
+            self.pos += Vec2::from(state.queued());
             true
         } else {
             // Collision.
 
             info!(" - Collision!"; "vel.x" => self.vel.x, "vel.y" => self.vel.y);
-            self.vel = self.vel * 0.9;
 
-            state.poc = set.get_coords(); // point of collision
-            state.toc = self.vel.length() / state.vel_backup.length();
             state.collision = true;
+            state.poc = set.get_coords();
+            state.toc *= 0.9;
             state.current_try += 1;
 
             false
         }
     }
 
-    fn postsolve(&mut self, _collided_once: bool, _resolved: bool, state: &mut PolygonState) {
-        self.vel = state.vel_backup;
-    }
+    // fn postsolve(&mut self, _collided_once: bool, _resolved: bool, state: &mut PolygonState) { }
 }

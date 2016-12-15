@@ -71,13 +71,14 @@ impl Ren {
         let slice = self.vertex_buffer.slice(0..(self.geometry.len())).unwrap();
         slice.write(&self.geometry);
     }
+
     pub fn render(&mut self,
                   target: &mut glium::Frame,
                   center: (f32, f32),
                   zoom: f32,
                   width: u32,
                   height: u32,
-                  world: &World) {
+                  _: &World) {
 
         self.upload_vertices();
         let uniforms = uniform! {

@@ -1,4 +1,5 @@
 use std::ops::{Add, Sub, Mul, Div, AddAssign, SubAssign, MulAssign, DivAssign};
+use tile_net;
 
 #[allow(non_camel_case_types)]
 #[derive(Copy,Clone,Default)]
@@ -153,6 +154,19 @@ impl PartialEq for Vec2 {
         self.x == other.x && self.y == other.y
     }
 }
+
+impl Into<tile_net::Vector> for Vec2 {
+    fn into(self) -> tile_net::Vector {
+        tile_net::Vector(self.x, self.y)
+    }
+}
+impl From<tile_net::Vector> for Vec2 {
+    fn from(v: tile_net::Vector) -> Vec2 {
+        Vec2::new(v.0, v.1)
+    }
+}
+
+
 // impl MulAssign for Vec2 {
 // fn mul_assign(&mut self, other: f32) {
 // self.x *= other;

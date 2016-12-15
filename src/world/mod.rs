@@ -68,8 +68,9 @@ impl World {
             // - If collision: move a bit away from the wall
 
 			let mut i = 0;
+            let mut time_left = 1.0;
             while {
-                polygon_state = PolygonState::default();
+                polygon_state = PolygonState::new(time_left, p.vel);
                 p.solve(&self.tilenet, &mut polygon_state);
 
                 if polygon_state.collision {
@@ -98,13 +99,11 @@ impl World {
                         .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32), b));
                 }
                 i += 1;
+                time_left -= polygon_state.toc;
                 // condition of do-while loop..:
-                polygon_state.collision && polygon_state.toc < 0.9 && i <= 0
+                polygon_state.collision && time_left > 0.1 && i <= 10
             } {}
-            // TODO CURRENT PROBLEMS
-            // - PROHIBITIVE: needs PolygonState::queued() solution!
-            // - Need to actually move with _less speed_/less time
-            //
+
             // - Further problem with allowing to move after collision:
             //    * if user continuously accelerates toward wall there's going to be a lot of jumping..
             //    * is it possible to limit this to only be in effect when we are actually having

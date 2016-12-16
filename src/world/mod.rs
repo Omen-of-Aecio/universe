@@ -23,6 +23,7 @@ pub struct World {
     pub exit: bool,
     width: usize,
     height: usize,
+    cam_pos: Vec2,
     // Extra graphics data (for debugging/visualization)
     pub vectors: Vec<(Vec2, Vec2)>,
 }
@@ -35,6 +36,7 @@ impl World {
             exit: false,
             width: width,
             height: height,
+            cam_pos: Vec2::new((width/2) as f32, (height/2) as f32),
             vectors: Vec::new(),
         }
     }
@@ -42,22 +44,10 @@ impl World {
 
     pub fn update(&mut self, input: &Input) {
         self.vectors.clear(); // clear debug geometry
-        // Ad hoc: input to control first polygon
-        if input.key_down(VirtualKeyCode::Escape) {
-            self.exit = true;
-        }
-        if input.key_down(VirtualKeyCode::Left) || input.key_down(VirtualKeyCode::A) || input.key_down(VirtualKeyCode::F) {
-            self.polygons[SUBJECT_POLYGON].vel.x -= ACCELERATION;
-        }
-        if input.key_down(VirtualKeyCode::Right) || input.key_down(VirtualKeyCode::D) || input.key_down(VirtualKeyCode::R) {
-            self.polygons[SUBJECT_POLYGON].vel.x += ACCELERATION;
-        }
-        if input.key_down(VirtualKeyCode::Up) || input.key_down(VirtualKeyCode::W) || input.key_down(VirtualKeyCode::S) {
-            self.polygons[SUBJECT_POLYGON].vel.y += ACCELERATION;
-        }
-        if input.key_down(VirtualKeyCode::Down) || input.key_down(VirtualKeyCode::S) || input.key_down(VirtualKeyCode::T) {
-            self.polygons[SUBJECT_POLYGON].vel.y -= ACCELERATION;
-        }
+
+        self.handle_input(input);
+
+        self.update_camera();
 
         // Physics
         for p in &mut self.polygons.iter_mut() {
@@ -130,11 +120,38 @@ impl World {
 
     }
 
+    fn handle_input(&mut self, input: &Input) {
+        // Ad hoc: input to control first polygon
+        if input.key_down(VirtualKeyCode::Escape) {
+            self.exit = true;
+        }
+        if input.key_down(VirtualKeyCode::Left) || input.key_down(VirtualKeyCode::A) || input.key_down(VirtualKeyCode::R) {
+            self.polygons[SUBJECT_POLYGON].vel.x -= ACCELERATION;
+        }
+        if input.key_down(VirtualKeyCode::Right) || input.key_down(VirtualKeyCode::D) || input.key_down(VirtualKeyCode::T) {
+            self.polygons[SUBJECT_POLYGON].vel.x += ACCELERATION;
+        }
+        if input.key_down(VirtualKeyCode::Up) || input.key_down(VirtualKeyCode::W) || input.key_down(VirtualKeyCode::F) {
+            self.polygons[SUBJECT_POLYGON].vel.y += ACCELERATION;
+        }
+        if input.key_down(VirtualKeyCode::Down) || input.key_down(VirtualKeyCode::S) || input.key_down(VirtualKeyCode::S) {
+            self.polygons[SUBJECT_POLYGON].vel.y -= ACCELERATION;
+        }
+    }
+    fn update_camera(&mut self) {
+        // Camera follows SUBJECT_POLYGON
+        self.cam_pos = self.polygons[SUBJECT_POLYGON].pos;
+    }
+
+    // Access //
     pub fn get_width(&self) -> usize {
         self.width
     }
     pub fn get_height(&self) -> usize {
         self.height
+    }
+    pub fn get_cam_pos(&self) -> Vec2 {
+        self.cam_pos
     }
 
     pub fn print(&self) {

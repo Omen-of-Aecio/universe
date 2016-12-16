@@ -4,6 +4,7 @@ use glium;
 use glium::{Display, Surface};
 
 use geometry::polygon::Polygon;
+use geometry::vec::Vec2;
 use world::World;
 
 
@@ -50,7 +51,7 @@ impl Ren {
 
     pub fn render(&self,
                   target: &mut glium::Frame,
-                  center: (f32, f32),
+                  center: Vec2,
                   zoom: f32,
                   width: u32,
                   height: u32,
@@ -65,7 +66,7 @@ impl Ren {
                 orientation: world.polygons[i].ori,
                 color: world.polygons[i].color.to_rgb(),
                 proj: super::proj_matrix(width as f32, height as f32, 0.0, 1.0),
-                view: super::view_matrix(center.0, center.1, zoom, zoom),
+                view: super::view_matrix(center.x, center.y, zoom, zoom),
             };
 
             target.draw(&self.vertex_buffer,

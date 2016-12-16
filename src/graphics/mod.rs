@@ -38,7 +38,7 @@ impl Graphics {
 
 
     pub fn render(&mut self,
-                  center: (f32, f32),
+                  center: Vec2,
                   zoom: f32,
                   width: u32,
                   height: u32,
@@ -49,7 +49,7 @@ impl Graphics {
         prof![
             "Just render",
             target.clear_color(0.0, 0.0, 0.0, 1.0);
-            self.tilenet_renderer.render(&mut target, center, zoom, width, height);
+            self.tilenet_renderer.render(&mut target, (center.x, center.y), zoom, width, height);
             self.poly_renderer.render(&mut target, center, zoom, width, height, world);
             self.line_renderer.render(&mut target, center, zoom, width, height, world);
         ];

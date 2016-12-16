@@ -104,6 +104,12 @@ fn main() {
 
 const WORLD_SIZE: usize = 1200;
 
+/* Should go, together with some logic, to some camera module (?) */
+enum CameraMode {
+    Interactive,
+    FollowPlayer,
+}
+
 struct Main {
     display: glium::Display,
     input: Input,
@@ -111,6 +117,8 @@ struct Main {
     world: World,
 
     // Camera & input (for now)
+    cam_mode: CameraMode,
+    //   following is used only if INTERACTIVE camera mode
     zoom: f32,
     center: Vec2,
     mouse_down: bool,
@@ -150,8 +158,12 @@ impl Main {
             prof!["Logic", self.world.update(&self.input)];
 
             // Render
+            let cam_pos = match self.cam_mode {
+                CameraMode::Interactive => self.center,
+                CameraMode::FollowPlayer => self.world.get_cam_pos(),
+            };
             prof!["Render",
-                  self.graphics.render((self.center.x, self.center.y),
+                  self.graphics.render(cam_pos,
                                        self.zoom,
                                        window_size.0,
                                        window_size.1,
@@ -227,6 +239,7 @@ impl Main {
             input: Input::new(),
             graphics: graphics,
             world: world,
+            cam_mode: CameraMode::FollowPlayer,
             zoom: 1.0,
             center: Vec2::new(0.0, 0.0),
             mouse_down: false,

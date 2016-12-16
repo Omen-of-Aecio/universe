@@ -74,7 +74,7 @@ impl Ren {
 
     pub fn render(&mut self,
                   target: &mut glium::Frame,
-                  center: (f32, f32),
+                  center: Vec2,
                   zoom: f32,
                   width: u32,
                   height: u32,
@@ -83,7 +83,7 @@ impl Ren {
         self.upload_vertices();
         let uniforms = uniform! {
             proj: super::proj_matrix(width as f32, height as f32, 0.0, 1.0),
-            view: super::view_matrix(center.0, center.1, zoom, zoom),
+            view: super::view_matrix(center.x, center.y, zoom, zoom),
         };
         let indices = glium::index::NoIndices(glium::index::PrimitiveType::LinesList);
         target.draw(self.vertex_buffer.slice(0..self.geometry.len()).unwrap(),

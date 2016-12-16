@@ -61,7 +61,6 @@ impl World {
 
         // Physics
         for p in &mut self.polygons.iter_mut() {
-
             // - Until we reach end of frame:
             // - Do collision with remaining time
             // - While collision

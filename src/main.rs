@@ -35,6 +35,7 @@ use input::Input;
 use slog::{DrainExt, Level};
 use std::f32;
 use world::World;
+use world::color::Color;
 
 fn setup_logger() {
     let logger = if isatty::stderr_isatty() {
@@ -211,11 +212,13 @@ impl Main {
         let mut world = World::new(WORLD_SIZE, WORLD_SIZE);
         world::gen::proc1(&mut world.tilenet);
 
-        world.tilenet.set_box(&0, (0, 0), (100, 100));
-        world.polygons.push(Polygon::new_quad(50.0, 50.0, 10.0, 10.0));
+        let pos = (50, WORLD_SIZE/3);
+        world.polygons.push(Polygon::new_quad(pos.0 as f32, pos.1 as f32, 10.0, 10.0, Color::WHITE));
+        world.tilenet.set_box(&0, (pos.0-50, pos.1-50), (pos.0+50, pos.1+50));
 
-        world.tilenet.set_box(&0, (0, 0), (100, 100));
-        world.polygons.push(Polygon::new_quad(50.0, 50.0, 10.0, 10.0));
+        let pos = (WORLD_SIZE - 50, WORLD_SIZE/3);
+        world.polygons.push(Polygon::new_quad(pos.0 as f32, pos.1 as f32, 10.0, 10.0, Color::BLACK));
+        world.tilenet.set_box(&255, (pos.0-50, pos.1-50), (pos.0+50, pos.1+50));
 
         let display = glutin::WindowBuilder::new().build_glium().unwrap();
         let graphics = Graphics::new(display.clone(), &world);

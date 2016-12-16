@@ -1,4 +1,5 @@
 pub mod gen;
+pub mod color;
 
 use std::vec::Vec;
 
@@ -11,8 +12,10 @@ use global::Tile;
 use geometry::polygon::{Polygon, PolygonState};
 use geometry::vec::Vec2;
 use input::Input;
+use world::color::Color;
 
 const ACCELERATION: f32 = 0.35;
+const SUBJECT_POLYGON: usize = 1;
 
 pub struct World {
     pub tilenet: TileNet<Tile>,
@@ -43,17 +46,17 @@ impl World {
         if input.key_down(VirtualKeyCode::Escape) {
             self.exit = true;
         }
-        if input.key_down(VirtualKeyCode::Left) || input.key_down(VirtualKeyCode::A) {
-            self.polygons[0].vel.x -= ACCELERATION;
+        if input.key_down(VirtualKeyCode::Left) || input.key_down(VirtualKeyCode::A) || input.key_down(VirtualKeyCode::F) {
+            self.polygons[SUBJECT_POLYGON].vel.x -= ACCELERATION;
         }
-        if input.key_down(VirtualKeyCode::Right) || input.key_down(VirtualKeyCode::D) {
-            self.polygons[0].vel.x += ACCELERATION;
+        if input.key_down(VirtualKeyCode::Right) || input.key_down(VirtualKeyCode::D) || input.key_down(VirtualKeyCode::R) {
+            self.polygons[SUBJECT_POLYGON].vel.x += ACCELERATION;
         }
-        if input.key_down(VirtualKeyCode::Up) || input.key_down(VirtualKeyCode::W) {
-            self.polygons[0].vel.y += ACCELERATION;
+        if input.key_down(VirtualKeyCode::Up) || input.key_down(VirtualKeyCode::W) || input.key_down(VirtualKeyCode::S) {
+            self.polygons[SUBJECT_POLYGON].vel.y += ACCELERATION;
         }
-        if input.key_down(VirtualKeyCode::Down) || input.key_down(VirtualKeyCode::S) {
-            self.polygons[0].vel.y -= ACCELERATION;
+        if input.key_down(VirtualKeyCode::Down) || input.key_down(VirtualKeyCode::S) || input.key_down(VirtualKeyCode::T) {
+            self.polygons[SUBJECT_POLYGON].vel.y -= ACCELERATION;
         }
 
         // Physics
@@ -65,6 +68,11 @@ impl World {
             //   * move a bit away from the wall
             //   * try to move further
             //   * negate that movement away from wall
+            
+            // Possible improvements
+            // - if it still sometimes gets stuc, maybe use the normal of the next real collision
+            //   for moving a unit away, since it's this normal that really signifies the problem
+            //   (increases complexity)
 
 			let mut i = 0;
             let mut time_left = 1.0;
@@ -73,11 +81,20 @@ impl World {
             p.solve(&self.tilenet, &mut polygon_state);
 
             while polygon_state.collision && time_left > 0.1 && i<= 10 {
-                let normal = get_normal(&self.tilenet, i32_to_usize(polygon_state.poc));
+                let normal = get_normal(&self.tilenet, i32_to_usize(polygon_state.poc), p.color);
                 assert!( !(normal.x == 0.0 && normal.y == 0.0));
 
                 // Physical response
                 let (a, b) = p.collide_wall(normal);
+
+                // Debug vectors
+                self.vectors
+                    .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32),
+                           normal));
+                self.vectors
+                    .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32), a));
+                self.vectors
+                    .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32), b));
 
                 // Move away one unit from wall
                 let mut moveaway_state = PolygonState::new(1.0, normal.normalize());
@@ -91,14 +108,6 @@ impl World {
                 let mut moveback_state = PolygonState::new(1.0, normal.normalize().scale(-1.0));
                 p.solve(&self.tilenet, &mut moveback_state);
 
-                // Debug vectors
-                self.vectors
-                    .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32),
-                           normal));
-                self.vectors
-                    .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32), a));
-                self.vectors
-                    .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32), b));
 
                 i += 1;
                 time_left -= polygon_state.toc;
@@ -106,16 +115,9 @@ impl World {
 
             if polygon_state.collision {
                 // One last physical response for the last collision
-                let normal = get_normal(&self.tilenet, i32_to_usize(polygon_state.poc));
+                let normal = get_normal(&self.tilenet, i32_to_usize(polygon_state.poc), p.color);
                 let _ = p.collide_wall(normal);
             }
-
-
-
-            // - Further problem with allowing to move after collision:
-            //    * if user continuously accelerates toward wall there's going to be a lot of jumping..
-            //    * is it possible to limit this to only be in effect when we are actually having
-            //    problems with pixel sides?
 
             debug!("Position in world, "; "x" => p.pos.x, "y" => p.pos.y);
 
@@ -140,17 +142,19 @@ impl World {
         info!("TileNet"; "content" => format!["{:?}", self.tilenet]);
     }
 }
-pub fn get_normal(tilenet: &TileNet<Tile>, coord: (usize, usize)) -> Vec2 {
-    let kernel = [[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]];
+pub fn get_normal(tilenet: &TileNet<Tile>, coord: (usize, usize), color: Color) -> Vec2 {
+    let kernel = match color {
+        Color::WHITE => [[1.0, 0.0, -1.0], [2.0, 0.0, -2.0], [1.0, 0.0, -1.0]],
+        Color::BLACK => [[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]],
+    };
     let mut dx = 0.0;
     let mut dy = 0.0;
     for (y, row) in kernel.iter().enumerate() {
         for (x, _) in row.iter().enumerate() {
             if let (Some(x_coord), Some(y_coord)) = ((coord.0 + x).checked_sub(1),
                                                      (coord.1 + y).checked_sub(1)) {
-                tilenet.get((x_coord, y_coord)).map(|&v| dx -= kernel[y][x] * v as f32 / 255.0);
-                tilenet.get((x_coord, y_coord)).map(|&v| dy -= kernel[x][y] * v as f32 / 255.0);
-                // NOTE: -= just because I needed to flip the normal to be correct for white matter
+                tilenet.get((x_coord, y_coord)).map(|&v| dx += kernel[y][x] * v as f32 / 255.0);
+                tilenet.get((x_coord, y_coord)).map(|&v| dy += kernel[x][y] * v as f32 / 255.0);
             }
         }
     }

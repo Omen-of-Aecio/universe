@@ -57,11 +57,13 @@ impl Ren {
                   world: &World) {
         let index_buffer = glium::index::NoIndices(glium::index::PrimitiveType::TriangleFan);
         for i in 0..self.end_indices.len() {
+            let color = world.polygons[i].color.to_rgb();
+            info!("Color"; "r" => color[0], "g" => color[1], "b" => color[2]);
 
             let uniforms = uniform! {
                 center: [world.polygons[i].pos.x, world.polygons[i].pos.y],
                 orientation: world.polygons[i].ori,
-                color: [0.5, 0.5, 0.5],
+                color: world.polygons[i].color.to_rgb(),
                 proj: super::proj_matrix(width as f32, height as f32, 0.0, 1.0),
                 view: super::view_matrix(center.0, center.1, zoom, zoom),
             };

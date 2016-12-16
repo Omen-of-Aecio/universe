@@ -1,18 +1,20 @@
 use tile_net::*;
 use geometry::vec::Vec2;
 use global::Tile;
+use world::color::Color;
 
 pub struct Polygon {
     pub points: Vec<(f32, f32)>, // Vec<Vec2> later. Now: for convenience with TileNet
+    pub color: Color,
     pub pos: Vec2,
     pub ori: f32,
-
     pub vel: Vec2, // rot: f32,
 }
 
 impl Polygon {
-    pub fn new_quad(start_x: f32, start_y: f32, width: f32, height: f32) -> Polygon {
+    pub fn new_quad(start_x: f32, start_y: f32, width: f32, height: f32, color: Color) -> Polygon {
         let mut result = Polygon {
+            color: color,
             points: Vec::new(),
             pos: Vec2::new(start_x, start_y),
             ori: 0.0,
@@ -76,7 +78,11 @@ impl Collable<u8, PolygonState> for Polygon {
     fn resolve<I>(&mut self, mut set: TileSet<Tile, I>, state: &mut PolygonState) -> bool
         where I: Iterator<Item = (i32, i32)>
     {
-        if set.all(|x| *x == 0) {
+        let no_collision = match self.color {
+            Color::WHITE => set.all(|x| *x == 0),
+            Color::BLACK => set.all(|x| *x != 0),
+        };
+        if no_collision {
             // If there is no collision (we only collide with non-zero tiles)
             self.pos += Vec2::from(state.queued());
             true

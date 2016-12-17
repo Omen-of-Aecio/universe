@@ -1,4 +1,5 @@
 use tilenet_ren;
+use tilenet_ren::{MinifySamplerFilter, MagnifySamplerFilter};
 use self::ren::{polygons, lines};
 
 use glium::{Display, Surface};
@@ -33,6 +34,8 @@ impl Graphics {
             line_renderer: lines::Ren::new(display.clone()),
         };
         g.tilenet_renderer.set_bg_col(0.1, 0.05, 0.05);
+        g.tilenet_renderer.set_minify_filter(MinifySamplerFilter::Linear);
+        g.tilenet_renderer.set_magnify_filter(MagnifySamplerFilter::Linear);
         g
     }
 

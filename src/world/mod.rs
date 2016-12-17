@@ -168,11 +168,14 @@ pub fn map_tile_value_via_color(tile: &Tile, color: Color) -> Tile {
 }
 
 pub fn get_normal(tilenet: &TileNet<Tile>, coord: (usize, usize), color: Color) -> Vec2 {
-		let cmap = map_tile_value_via_color;
+    let cmap = map_tile_value_via_color;
+    /*
     let kernel = match color {
         Color::WHITE => [[1.0, 0.0, -1.0], [2.0, 0.0, -2.0], [1.0, 0.0, -1.0]],
         Color::BLACK => [[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]],
     };
+    */
+    let kernel = [[1.0, 0.0, -1.0], [2.0, 0.0, -2.0], [1.0, 0.0, -1.0]];
     let mut dx = 0.0;
     let mut dy = 0.0;
     for (y, row) in kernel.iter().enumerate() {

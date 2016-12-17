@@ -161,8 +161,8 @@ impl World {
 
 pub fn map_tile_value_via_color(tile: &Tile, color: Color) -> Tile {
 	match (tile, color) {
-		(&0u8, Color::BLACK) => 1u8,
-		(&1u8, Color::BLACK) => 0u8,
+		(&0, Color::BLACK) => 255,
+		(&255, Color::BLACK) => 0,
 		_ => *tile,
 	}
 }

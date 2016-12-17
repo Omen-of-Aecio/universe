@@ -57,7 +57,7 @@ impl World {
             //   * move a bit away from the wall
             //   * try to move further
             //   * negate that movement away from wall
-            
+
             // Possible improvements
             // - if it still sometimes gets stuc, maybe use the normal of the next real collision
             //   for moving a unit away, since it's this normal that really signifies the problem
@@ -158,7 +158,17 @@ impl World {
         info!("TileNet"; "content" => format!["{:?}", self.tilenet]);
     }
 }
+
+pub fn map_tile_value_via_color(tile: &Tile, color: Color) -> Tile {
+	match (tile, color) {
+		(&0u8, Color::BLACK) => 1u8,
+		(&1u8, Color::BLACK) => 0u8,
+		_ => *tile,
+	}
+}
+
 pub fn get_normal(tilenet: &TileNet<Tile>, coord: (usize, usize), color: Color) -> Vec2 {
+		let cmap = map_tile_value_via_color;
     let kernel = match color {
         Color::WHITE => [[1.0, 0.0, -1.0], [2.0, 0.0, -2.0], [1.0, 0.0, -1.0]],
         Color::BLACK => [[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]],
@@ -169,8 +179,8 @@ pub fn get_normal(tilenet: &TileNet<Tile>, coord: (usize, usize), color: Color) 
         for (x, _) in row.iter().enumerate() {
             if let (Some(x_coord), Some(y_coord)) = ((coord.0 + x).checked_sub(1),
                                                      (coord.1 + y).checked_sub(1)) {
-                tilenet.get((x_coord, y_coord)).map(|&v| dx += kernel[y][x] * v as f32 / 255.0);
-                tilenet.get((x_coord, y_coord)).map(|&v| dy += kernel[x][y] * v as f32 / 255.0);
+                tilenet.get((x_coord, y_coord)).map(|&v| dx += kernel[y][x] * cmap(&v, color) as f32 / 255.0);
+                tilenet.get((x_coord, y_coord)).map(|&v| dy += kernel[x][y] * cmap(&v, color) as f32 / 255.0);
             }
         }
     }

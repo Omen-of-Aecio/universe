@@ -36,6 +36,8 @@ use slog::{DrainExt, Level};
 use std::f32;
 use world::World;
 use world::color::Color;
+use std::thread;
+use std::time::Duration;
 
 fn setup_logger() {
     let logger = if isatty::stderr_isatty() {
@@ -181,7 +183,9 @@ impl Main {
             }
             oldpos = pos;
 
-            // thread::sleep(Duration::from_millis(15));
+            
+            // vsync doesn't seem to work on Windows
+            thread::sleep(Duration::from_millis(15));
         }
     }
 

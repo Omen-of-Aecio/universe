@@ -19,7 +19,7 @@ pub mod ren;
 
 pub struct Graphics {
     display: Display,
-    tilenet_renderer: tilenet_ren::Ren,
+    pub tilenet_renderer: tilenet_ren::Ren,
     poly_renderer: polygons::Ren,
     pub line_renderer: lines::Ren, /* TODO: Maybe make line_renderer private and make interface
                                     * for all renderers in Graphics */

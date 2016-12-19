@@ -134,6 +134,7 @@ impl Main {
     fn run(&mut self) {
         let mut window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
         let mut oldpos = Vec2::null_vec();
+        let mut tileren_smooth = true;
         while !self.world.exit {
             self.input.update();
             // Handle input events
@@ -158,6 +159,11 @@ impl Main {
 
             // Logic
             prof!["Logic", self.world.update(&self.input)];
+
+            // Some interactivity for debugging
+            if self.input.key_down(glutin::VirtualKeyCode::Comma) && self.input.key_toggled(glutin::VirtualKeyCode::Comma) {
+                self.graphics.tilenet_renderer.toggle_smooth();
+            }
 
             // Render
             let cam_pos = match self.cam_mode {

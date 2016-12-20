@@ -36,6 +36,7 @@ use slog::{DrainExt, Level};
 use std::f32;
 use world::World;
 use world::color::Color;
+use world::player::Player;
 use std::thread;
 use std::time::Duration;
 
@@ -231,16 +232,11 @@ impl Main {
     }
 
     fn new() -> Main {
-        let mut world = World::new(WORLD_SIZE, WORLD_SIZE);
+        let pos = Vec2::new(WORLD_SIZE as f32 - 50.0, WORLD_SIZE as f32/3.0);
+        let mut world = World::new(WORLD_SIZE, WORLD_SIZE, pos);
         world::gen::proc1(&mut world.tilenet);
 
-        let pos = (50, WORLD_SIZE/3);
-        world.polygons.push(Polygon::new_quad(pos.0 as f32, pos.1 as f32, 10.0, 10.0, Color::WHITE));
-        world.tilenet.set_box(&0, (pos.0-50, pos.1-50), (pos.0+50, pos.1+50));
-
-        let pos = (WORLD_SIZE - 50, WORLD_SIZE/3);
-        world.polygons.push(Polygon::new_quad(pos.0 as f32, pos.1 as f32, 10.0, 10.0, Color::BLACK));
-        world.tilenet.set_box(&255, (pos.0-50, pos.1-50), (pos.0+50, pos.1+50));
+        world.tilenet.set_box(&255, (pos.x as usize-50, pos.y as usize-50), (pos.x as usize+50, pos.y as usize+50));
 
         let display = glutin::WindowBuilder::new().build_glium().unwrap();
         let graphics = Graphics::new(display.clone(), &world);

@@ -2,6 +2,7 @@ use tile_net::*;
 use geometry::vec::Vec2;
 use global::Tile;
 use world::color::Color;
+use world::jump::Jump;
 
 pub struct Polygon {
     pub points: Vec<(f32, f32)>, // Vec<Vec2> later. Now: for convenience with TileNet
@@ -28,13 +29,12 @@ impl Polygon {
     }
 
     /// Physical response to collision - i.e. bounce in direction of normal
-    pub fn collide_wall(&mut self, normal: Vec2) -> (Vec2, Vec2) {
+    pub fn collide_wall(&mut self, normal: Vec2) {
         const RESTITUTION: f32 = 0.0;
         let normal = normal.normalize();
         let tangent = Vec2::new(-normal.y, normal.x);
         self.vel = tangent.scale(Vec2::dot(self.vel, tangent)) +
                    normal.scale(Vec2::dot(self.vel, normal).abs() * RESTITUTION);
-        (tangent, tangent.scale(-1.0))
     }
 }
 

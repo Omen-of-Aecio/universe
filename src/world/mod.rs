@@ -1,9 +1,12 @@
 pub mod gen;
 pub mod color;
+pub mod jump;
+pub mod player;
+pub mod iter;
 
 use std::vec::Vec;
 
-use glium::glutin::VirtualKeyCode;
+use glium::glutin::VirtualKeyCode as KeyCode;
 
 use tile_net::TileNet;
 use tile_net::Collable;
@@ -13,30 +16,41 @@ use geometry::polygon::{Polygon, PolygonState};
 use geometry::vec::Vec2;
 use input::Input;
 use world::color::Color;
+use world::jump::Jump;
+use world::player::Player;
+use world::iter::PolygonIter;
 
 const ACCELERATION: f32 = 0.35;
-const SUBJECT_POLYGON: usize = 1;
+const JUMP_DURATION: u32 = 5;
+const JUMP_ACC: f32 = 1.0;
 
 pub struct World {
     pub tilenet: TileNet<Tile>,
-    pub polygons: Vec<Polygon>,
+    pub player: Player,
     pub exit: bool,
     width: usize,
     height: usize,
     cam_pos: Vec2,
+    gravity_on: bool,
+    gravity: f32,
+    jump: Option<Jump>,
     // Extra graphics data (for debugging/visualization)
     pub vectors: Vec<(Vec2, Vec2)>,
 }
 
 impl World {
-    pub fn new(width: usize, height: usize) -> World {
+    pub fn new(width: usize, height: usize, player_pos: Vec2) -> World {
+        let shape = Polygon::new_quad(player_pos.x, player_pos.y, 10.0, 10.0, Color::BLACK);
         World {
             tilenet: TileNet::<Tile>::new(width, height),
-            polygons: Vec::new(),
+            player: Player::new(shape),
             exit: false,
             width: width,
             height: height,
             cam_pos: Vec2::new((width/2) as f32, (height/2) as f32),
+            gravity_on: false,
+            gravity: 0.5,
+            jump: None,
             vectors: Vec::new(),
         }
     }
@@ -49,8 +63,20 @@ impl World {
 
         self.update_camera();
 
+        // Jump
+        let mut acc = None;
+        if let Some(ref mut jump) = self.jump {
+            acc = jump.tick();
+        }
+        if let Some(acc) = acc {
+            self.player.shape.vel.y += acc;
+        }
         // Physics
-        for p in &mut self.polygons.iter_mut() {
+        let p = &mut self.player; // Instead of looping through Polygons p...
+        {
+            if self.gravity_on {
+                p.shape.vel += Vec2::new(0.0, -self.gravity);
+            }
             // - Until we reach end of frame:
             // - Do collision with remaining time
             // - While collision
@@ -66,37 +92,32 @@ impl World {
 			let mut i = 0;
             let mut time_left = 1.0;
 
-            let mut polygon_state = PolygonState::new(time_left, p.vel);
-            p.solve(&self.tilenet, &mut polygon_state);
+            let mut polygon_state = PolygonState::new(time_left, p.shape.vel);
+            p.shape.solve(&self.tilenet, &mut polygon_state);
 
             while polygon_state.collision && time_left > 0.1 && i<= 10 {
-                let normal = get_normal(&self.tilenet, i32_to_usize(polygon_state.poc), p.color);
+                let normal = get_normal(&self.tilenet, i32_to_usize(polygon_state.poc), p.shape.color);
                 assert!( !(normal.x == 0.0 && normal.y == 0.0));
 
                 // Physical response
-                let (a, b) = p.collide_wall(normal);
+                p.shape.collide_wall(normal);
 
                 // Debug vectors
                 self.vectors
                     .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32),
-                           normal));
-                self.vectors
-                    .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32), a));
-                self.vectors
-                    .push((Vec2::new(polygon_state.poc.0 as f32, polygon_state.poc.1 as f32), b));
+                           normal.scale(-1.0)));
 
                 // Move away one unit from wall
                 let mut moveaway_state = PolygonState::new(1.0, normal.normalize());
-                p.solve(&self.tilenet, &mut moveaway_state);
+                p.shape.solve(&self.tilenet, &mut moveaway_state);
 
                 // Try to move further with the current velocity
-                polygon_state = PolygonState::new(time_left, p.vel);
-                p.solve(&self.tilenet, &mut polygon_state);
+                polygon_state = PolygonState::new(time_left, p.shape.vel);
+                p.shape.solve(&self.tilenet, &mut polygon_state);
 
                 // Move back one unit
                 let mut moveback_state = PolygonState::new(1.0, normal.normalize().scale(-1.0));
-                p.solve(&self.tilenet, &mut moveback_state);
-
+                p.shape.solve(&self.tilenet, &mut moveback_state);
 
                 i += 1;
                 time_left -= polygon_state.toc;
@@ -104,43 +125,56 @@ impl World {
 
             if polygon_state.collision {
                 // One last physical response for the last collision
-                let normal = get_normal(&self.tilenet, i32_to_usize(polygon_state.poc), p.color);
-                let _ = p.collide_wall(normal);
+                let normal = get_normal(&self.tilenet, i32_to_usize(polygon_state.poc), p.shape.color);
+                let _ = p.shape.collide_wall(normal);
             }
 
-            debug!("Position in world, "; "x" => p.pos.x, "y" => p.pos.y);
+            //debug!("Position in world, "; "x" => p.shape.pos.x, "y" => p.shape.pos.y);
 
             // Add debug vectors
             self.vectors.extend(polygon_state.debug_vectors.iter().cloned());
-        }
-        // Friction
-        for p in &mut self.polygons {
-            p.vel = p.vel * 0.9;
+
+            // Friction
+            p.shape.vel = p.shape.vel * 0.9;
         }
 
+    }
+
+    pub fn polygons_iter<'a>(&'a self) -> PolygonIter<'a> {
+        PolygonIter::new(self)
     }
 
     fn handle_input(&mut self, input: &Input) {
         // Ad hoc: input to control first polygon
-        if input.key_down(VirtualKeyCode::Escape) {
+        if input.key_down(KeyCode::Escape) {
             self.exit = true;
         }
-        if input.key_down(VirtualKeyCode::Left) || input.key_down(VirtualKeyCode::A) || input.key_down(VirtualKeyCode::R) {
-            self.polygons[SUBJECT_POLYGON].vel.x -= ACCELERATION;
+        if input.key_down(KeyCode::Left) || input.key_down(KeyCode::A) || input.key_down(KeyCode::R) {
+            self.player.shape.vel.x -= ACCELERATION;
         }
-        if input.key_down(VirtualKeyCode::Right) || input.key_down(VirtualKeyCode::D) || input.key_down(VirtualKeyCode::T) {
-            self.polygons[SUBJECT_POLYGON].vel.x += ACCELERATION;
+        if input.key_down(KeyCode::Right) || input.key_down(KeyCode::D) || input.key_down(KeyCode::T) {
+            self.player.shape.vel.x += ACCELERATION;
         }
-        if input.key_down(VirtualKeyCode::Up) || input.key_down(VirtualKeyCode::W) || input.key_down(VirtualKeyCode::F) {
-            self.polygons[SUBJECT_POLYGON].vel.y += ACCELERATION;
+        if input.key_down(KeyCode::Up) || input.key_down(KeyCode::W) || input.key_down(KeyCode::F) {
+            if self.gravity_on && self.jump.is_none() {
+                // Initialize jump
+                self.jump = Some(Jump::new(JUMP_DURATION, JUMP_ACC));
+            } else {
+                self.player.shape.vel.y += ACCELERATION;
+            }
         }
-        if input.key_down(VirtualKeyCode::Down) || input.key_down(VirtualKeyCode::S) || input.key_down(VirtualKeyCode::S) {
-            self.polygons[SUBJECT_POLYGON].vel.y -= ACCELERATION;
+        if input.key_down(KeyCode::Down) || input.key_down(KeyCode::S) || input.key_down(KeyCode::S) {
+            if !self.gravity_on {
+                self.player.shape.vel.y -= ACCELERATION;
+            }
+        }
+        if input.key_toggled_down(KeyCode::G) {
+            self.gravity_on = ! self.gravity_on;
         }
     }
     fn update_camera(&mut self) {
-        // Camera follows SUBJECT_POLYGON
-        self.cam_pos = self.polygons[SUBJECT_POLYGON].pos;
+        // Camera follows player
+        self.cam_pos = self.player.shape.pos;
     }
 
     // Access //

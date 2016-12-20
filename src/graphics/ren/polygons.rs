@@ -6,6 +6,8 @@ use glium::{Display, Surface};
 use geometry::polygon::Polygon;
 use geometry::vec::Vec2;
 use world::World;
+use world::iter::PolygonIter;
+
 
 
 /// Renderer for polygons.
@@ -18,7 +20,8 @@ pub struct Ren {
 }
 
 impl Ren {
-    pub fn new(display: Display, polygons: &[Polygon]) -> Ren {
+    // TODO take a PolygonIterator as input
+    pub fn new(display: Display, polygons: PolygonIter) -> Ren {
         let mut end_indices = Vec::new();
         let mut pos = Vec::new();
         let mut ori = Vec::new();
@@ -28,12 +31,12 @@ impl Ren {
         let frag_src = include_str!("../../../shaders/xy_tr.frag");
         let prg = glium::Program::from_source(&display, vert_src, frag_src, None).unwrap();
         let mut vertices = Vec::new();
+
         // Upload vertices
         for p in polygons {
             for v in &p.points {
                 // v: (f32, f32)
                 vertices.push(Vertex { pos: [v.0, v.1] });
-                debug!["Pushed vertex"; "x" => v.0, "y" => v.1];
             }
             end_indices.push(vertices.len() - 1);
             pos.push(p.pos);
@@ -57,14 +60,16 @@ impl Ren {
                   height: u32,
                   world: &World) {
         let index_buffer = glium::index::NoIndices(glium::index::PrimitiveType::TriangleFan);
-        for i in 0..self.end_indices.len() {
-            let color = world.polygons[i].color.to_rgb();
-            info!("Color"; "r" => color[0], "g" => color[1], "b" => color[2]);
+
+        // Very stupid and fragile solution.
+        let mut i = 0;
+        for p in world.polygons_iter() {
+            let color = p.color.to_rgb();
 
             let uniforms = uniform! {
-                center: [world.polygons[i].pos.x, world.polygons[i].pos.y],
-                orientation: world.polygons[i].ori,
-                color: world.polygons[i].color.to_rgb(),
+                center: [p.pos.x, p.pos.y],
+                orientation: p.ori,
+                color: p.color.to_rgb(),
                 proj: super::proj_matrix(width as f32, height as f32, 0.0, 1.0),
                 view: super::view_matrix(center.x, center.y, zoom, zoom),
             };
@@ -75,6 +80,7 @@ impl Ren {
                       &uniforms,
                       &Default::default())
                 .unwrap();
+            i += 1;
         }
     }
 }

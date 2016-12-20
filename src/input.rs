@@ -1,6 +1,6 @@
 use glium::glutin;
-use glium::glutin::ElementState;
-// use glium::glutin::VirtualKeyCode;
+use glium::glutin::{ElementState, VirtualKeyCode as KeyCode};
+// use glium::glutin::KeyCode;
 use glium::glutin::Event::KeyboardInput;
 
 const NUM_KEYS: usize = 150;
@@ -43,16 +43,21 @@ impl Input {
         }
     }
 
-    pub fn key_down(&self, keycode: glutin::VirtualKeyCode) -> bool {
+    pub fn key_down(&self, keycode: KeyCode) -> bool {
         self.key_down[keycode as usize]
     }
 
-    pub fn key_toggled(&self, keycode: glutin::VirtualKeyCode) -> bool {
+    pub fn key_toggled(&self, keycode: KeyCode) -> bool {
         self.key_toggled[keycode as usize]
     }
 
+    /// True if key was just pressed down this frame.
+    pub fn key_toggled_down(&self, keycode: KeyCode) -> bool {
+        self.key_down(keycode) && self.key_toggled(keycode)
+    }
 
-    fn register_key_down(&mut self, keycode: glutin::VirtualKeyCode) {
+
+    fn register_key_down(&mut self, keycode: KeyCode) {
         debug!("Key down"; "code" => keycode as i32);
         let keycode = keycode as usize;
         if !self.key_down[keycode] {
@@ -61,7 +66,7 @@ impl Input {
         }
         self.key_down[keycode] = true;
     }
-    fn register_key_up(&mut self, keycode: glutin::VirtualKeyCode) {
+    fn register_key_up(&mut self, keycode: KeyCode) {
         let keycode = keycode as usize;
         if self.key_down[keycode] {
             // If this toggles the key...

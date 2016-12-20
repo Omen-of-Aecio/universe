@@ -30,7 +30,7 @@ impl Graphics {
         let mut g = Graphics {
             display: display.clone(),
             tilenet_renderer: tilenet_ren::Ren::new(display.clone(), &world.tilenet),
-            poly_renderer: polygons::Ren::new(display.clone(), &world.polygons),
+            poly_renderer: polygons::Ren::new(display.clone(), world.polygons_iter()),
             line_renderer: lines::Ren::new(display.clone()),
         };
         g.tilenet_renderer.set_bg_col(0.1, 0.05, 0.05);

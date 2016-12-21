@@ -40,7 +40,6 @@ impl Polygon {
 
 #[derive(Default)]
 pub struct PolygonState {
-
     /* Config / Algorithm */
     pub queued_vel: Vec2,
     current_try: usize,

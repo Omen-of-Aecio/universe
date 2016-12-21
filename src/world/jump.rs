@@ -21,14 +21,19 @@ impl Jump {
             force: force,
         }
     }
+
     /// Returns acceleration upward for this frame
     /// Returns None if it's done.
     pub fn tick(&mut self) -> Option<f32> {
-        if self.progress < self.frames {
-            self.progress += 1;
+        self.progress += 1;
+        if self.progress <= self.frames {
             Some(self.force)
         } else {
             None
         }
+    }
+
+    pub fn get_progress(&self) -> u32 {
+        self.progress
     }
 }

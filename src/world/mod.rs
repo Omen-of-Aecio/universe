@@ -30,7 +30,7 @@ pub struct World {
     height: usize,
     cam_pos: Vec2,
     gravity_on: bool,
-    gravity: f32,
+    gravity: Vec2,
     // Extra graphics data (for debugging/visualization)
     pub vectors: Vec<(Vec2, Vec2)>,
 }
@@ -46,7 +46,7 @@ impl World {
             height: height,
             cam_pos: Vec2::new((width/2) as f32, (height/2) as f32),
             gravity_on: false,
-            gravity: 0.5,
+            gravity: Vec2::new(0.0, -0.5),
             vectors: Vec::new(),
         }
     }
@@ -55,8 +55,10 @@ impl World {
     pub fn update(&mut self, input: &Input) {
         self.vectors.clear(); // clear debug geometry
         self.handle_input(input);
+        self.player.update(&self.tilenet, if self.gravity_on { self.gravity } else { Vec2::null_vec() });
         self.update_camera();
-        self.player.update(&self.tilenet, if self.gravity_on { self.gravity } else { 0.0 });
+
+        self.vectors.push((self.player.shape.pos,  self.player.shape.vel * 5.0));
     }
 
     pub fn polygons_iter<'a>(&'a self) -> PolygonIter<'a> {
@@ -69,21 +71,22 @@ impl World {
             self.exit = true;
         }
         if input.key_down(KeyCode::Left) || input.key_down(KeyCode::A) || input.key_down(KeyCode::R) {
-            self.player.shape.vel.x -= ACCELERATION;
+            self.player.accelerate(Vec2::new(-ACCELERATION, 0.0));
         }
         if input.key_down(KeyCode::Right) || input.key_down(KeyCode::D) || input.key_down(KeyCode::T) {
-            self.player.shape.vel.x += ACCELERATION;
+            self.player.accelerate(Vec2::new(ACCELERATION, 0.0));
+
         }
         if input.key_down(KeyCode::Up) || input.key_down(KeyCode::W) || input.key_down(KeyCode::F) {
             if self.gravity_on {
                 self.player.jump();
             } else {
-                self.player.shape.vel.y += ACCELERATION;
+                self.player.accelerate(Vec2::new(0.0, ACCELERATION));
             }
         }
         if input.key_down(KeyCode::Down) || input.key_down(KeyCode::S) || input.key_down(KeyCode::S) {
             if !self.gravity_on {
-                self.player.shape.vel.y -= ACCELERATION;
+                self.player.accelerate(Vec2::new(0.0, -ACCELERATION));
             }
         }
         if input.key_toggled_down(KeyCode::G) {

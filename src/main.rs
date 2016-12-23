@@ -165,6 +165,13 @@ impl Main {
             if self.input.key_down(glutin::VirtualKeyCode::Comma) && self.input.key_toggled(glutin::VirtualKeyCode::Comma) {
                 self.graphics.tilenet_renderer.toggle_smooth();
             }
+            // Zooming..
+            if self.input.key_down(glutin::VirtualKeyCode::N) {
+                self.zoom += 0.1;
+            }
+            if self.input.key_down(glutin::VirtualKeyCode::E) {
+                self.zoom -= 0.1;
+            }
 
             // Render
             let cam_pos = match self.cam_mode {
@@ -232,9 +239,11 @@ impl Main {
     }
 
     fn new() -> Main {
-        let pos = Vec2::new(WORLD_SIZE as f32 - 50.0, WORLD_SIZE as f32/3.0);
+        // let pos = Vec2::new(WORLD_SIZE as f32 - 50.0, WORLD_SIZE as f32/3.0);
+        let pos = Vec2::new(WORLD_SIZE as f32 / 2.0, WORLD_SIZE as f32/2.0);
         let mut world = World::new(WORLD_SIZE, WORLD_SIZE, pos);
-        world::gen::proc1(&mut world.tilenet);
+        /* world::gen::proc1(&mut world.tilenet); */
+        world::gen::rings(&mut world.tilenet, 2);
 
         world.tilenet.set_box(&255, (pos.x as usize-50, pos.y as usize-50), (pos.x as usize+50, pos.y as usize+50));
 

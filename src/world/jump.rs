@@ -1,5 +1,3 @@
-use geometry::polygon::Polygon;
-
 // This little struct makes me realize we need two things in the game:
 // - force rather than acceleration
 // - 'delta time' sent to all update functions.

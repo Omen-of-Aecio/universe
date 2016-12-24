@@ -3,7 +3,6 @@ use std::vec::Vec;
 use glium;
 use glium::{Display, Surface};
 
-use geometry::polygon::Polygon;
 use geometry::vec::Vec2;
 use world::World;
 use world::iter::PolygonIter;
@@ -64,8 +63,6 @@ impl Ren {
         // Very stupid and fragile solution.
         let mut i = 0;
         for p in world.polygons_iter() {
-            let color = p.color.to_rgb();
-
             let uniforms = uniform! {
                 center: [p.pos.x, p.pos.y],
                 orientation: p.ori,

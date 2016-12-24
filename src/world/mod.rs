@@ -9,14 +9,12 @@ use std::vec::Vec;
 use glium::glutin::VirtualKeyCode as KeyCode;
 
 use tile_net::TileNet;
-use tile_net::Collable;
 
 use global::Tile;
-use geometry::polygon::{Polygon, PolygonState};
+use geometry::polygon::Polygon;
 use geometry::vec::Vec2;
 use input::Input;
 use world::color::Color;
-use world::jump::Jump;
 use world::player::Player;
 use world::iter::PolygonIter;
 
@@ -57,8 +55,6 @@ impl World {
         self.handle_input(input);
         self.player.update(&self.tilenet, if self.gravity_on { self.gravity } else { Vec2::null_vec() });
         self.update_camera();
-
-        self.vectors.push((self.player.shape.pos,  self.player.shape.vel * 5.0));
     }
 
     pub fn polygons_iter<'a>(&'a self) -> PolygonIter<'a> {

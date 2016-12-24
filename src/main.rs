@@ -25,7 +25,6 @@ pub mod input;
 pub mod world;
 
 use bgjk::{bgjk, Vec3};
-use geometry::polygon::Polygon;
 use geometry::vec::Vec2;
 use glium::{DisplayBuild, glutin};
 use glium::glutin::{ElementState, MouseButton, MouseScrollDelta};
@@ -35,8 +34,6 @@ use input::Input;
 use slog::{DrainExt, Level};
 use std::f32;
 use world::World;
-use world::color::Color;
-use world::player::Player;
 use std::thread;
 use std::time::Duration;
 
@@ -135,7 +132,6 @@ impl Main {
     fn run(&mut self) {
         let mut window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
         let mut oldpos = Vec2::null_vec();
-        let mut tileren_smooth = true;
         while !self.world.exit {
             self.input.update();
             // Handle input events
@@ -242,6 +238,8 @@ impl Main {
         // let pos = Vec2::new(WORLD_SIZE as f32 - 50.0, WORLD_SIZE as f32/3.0);
         let pos = Vec2::new(WORLD_SIZE as f32 / 2.0, WORLD_SIZE as f32/2.0);
         let mut world = World::new(WORLD_SIZE, WORLD_SIZE, pos);
+
+
         world::gen::proc1(&mut world.tilenet); 
         // world::gen::rings(&mut world.tilenet, 2);
 

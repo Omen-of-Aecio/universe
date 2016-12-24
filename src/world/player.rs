@@ -10,7 +10,7 @@ const JUMP_DURATION: u32 = 4;
 const JUMP_DELAY: u32 = 20; // Delay before you can jump again
 const JUMP_ACC: f32 = 3.0;
 const AIR_FRI: Vec2 = Vec2 { x: 0.91, y: 0.95 };
-const GROUND_FRI: f32 = 0.9;
+// (TODO extra friction when on ground?)
 
 pub struct Player {
     pub shape: Polygon,
@@ -55,6 +55,9 @@ impl Player {
          * Right now, I only set vel.y to 0 when we have contact with ground.
          * Could also set vel.x to 0. (But might be necessary to check that it's ground and not
          * ceiling, by checking the normal).
+         *
+         * A small shortcoming: if we have great speed, we can only climb MAX_HEIGHT pixels in
+         * y-direction in total total - desired: for every move in y direction you can climb MAX_HEIGHT pixels.
          */
         const HEURISTIC1: bool = false;
         const HEURISTIC2: bool = true;
@@ -75,8 +78,6 @@ impl Player {
             self.shape.solve(&tilenet, &mut polygon_state);
 
             if polygon_state.collision {
-                // TODO: When is offset reset?
-
                 // If we cannot move, try one pixel up
                 let mut moveup_state = PolygonState::new(Vec2::new(0.0, 1.0), 1.0);
                 self.shape.solve(&tilenet, &mut moveup_state);
@@ -101,10 +102,6 @@ impl Player {
                 offset += 1.0; 
 
                 if offset > MAX_HEIGHT {
-                    // Climbed more than allowed. Climb down again.
-                    let mut movedown_state = PolygonState::new(Vec2::new(0.0, -offset), 1.0);
-                    self.shape.solve(&tilenet, &mut movedown_state);
-
                     break;
                 }
 
@@ -112,8 +109,6 @@ impl Player {
                 // We have moved all we wanted
                 break;
             }
-            // TODO move one pixel down here
-            // TODO move down all
         }
 
 
@@ -131,16 +126,6 @@ impl Player {
         if polygon_state.collision {
             self.shape.vel.y = 0.0;
         }
-
-        /*
-        let mut polygon_state = PolygonState::new(self.shape.vel, 1.0);
-        self.shape.solve(&tilenet, &mut polygon_state);
-        if polygon_state.collision {
-            let normal = world::get_normal(&tilenet, world::i32_to_usize(polygon_state.poc), self.shape.color);
-            assert!( !(normal.x == 0.0 && normal.y == 0.0));
-            self.collide_wall(normal, gravity);
-        }
-        */
 
 
         // Friction
@@ -161,31 +146,6 @@ impl Player {
     pub fn jump(&mut self) {
         if self.jump.is_none() {
             self.jump = Some(Jump::new(JUMP_DURATION, JUMP_ACC));
-        }
-    }
-
-    fn collide_wall(&mut self, normal: Vec2, gravity: Vec2) {
-        let tangent = Vec2::new(-normal.y, normal.x).normalize();
-        // Collide wall
-        self.shape.collide_wall(normal);
-
-        // If on "ground"...
-        let up = Vec2::new(0.0, 1.0);
-        if Vec2::dot(normal, up) > 0.0 {
-            // Regain jump
-            self.jump = None;
-        }
-
-        // If player isn't trying to move the character...
-        if self.force.length() == 0.0 { 
-            // Just friction from ground
-            self.shape.vel = self.shape.vel * GROUND_FRI;
-
-            // Extra friction to help player stay put
-            if Vec2::dot(normal, up) > 0.0 {
-                self.shape.vel = Vec2::null_vec();
-            }
-
         }
     }
 }

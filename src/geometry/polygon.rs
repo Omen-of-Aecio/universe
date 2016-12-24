@@ -2,7 +2,6 @@ use tile_net::*;
 use geometry::vec::Vec2;
 use global::Tile;
 use world::color::Color;
-use world::jump::Jump;
 
 pub struct Polygon {
     pub points: Vec<(f32, f32)>, // Vec<Vec2> later. Now: for convenience with TileNet

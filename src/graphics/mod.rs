@@ -77,5 +77,5 @@ pub fn screen_to_world(screen_pos: Vec2, center: Vec2, zoom: f32, width: u32, he
     // Translate by -screen_size/2
     // Scale by 1/zoom
     // Translate by center
-    (screen_pos - screen_size.scale(0.5)).scale(1.0 / zoom) + center
+    (screen_pos - screen_size.scale_uni(0.5)).scale_uni(1.0 / zoom) + center
 }

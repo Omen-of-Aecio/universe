@@ -48,7 +48,7 @@ fn setup_logger() {
             .full()
             .use_utc_timestamp()
             .build();
-        let d = slog::level_filter(Level::Debug, drain);
+        let d = slog::level_filter(Level::Critical, drain);
         slog::Logger::root(d.fuse(), o![])
     } else {
         slog::Logger::root(slog_stream::stream(std::io::stderr(), slog_json::default()).fuse(),
@@ -242,8 +242,8 @@ impl Main {
         // let pos = Vec2::new(WORLD_SIZE as f32 - 50.0, WORLD_SIZE as f32/3.0);
         let pos = Vec2::new(WORLD_SIZE as f32 / 2.0, WORLD_SIZE as f32/2.0);
         let mut world = World::new(WORLD_SIZE, WORLD_SIZE, pos);
-        /* world::gen::proc1(&mut world.tilenet); */
-        world::gen::rings(&mut world.tilenet, 2);
+        world::gen::proc1(&mut world.tilenet); 
+        // world::gen::rings(&mut world.tilenet, 2);
 
         world.tilenet.set_box(&255, (pos.x as usize-50, pos.y as usize-50), (pos.x as usize+50, pos.y as usize+50));
 

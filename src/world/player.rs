@@ -44,56 +44,104 @@ impl Player {
             }
         }
 
-        // Physics
-        // - Until we reach end of frame:
-        // - Do collision with remaining time
-        // - While collision
-        //   * move a bit away from the wall
-        //   * try to move further
-        //   * negate that movement away from wall
 
-        // Possible improvements
-        // - if it still sometimes gets stuc, maybe use the normal of the next real collision
-        //   for moving a unit away, since it's this normal that really signifies the problem
-        //   (increases complexity)
+        /* KISS algorithm for moving 
+         *  - not trying to be so physical
+         * Tried several heuristics/meaasures to make it better. Keep them around to play with.
+         * They all have some problems, but I think I'd prefer Heuristic 2 over Heuristic 1,
+         * because H1 makes the maximum height we can climb dependent on velocity.
+         * Heuristic 3 has potential problems.
+         *
+         * Right now, I only set vel.y to 0 when we have contact with ground.
+         * Could also set vel.x to 0. (But might be necessary to check that it's ground and not
+         * ceiling, by checking the normal).
+         */
+        const HEURISTIC1: bool = false;
+        const HEURISTIC2: bool = true;
+        const HEURISTIC3: bool = true;
 
-        let mut i = 0;
+
+
+        // Move X
+        const MAX_HEIGHT: f32 = 8.0;
+        let q = self.shape.vel.scale(1.0, 0.0);
         let mut time_left = 1.0;
 
-        let mut polygon_state = PolygonState::new(time_left, self.shape.vel);
-        self.shape.solve(&tilenet, &mut polygon_state);
+        // To keep track of how much we have moved up in the attempt
+        let mut offset = 0.0;
 
-        while polygon_state.collision && time_left > 0.1 && i<= 10 {
-            time_left -= polygon_state.toc;
-
-            let normal = world::get_normal(&tilenet, world::i32_to_usize(polygon_state.poc), self.shape.color);
-            assert!( !(normal.x == 0.0 && normal.y == 0.0));
-
-            // Physical/interactive response
-            self.collide_wall(normal, gravity);
-
-            let moveaway_scale = 1.0;
-            // Move away one unit from wall
-            let mut moveaway_state = PolygonState::new(1.0, normal.normalize().scale(moveaway_scale));
-            self.shape.solve(&tilenet, &mut moveaway_state);
-
-            // Try to move further with the current velocity
-            polygon_state = PolygonState::new(time_left, self.shape.vel);
-            // TODO ^ are we using more time than we have here? We decrease it one too many
+        while time_left > 0.0 {
+            let mut polygon_state = PolygonState::new(q, time_left);
             self.shape.solve(&tilenet, &mut polygon_state);
 
-            // Move back one unit
-            let mut moveback_state = PolygonState::new(1.0, normal.normalize().scale(-moveaway_scale));
-            self.shape.solve(&tilenet, &mut moveback_state);
+            if polygon_state.collision {
+                // TODO: When is offset reset?
 
-            i += 1;
+                // If we cannot move, try one pixel up
+                let mut moveup_state = PolygonState::new(Vec2::new(0.0, 1.0), 1.0);
+                self.shape.solve(&tilenet, &mut moveup_state);
+                if moveup_state.collision {
+                    break;
+                }
+
+                if HEURISTIC1 {
+                    // Decrease time left when climbing up
+                    time_left -= 1.0 / self.shape.vel.length();
+                }
+
+                if HEURISTIC2 {
+                    // Decrease speed based on how steep the hill is
+                    let up: Vec2 = Vec2::new(0.0, 1.0);
+                    let normal = world::get_normal(&tilenet, world::i32_to_usize(polygon_state.poc), self.shape.color)
+                        .normalize();
+                    self.shape.vel.x *= 0.5 + 0.5 * f32::powf(Vec2::dot(up, normal), 0.5);
+                }
+
+                time_left -= polygon_state.toc;
+                offset += 1.0; 
+
+                if offset > MAX_HEIGHT {
+                    // Climbed more than allowed. Climb down again.
+                    let mut movedown_state = PolygonState::new(Vec2::new(0.0, -offset), 1.0);
+                    self.shape.solve(&tilenet, &mut movedown_state);
+
+                    break;
+                }
+
+            } else {
+                // We have moved all we wanted
+                break;
+            }
+            // TODO move one pixel down here
+            // TODO move down all
         }
+
+
+        if HEURISTIC3 {
+            // Try to climb down again whatever distance climbed up.
+            let mut movedown_state = PolygonState::new(Vec2::new(0.0, -offset), 1.0);
+            self.shape.solve(&tilenet, &mut movedown_state);
+        }
+
+
+        // Move Y
+        let mut polygon_state = PolygonState::new(self.shape.vel.scale(0.0, 1.0), 1.0);
+        self.shape.solve(&tilenet, &mut polygon_state);
 
         if polygon_state.collision {
-            // One last physical response for the last collision
+            self.shape.vel.y = 0.0;
+        }
+
+        /*
+        let mut polygon_state = PolygonState::new(self.shape.vel, 1.0);
+        self.shape.solve(&tilenet, &mut polygon_state);
+        if polygon_state.collision {
             let normal = world::get_normal(&tilenet, world::i32_to_usize(polygon_state.poc), self.shape.color);
+            assert!( !(normal.x == 0.0 && normal.y == 0.0));
             self.collide_wall(normal, gravity);
         }
+        */
+
 
         // Friction
         self.shape.vel = self.shape.vel * AIR_FRI;
@@ -103,7 +151,6 @@ impl Player {
 
         //
         self.force = Vec2::null_vec();
-
     }
 
     pub fn accelerate(&mut self, force: Vec2) {
@@ -117,10 +164,6 @@ impl Player {
         }
     }
 
-    /// - Physical response of the shape.
-    /// - Regain jump.
-    /// - Climb hills - this is the hardest part
-    /// - Stay put on hills.
     fn collide_wall(&mut self, normal: Vec2, gravity: Vec2) {
         let tangent = Vec2::new(-normal.y, normal.x).normalize();
         // Collide wall
@@ -131,18 +174,11 @@ impl Player {
         if Vec2::dot(normal, up) > 0.0 {
             // Regain jump
             self.jump = None;
-            // If player wants to go up that direction
-            if normal.x.signum() != self.force.x.signum() {
-                // Help player climb hill by working against gravity
-                // The current solution makes it kinda jump when it goes over just a little bump ..
-                self.shape.vel -= gravity * Vec2::cross(normal, up);
-            }
         }
 
         // If player isn't trying to move the character...
         if self.force.length() == 0.0 { 
             // Just friction from ground
-            // Idea: Make friction greater when speed (WRT Normal) is greater, and probably outside of this if.
             self.shape.vel = self.shape.vel * GROUND_FRI;
 
             // Extra friction to help player stay put

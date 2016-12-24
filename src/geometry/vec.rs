@@ -26,9 +26,13 @@ impl Vec2 {
         Vec2::new(self.x / len, self.y / len)
     }
     /// TODO make clear that it clones?
-    pub fn scale(&self, s: f32) -> Vec2 {
+    pub fn scale(&self, x: f32, y: f32) -> Vec2 {
+        Vec2::new(self.x * x, self.y * y)
+    }
+    pub fn scale_uni(&self, s: f32) -> Vec2 {
         Vec2::new(self.x * s, self.y * s)
     }
+
 
     pub fn dot(a: Vec2, b: Vec2) -> f32 {
         a.x * b.x + a.y * b.y

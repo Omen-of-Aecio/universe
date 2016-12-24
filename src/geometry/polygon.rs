@@ -33,8 +33,8 @@ impl Polygon {
         const RESTITUTION: f32 = 0.0;
         let normal = normal.normalize();
         let tangent = Vec2::new(-normal.y, normal.x);
-        self.vel = tangent.scale(Vec2::dot(self.vel, tangent)) +
-                   normal.scale(Vec2::dot(self.vel, normal).abs() * RESTITUTION);
+        self.vel = tangent.scale_uni(Vec2::dot(self.vel, tangent)) +
+                   normal.scale_uni(Vec2::dot(self.vel, normal).abs() * RESTITUTION);
     }
 }
 
@@ -53,7 +53,7 @@ pub struct PolygonState {
 }
 impl PolygonState {
     /// start_toc is what fraction of the velocity we start the algorithm with
-    pub fn new(start_toc: f32, vel: Vec2) -> PolygonState {
+    pub fn new(vel: Vec2, start_toc: f32) -> PolygonState {
         let mut result = PolygonState::default();
         result.toc = start_toc;
         result.queued_vel = vel;

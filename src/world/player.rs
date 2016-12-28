@@ -58,6 +58,8 @@ impl Player {
          *
          * A small shortcoming: if we have great speed, we can only climb MAX_HEIGHT pixels in
          * y-direction in total total - desired: for every move in y direction you can climb MAX_HEIGHT pixels.
+         *
+         * TODO: Problem: When top of polygon hits a wall; it can climb high.
          */
         const HEURISTIC1: bool = false;
         const HEURISTIC2: bool = true;
@@ -77,6 +79,7 @@ impl Player {
             let mut polygon_state = PolygonState::new(q, time_left);
             self.shape.solve(&tilenet, &mut polygon_state);
 
+
             if polygon_state.collision {
                 // If we cannot move, try one pixel up
                 let mut moveup_state = PolygonState::new(Vec2::new(0.0, 1.0), 1.0);
@@ -91,11 +94,15 @@ impl Player {
                 }
 
                 if HEURISTIC2 {
-                    // Decrease speed based on how steep the hill is
+                    // Decrease x speed based on how steep the hill is
                     let up: Vec2 = Vec2::new(0.0, 1.0);
                     let normal = world::get_normal(&tilenet, world::i32_to_usize(polygon_state.poc), self.shape.color)
                         .normalize();
-                    self.shape.vel.x *= 0.5 + 0.5 * f32::powf(Vec2::dot(up, normal), 0.5);
+                    let steepness = Vec2::dot(up, normal);
+                    if steepness > 0.0 {
+                        // Can't do pow of negative number (ceiling)
+                        self.shape.vel.x *= 0.5 + 0.5 * f32::powf(steepness, 0.5);
+                    }
                 }
 
                 time_left -= polygon_state.toc;

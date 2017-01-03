@@ -17,25 +17,20 @@ extern crate slog_term;
 extern crate tile_net;
 extern crate tilenet_ren;
 extern crate time;
+extern crate clap;
 
 pub mod geometry;
 pub mod global;
 pub mod graphics;
 pub mod input;
 pub mod world;
+pub mod cli;
+pub mod srv;
+use clap::{Arg, App, SubCommand};
 
-use bgjk::{bgjk, Vec3};
-use geometry::vec::Vec2;
-use glium::{DisplayBuild, glutin};
-use glium::glutin::{ElementState, MouseButton, MouseScrollDelta};
-use graphics::Graphics;
-use graphics::screen_to_world;
-use input::Input;
 use slog::{DrainExt, Level};
-use std::f32;
-use world::World;
-use std::thread;
-use std::time::Duration;
+use cli::Client;
+use srv::Server;
 
 fn setup_logger() {
     let logger = if isatty::stderr_isatty() {
@@ -56,208 +51,17 @@ fn setup_logger() {
 
 fn main() {
     setup_logger();
-    info!["Logger initialized"];
+    let options = App::new("Universe")
+        .arg(Arg::with_name("s")
+             .short("s")
+             .help("Run server instead of client")
+             .takes_value(false))
+        .get_matches();
 
-    if false
-    {
-		/*
-		Imagine a slope and a plane:
-		\__I_
-		where I is the character.
-		Walking left needs to attach you to the slope.
-
-		When colliding with an object:
-			1. Check if it has a 'sticky' property
-			2. Use sticky to compute position (hover slightly)
-			3. When outside of domain, cause obj to fall
-
-		This solves the cases:
-		__
-		  \__
-
-		At the top of the hill. Walk right. Gravity pulls you into the slope. Slope function activates.
-		Walk left, slope function unsticks, fall into plane.
-		At bottom, same idea.
-
-		Could use function to compute next wall function
-		*/
-		let slope = [
-			Vec3(0.0, 0.0, 0.0),
-			Vec3(1.0, 1.0, 0.0),
-			Vec3(0.0, 0.0, 1.0),
-			Vec3(1.0, 1.0, 1.0),
-		];
-		let movement = [
-			Vec3(0.5, 0.6, 0.0),
-			Vec3(0.599, 0.6, 1.0),
-		];
-		print!["kek\n"];
-		for _ in 1..10000 {
-			info!["Collision"; "bgjk" => bgjk(&slope, &movement)];
-		}
-		return;
-    }
-
-    let mut ctrl: Main = Main::new();
-    ctrl.run();
-}
-
-const WORLD_SIZE: usize = 1200;
-
-/* Should go, together with some logic, to some camera module (?) */
-enum CameraMode {
-    Interactive,
-    FollowPlayer,
-}
-
-struct Main {
-    display: glium::Display,
-    input: Input,
-    graphics: Graphics,
-    world: World,
-
-    // Camera & input (for now)
-    cam_mode: CameraMode,
-    //   following is used only if INTERACTIVE camera mode
-    zoom: f32,
-    center: Vec2,
-    mouse_down: bool,
-    mouse_pos: Vec2,
-    mouse_pos_past: Vec2,
-}
-
-
-
-impl Main {
-    fn run(&mut self) {
-        let mut window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
-        let mut oldpos = Vec2::null_vec();
-        while !self.world.exit {
-            self.input.update();
-            // Handle input events
-            for ev in self.display.clone().poll_events() {
-                match ev {
-                    glutin::Event::Closed => return,
-                    glutin::Event::MouseMoved(x, y) => self.mouse_moved(x, y),
-                    glutin::Event::MouseWheel(MouseScrollDelta::LineDelta(_, y), _) => {
-                        self.mouse_wheel_line(y)
-                    }
-                    glutin::Event::MouseInput(ElementState::Pressed, button) => {
-                        self.mouse_press(button)
-                    }
-                    glutin::Event::MouseInput(ElementState::Released, button) => {
-                        self.mouse_release(button)
-                    }
-                    glutin::Event::KeyboardInput(_, _, _) => self.input.register_key(ev),
-                    glutin::Event::Resized(w, h) => window_size = (w, h),
-                    _ => (),
-                }
-            }
-
-            // Logic
-            prof!["Logic", self.world.update(&self.input)];
-
-            // Some interactivity for debugging
-            if self.input.key_down(glutin::VirtualKeyCode::Comma) && self.input.key_toggled(glutin::VirtualKeyCode::Comma) {
-                self.graphics.tilenet_renderer.toggle_smooth();
-            }
-            // Zooming..
-            if self.input.key_down(glutin::VirtualKeyCode::N) {
-                self.zoom += 0.1;
-            }
-            if self.input.key_down(glutin::VirtualKeyCode::E) {
-                self.zoom -= 0.1;
-            }
-
-            // Render
-            let cam_pos = match self.cam_mode {
-                CameraMode::Interactive => self.center,
-                CameraMode::FollowPlayer => self.world.get_cam_pos(),
-            };
-            prof!["Render",
-                  self.graphics.render(cam_pos,
-                                       self.zoom,
-                                       window_size.0,
-                                       window_size.1,
-                                       &self.world)];
-
-            // TEST screen to world.
-            let pos = screen_to_world(self.mouse_pos,
-                                      Vec2::new(self.center.x, self.center.y),
-                                      self.zoom,
-                                      window_size.0,
-                                      window_size.1);
-
-            if pos != oldpos {
-                debug!["Position in world"; "x" => pos.x, "y" => pos.y];
-            }
-            oldpos = pos;
-
-            
-            // vsync doesn't seem to work on Windows
-            thread::sleep(Duration::from_millis(15));
-        }
-    }
-
-    fn mouse_moved(&mut self, x: i32, y: i32) {
-        self.mouse_pos_past = self.mouse_pos;
-        self.mouse_pos = Vec2::new(x as f32, y as f32);
-        // Move the texture //
-        if self.mouse_down {
-            // let window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
-            let mut offset = (self.mouse_pos - self.mouse_pos_past) / self.zoom;
-            offset.x = -offset.x;
-            offset.y = offset.y;
-            self.center += offset;
-        }
-    }
-
-    fn mouse_wheel_line(&mut self, y: f32) {
-        // For each 'tick', it should *= factor
-        const ZOOM_FACTOR: f32 = 1.2;
-        if y > 0.0 {
-            self.zoom *= f32::powf(ZOOM_FACTOR, y as f32);
-        } else if y < 0.0 {
-            self.zoom /= f32::powf(ZOOM_FACTOR, -y as f32);
-        }
-    }
-
-    fn mouse_press(&mut self, button: MouseButton) {
-        if let MouseButton::Left = button {
-            self.mouse_down = true;
-        }
-    }
-
-    fn mouse_release(&mut self, button: MouseButton) {
-        if let MouseButton::Left = button {
-            self.mouse_down = false;
-        }
-    }
-
-    fn new() -> Main {
-        // let pos = Vec2::new(WORLD_SIZE as f32 - 50.0, WORLD_SIZE as f32/3.0);
-        let pos = Vec2::new(WORLD_SIZE as f32 / 2.0, WORLD_SIZE as f32/2.0);
-        let mut world = World::new(WORLD_SIZE, WORLD_SIZE, pos);
-
-
-        world::gen::proc1(&mut world.tilenet); 
-        // world::gen::rings(&mut world.tilenet, 2);
-
-        world.tilenet.set_box(&255, (pos.x as usize-50, pos.y as usize-50), (pos.x as usize+50, pos.y as usize+50));
-
-        let display = glutin::WindowBuilder::new().build_glium().unwrap();
-        let graphics = Graphics::new(display.clone(), &world);
-        Main {
-            display: display,
-            input: Input::new(),
-            graphics: graphics,
-            world: world,
-            cam_mode: CameraMode::FollowPlayer,
-            zoom: 1.0,
-            center: Vec2::new(0.0, 0.0),
-            mouse_down: false,
-            mouse_pos: Vec2::new(0.0, 0.0),
-            mouse_pos_past: Vec2::new(0.0, 0.0),
-        }
+    if let 0 = options.occurrences_of("s") {
+        Client::new().run();
+    } else {
+        Server::new().run();
     }
 }
+

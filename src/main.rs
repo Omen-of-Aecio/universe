@@ -1,6 +1,7 @@
 #![cfg_attr(feature = "dev", allow(unstable_features))]
 #![cfg_attr(feature = "dev", feature(plugin))]
 #![cfg_attr(feature = "dev", plugin(clippy))]
+#![feature(discriminant_value)]
 
 extern crate bgjk;
 #[macro_use]
@@ -17,7 +18,12 @@ extern crate slog_term;
 extern crate tile_net;
 extern crate tilenet_ren;
 extern crate time;
+
 extern crate clap;
+extern crate byteorder;
+
+extern crate bincode;
+extern crate rustc_serialize;
 
 pub mod geometry;
 pub mod global;
@@ -26,7 +32,9 @@ pub mod input;
 pub mod world;
 pub mod cli;
 pub mod srv;
-use clap::{Arg, App, SubCommand};
+pub mod net;
+pub mod err;
+use clap::{Arg, App};
 
 use slog::{DrainExt, Level};
 use cli::Client;
@@ -52,14 +60,14 @@ fn setup_logger() {
 fn main() {
     setup_logger();
     let options = App::new("Universe")
-        .arg(Arg::with_name("s")
-             .short("s")
-             .help("Run server instead of client")
-             .takes_value(false))
+        .arg(Arg::with_name("connect")
+             .short("c")
+             .help("Run client and connect to specified server of form `ipaddress:port`")
+             .takes_value(true))
         .get_matches();
 
-    if let 0 = options.occurrences_of("s") {
-        Client::new().run();
+    if let Some(connect) = options.value_of("connect") {
+        Client::new(connect).run();
     } else {
         Server::new().run();
     }

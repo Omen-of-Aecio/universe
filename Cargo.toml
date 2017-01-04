@@ -19,6 +19,9 @@ time = "0"
 glium = "0"
 rand = "0"
 clap = "2.19.3"
+byteorder = "1.0.0"
+bincode = "0.6.0"
+rustc-serialize = "0.3"
 
 [features]
 default = []

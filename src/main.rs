@@ -24,6 +24,7 @@ extern crate byteorder;
 
 extern crate bincode;
 extern crate rustc_serialize;
+extern crate num_traits;
 
 pub mod geometry;
 pub mod global;
@@ -67,9 +68,9 @@ fn main() {
         .get_matches();
 
     if let Some(connect) = options.value_of("connect") {
-        Client::new(connect).run();
+        Client::new(connect).unwrap().run().unwrap();
     } else {
-        Server::new().run();
+        Server::new().run().unwrap();
     }
 }
 

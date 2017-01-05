@@ -12,7 +12,7 @@ use num_traits::Float;
 use std::net::SocketAddr;
 use std::vec::Vec;
 
-const WORLD_SIZE: usize = 1200;
+const WORLD_SIZE: usize = 700;
 
 pub struct Server {
     world: World,
@@ -36,7 +36,7 @@ impl Server {
         Server {
             world: world,
 
-            socket: Socket::new(9123),
+            socket: Socket::new(9123).unwrap(),
             connections: Vec::new(),
         }
     }
@@ -81,9 +81,11 @@ impl Server {
         // We will need to split it up because of limited package size
         let dim = Server::packet_dim(Socket::max_packet_size());
         let blocks = (self.world.get_width() / dim.0 + 1, self.world.get_height() / dim.1 + 1);
+        println!("NUM BLOCKS = {}, {}", blocks.0, blocks.1);
         for x in 0..blocks.0 {
             for y in 0..blocks.1 {
                 self.send_world_rect(x * dim.0, y * dim.0, dim.0, dim.1, src)?;
+                thread::sleep(Duration::from_millis(5));
             }
         }
 
@@ -96,7 +98,7 @@ impl Server {
 
         println!("Server World Rect: {}, {}; {}, {}", x, y, w, h);
         let pixels: Vec<u8> = self.world.tilenet.view_box((x, x+w, y, y+h)).map(|x| *x.0).collect();
-        assert!(pixels.len() != 0);
+        assert!(pixels.len() == w*h);
         let msg = Message::WorldRect { x: x, y: y, width: w, height: h, pixels: pixels};
         self.socket.send_to(msg, dest);
         Ok(())
@@ -105,7 +107,7 @@ impl Server {
     /// ASSUMPTION: packet size is 2^n
     fn packet_dim(packet_size: usize) -> (usize, usize) {
         let n = (packet_size as f32).log(2.0).floor();
-        (2.0.powf(n/2.0).ceil() as usize, 2.0.powf(n/2.0).floor() as usize)
+        (2.0.powf((n/2.0).ceil()) as usize, 2.0.powf((n/2.0).floor()) as usize)
     }
 }
 

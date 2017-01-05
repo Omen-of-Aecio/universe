@@ -7,6 +7,8 @@ use world::World;
 use graphics::Graphics;
 use graphics::screen_to_world;
 use err::{Result, Error};
+use rand;
+use rand::Rng;
 
 use net::{Message, Socket};
 use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
@@ -38,6 +40,8 @@ pub struct Client {
     // Networking
     socket: Socket,
     server: SocketAddr,
+
+    a: i32,
 }
 
 
@@ -47,6 +51,7 @@ impl Client {
         let mut window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
         let mut oldpos = Vec2::null_vec();
         loop {
+            println!("Number of world pieces: {}", self.a);
             // Input
             self.input.update();
             // Handle input events
@@ -120,12 +125,14 @@ impl Client {
                 }
                 self.receive_world(x, y, width, height, pixels);
             },
-            _ => {},
+            _ => { println!("CLIENT: WRONG PACKAGE"); return Err(Error::Other("Wrong message type.".to_string()));},
         };
         Ok(())
     }
 
     fn receive_world(&mut self, x: usize, y: usize, w: usize, h: usize, pixels: Vec<u8>) {
+        self.a += 1;
+        assert!(pixels.len() == w*h);
         let mut i = 0;
         for y in y..y+h {
             for x in x..x+w {
@@ -133,11 +140,12 @@ impl Client {
                 i += 1;
             }
         }
+        self.graphics.tilenet_renderer.upload_texture(&self.world.tilenet, x as u32, y as u32, w as u32, h as u32);
     }
 
     pub fn new(server_addr: &str) -> Result<Client> {
 
-        let mut socket = Socket::new(CLIENT_PORT);
+        let mut socket = Client::create_socket();
         let server = to_socket_addr(server_addr);
 
         // Init connection
@@ -172,6 +180,7 @@ impl Client {
 
             socket: socket,
             server: server,
+            a: 0,
         })
     }
 
@@ -207,6 +216,19 @@ impl Client {
     fn mouse_release(&mut self, button: MouseButton) {
         if let MouseButton::Left = button {
             self.mouse_down = false;
+        }
+    }
+
+    fn create_socket() -> Socket {
+        let mut rng = rand::thread_rng();
+        loop {
+            let p: u16 = 10000 + (rng.gen::<u16>() % 50000);
+            let socket = Socket::new(p);
+            match socket {
+                Ok(socket) => return socket,
+                Err(_) => {},
+            };
+            
         }
     }
 

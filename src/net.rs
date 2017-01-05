@@ -49,12 +49,11 @@ pub struct Socket {
     buffer: Vec<u8>,
 }
 impl Socket {
-    pub fn new(port: u16) -> Socket {
-        let mut socket = Socket {
-            socket: UdpSocket::bind(("0.0.0.0:".to_string() + port.to_string().as_str()).as_str()).unwrap(),
+    pub fn new(port: u16) -> Result<Socket> {
+        Ok(Socket {
+            socket: UdpSocket::bind(("0.0.0.0:".to_string() + port.to_string().as_str()).as_str())?,
             buffer: default_vec(2.pow(N)),
-        };
-        socket
+        })
     }
 
     pub fn max_packet_size() -> usize {

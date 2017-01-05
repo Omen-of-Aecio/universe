@@ -9,13 +9,15 @@ use err::{Result, Error};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use bincode::rustc_serialize::{encode, decode, DecodingError, DecodingResult};
 use bincode;
+use world::color::Color;
+use geometry::vec::Vec2;
 
 use num_traits::int::PrimInt;
 
 #[derive(RustcEncodable, RustcDecodable)]
 pub enum Message {
     // Messages from server
-    WorldMeta {width: usize, height: usize},
+    Welcome {width: usize, height: usize, you_index: usize, players: Vec<Color>, white_base: Vec2, black_base: Vec2},
     WorldRect {x: usize, y: usize, width: usize, height: usize, pixels: Vec<u8>},
 
     // Messages from client

@@ -117,7 +117,7 @@ impl Client {
             return Err(Error::Other("Packet not from server".to_string()));
         }
         match msg {
-            Message::WorldMeta {width:_, height:_} => {
+            Message::Welcome {width: _, height: _, you_index: _, players: _, white_base: _, black_base: _} => {
             },
             Message::WorldRect {x, y, width, height, pixels} => {
                 if width * height != pixels.len() {
@@ -125,7 +125,8 @@ impl Client {
                 }
                 self.receive_world(x, y, width, height, pixels);
             },
-            _ => { println!("CLIENT: WRONG PACKAGE"); return Err(Error::Other("Wrong message type.".to_string()));},
+            _ => return Err(Error::Other("Wrong message type.".to_string())),
+
         };
         Ok(())
     }
@@ -151,37 +152,41 @@ impl Client {
         // Init connection
         socket.send_to(Message::Join, server);
         // Get world metadata
-        let (src, msg) = socket.recv()?;
+        let (_, msg) = socket.recv()?;
         // TODO reordering will be problematic here, expecting only a certain message
-        let (w, h) = match msg {
-            Message::WorldMeta {width, height} => (width, height),
-            _ => return Err(Error::Other("hello".to_string())),
-        };
+        match msg {
+            Message::Welcome {width, height, you_index, players, white_base, black_base} => {
+                let mut world = World::new(width, height, white_base, black_base);
+                world.player_nr = Some(you_index);
 
-        println!("Client creation. World size = ({}, {})", w, h);
+                println!("Client create new world");
+                for color in players {
+                    world.add_new_player(color);
+                    println!("Client add new player");
+                }
 
-        // let pos = Vec2::new(WORLD_SIZE as f32 - 50.0, WORLD_SIZE as f32/3.0);
-        let pos = Vec2::new(w as f32 / 2.0, h as f32/2.0);
-        let mut world = World::new(w, h, pos);
+                let display = glutin::WindowBuilder::new().build_glium().unwrap();
+                let graphics = Graphics::new(display.clone(), &world);
+                Ok(Client {
+                    display: display,
+                    input: Input::new(),
+                    graphics: graphics,
+                    world: world,
+                    cam_mode: CameraMode::FollowPlayer,
+                    zoom: 1.0,
+                    center: Vec2::new(0.0, 0.0),
+                    mouse_down: false,
+                    mouse_pos: Vec2::new(0.0, 0.0),
+                    mouse_pos_past: Vec2::new(0.0, 0.0),
 
-        let display = glutin::WindowBuilder::new().build_glium().unwrap();
-        let graphics = Graphics::new(display.clone(), &world);
-        Ok(Client {
-            display: display,
-            input: Input::new(),
-            graphics: graphics,
-            world: world,
-            cam_mode: CameraMode::FollowPlayer,
-            zoom: 1.0,
-            center: Vec2::new(0.0, 0.0),
-            mouse_down: false,
-            mouse_pos: Vec2::new(0.0, 0.0),
-            mouse_pos_past: Vec2::new(0.0, 0.0),
+                    socket: socket,
+                    server: server,
+                    a: 0,
+                })
+            },
+            _ => Err(Error::Other("hello".to_string()))
+        }
 
-            socket: socket,
-            server: server,
-            a: 0,
-        })
     }
 
     fn mouse_moved(&mut self, x: i32, y: i32) {

@@ -12,6 +12,7 @@ const JUMP_ACC: f32 = 3.0;
 const AIR_FRI: Vec2 = Vec2 { x: 0.91, y: 0.95 };
 // (TODO extra friction when on ground?)
 
+
 pub struct Player {
     pub shape: Polygon,
     jump: Option<Jump>,

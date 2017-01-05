@@ -1,13 +1,13 @@
-#[derive(Copy,Clone)]
+#[derive(Copy, Clone, RustcEncodable, RustcDecodable)]
 pub enum Color {
-    WHITE, BLACK,
+    White, Black,
 }
 
 impl Color {
     pub fn to_rgb(&self) -> [f32; 3] {
         match self {
-            &Color::BLACK => [0.0, 0.0, 0.0],
-            &Color::WHITE => [1.0, 1.0, 1.0],
+            &Color::Black => [0.0, 0.0, 0.0],
+            &Color::White => [1.0, 1.0, 1.0],
         }
     }
 }

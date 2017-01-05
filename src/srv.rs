@@ -6,6 +6,8 @@ use err::Result;
 use std::cmp::min;
 use std::thread;
 use std::time::Duration;
+use world::color::Color;
+use world::player::Player;
 
 use num_traits::Float;
 
@@ -24,15 +26,10 @@ pub struct Server {
 
 impl Server {
     pub fn new() -> Server {
-        // let pos = Vec2::new(WORLD_SIZE as f32 - 50.0, WORLD_SIZE as f32/3.0);
         let pos = Vec2::new(WORLD_SIZE as f32 / 2.0, WORLD_SIZE as f32/2.0);
-        let mut world = World::new(WORLD_SIZE, WORLD_SIZE, pos);
+        let size = WORLD_SIZE as f32;
+        let mut world = World::new(WORLD_SIZE, WORLD_SIZE, Vec2::new(size/4.0, size/2.0), Vec2::new(3.0*size/4.0, size/2.0));
 
-
-        world::gen::proc1(&mut world.tilenet); 
-        // world::gen::rings(&mut world.tilenet, 2);
-
-        world.tilenet.set_box(&255, (pos.x as usize-50, pos.y as usize-50), (pos.x as usize+50, pos.y as usize+50));
         Server {
             world: world,
 
@@ -69,11 +66,17 @@ impl Server {
 
     fn new_connection(&mut self, src: SocketAddr) -> Result<()> {
         self.connections.push(src);
-        // Tell about the world size
+        // Add new player
+        self.world.add_new_player(Color::Black);
+        // Tell about the world size and other meta data
         self.socket.send_to(
-            Message::WorldMeta {
+            Message::Welcome {
                 width: self.world.get_width(),
-                height: self.world.get_height()
+                height: self.world.get_height(),
+                you_index: self.world.players.len() - 1,
+                players: self.world.players.iter().map(|x| x.shape.color).collect(),
+                white_base: self.world.white_base,
+                black_base: self.world.black_base,
             },
             src);
 

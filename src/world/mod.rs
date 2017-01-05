@@ -22,8 +22,13 @@ const ACCELERATION: f32 = 0.35;
 
 pub struct World {
     pub tilenet: TileNet<Tile>,
-    pub player: Player,
+    pub players: Vec<Player>,
+    pub player_nr: Option<usize>, // which player is played locally (if client)
     pub exit: bool,
+
+    pub white_base: Vec2,
+    pub black_base: Vec2,
+
     width: usize,
     height: usize,
     cam_pos: Vec2,
@@ -34,12 +39,50 @@ pub struct World {
 }
 
 impl World {
-    pub fn new(width: usize, height: usize, player_pos: Vec2) -> World {
-        let shape = Polygon::new_quad(player_pos.x, player_pos.y, 10.0, 10.0, Color::BLACK);
+    pub fn new(width: usize, height: usize, white_base: Vec2, black_base: Vec2) -> World {
+
+        // let shape = Polygon::new_quad(player_pos.x, player_pos.y, 10.0, 10.0, Color::BLACK);
+        // let players = vec![ Player::new(shape) ];
+        let mut w = World {
+            tilenet: TileNet::<Tile>::new(width, height),
+            players: Vec::new(),
+            player_nr: None,
+            exit: false,
+            white_base: white_base,
+            black_base: black_base,
+            width: width,
+            height: height,
+            cam_pos: Vec2::new((width/2) as f32, (height/2) as f32),
+            gravity_on: false,
+            gravity: Vec2::new(0.0, -0.5),
+            vectors: Vec::new(),
+        };
+
+        // Generate TileNet
+        gen::proc1(&mut w.tilenet);
+        // world::gen::rings(&mut world.tilenet, 2);
+        
+        // Create bases
+        let base_size: usize = 50;
+
+        let pos = (white_base.x as usize, white_base.y as usize);
+        w.tilenet.set_box(&0, (pos.0 - base_size, pos.1 - base_size), (pos.0 + base_size, pos.1 + base_size));
+
+        let pos = (black_base.x as usize, black_base.y as usize);
+        w.tilenet.set_box(&255, (pos.0 - base_size, pos.1 - base_size), (pos.0 + base_size, pos.1 + base_size));
+
+        w
+    }
+
+    /// Will default_initialize certain fields that aren't needed on client side
+    pub fn new_for_client(width: usize, height: usize) -> World {
         World {
             tilenet: TileNet::<Tile>::new(width, height),
-            player: Player::new(shape),
+            players: Vec::new(),
+            player_nr: None,
             exit: false,
+            white_base: Vec2::null_vec(),
+            black_base: Vec2::null_vec(),
             width: width,
             height: height,
             cam_pos: Vec2::new((width/2) as f32, (height/2) as f32),
@@ -49,11 +92,28 @@ impl World {
         }
     }
 
+    pub fn add_new_player(&mut self, col: Color) { 
+        self.players.push(Player::new(
+            match col {
+                Color::White => Polygon::new_quad(self.white_base.x, self.white_base.y, 10.0, 10.0, Color::White),
+                Color::Black => Polygon::new_quad(self.black_base.x, self.black_base.y, 10.0, 10.0, Color::Black),
+            }
+        ));
+    }
+
+    fn get_player(&mut self) -> Option<&mut Player> {
+        match self.player_nr {
+            Some(player_nr) => Some(&mut self.players[player_nr]),
+            None => None
+        }
+    }
 
     pub fn update(&mut self, input: &Input) {
         self.vectors.clear(); // clear debug geometry
         self.handle_input(input);
-        self.player.update(&self.tilenet, if self.gravity_on { self.gravity } else { Vec2::null_vec() });
+        for player in &mut self.players {
+            player.update(&self.tilenet, if self.gravity_on { self.gravity } else { Vec2::null_vec() });
+        }
         self.update_camera();
     }
 
@@ -67,22 +127,22 @@ impl World {
             self.exit = true;
         }
         if input.key_down(KeyCode::Left) || input.key_down(KeyCode::A) || input.key_down(KeyCode::R) {
-            self.player.accelerate(Vec2::new(-ACCELERATION, 0.0));
+            self.get_player().map(|x| x.accelerate(Vec2::new(-ACCELERATION, 0.0)));
         }
         if input.key_down(KeyCode::Right) || input.key_down(KeyCode::D) || input.key_down(KeyCode::T) {
-            self.player.accelerate(Vec2::new(ACCELERATION, 0.0));
+            self.get_player().map(|x| x.accelerate(Vec2::new(ACCELERATION, 0.0)));
 
         }
         if input.key_down(KeyCode::Up) || input.key_down(KeyCode::W) || input.key_down(KeyCode::F) {
             if self.gravity_on {
-                self.player.jump();
+                self.get_player().map(|x| x.jump());
             } else {
-                self.player.accelerate(Vec2::new(0.0, ACCELERATION));
+                self.get_player().map(|x| x.accelerate(Vec2::new(0.0, ACCELERATION)));
             }
         }
         if input.key_down(KeyCode::Down) || input.key_down(KeyCode::S) || input.key_down(KeyCode::S) {
             if !self.gravity_on {
-                self.player.accelerate(Vec2::new(0.0, -ACCELERATION));
+                self.get_player().map(|x| x.accelerate(Vec2::new(0.0, -ACCELERATION)));
             }
         }
         if input.key_toggled_down(KeyCode::G) {
@@ -91,7 +151,7 @@ impl World {
     }
     fn update_camera(&mut self) {
         // Camera follows player
-        self.cam_pos = self.player.shape.pos;
+        self.cam_pos = self.get_player().map(|x| x.shape.pos).unwrap_or(self.cam_pos);
     }
 
     // Access //
@@ -112,8 +172,8 @@ impl World {
 
 pub fn map_tile_value_via_color(tile: &Tile, color: Color) -> Tile {
 	match (tile, color) {
-		(&0, Color::BLACK) => 255,
-		(&255, Color::BLACK) => 0,
+		(&0, Color::Black) => 255,
+		(&255, Color::Black) => 0,
 		_ => *tile,
 	}
 }

@@ -77,8 +77,8 @@ impl Collable<u8, PolygonState> for Polygon {
         where I: Iterator<Item = (i32, i32)>
     {
         let no_collision = match self.color {
-            Color::WHITE => set.all(|x| *x == 0),
-            Color::BLACK => set.all(|x| *x != 0),
+            Color::White => set.all(|x| *x == 0),
+            Color::Black => set.all(|x| *x != 0),
         };
         if no_collision {
             // If there is no collision (we only collide with non-zero tiles)

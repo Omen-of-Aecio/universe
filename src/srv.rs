@@ -71,7 +71,7 @@ impl Server {
 
             // Logic
             prof!["Logic", self.world.update()];
-            thread::sleep(Duration::from_millis(30));
+            thread::sleep(Duration::from_millis(10));
         }
 
     }
@@ -90,7 +90,8 @@ impl Server {
                     Some(ref mut player_data) => player_data.input = input,
                     None => return Err(Error::Other("Received 'Input' messages from player with unregistered connection.".into())),
                 }
-            }
+            },
+            Message::ToggleGravity => self.world.gravity_on = !self.world.gravity_on,
             _ => {}
         }
         Ok(())

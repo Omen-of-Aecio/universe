@@ -72,6 +72,7 @@ impl Client {
                     _ => (),
                 }
             }
+            self.handle_input();
             self.send_input()?;
 
             // Networking
@@ -113,6 +114,11 @@ impl Client {
         }
     }
 
+    fn handle_input(&self) {
+        if self.input.key_toggled_down(KeyCode::G) {
+            self.socket.send_to(&Message::ToggleGravity, self.server);
+        }
+    }
     fn send_input(&mut self) -> Result<()> {
         let msg = Message::Input (self.input.create_player_input());
         self.socket.send_to(&msg, self.server);

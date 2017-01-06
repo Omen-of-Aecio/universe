@@ -29,6 +29,7 @@ pub enum Message {
     // Messages from client
     Join,
     Input (PlayerInput),
+    ToggleGravity,
 }
 
 impl Message {

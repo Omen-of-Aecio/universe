@@ -1,7 +1,7 @@
 use geometry::vec::Vec2;
 use glium;
 use glium::{DisplayBuild, glutin};
-use glium::glutin::{ElementState, MouseButton, MouseScrollDelta};
+use glium::glutin::{ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode as KeyCode};
 use input::Input;
 use world::World;
 use graphics::Graphics;
@@ -12,6 +12,7 @@ use rand::Rng;
 
 use net::{Message, Socket};
 use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
+use std::iter::Iterator;
 
 const CLIENT_PORT: u16 = 10123;
 
@@ -28,6 +29,8 @@ pub struct Client {
     graphics: Graphics,
     world: World,
 
+    player_nr: usize,
+
     // Camera & input (for now)
     cam_mode: CameraMode,
     //   following is used only if INTERACTIVE camera mode
@@ -40,8 +43,6 @@ pub struct Client {
     // Networking
     socket: Socket,
     server: SocketAddr,
-
-    a: i32,
 }
 
 
@@ -49,9 +50,7 @@ pub struct Client {
 impl Client {
     pub fn run(&mut self) -> Result<()> {
         let mut window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
-        let mut oldpos = Vec2::null_vec();
         loop {
-            println!("Number of world pieces: {}", self.a);
             // Input
             self.input.update();
             // Handle input events
@@ -73,6 +72,8 @@ impl Client {
                     _ => (),
                 }
             }
+            self.send_input()?;
+
             // Networking
             for msg in &mut self.socket.messages().unwrap() {
                 match msg {
@@ -98,7 +99,7 @@ impl Client {
             // Render
             let cam_pos = match self.cam_mode {
                 CameraMode::Interactive => self.center,
-                CameraMode::FollowPlayer => self.world.get_cam_pos(),
+                CameraMode::FollowPlayer => self.world.players[self.player_nr].shape.pos,
             };
             prof!["Render",
                   self.graphics.render(cam_pos,
@@ -111,6 +112,13 @@ impl Client {
             // thread::sleep(Duration::from_millis(15));
         }
     }
+
+    fn send_input(&mut self) -> Result<()> {
+        let msg = Message::Input (self.input.create_player_input());
+        self.socket.send_to(&msg, self.server);
+        Ok(())
+    }
+
     /// Currently just ignores unexpected messages
     fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<()> {
         if src != self.server {
@@ -125,6 +133,12 @@ impl Client {
                 }
                 self.receive_world(x, y, width, height, pixels);
             },
+            Message::PlayerPos (pos) => {
+                let mut i = 0;
+                for (i, pos) in pos.iter().enumerate() {
+                    self.world.players[i].shape.pos = *pos;
+                }
+            },
             _ => return Err(Error::Other("Wrong message type.".to_string())),
 
         };
@@ -132,7 +146,6 @@ impl Client {
     }
 
     fn receive_world(&mut self, x: usize, y: usize, w: usize, h: usize, pixels: Vec<u8>) {
-        self.a += 1;
         assert!(pixels.len() == w*h);
         let mut i = 0;
         for y in y..y+h {
@@ -150,14 +163,13 @@ impl Client {
         let server = to_socket_addr(server_addr);
 
         // Init connection
-        socket.send_to(Message::Join, server);
+        socket.send_to(&Message::Join, server);
         // Get world metadata
         let (_, msg) = socket.recv()?;
         // TODO reordering will be problematic here, expecting only a certain message
         match msg {
             Message::Welcome {width, height, you_index, players, white_base, black_base} => {
                 let mut world = World::new(width, height, white_base, black_base);
-                world.player_nr = Some(you_index);
 
                 println!("Client create new world");
                 for color in players {
@@ -172,6 +184,8 @@ impl Client {
                     input: Input::new(),
                     graphics: graphics,
                     world: world,
+                    player_nr: you_index,
+
                     cam_mode: CameraMode::FollowPlayer,
                     zoom: 1.0,
                     center: Vec2::new(0.0, 0.0),
@@ -181,10 +195,9 @@ impl Client {
 
                     socket: socket,
                     server: server,
-                    a: 0,
                 })
             },
-            _ => Err(Error::Other("hello".to_string()))
+            _ => Err(Error::Other("Didn't receive Welcome message (in order...)".to_string()))
         }
 
     }

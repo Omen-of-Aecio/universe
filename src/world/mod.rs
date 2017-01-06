@@ -23,7 +23,6 @@ const ACCELERATION: f32 = 0.35;
 pub struct World {
     pub tilenet: TileNet<Tile>,
     pub players: Vec<Player>,
-    pub player_nr: Option<usize>, // which player is played locally (if client)
     pub exit: bool,
 
     pub white_base: Vec2,
@@ -32,11 +31,12 @@ pub struct World {
     width: usize,
     height: usize,
     cam_pos: Vec2,
-    gravity_on: bool,
+    pub gravity_on: bool,
     gravity: Vec2,
     // Extra graphics data (for debugging/visualization)
     pub vectors: Vec<(Vec2, Vec2)>,
 }
+
 
 impl World {
     pub fn new(width: usize, height: usize, white_base: Vec2, black_base: Vec2) -> World {
@@ -46,7 +46,6 @@ impl World {
         let mut w = World {
             tilenet: TileNet::<Tile>::new(width, height),
             players: Vec::new(),
-            player_nr: None,
             exit: false,
             white_base: white_base,
             black_base: black_base,
@@ -79,7 +78,6 @@ impl World {
         World {
             tilenet: TileNet::<Tile>::new(width, height),
             players: Vec::new(),
-            player_nr: None,
             exit: false,
             white_base: Vec2::null_vec(),
             black_base: Vec2::null_vec(),
@@ -92,66 +90,26 @@ impl World {
         }
     }
 
-    pub fn add_new_player(&mut self, col: Color) { 
+    /// Returns index of the new player
+    pub fn add_new_player(&mut self, col: Color) -> usize { 
         self.players.push(Player::new(
             match col {
                 Color::White => Polygon::new_quad(self.white_base.x, self.white_base.y, 10.0, 10.0, Color::White),
                 Color::Black => Polygon::new_quad(self.black_base.x, self.black_base.y, 10.0, 10.0, Color::Black),
             }
         ));
+        self.players.len() - 1
     }
 
-    fn get_player(&mut self) -> Option<&mut Player> {
-        match self.player_nr {
-            Some(player_nr) => Some(&mut self.players[player_nr]),
-            None => None
-        }
-    }
-
-    pub fn update(&mut self, input: &Input) {
+    pub fn update(&mut self) {
         self.vectors.clear(); // clear debug geometry
-        self.handle_input(input);
         for player in &mut self.players {
             player.update(&self.tilenet, if self.gravity_on { self.gravity } else { Vec2::null_vec() });
         }
-        self.update_camera();
     }
 
     pub fn polygons_iter<'a>(&'a self) -> PolygonIter<'a> {
         PolygonIter::new(self)
-    }
-
-    fn handle_input(&mut self, input: &Input) {
-        // Ad hoc: input to control first polygon
-        if input.key_down(KeyCode::Escape) {
-            self.exit = true;
-        }
-        if input.key_down(KeyCode::Left) || input.key_down(KeyCode::A) || input.key_down(KeyCode::R) {
-            self.get_player().map(|x| x.accelerate(Vec2::new(-ACCELERATION, 0.0)));
-        }
-        if input.key_down(KeyCode::Right) || input.key_down(KeyCode::D) || input.key_down(KeyCode::T) {
-            self.get_player().map(|x| x.accelerate(Vec2::new(ACCELERATION, 0.0)));
-
-        }
-        if input.key_down(KeyCode::Up) || input.key_down(KeyCode::W) || input.key_down(KeyCode::F) {
-            if self.gravity_on {
-                self.get_player().map(|x| x.jump());
-            } else {
-                self.get_player().map(|x| x.accelerate(Vec2::new(0.0, ACCELERATION)));
-            }
-        }
-        if input.key_down(KeyCode::Down) || input.key_down(KeyCode::S) || input.key_down(KeyCode::S) {
-            if !self.gravity_on {
-                self.get_player().map(|x| x.accelerate(Vec2::new(0.0, -ACCELERATION)));
-            }
-        }
-        if input.key_toggled_down(KeyCode::G) {
-            self.gravity_on = ! self.gravity_on;
-        }
-    }
-    fn update_camera(&mut self) {
-        // Camera follows player
-        self.cam_pos = self.get_player().map(|x| x.shape.pos).unwrap_or(self.cam_pos);
     }
 
     // Access //

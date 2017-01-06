@@ -2,7 +2,7 @@ use std::ops::{Add, Sub, Mul, Div, AddAssign, SubAssign, MulAssign, DivAssign};
 use tile_net;
 
 #[allow(non_camel_case_types)]
-#[derive(Copy, Clone, Default, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Default, Debug, RustcEncodable, RustcDecodable)]
 pub struct Vec2 {
     pub x: f32,
     pub y: f32,

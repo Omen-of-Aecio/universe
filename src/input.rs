@@ -3,6 +3,10 @@ use glium::glutin::{ElementState, VirtualKeyCode as KeyCode};
 // use glium::glutin::KeyCode;
 use glium::glutin::Event::KeyboardInput;
 
+// TODO
+// Input isn't really made for ease of client-server
+
+
 const NUM_KEYS: usize = 150;
 
 pub struct Input {
@@ -57,7 +61,7 @@ impl Input {
     }
 
 
-    fn register_key_down(&mut self, keycode: KeyCode) {
+    pub fn register_key_down(&mut self, keycode: KeyCode) {
         debug!("Key down"; "code" => keycode as i32);
         let keycode = keycode as usize;
         if !self.key_down[keycode] {
@@ -66,7 +70,7 @@ impl Input {
         }
         self.key_down[keycode] = true;
     }
-    fn register_key_up(&mut self, keycode: KeyCode) {
+    pub fn register_key_up(&mut self, keycode: KeyCode) {
         let keycode = keycode as usize;
         if self.key_down[keycode] {
             // If this toggles the key...
@@ -74,4 +78,23 @@ impl Input {
         }
         self.key_down[keycode] = false;
     }
+
+    pub fn create_player_input(&self) -> PlayerInput {
+        PlayerInput {
+            up: self.key_down(KeyCode::Up) || self.key_down(KeyCode::W) || self.key_down(KeyCode::F),
+            down: self.key_down(KeyCode::Down) || self.key_down(KeyCode::S) || self.key_down(KeyCode::S),
+            left: self.key_down(KeyCode::Left) || self.key_down(KeyCode::A) || self.key_down(KeyCode::R),
+            right: self.key_down(KeyCode::Right) || self.key_down(KeyCode::D) || self.key_down(KeyCode::T),
+            g: self.key_down(KeyCode::G),
+        }
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone, RustcEncodable, RustcDecodable)]
+pub struct PlayerInput {
+    pub up: bool,
+    pub down: bool,
+    pub left: bool,
+    pub right: bool,
+    pub g: bool,
 }

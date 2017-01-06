@@ -11,17 +11,24 @@ use bincode::rustc_serialize::{encode, decode, DecodingError, DecodingResult};
 use bincode;
 use world::color::Color;
 use geometry::vec::Vec2;
+use input::PlayerInput;
 
 use num_traits::int::PrimInt;
+
+const PROTOCOL: u32 = 0xf5ad9165;
+const N: u32 = 10; // max packet size = 2^N
 
 #[derive(RustcEncodable, RustcDecodable)]
 pub enum Message {
     // Messages from server
     Welcome {width: usize, height: usize, you_index: usize, players: Vec<Color>, white_base: Vec2, black_base: Vec2},
     WorldRect {x: usize, y: usize, width: usize, height: usize, pixels: Vec<u8>},
+    PlayerPos (Vec<Vec2>),
+    
 
     // Messages from client
     Join,
+    Input (PlayerInput),
 }
 
 impl Message {
@@ -42,9 +49,6 @@ impl Message {
     }
 }
 
-
-const PROTOCOL: u32 = 0xf5ad9165;
-const N: u32 = 10; // max packet size = 2^N
 
 pub struct Socket {
     socket: UdpSocket,
@@ -70,7 +74,8 @@ impl Socket {
         })
     }
 
-    pub fn send_to(&mut self, msg: Message, dest: SocketAddr) {
+    // TODO Should return Result.
+    pub fn send_to(&self, msg: &Message, dest: SocketAddr) {
         let mut buffer = Vec::new();
         buffer.write_u32::<BigEndian>(PROTOCOL);
         buffer.extend(msg.encode());

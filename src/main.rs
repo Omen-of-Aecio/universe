@@ -49,7 +49,7 @@ fn setup_logger() {
             .full()
             .use_utc_timestamp()
             .build();
-        let d = slog::level_filter(Level::Critical, drain);
+        let d = slog::level_filter(Level::Info, drain);
         slog::Logger::root(d.fuse(), o![])
     } else {
         slog::Logger::root(slog_stream::stream(std::io::stderr(), slog_json::default()).fuse(),

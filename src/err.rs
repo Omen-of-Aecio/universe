@@ -13,31 +13,26 @@ pub enum Error {
     // Networking
     WrongProtocol,
     UnknownMessage,
-    
 }
 
-
-impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Error {
-        Error::IO(e)
-    }
-}
-impl From<DecodingError> for Error {
-    fn from(e: DecodingError) -> Error {
-        Error::Decoding(e)
-    }
-}
-impl From<String> for Error {
-    fn from(e: String) -> Error {
-        Error::Other(e)
-    }
-}
-impl From<&'static str> for Error {
-    fn from(e: &'static str) -> Error {
-        Error::Other(e.to_string())
-    }
+macro_rules! implement_froms_for_error {
+  ($($i:ident : $t:ty => $e:expr),*,) => { implement_froms_for_error![$($i: $t => $e),*]; };
+  ($($i:ident : $t:ty => $e:expr),*) => {
+    $(impl From<$t> for Error {
+        fn from($i: $t) -> Error {
+          $e
+        }
+      }
+    )*
+  };
 }
 
+implement_froms_for_error![
+  e: std::io::Error => Error::IO(e),
+  e: DecodingError => Error::Decoding(e),
+  e: String => Error::Other(e),
+  e: &'static str => Error::Other(e.to_string()),
+];
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

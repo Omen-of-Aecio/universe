@@ -10,7 +10,8 @@ use err::{Result, Error};
 use rand;
 use rand::Rng;
 
-use net::{Message, Socket};
+use net::Socket;
+use net::msg::Message;
 use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 use std::iter::Iterator;
 

@@ -1,15 +1,17 @@
+pub mod msg;
+
+use net::msg::Message;
 use std;
 use std::mem::size_of_val;
-use std::io::Cursor;
 use std::time::Duration;
 use std::net::{UdpSocket, SocketAddr};
 use std::iter::Iterator;
 use std::mem::discriminant;
+use std::io::Cursor;
 use err::{Result, Error};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use bincode::rustc_serialize::{encode, decode, DecodingError, DecodingResult};
 use bincode;
-use world::color::Color;
 use geometry::vec::Vec2;
 use input::PlayerInput;
 
@@ -18,37 +20,22 @@ use num_traits::int::PrimInt;
 const PROTOCOL: u32 = 0xf5ad9165;
 const N: u32 = 10; // max packet size = 2^N
 
-#[derive(RustcEncodable, RustcDecodable)]
-pub enum Message {
-    // Messages from server
-    Welcome {width: usize, height: usize, you_index: usize, players: Vec<Color>, white_base: Vec2, black_base: Vec2},
-    WorldRect {x: usize, y: usize, width: usize, height: usize, pixels: Vec<u8>},
-    PlayerPos (Vec<Vec2>),
-    
 
-    // Messages from client
-    Join,
-    Input (PlayerInput),
-    ToggleGravity,
+/// `Protocol` struct wraps a message in protocol-specific data.
+struct Protocol {
+    protocol_nr: u32,
+
+    msg: Message,
 }
-
-impl Message {
-    fn encode(&self) -> Vec<u8> {
-        encode(&self, bincode::SizeLimit::Bounded((Socket::max_packet_size()) as u64)).unwrap()
-    }
-
-    fn decode(data: &[u8]) -> Result<Message> {
-        let mut rdr = Cursor::new(data);
-        Socket::check_protocol(&mut rdr)?;
-
-        let msg: DecodingResult<Message> = decode(&data[4..]);
-        match msg {
-            Ok(msg) => Ok(msg),
-            Err(DecodingError::IoError(e)) => Err(e.into()),
-            Err(e) => Err(e.into())
+impl Protocol{ 
+    pub fn new(msg: Message) -> Protocol {
+        Protocol {
+            protocol_nr: PROTOCOL,
+            msg: msg,
         }
     }
 }
+
 
 
 pub struct Socket {

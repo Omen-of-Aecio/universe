@@ -1,7 +1,8 @@
 use geometry::vec::Vec2;
 use world;
 use world::World;
-use net::{Message, Socket};
+use net::Socket;
+use net::msg::Message;
 use world::color::Color;
 use world::player::Player;
 use glium::glutin::VirtualKeyCode as KeyCode;

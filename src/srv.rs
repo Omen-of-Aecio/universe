@@ -91,7 +91,7 @@ impl Server {
             Message::Input (input) => {
                 match self.players.get_mut(&src) {
                     Some(ref mut player_data) => player_data.input = input,
-                    None => return Err(Error::Other("Received 'Input' messages from player with unregistered connection.".into())),
+                    None => bail!("Received 'Input' messages from player with unregistered connection."),
                 }
             },
             Message::ToggleGravity => self.world.gravity_on = !self.world.gravity_on,

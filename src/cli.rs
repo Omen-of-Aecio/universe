@@ -6,7 +6,7 @@ use input::Input;
 use world::World;
 use graphics::Graphics;
 use graphics::screen_to_world;
-use err::{Result, Error};
+use err::*;
 use rand;
 use rand::Rng;
 
@@ -91,7 +91,7 @@ impl Client {
                 })
             },
             _ => {
-                Err(Error::Other("Didn't receive Welcome message (in order...)".to_string()))
+                Err("Didn't receive Welcome message (in order...)".into())
             },
         }
 
@@ -126,12 +126,8 @@ impl Client {
             let messages: Vec<Result<(SocketAddr, Message)>> = self.socket.messages().collect();
             // Networking
             for msg in messages {
-                match msg {
-                    Ok((src, msg)) => {
-                        self.handle_message(src, msg).unwrap();
-                    },
-                    Err(e) => return Err(e),
-                }
+                let msg = msg.chain_err(|| "Client: error in received message.")?;
+                self.handle_message(msg.0, msg.1).chain_err(|| "Client: error in handling message.")?;
             }
 
             // Some interactivity for debugging
@@ -177,14 +173,14 @@ impl Client {
     /// Currently just ignores unexpected messages
     fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<()> {
         if src != self.server {
-            return Err(Error::Other("Packet not from server".to_string()));
+            bail!("Packet not from server");
         }
         match msg {
             Message::Welcome {width: _, height: _, you_index: _, players: _, white_base: _, black_base: _} => {
             },
             Message::WorldRect {x, y, width, height, pixels} => {
                 if width * height != pixels.len() {
-                    return Err(Error::Other(format!("Not enough pixels ({}) to cover rect ({}, {}; {}, {})", pixels.len(), x, y, width, height)));
+                    bail!("Not enough pixels ({}) to cover rect ({}, {}; {}, {})", pixels.len(), x, y, width, height);
                 }
                 self.receive_world(x, y, width, height, pixels);
             },
@@ -194,7 +190,7 @@ impl Client {
                     self.world.players[i].shape.pos = *pos;
                 }
             },
-            _ => return Err(Error::Other("Wrong message type.".to_string())),
+            _ => bail!("Wrong message type."),
 
         };
         Ok(())

@@ -18,6 +18,8 @@ extern crate slog_term;
 extern crate tile_net;
 extern crate tilenet_ren;
 extern crate time;
+#[macro_use]
+extern crate error_chain;
 
 extern crate clap;
 extern crate byteorder;

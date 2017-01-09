@@ -1,6 +1,6 @@
 use net::msg::Message;
 use net::Socket;
-use err::{Error, Result};
+use err::*;
 
 
 use bincode;
@@ -47,7 +47,7 @@ impl Packet{
     pub fn check_protocol_nr(&self) -> Result<()> {
         match self.protocol_nr {
             PROTOCOL => Ok(()),
-            _ => Err(Error::WrongProtocol),
+            _ => Err(ErrorKind::WrongProtocol.into()),
         }
     }
 }

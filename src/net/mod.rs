@@ -136,7 +136,7 @@ impl<'a> Iterator for SocketIter<'a> {
             Ok((amt, src)) => {
                 let packet = match Packet::decode(&self.socket.buffer[0..amt]) {
                     Ok(p) => p,
-                    Err(e) => return(Some(Err(e))),
+                    Err(e) => return Some(Err(e)),
                 };
                 let conn = self.socket.get_connection_or_create(src);
                 Some(conn.unwrap_message(packet).map(|msg| (src, msg)))

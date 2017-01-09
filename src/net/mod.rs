@@ -54,39 +54,46 @@ impl Socket {
     }
 
     /// Attempt to clone the socket to create consumable iterator
-    pub fn messages(&self) -> Result<SocketIter> {
-        Ok(SocketIter {
-            socket: self.socket.try_clone()?,
-            buffer: default_vec(Socket::max_packet_size()),
-        })
+    pub fn messages(&mut self) -> SocketIter {
+        SocketIter {
+            socket: self,
+        }
     }
 
-    pub fn send_to(&self, msg: Message, dest: SocketAddr) -> Result<()> {
-        let conn = self.get_connection_or_create(dest);
-        let mut buffer = conn.wrap_unreliable_message(msg);
+    pub fn send_to(&mut self, msg: Message, dest: SocketAddr) -> Result<()> {
+        let mut buffer = {
+            let conn = self.get_connection_or_create(dest);
+            conn.wrap_unreliable_message(msg)
+        };
         self.socket.send_to(&buffer, dest)?;
         Ok(())
     }
 
 
 
-    pub fn send_reliable_to(&self, msg: Message, dest: SocketAddr) -> Result<()> {
-        let conn = self.get_connection_or_create(dest);
-        let mut buffer = conn.wrap_message(msg);
-        self.socket.send_to(buffer, dest)?;
+    pub fn send_reliable_to(&mut self, msg: Message, dest: SocketAddr) -> Result<()> {
+        // Need to clone it here because of aliasing :/
+        // IDEA: Could also let Connection::wrap_message take a clone of the UdpSocket and send the
+        // message itself. Connection could even know what UdpSocket it is associated with..
+        let socket = self.socket.try_clone()?;
+
+        let mut buffer = {
+            let mut conn = self.get_connection_or_create(dest);
+            conn.wrap_message(msg)
+        };
+        socket.send_to(buffer, dest)?;
         Ok(())
     }
 
-    fn get_connection_or_create(&mut self, dest: SocketAddr) -> Connection{
-        match self.connections.get(&dest) {
-            None => {
+    fn get_connection_or_create<'a>(&'a mut self, dest: SocketAddr) -> &'a mut Connection {
+        match self.connections.get(&dest).is_some() {
+            false => {
                 let conn = Connection::new();
                 self.connections.insert(dest, conn);
-                conn
             },
-            Some(conn) => *conn,
-            
+            true => {},
         }
+        self.connections.get_mut(&dest).unwrap()
     }
 
     // Should wait until the packet is acknowledged..:
@@ -94,14 +101,15 @@ impl Socket {
 
     /// Blocking, with timeout (3 sec)
     pub fn recv(&mut self) -> Result<(SocketAddr, Message)> {
-        self.socket.set_nonblocking(false);
-        self.socket.set_read_timeout(Some(Duration::new(3, 0)));
+        self.socket.set_nonblocking(false)?;
+        self.socket.set_read_timeout(Some(Duration::new(3, 0)))?;
 
         let recv_result = self.socket.recv_from(&mut self.buffer);
         match recv_result {
             Ok((amt, src)) => {
+                let packet = Packet::decode(&self.buffer[0..amt])?;
                 let conn = self.get_connection_or_create(src);
-                let msg = conn.unwrap_message(&self.buffer[0..amt])?;
+                let msg = conn.unwrap_message(packet)?;
                 Ok((src, msg))
 
             },
@@ -110,17 +118,28 @@ impl Socket {
     }
 }
 
-impl Iterator for Socket {
+pub struct SocketIter<'a> {
+    socket: &'a mut Socket,
+}
+
+impl<'a> Iterator for SocketIter<'a> {
     type Item = Result<(SocketAddr, Message)>;
 
     fn next(&mut self) -> Option<Result<(SocketAddr, Message)>> {
-        self.socket.set_nonblocking(true).unwrap();
+        match self.socket.socket.set_nonblocking(true) {
+            Err(e) => return Some(Err(e.into())),
+            Ok(_) => {},
+        }
 
-        let msg = self.socket.recv_from(&mut self.buffer);
+        let msg = self.socket.socket.recv_from(&mut self.socket.buffer);
         match msg {
             Ok((amt, src)) => {
-                let conn = self.get_connection_or_create(src);
-                Some(conn.unwrap_message(&self.buffer[0..amt]).map(|msg| (src, msg)))
+                let packet = match Packet::decode(&self.socket.buffer[0..amt]) {
+                    Ok(p) => p,
+                    Err(e) => return(Some(Err(e))),
+                };
+                let conn = self.socket.get_connection_or_create(src);
+                Some(conn.unwrap_message(packet).map(|msg| (src, msg)))
             },
             Err(e) => {
                 if let std::io::ErrorKind::WouldBlock = e.kind() {

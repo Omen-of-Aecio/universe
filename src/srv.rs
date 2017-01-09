@@ -49,7 +49,8 @@ impl Server {
     }
     pub fn run(&mut self) -> Result<()> {
         loop {
-            for msg in &mut self.socket.messages().unwrap() {
+            let messages: Vec<Result<(SocketAddr, Message)>> = self.socket.messages().collect();
+            for msg in messages {
                 match msg {
                     Ok((src, msg)) => {
                         self.handle_message(src, msg)?;
@@ -78,7 +79,7 @@ impl Server {
 
     }
 
-    fn broadcast(&self, msg: &Message) {
+    fn broadcast(&mut self, msg: &Message) {
         for client in self.players.keys() {
             self.socket.send_to(msg.clone(), *client);
         }

@@ -49,6 +49,53 @@ pub struct Client {
 
 
 impl Client {
+    pub fn new(server_addr: &str) -> Result<Client> {
+
+        let mut socket = Client::create_socket();
+        let server = to_socket_addr(server_addr);
+
+        // Init connection
+        socket.send_to(Message::Join, server);
+        // Get world metadata
+        let (_, msg) = socket.recv().unwrap();
+        // TODO reordering will be problematic here, expecting only a certain message
+        match msg {
+            Message::Welcome {width, height, you_index, players, white_base, black_base} => {
+                let mut world = World::new(width, height, white_base, black_base);
+
+                println!("Client create new world");
+                for color in players {
+                    world.add_new_player(color);
+                    println!("Client add new player");
+                }
+
+                let display = glutin::WindowBuilder::new().build_glium().unwrap();
+                let graphics = Graphics::new(display.clone(), &world);
+                info!("CHK 1");
+                Ok(Client {
+                    display: display,
+                    input: Input::new(),
+                    graphics: graphics,
+                    world: world,
+                    player_nr: you_index,
+
+                    cam_mode: CameraMode::FollowPlayer,
+                    zoom: 1.0,
+                    center: Vec2::new(0.0, 0.0),
+                    mouse_down: false,
+                    mouse_pos: Vec2::new(0.0, 0.0),
+                    mouse_pos_past: Vec2::new(0.0, 0.0),
+
+                    socket: socket,
+                    server: server,
+                })
+            },
+            _ => {
+                Err(Error::Other("Didn't receive Welcome message (in order...)".to_string()))
+            },
+        }
+
+    }
     pub fn run(&mut self) -> Result<()> {
         let mut window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
         loop {
@@ -74,13 +121,14 @@ impl Client {
                 }
             }
             self.handle_input();
-            self.send_input()?;
+            self.send_input().unwrap();
 
+            let messages: Vec<Result<(SocketAddr, Message)>> = self.socket.messages().collect();
             // Networking
-            for msg in &mut self.socket.messages().unwrap() {
+            for msg in messages {
                 match msg {
                     Ok((src, msg)) => {
-                        self.handle_message(src, msg)?;
+                        self.handle_message(src, msg).unwrap();
                     },
                     Err(e) => return Err(e),
                 }
@@ -115,7 +163,7 @@ impl Client {
         }
     }
 
-    fn handle_input(&self) {
+    fn handle_input(&mut self) {
         if self.input.key_toggled_down(KeyCode::G) {
             self.socket.send_to(Message::ToggleGravity, self.server);
         }
@@ -164,50 +212,6 @@ impl Client {
         self.graphics.tilenet_renderer.upload_texture(&self.world.tilenet, x as u32, y as u32, w as u32, h as u32);
     }
 
-    pub fn new(server_addr: &str) -> Result<Client> {
-
-        let mut socket = Client::create_socket();
-        let server = to_socket_addr(server_addr);
-
-        // Init connection
-        socket.send_to(Message::Join, server);
-        // Get world metadata
-        let (_, msg) = socket.recv()?;
-        // TODO reordering will be problematic here, expecting only a certain message
-        match msg {
-            Message::Welcome {width, height, you_index, players, white_base, black_base} => {
-                let mut world = World::new(width, height, white_base, black_base);
-
-                println!("Client create new world");
-                for color in players {
-                    world.add_new_player(color);
-                    println!("Client add new player");
-                }
-
-                let display = glutin::WindowBuilder::new().build_glium().unwrap();
-                let graphics = Graphics::new(display.clone(), &world);
-                Ok(Client {
-                    display: display,
-                    input: Input::new(),
-                    graphics: graphics,
-                    world: world,
-                    player_nr: you_index,
-
-                    cam_mode: CameraMode::FollowPlayer,
-                    zoom: 1.0,
-                    center: Vec2::new(0.0, 0.0),
-                    mouse_down: false,
-                    mouse_pos: Vec2::new(0.0, 0.0),
-                    mouse_pos_past: Vec2::new(0.0, 0.0),
-
-                    socket: socket,
-                    server: server,
-                })
-            },
-            _ => Err(Error::Other("Didn't receive Welcome message (in order...)".to_string()))
-        }
-
-    }
 
     fn mouse_moved(&mut self, x: i32, y: i32) {
         self.mouse_pos_past = self.mouse_pos;

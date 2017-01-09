@@ -68,7 +68,8 @@ fn main() {
         .get_matches();
 
     if let Some(connect) = options.value_of("connect") {
-        Client::new(connect).unwrap().run().unwrap();
+        let mut client = Client::new(connect).unwrap();
+        client.run().unwrap();
     } else {
         Server::new().run().unwrap();
     }

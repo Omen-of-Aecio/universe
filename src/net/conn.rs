@@ -6,7 +6,7 @@ use std::net::SocketAddr;
 use err::Result;
 
 #[derive(Clone)]
-struct SendWindow {
+pub struct SendWindow {
     /// Sequence number of first packet in the queue
     pub start_seq: u32,
     /// The time that the first packet in the queue was sent
@@ -64,17 +64,18 @@ impl<'a> Connection {
     }
 
     /// Unwraps packet, and if it is reliable, update `self.ack` to acknowledge it later.
-    pub fn unwrap_message(&mut self, data: &[u8]) -> Result<Message> {
-        let p = Packet::decode(data)?;
-        p.check_protocol_nr()?;
-        match p.kind {
+    // Ideally, I would like to take a &[u8] here but it creates aliasing conflicts, as Socket will
+    // have to send a slice of its own buffer.
+    pub fn unwrap_message(&mut self, packet: Packet) -> Result<Message> {
+        packet.check_protocol_nr()?;
+        match packet.kind {
             PacketKind::Unreliable {ack} => {},
             PacketKind::Reliable {ack, seq} => {
                 self.received = seq;
                 self.acked = ack;
             },
         };
-        Ok(p.msg)
+        Ok(packet.msg)
     }
 
     /// Wraps and encodes the message but doesn't change its own state.

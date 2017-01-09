@@ -28,7 +28,6 @@ pub struct Server {
 
     // Networking
     socket: Socket,
-    connections: Vec<SocketAddr>,
 }
 
 // Thoughts
@@ -46,7 +45,6 @@ impl Server {
             players: HashMap::new(),
 
             socket: Socket::new(9123).unwrap(),
-            connections: Vec::new(),
         }
     }
     pub fn run(&mut self) -> Result<()> {
@@ -82,7 +80,7 @@ impl Server {
 
     fn broadcast(&self, msg: &Message) {
         for client in self.players.keys() {
-            self.socket.send_to(&msg, *client);
+            self.socket.send_to(msg.clone(), *client);
         }
     }
 
@@ -130,13 +128,12 @@ impl Server {
     }
 
     fn new_connection(&mut self, src: SocketAddr) -> Result<()> {
-        self.connections.push(src);
         // Add new player
         let player_nr = self.world.add_new_player(Color::Black);
         let _ = self.players.insert(src, PlayerData::new(player_nr));
         // Tell about the world size and other meta data
         self.socket.send_to(
-            &Message::Welcome {
+            Message::Welcome {
                 width: self.world.get_width(),
                 height: self.world.get_height(),
                 you_index: player_nr,
@@ -169,7 +166,7 @@ impl Server {
         let pixels: Vec<u8> = self.world.tilenet.view_box((x, x+w, y, y+h)).map(|x| *x.0).collect();
         assert!(pixels.len() == w*h);
         let msg = Message::WorldRect { x: x, y: y, width: w, height: h, pixels: pixels};
-        self.socket.send_to(&msg, dest);
+        self.socket.send_to(msg, dest);
         Ok(())
     }
 

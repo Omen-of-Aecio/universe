@@ -117,12 +117,12 @@ impl Client {
 
     fn handle_input(&self) {
         if self.input.key_toggled_down(KeyCode::G) {
-            self.socket.send_to(&Message::ToggleGravity, self.server);
+            self.socket.send_to(Message::ToggleGravity, self.server);
         }
     }
     fn send_input(&mut self) -> Result<()> {
         let msg = Message::Input (self.input.create_player_input());
-        self.socket.send_to(&msg, self.server);
+        self.socket.send_to(msg, self.server);
         Ok(())
     }
 
@@ -170,7 +170,7 @@ impl Client {
         let server = to_socket_addr(server_addr);
 
         // Init connection
-        socket.send_to(&Message::Join, server);
+        socket.send_to(Message::Join, server);
         // Get world metadata
         let (_, msg) = socket.recv()?;
         // TODO reordering will be problematic here, expecting only a certain message

@@ -120,8 +120,8 @@ impl Client {
                     _ => (),
                 }
             }
-            self.handle_input();
-            self.send_input().unwrap();
+            self.handle_input()?;
+            self.send_input()?;
 
             let messages: Vec<Result<(SocketAddr, Message)>> = self.socket.messages().collect();
             // Networking
@@ -159,14 +159,15 @@ impl Client {
         }
     }
 
-    fn handle_input(&mut self) {
+    fn handle_input(&mut self) -> Result<()> {
         if self.input.key_toggled_down(KeyCode::G) {
-            self.socket.send_to(Message::ToggleGravity, self.server);
+            self.socket.send_to(Message::ToggleGravity, self.server)?;
         }
+        Ok(())
     }
     fn send_input(&mut self) -> Result<()> {
         let msg = Message::Input (self.input.create_player_input());
-        self.socket.send_to(msg, self.server);
+        self.socket.send_to(msg, self.server)?;
         Ok(())
     }
 

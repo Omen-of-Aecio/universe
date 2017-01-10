@@ -38,11 +38,7 @@ impl Packet{
     }
     pub fn decode(data: &[u8]) -> Result<Packet> {
         let msg: DecodingResult<Packet> = decode(&data);
-        match msg {
-            Ok(msg) => Ok(msg),
-            Err(DecodingError::IoError(e)) => Err(e.into()),
-            Err(e) => Err(e.into())
-        }
+        msg.chain_err(|| "Error in decoding the data.")
     }
     pub fn check_protocol_nr(&self) -> Result<()> {
         match self.protocol_nr {

@@ -69,11 +69,23 @@ fn main() {
              .takes_value(true))
         .get_matches();
 
-    if let Some(connect) = options.value_of("connect") {
+    let err = if let Some(connect) = options.value_of("connect") {
         let mut client = Client::new(connect).unwrap();
-        client.run().unwrap();
+        let err = client.run();
+        match err {
+            Ok(_) => return,
+            Err(err) => err,
+        }
     } else {
-        Server::new().run().unwrap();
+        let err = Server::new().run();
+        match err {
+            Ok(_) => return,
+            Err(err) => err,
+        }
+    };
+    println!("Error: {}", err);
+    for e in err.iter().skip(1) {
+        println!("  caused by: {}", e);
     }
 }
 

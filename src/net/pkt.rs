@@ -7,40 +7,28 @@ use bincode;
 use bincode::rustc_serialize::{encode, decode, DecodingError, DecodingResult};
 use num_traits::int::PrimInt;
 
-const PROTOCOL: u32 = 0xf5ad9165;
 const N: u32 = 10; // max packet size = 2^N
 
 ////////////
 // Packet //
 ////////////
 
-#[derive(Clone, RustcEncodable, RustcDecodable)]
-pub enum PacketKind {
-    Unreliable {ack: u32},
-    Reliable {ack: u32, seq: u32},
-}
-
 /// `Packet` struct wraps a message in protocol-specific data.
 #[derive(Clone, RustcEncodable, RustcDecodable)]
-pub struct Packet {
-    protocol_nr: u32,
-    pub kind: PacketKind,
-    pub msg: Message,
+pub enum Packet {
+    Unreliable {
+        msg: Message,
+    },
+    Reliable {
+        seq: u32,
+        msg: Message,
+    },
+    Ack {
+        ack: u32,
+    },
+
 }
 impl Packet{ 
-    pub fn new(kind: PacketKind, msg: Message) -> Packet {
-        Packet {
-            protocol_nr: PROTOCOL,
-            kind: kind,
-            msg: msg,
-        }
-    }
-    pub fn check_protocol_nr(&self) -> Result<()> {
-        match self.protocol_nr {
-            PROTOCOL => Ok(()),
-            _ => Err(ErrorKind::WrongProtocol.into()),
-        }
-    }
     pub fn encode(&self) -> Vec<u8> {
         encode(self, bincode::SizeLimit::Bounded((Packet::max_packet_size()) as u64)).unwrap()
     }

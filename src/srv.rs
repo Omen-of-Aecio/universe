@@ -7,7 +7,7 @@ use world::color::Color;
 use world::player::Player;
 use glium::glutin::VirtualKeyCode as KeyCode;
 use input::PlayerInput;
-use err::{Error, Result};
+use err::*;
 
 use num_traits::Float;
 
@@ -49,15 +49,7 @@ impl Server {
     }
     pub fn run(&mut self) -> Result<()> {
         loop {
-            let messages: Vec<Result<(SocketAddr, Message)>> = self.socket.messages().collect();
-            for msg in messages {
-                match msg {
-                    Ok((src, msg)) => {
-                        self.handle_message(src, msg)?;
-                    },
-                    Err(e) => return Err(e),
-                }
-            }
+            info!("Tick");
             // TODO: Unnecessary clone?
             let players = self.players.clone();
 
@@ -70,6 +62,17 @@ impl Server {
 
             // Networking
             self.socket.update()?;
+
+            // Receive messages
+            let mut messages = Vec::new();
+            for msg in self.socket.messages() {
+                let msg = msg.chain_err(|| "Error in received message.")?;
+                messages.push(msg);
+            }
+            for msg in messages {
+                self.handle_message(msg.0, msg.1).chain_err(|| "Error in handling message.")?;
+            }
+            // Send messages
             let message = Message::PlayerPos (players.values().map(|p| self.world.players[p.nr].shape.pos).collect());
             self.broadcast(&message);
 

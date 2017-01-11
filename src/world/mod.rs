@@ -65,7 +65,7 @@ impl World {
         // world::gen::rings(&mut world.tilenet, 2);
         
         // Create bases
-        let base_size: usize = 50;
+        let base_size: usize = 24;
 
         let pos = (white_base.x as usize, white_base.y as usize);
         w.tilenet.set_box(&0, (pos.0 - base_size, pos.1 - base_size), (pos.0 + base_size, pos.1 + base_size));

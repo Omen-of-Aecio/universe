@@ -20,6 +20,7 @@ use time::precise_time_ns;
 /// Reliability is provided through each Connection.
 
 // Ideas
+
 // Socket can be run in its own thread, where it keeps an event list (of future events) and counts
 // down to the next event.
 //
@@ -47,8 +48,6 @@ use time::precise_time_ns;
 
 
 
-// Further thoughts...
-// we may move the whole send window to Socket!
 
 
 
@@ -76,32 +75,14 @@ impl Socket {
     /// A temporary simple (but brute force) solution to the need of occationally resending packets
     /// which haven't been acknowledged.
     pub fn update(&mut self) -> Result<()>{
-        let now = precise_time_ns();
-
-        let mut keys = Vec::new();
-        {
-        for (addr, conn) in self.connections.iter() {
-            let next_event = conn.first_unacked_packet().map(|x| x + RESEND_INTERVAL_MS * 1000000);
-            match next_event {
-                Some(next_event) => {
-                    if now >= next_event {
-                        // Register the keys for the connections which needs to resend
-                        keys.push(*addr);
-                        info!("Gotta resend some packets");
-                    }
-                },
-                None => {},
-            };
-        }
-        }
-        for k in keys {
-            let socket = self.socket.try_clone()?; // because of aliasing
-
-            let conn = self.connections.get_mut(&k).unwrap();
-            for sent_packet in conn.consume_queue() {
-                let buffer = conn.wrap_message(sent_packet.packet.msg);
-                socket.send_to(&buffer, k)?;
+        let socket = self.socket.try_clone()?; // because of aliasing
+        for (addr, conn) in self.connections.iter_mut() {
+            let to_resend = conn.get_resend_queue();
+            debug!("To resend: {}", to_resend.len());
+            for pkt in to_resend {
+                socket.send_to(&pkt, *addr)?;
             }
+            
         }
 
         Ok(())
@@ -119,12 +100,9 @@ impl Socket {
     }
 
     pub fn send_to(&mut self, msg: Message, dest: SocketAddr) -> Result<()> {
-        let buffer = {
-            let conn = self.get_connection_or_create(dest);
-            conn.wrap_unreliable_message(msg)
-        };
+        let buffer = Packet::Unreliable {msg: msg}.encode();
         self.socket.send_to(&buffer, dest)?;
-        info!("Send: {}", buffer.len());
+
         Ok(())
     }
 
@@ -136,9 +114,9 @@ impl Socket {
 
         let buffer = {
             let mut conn = self.get_connection_or_create(dest);
+            debug!("Send reliably");
             conn.wrap_message(msg)
         };
-        info!("Send reliably: {}", buffer.len());
         socket.send_to(&buffer, dest)?;
         Ok(())
     }
@@ -165,12 +143,23 @@ impl Socket {
     }
 
     fn _recv(&mut self) -> Result<(SocketAddr, Message)> {
-        let recv_result = self.socket.recv_from(&mut self.buffer)?;
-        let (amt, src) = recv_result;
-        let packet = Packet::decode(&self.buffer[0..amt])?;
-        let conn = self.get_connection_or_create(src);
-        let msg = conn.unwrap_message(packet)?;
-        Ok((src, msg))
+        let socket = self.socket.try_clone()?;
+        // Since we may just receive an Ack, we loop until we receive an actual message
+        Ok(loop {
+            let (amt, src) = self.socket.recv_from(&mut self.buffer)?;
+            let packet = Packet::decode(&self.buffer[0..amt])?;
+            let conn = self.get_connection_or_create(src);
+            let (msg, reply) = conn.unwrap_message(packet)?;
+            if let Some(msg) = msg {
+                // Send Ack back if needed
+                if let Some(reply) = reply {
+                    let buffer = reply.encode();
+                    debug!("send ack :O");
+                    socket.send_to(&buffer, src);
+                }
+                break (src, msg);
+            }
+        })
     }
 }
 

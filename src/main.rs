@@ -1,7 +1,7 @@
 #![cfg_attr(feature = "dev", allow(unstable_features))]
 #![cfg_attr(feature = "dev", feature(plugin))]
 #![cfg_attr(feature = "dev", plugin(clippy))]
-#![feature(discriminant_value)]
+#![feature(loop_break_value)]
 
 extern crate bgjk;
 #[macro_use]
@@ -51,7 +51,7 @@ fn setup_logger() {
             .full()
             .use_utc_timestamp()
             .build();
-        let d = slog::level_filter(Level::Info, drain);
+        let d = slog::level_filter(Level::Debug, drain);
         slog::Logger::root(d.fuse(), o![])
     } else {
         slog::Logger::root(slog_stream::stream(std::io::stderr(), slog_json::default()).fuse(),

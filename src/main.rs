@@ -73,13 +73,13 @@ fn main() {
         let mut client = Client::new(connect).unwrap();
         let err = client.run();
         match err {
-            Ok(_) => return,
+            Ok(_) => std::process::exit(1),
             Err(err) => err,
         }
     } else {
         let err = Server::new().run();
         match err {
-            Ok(_) => return,
+            Ok(_) => std::process::exit(1),
             Err(err) => err,
         }
     };
@@ -87,5 +87,13 @@ fn main() {
     for e in err.iter().skip(1) {
         println!("  caused by: {}", e);
     }
+
+    /*
+    if let Some(backtrace) = err.backtrace() {
+        println!("backtrace: {:?}", backtrace);
+    }
+    */
+
+    std::process::exit(1);
 }
 

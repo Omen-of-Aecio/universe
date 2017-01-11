@@ -61,7 +61,7 @@ impl Client {
         // TODO reordering will be problematic here, expecting only a certain message
         match msg {
             Message::Welcome {width, height, you_index, players, white_base, black_base} => {
-                let mut world = World::new(width, height, white_base, black_base);
+                let mut world = World::new(width, height, white_base, black_base, false);
 
                 println!("Client create new world");
                 for color in players {
@@ -71,7 +71,6 @@ impl Client {
 
                 let display = glutin::WindowBuilder::new().build_glium().unwrap();
                 let graphics = Graphics::new(display.clone(), &world);
-                info!("CHK 1");
                 Ok(Client {
                     display: display,
                     input: Input::new(),
@@ -99,6 +98,7 @@ impl Client {
     pub fn run(&mut self) -> Result<()> {
         let mut window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
         loop {
+            info!("Frame");
             // Input
             self.input.update();
             // Handle input events
@@ -123,10 +123,14 @@ impl Client {
             self.handle_input()?;
             self.send_input()?;
 
-            let messages: Vec<Result<(SocketAddr, Message)>> = self.socket.messages().collect();
             // Networking
-            for msg in messages {
+            self.socket.update()?;
+            let mut messages = Vec::new();
+            for msg in self.socket.messages() {
                 let msg = msg.chain_err(|| "Client: error in received message.")?;
+                messages.push(msg);
+            }
+            for msg in messages {
                 self.handle_message(msg.0, msg.1).chain_err(|| "Client: error in handling message.")?;
             }
 
@@ -198,7 +202,6 @@ impl Client {
     }
 
     fn receive_world(&mut self, x: usize, y: usize, w: usize, h: usize, pixels: Vec<u8>) {
-        assert!(pixels.len() == w*h);
         let mut i = 0;
         for y in y..y+h {
             for x in x..x+w {

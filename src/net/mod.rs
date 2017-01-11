@@ -4,32 +4,55 @@ mod pkt;
 
 use net::msg::Message;
 use net::conn::Connection;
-use net::pkt::{Packet, PacketKind};
-use geometry::vec::Vec2;
-use input::PlayerInput;
+use net::pkt::Packet;
 
 use std;
-use std::mem::size_of_val;
 use std::time::Duration;
 use std::net::{UdpSocket, SocketAddr};
 use std::iter::Iterator;
-use std::mem::discriminant;
-use std::io::Cursor;
 use std::collections::hash_map::HashMap;
-use err::{Result, Error};
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use bincode::rustc_serialize::{encode, decode, DecodingError, DecodingResult};
-use bincode;
+use err::*;
+use time::precise_time_ns;
 
-use num_traits::int::PrimInt;
 
 
 /// Provides an interface to encode and send, decode and receive messages to/from any destination.
 /// Reliability is provided through each Connection.
 
-const PROTOCOL: u32 = 0xf5ad9165;
-const N: u32 = 10; // max packet size = 2^N
+// Ideas
+// Socket can be run in its own thread, where it keeps an event list (of future events) and counts
+// down to the next event.
+//
+// Events are really just resending unacked packets.
+//
+// The event list may be just a list of the sent byte-arrays, together with the time in which they
+// were sent and the sequence number.
+//
+// It has an interface to the outside world, on which you can queue packets and receive (iterate)
+// packets. I think it will be adequate for now to use non-blocking socket for reception.
 
+// - Potiential problem
+// What if Client is waiting for a specific packet from Server - e.g the Welcome packet may come
+// after some WorldPiece packets :o
+//
+// I think we need strictly in-order delivery of packets from Socket - at least until we find
+// something better.
+
+
+// ALTERNATIVE TO IN-ORDER DELIVERY
+// - Client asks for a specific packet number if it needs to (e.g. it knows it will be the next
+// packet)
+// - Else, Client accepts whatever packet
+// - Acknowledging happens by 
+
+
+
+// Further thoughts...
+// we may move the whole send window to Socket!
+
+
+
+const RESEND_INTERVAL_MS: u64 = 1000;
 
 ////////////
 // Socket //
@@ -39,19 +62,51 @@ pub struct Socket {
     socket: UdpSocket,
     connections: HashMap<SocketAddr, Connection>,
     buffer: Vec<u8>,
+
 }
 impl Socket {
     pub fn new(port: u16) -> Result<Socket> {
         Ok(Socket {
             socket: UdpSocket::bind(("0.0.0.0:".to_string() + port.to_string().as_str()).as_str())?,
             connections: HashMap::new(),
-            buffer: default_vec(2.pow(N)),
+            buffer: default_vec(Packet::max_packet_size()),
         })
     }
 
-    pub fn max_packet_size() -> usize {
-        2.pow(N) + 100
+    /// A temporary simple (but brute force) solution to the need of occationally resending packets
+    /// which haven't been acknowledged.
+    pub fn update(&mut self) -> Result<()>{
+        let now = precise_time_ns();
+
+        let mut keys = Vec::new();
+        {
+        for (addr, conn) in self.connections.iter() {
+            let next_event = conn.first_unacked_packet().map(|x| x + RESEND_INTERVAL_MS * 1000000);
+            match next_event {
+                Some(next_event) => {
+                    if now >= next_event {
+                        // Register the keys for the connections which needs to resend
+                        keys.push(*addr);
+                        info!("Gotta resend some packets");
+                    }
+                },
+                None => {},
+            };
+        }
+        }
+        for k in keys {
+            let socket = self.socket.try_clone()?; // because of aliasing
+
+            let conn = self.connections.get_mut(&k).unwrap();
+            for sent_packet in conn.consume_queue() {
+                let buffer = conn.wrap_message(sent_packet.packet.msg);
+                socket.send_to(&buffer, k)?;
+            }
+        }
+
+        Ok(())
     }
+
 
     /// Attempt to clone the socket to create consumable iterator
     pub fn messages(&mut self) -> SocketIter {
@@ -59,29 +114,32 @@ impl Socket {
             socket: self,
         }
     }
+    pub fn max_packet_size() -> usize {
+        Packet::max_packet_size() // because Packet should probably be private to the net module
+    }
 
     pub fn send_to(&mut self, msg: Message, dest: SocketAddr) -> Result<()> {
-        let mut buffer = {
+        let buffer = {
             let conn = self.get_connection_or_create(dest);
             conn.wrap_unreliable_message(msg)
         };
         self.socket.send_to(&buffer, dest)?;
+        info!("Send: {}", buffer.len());
         Ok(())
     }
 
-
-
-    pub fn send_reliable_to(&mut self, msg: Message, dest: SocketAddr) -> Result<()> {
+    pub fn send_reliably_to(&mut self, msg: Message, dest: SocketAddr) -> Result<()> {
         // Need to clone it here because of aliasing :/
         // IDEA: Could also let Connection::wrap_message take a clone of the UdpSocket and send the
-        // message itself. Connection could even know what UdpSocket it is associated with..
+        // message itself. Connection could even know the UdpSocket and SocketAddr
         let socket = self.socket.try_clone()?;
 
-        let mut buffer = {
+        let buffer = {
             let mut conn = self.get_connection_or_create(dest);
             conn.wrap_message(msg)
         };
-        socket.send_to(buffer, dest)?;
+        info!("Send reliably: {}", buffer.len());
+        socket.send_to(&buffer, dest)?;
         Ok(())
     }
 
@@ -103,18 +161,16 @@ impl Socket {
     pub fn recv(&mut self) -> Result<(SocketAddr, Message)> {
         self.socket.set_nonblocking(false)?;
         self.socket.set_read_timeout(Some(Duration::new(3, 0)))?;
+        self._recv()
+    }
 
-        let recv_result = self.socket.recv_from(&mut self.buffer);
-        match recv_result {
-            Ok((amt, src)) => {
-                let packet = Packet::decode(&self.buffer[0..amt])?;
-                let conn = self.get_connection_or_create(src);
-                let msg = conn.unwrap_message(packet)?;
-                Ok((src, msg))
-
-            },
-            Err(e) => Err(e.into()),
-        }
+    fn _recv(&mut self) -> Result<(SocketAddr, Message)> {
+        let recv_result = self.socket.recv_from(&mut self.buffer)?;
+        let (amt, src) = recv_result;
+        let packet = Packet::decode(&self.buffer[0..amt])?;
+        let conn = self.get_connection_or_create(src);
+        let msg = conn.unwrap_message(packet)?;
+        Ok((src, msg))
     }
 }
 
@@ -125,29 +181,33 @@ pub struct SocketIter<'a> {
 impl<'a> Iterator for SocketIter<'a> {
     type Item = Result<(SocketAddr, Message)>;
 
+    // TODO HERE the problem now is that _recv blocks.........
     fn next(&mut self) -> Option<Result<(SocketAddr, Message)>> {
         match self.socket.socket.set_nonblocking(true) {
             Err(e) => return Some(Err(e.into())),
             Ok(_) => {},
         }
 
-        let msg = self.socket.socket.recv_from(&mut self.socket.buffer);
+        let msg = self.socket._recv();
+
         match msg {
-            Ok((amt, src)) => {
-                let packet = match Packet::decode(&self.socket.buffer[0..amt]) {
-                    Ok(p) => p,
-                    Err(e) => return Some(Err(e)),
-                };
-                let conn = self.socket.get_connection_or_create(src);
-                Some(conn.unwrap_message(packet).map(|msg| (src, msg)))
+            Ok(msg) => {
+                Some(Ok(msg))
             },
             Err(e) => {
-                if let std::io::ErrorKind::WouldBlock = e.kind() {
-                    // There are no more messages
+                let end_messages = match e {
+                    Error(ErrorKind::Io(ref ioerr), _) => {
+                        match ioerr.kind() {
+                            std::io::ErrorKind::WouldBlock => true,
+                            _ => false,
+                        }
+                    },
+                    _ => false,
+                };
+                if end_messages {
                     None
                 } else {
-                    // Some error Occured
-                    Some(Err(e.into()))
+                    Some(Err(e))
                 }
             },
         }

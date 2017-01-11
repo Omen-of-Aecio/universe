@@ -38,7 +38,7 @@ impl Server {
     pub fn new() -> Server {
         let pos = Vec2::new(WORLD_SIZE as f32 / 2.0, WORLD_SIZE as f32/2.0);
         let size = WORLD_SIZE as f32;
-        let mut world = World::new(WORLD_SIZE, WORLD_SIZE, Vec2::new(size/4.0, size/2.0), Vec2::new(3.0*size/4.0, size/2.0));
+        let mut world = World::new(WORLD_SIZE, WORLD_SIZE, Vec2::new(size/4.0, size/2.0), Vec2::new(3.0*size/4.0, size/2.0), true);
 
         Server {
             world: world,
@@ -69,6 +69,7 @@ impl Server {
             // TODO: Logic and networking shouldn't necessary be done equally frequently.
 
             // Networking
+            self.socket.update()?;
             let message = Message::PlayerPos (players.values().map(|p| self.world.players[p.nr].shape.pos).collect());
             self.broadcast(&message);
 
@@ -101,7 +102,6 @@ impl Server {
     }
 
     fn handle_input(&mut self, input: PlayerInput, player_nr: usize) {
-        println!("SERVER input: {:?}", input);
         if input.left {
             self.world.players[player_nr].accelerate(Vec2::new(-ACCELERATION, 0.0));
         }
@@ -129,6 +129,7 @@ impl Server {
     }
 
     fn new_connection(&mut self, src: SocketAddr) -> Result<()> {
+        info!("New connection!");
         // Add new player
         let player_nr = self.world.add_new_player(Color::Black);
         let _ = self.players.insert(src, PlayerData::new(player_nr));
@@ -148,11 +149,10 @@ impl Server {
         // We will need to split it up because of limited package size
         let dim = Server::packet_dim(Socket::max_packet_size());
         let blocks = (self.world.get_width() / dim.0 + 1, self.world.get_height() / dim.1 + 1);
-        println!("NUM BLOCKS = {}, {}", blocks.0, blocks.1);
         for x in 0..blocks.0 {
             for y in 0..blocks.1 {
                 self.send_world_rect(x * dim.0, y * dim.0, dim.0, dim.1, src)?;
-                thread::sleep(Duration::from_millis(5));
+                // thread::sleep(Duration::from_millis(15));
             }
         }
 
@@ -163,11 +163,10 @@ impl Server {
         let w = min(x + w, self.world.tilenet.get_size().0) - x;
         let h = min(y + h, self.world.tilenet.get_size().1) - y;
 
-        println!("Server World Rect: {}, {}; {}, {}", x, y, w, h);
         let pixels: Vec<u8> = self.world.tilenet.view_box((x, x+w, y, y+h)).map(|x| *x.0).collect();
         assert!(pixels.len() == w*h);
         let msg = Message::WorldRect { x: x, y: y, width: w, height: h, pixels: pixels};
-        self.socket.send_to(msg, dest);
+        self.socket.send_reliably_to(msg, dest)?;
         Ok(())
     }
 

@@ -38,8 +38,9 @@ pub struct World {
 }
 
 
+
 impl World {
-    pub fn new(width: usize, height: usize, white_base: Vec2, black_base: Vec2) -> World {
+    pub fn new(width: usize, height: usize, white_base: Vec2, black_base: Vec2, generate: bool) -> World {
 
         // let shape = Polygon::new_quad(player_pos.x, player_pos.y, 10.0, 10.0, Color::BLACK);
         // let players = vec![ Player::new(shape) ];
@@ -58,7 +59,9 @@ impl World {
         };
 
         // Generate TileNet
-        gen::proc1(&mut w.tilenet);
+        if generate {
+            gen::proc1(&mut w.tilenet);
+        }
         // world::gen::rings(&mut world.tilenet, 2);
         
         // Create bases
@@ -71,23 +74,6 @@ impl World {
         w.tilenet.set_box(&255, (pos.0 - base_size, pos.1 - base_size), (pos.0 + base_size, pos.1 + base_size));
 
         w
-    }
-
-    /// Will default_initialize certain fields that aren't needed on client side
-    pub fn new_for_client(width: usize, height: usize) -> World {
-        World {
-            tilenet: TileNet::<Tile>::new(width, height),
-            players: Vec::new(),
-            exit: false,
-            white_base: Vec2::null_vec(),
-            black_base: Vec2::null_vec(),
-            width: width,
-            height: height,
-            cam_pos: Vec2::new((width/2) as f32, (height/2) as f32),
-            gravity_on: false,
-            gravity: Vec2::new(0.0, -0.5),
-            vectors: Vec::new(),
-        }
     }
 
     /// Returns index of the new player

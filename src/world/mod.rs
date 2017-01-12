@@ -6,19 +6,14 @@ pub mod iter;
 
 use std::vec::Vec;
 
-use glium::glutin::VirtualKeyCode as KeyCode;
-
 use tile_net::TileNet;
 
 use global::Tile;
 use geometry::polygon::Polygon;
 use geometry::vec::Vec2;
-use input::Input;
 use world::color::Color;
 use world::player::Player;
 use world::iter::PolygonIter;
-
-const ACCELERATION: f32 = 0.35;
 
 pub struct World {
     pub tilenet: TileNet<Tile>,

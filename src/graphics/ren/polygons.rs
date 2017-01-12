@@ -63,7 +63,6 @@ impl Ren {
         let index_buffer = glium::index::NoIndices(glium::index::PrimitiveType::TriangleFan);
 
         // Very stupid and fragile solution.
-        let mut i = 0;
         for p in world.polygons_iter() {
             let uniforms = uniform! {
                 center: [p.pos.x, p.pos.y],
@@ -79,7 +78,6 @@ impl Ren {
                       &uniforms,
                       &Default::default())
                 .unwrap();
-            i += 1;
         }
     }
 }

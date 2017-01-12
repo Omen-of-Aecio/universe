@@ -1,10 +1,9 @@
 use net::msg::Message;
-use net::Socket;
 use err::*;
 
 
 use bincode;
-use bincode::rustc_serialize::{encode, decode, DecodingError, DecodingResult};
+use bincode::rustc_serialize::{encode, decode, DecodingResult};
 use num_traits::int::PrimInt;
 
 const N: u32 = 10; // max packet size = 2^N
@@ -39,15 +38,4 @@ impl Packet{
     pub fn max_packet_size() -> usize {
         2.pow(N) + 100
     }
-}
-
-
-/////////////////
-// PacketState //
-/////////////////
-
-/// The state of a package sent reliably
-enum PacketState {
-    Waiting,
-    Acknowledged,
 }

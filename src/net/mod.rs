@@ -12,46 +12,12 @@ use std::net::{UdpSocket, SocketAddr};
 use std::iter::Iterator;
 use std::collections::hash_map::HashMap;
 use err::*;
-use time::precise_time_ns;
 
 
 
-/// Provides an interface to encode and send, decode and receive messages to/from any destination.
-/// Reliability is provided through each Connection.
+/// Provides an interface to encode and [reliably] send, decode and receive messages to/from any destination.
 
-// Ideas
-
-// Socket can be run in its own thread, where it keeps an event list (of future events) and counts
-// down to the next event.
-//
-// Events are really just resending unacked packets.
-//
-// The event list may be just a list of the sent byte-arrays, together with the time in which they
-// were sent and the sequence number.
-//
-// It has an interface to the outside world, on which you can queue packets and receive (iterate)
-// packets. I think it will be adequate for now to use non-blocking socket for reception.
-
-// - Potiential problem
-// What if Client is waiting for a specific packet from Server - e.g the Welcome packet may come
-// after some WorldPiece packets :o
-//
-// I think we need strictly in-order delivery of packets from Socket - at least until we find
-// something better.
-
-
-// ALTERNATIVE TO IN-ORDER DELIVERY
-// - Client asks for a specific packet number if it needs to (e.g. it knows it will be the next
-// packet)
-// - Else, Client accepts whatever packet
-// - Acknowledging happens by 
-
-
-
-
-
-
-const RESEND_INTERVAL_MS: u64 = 1000;
+// - maybe use concurrency for timing rather than polling
 
 ////////////
 // Socket //
@@ -153,8 +119,7 @@ impl Socket {
                 // Send Ack back if needed
                 if let Some(reply) = reply {
                     let buffer = reply.encode();
-                    debug!("send ack :O");
-                    socket.send_to(&buffer, src);
+                    socket.send_to(&buffer, src)?;
                 }
                 break (src, msg);
             }
@@ -203,7 +168,7 @@ impl<'a> Iterator for SocketIter<'a> {
 
 fn default_vec<T: Default>(size: usize) -> Vec<T> {
     let mut zero_vec: Vec<T> = Vec::with_capacity(size);
-    for i in 0..size {
+    for _ in 0..size {
         zero_vec.push(T::default());
     }
     return zero_vec;

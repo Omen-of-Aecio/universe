@@ -1,11 +1,8 @@
 use geometry::vec::Vec2;
-use world;
 use world::World;
 use net::Socket;
 use net::msg::Message;
 use world::color::Color;
-use world::player::Player;
-use glium::glutin::VirtualKeyCode as KeyCode;
 use input::PlayerInput;
 use err::*;
 
@@ -36,9 +33,8 @@ pub struct Server {
 
 impl Server {
     pub fn new() -> Server {
-        let pos = Vec2::new(WORLD_SIZE as f32 / 2.0, WORLD_SIZE as f32/2.0);
         let size = WORLD_SIZE as f32;
-        let mut world = World::new(WORLD_SIZE, WORLD_SIZE, Vec2::new(size/4.0, size/2.0), Vec2::new(3.0*size/4.0, size/2.0), true);
+        let world = World::new(WORLD_SIZE, WORLD_SIZE, Vec2::new(size/4.0, size/2.0), Vec2::new(3.0*size/4.0, size/2.0), true);
 
         Server {
             world: world,
@@ -49,16 +45,12 @@ impl Server {
     }
     pub fn run(&mut self) -> Result<()> {
         loop {
-            info!("Tick");
-            // TODO: Unnecessary clone?
-            let players = self.players.clone();
+            let players = self.players.clone(); // TODO: Unnecessary clone?
 
             // Handle input
             for player in players.values() {
                 self.handle_input(player.input, player.nr);
             }
-
-            // TODO: Logic and networking shouldn't necessary be done equally frequently.
 
             // Networking
             self.socket.update()?;
@@ -74,7 +66,7 @@ impl Server {
             }
             // Send messages
             let message = Message::PlayerPos (self.world.players.iter().map(|p| p.shape.pos).collect());
-            self.broadcast(&message);
+            self.broadcast(&message).chain_err(|| "Could not broadcast.")?;
 
             // Logic
             prof!["Logic", self.world.update()];
@@ -83,15 +75,17 @@ impl Server {
 
     }
 
-    fn broadcast(&mut self, msg: &Message) {
+    fn broadcast(&mut self, msg: &Message) -> Result<()> {
         for client in self.players.keys() {
-            self.socket.send_to(msg.clone(), *client);
+            self.socket.send_to(msg.clone(), *client)?;
         }
+        Ok(())
     }
-    fn broadcast_reliably(&mut self, msg: &Message) {
+    fn broadcast_reliably(&mut self, msg: &Message) -> Result<()> {
         for client in self.players.keys() {
-            self.socket.send_reliably_to(msg.clone(), *client);
+            self.socket.send_reliably_to(msg.clone(), *client)?;
         }
+        Ok(())
     }
 
     fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<()> {
@@ -153,7 +147,7 @@ impl Server {
                 white_base: self.world.white_base,
                 black_base: self.world.black_base,
             },
-            src);
+            src).chain_err(|| "Could not send Welcome packet.")?;
 
         // Send it the whole world
         // We will need to split it up because of limited package size
@@ -165,7 +159,8 @@ impl Server {
                 // thread::sleep(Duration::from_millis(15));
             }
         }
-        self.broadcast_reliably(&Message::NewPlayer {nr: player_nr as u32, color: color});
+        self.broadcast_reliably(&Message::NewPlayer {nr: player_nr as u32, color: color})
+            .chain_err(|| "Could not broadcast_reliably.")?;
 
         Ok(())
     }

@@ -6,7 +6,6 @@ use input::Input;
 use world::World;
 use world::player::Player;
 use graphics::Graphics;
-use graphics::screen_to_world;
 use err::*;
 use rand;
 use rand::Rng;
@@ -15,9 +14,6 @@ use net::Socket;
 use net::msg::Message;
 use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 use std::iter::Iterator;
-
-const CLIENT_PORT: u16 = 10123;
-
 
 /* Should go, together with some logic, to some camera module (?) */
 enum CameraMode {
@@ -56,7 +52,7 @@ impl Client {
         let server = to_socket_addr(server_addr);
 
         // Init connection
-        socket.send_to(Message::Join, server);
+        socket.send_to(Message::Join, server).chain_err(|| "Cannot send Join message.")?;
         // Get world metadata
         let (_, msg) = socket.recv().unwrap();
         // TODO reordering will be problematic here, expecting only a certain message
@@ -192,8 +188,6 @@ impl Client {
                 self.receive_world(x, y, width, height, pixels);
             },
             Message::PlayerPos (pos) => {
-                println!("Pos {:?}", pos);
-                let mut i = 0;
                 for (i, pos) in pos.iter().enumerate() {
                     if i < self.world.players.len() {
                         self.world.players[i].shape.pos = *pos;

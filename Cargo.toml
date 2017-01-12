@@ -7,8 +7,8 @@ authors = ["Erlend Hofstad Langseth <3rlendhl@gmail.com>", "Kevin Robert Straver
 bgjk = "0"
 clippy = { version = "0.0", optional = true }
 tile_net = { git = "https://github.com/BourgondAries/TileNet", branch = "polygon-state" }
-#tilenet_ren = { git = "https://github.com/Ploppz/tilenet-render"}
-tilenet_ren = { path = "../tilenet-ren"}
+tilenet_ren = { git = "https://github.com/Ploppz/tilenet-render"}
+#tilenet_ren = { path = "../tilenet-ren"}
 isatty = "0.1"
 slog = { version = "1", features = ["max_level_trace", "release_max_level_trace"] }
 slog-json = "1"
@@ -16,7 +16,7 @@ slog-scope = "0"
 slog-stream = "1"
 slog-term = "1"
 time = "0"
-glium = "0"
+glium = "0.15.0"
 rand = "0"
 clap = "2.19.3"
 byteorder = "1.0.0"

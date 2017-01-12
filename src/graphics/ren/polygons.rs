@@ -33,7 +33,9 @@ impl Ren {
 
         // Upload vertices
         for p in polygons {
+            debug!("Add polygon");
             for v in &p.points {
+                debug!("Add point");
                 // v: (f32, f32)
                 vertices.push(Vertex { pos: [v.0, v.1] });
             }

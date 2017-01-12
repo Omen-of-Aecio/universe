@@ -5,6 +5,7 @@ use world::jump::Jump;
 use tile_net::TileNet;
 use tile_net::Collable;
 use global::Tile;
+use world::color::Color;
 
 const JUMP_DURATION: u32 = 4;
 const JUMP_DELAY: u32 = 20; // Delay before you can jump again
@@ -13,6 +14,7 @@ const AIR_FRI: Vec2 = Vec2 { x: 0.91, y: 0.95 };
 // (TODO extra friction when on ground?)
 
 
+#[derive(Clone)]
 pub struct Player {
     pub shape: Polygon,
     jump: Option<Jump>,
@@ -23,6 +25,16 @@ impl Player {
     pub fn new(shape: Polygon) -> Player {
         Player {
             shape: shape,
+            jump: None,
+            force: Vec2::null_vec(),
+        }
+    }
+    pub fn with_color(col: Color) -> Player { 
+        Player {
+            shape: match col {
+                Color::White => Polygon::new_quad(0.0, 0.0, 10.0, 10.0, Color::White),
+                Color::Black => Polygon::new_quad(0.0, 0.0, 10.0, 10.0, Color::Black),
+            },
             jump: None,
             force: Vec2::null_vec(),
         }

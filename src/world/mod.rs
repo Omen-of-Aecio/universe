@@ -94,6 +94,18 @@ impl World {
         }
     }
 
+    /// Returns (white count, black count)
+    pub fn count_player_colors(&self) -> (u32, u32) {
+        let mut count = (0, 0);
+        for player in &self.players {
+            match player.shape.color {
+                Color::White => count.0 += 1,
+                Color::Black => count.1 += 1,
+            }
+        }
+        count
+    }
+
     pub fn polygons_iter<'a>(&'a self) -> PolygonIter<'a> {
         PolygonIter::new(self)
     }

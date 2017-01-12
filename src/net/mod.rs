@@ -78,7 +78,6 @@ impl Socket {
         let socket = self.socket.try_clone()?; // because of aliasing
         for (addr, conn) in self.connections.iter_mut() {
             let to_resend = conn.get_resend_queue();
-            debug!("To resend: {}", to_resend.len());
             for pkt in to_resend {
                 socket.send_to(&pkt, *addr)?;
             }
@@ -170,7 +169,6 @@ pub struct SocketIter<'a> {
 impl<'a> Iterator for SocketIter<'a> {
     type Item = Result<(SocketAddr, Message)>;
 
-    // TODO HERE the problem now is that _recv blocks.........
     fn next(&mut self) -> Option<Result<(SocketAddr, Message)>> {
         match self.socket.socket.set_nonblocking(true) {
             Err(e) => return Some(Err(e.into())),

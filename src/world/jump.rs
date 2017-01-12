@@ -3,6 +3,7 @@
 // - 'delta time' sent to all update functions.
 
 
+#[derive(Clone)]
 pub struct Jump {
     progress: u32,
     // config

@@ -73,7 +73,7 @@ impl Server {
                 self.handle_message(msg.0, msg.1).chain_err(|| "Error in handling message.")?;
             }
             // Send messages
-            let message = Message::PlayerPos (players.values().map(|p| self.world.players[p.nr].shape.pos).collect());
+            let message = Message::PlayerPos (self.world.players.iter().map(|p| p.shape.pos).collect());
             self.broadcast(&message);
 
             // Logic
@@ -86,6 +86,11 @@ impl Server {
     fn broadcast(&mut self, msg: &Message) {
         for client in self.players.keys() {
             self.socket.send_to(msg.clone(), *client);
+        }
+    }
+    fn broadcast_reliably(&mut self, msg: &Message) {
+        for client in self.players.keys() {
+            self.socket.send_reliably_to(msg.clone(), *client);
         }
     }
 
@@ -134,7 +139,9 @@ impl Server {
     fn new_connection(&mut self, src: SocketAddr) -> Result<()> {
         info!("New connection!");
         // Add new player
-        let player_nr = self.world.add_new_player(Color::Black);
+        let (w_count, b_count) = self.world.count_player_colors();
+        let color = if w_count >= b_count { Color::Black } else { Color::White };
+        let player_nr = self.world.add_new_player(color);
         let _ = self.players.insert(src, PlayerData::new(player_nr));
         // Tell about the world size and other meta data
         self.socket.send_to(
@@ -158,6 +165,7 @@ impl Server {
                 // thread::sleep(Duration::from_millis(15));
             }
         }
+        self.broadcast_reliably(&Message::NewPlayer {nr: player_nr as u32, color: color});
 
         Ok(())
     }

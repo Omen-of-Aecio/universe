@@ -70,7 +70,9 @@ fn main() {
         .get_matches();
 
     let err = if let Some(connect) = options.value_of("connect") {
+        info!("Create client");
         let mut client = Client::new(connect).unwrap();
+        info!("Run client");
         let err = client.run();
         match err {
             Ok(_) => std::process::exit(1),

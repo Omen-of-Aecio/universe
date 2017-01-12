@@ -15,6 +15,7 @@ pub enum Message {
     Welcome {width: usize, height: usize, you_index: usize, players: Vec<Color>, white_base: Vec2, black_base: Vec2},
     WorldRect {x: usize, y: usize, width: usize, height: usize, pixels: Vec<u8>},
     PlayerPos (Vec<Vec2>),
+    NewPlayer {nr: u32, color: Color},
     
 
     // Messages from client

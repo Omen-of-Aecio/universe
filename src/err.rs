@@ -41,7 +41,7 @@ error_chain! {
     // This section can be empty.
     foreign_links {
         Fmt(::std::fmt::Error);
-        Io(::std::io::Error) #[cfg(unix)];
+        Io(::std::io::Error);
         Decode(::bincode::rustc_serialize::DecodingError);
     }
     // Define additional `ErrorKind` variants. The syntax here is

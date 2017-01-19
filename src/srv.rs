@@ -90,23 +90,28 @@ impl Server {
         Ok(())
     }
 
-    fn bullet_fire(&mut self, player_data: &PlayerData, pos: Vec2, direction: Vec2) {
+    fn bullet_fire(&mut self, player_data: &PlayerData, pos: Vec2, direction: Vec2) -> Result<()> {
         let player_nr = player_data.nr;
         let player_col = self.world.players[player_nr].shape.color;
 
-        let value = if let Color::White = self.world.players[player_nr].shape.color { 0 } else { 255 };
         let mut ray = Ray::new(pos, direction);
         let mut state = ray.new_state(player_col);
         ray.solve(&self.world.tilenet, &mut state);
         match state.hit_tile {
-            Some(index) => {
-                self.world.tilenet.set(&value, (index.0 as usize, index.1 as usize));
+            Some((x, y)) => {
+                let x = x as usize;
+                let y = y as usize;
+                let intensity = (player_col.to_intensity() * 255.0) as u8;
+                self.world.tilenet.set(&intensity, (x, y));
                 // TODO send updated texture
+                let msg = self.wrap_world_rect(x, y, 1, 1)?;
+                self.broadcast(&msg);
             },
             None => {
-                // TODO delete bullet
+                // TODO delete bullet?
             }
-        }
+        };
+        Ok(())
     }
 
     fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<()> {
@@ -182,8 +187,8 @@ impl Server {
         let blocks = (self.world.get_width() / dim.0 + 1, self.world.get_height() / dim.1 + 1);
         for x in 0..blocks.0 {
             for y in 0..blocks.1 {
-                self.send_world_rect(x * dim.0, y * dim.0, dim.0, dim.1, src)?;
-                // thread::sleep(Duration::from_millis(15));
+                let msg = self.wrap_world_rect(x * dim.0, y * dim.0, dim.0, dim.1)?;
+                self.socket.send_reliably_to(msg, src)?;
             }
         }
         self.broadcast_reliably(&Message::NewPlayer {nr: player_nr as u32, color: color})
@@ -192,15 +197,14 @@ impl Server {
         Ok(())
     }
 
-    fn send_world_rect(&mut self, x: usize, y: usize, w: usize, h: usize, dest: SocketAddr) -> Result<()> {
+    /// Create message ready for sending
+    fn wrap_world_rect(&mut self, x: usize, y: usize, w: usize, h: usize) -> Result<Message> {
         let w = min(x + w, self.world.tilenet.get_size().0) - x;
         let h = min(y + h, self.world.tilenet.get_size().1) - y;
 
         let pixels: Vec<u8> = self.world.tilenet.view_box((x, x+w, y, y+h)).map(|x| *x.0).collect();
         assert!(pixels.len() == w*h);
-        let msg = Message::WorldRect { x: x, y: y, width: w, pixels: pixels};
-        self.socket.send_reliably_to(msg, dest)?;
-        Ok(())
+        Ok(Message::WorldRect { x: x, y: y, width: w, pixels: pixels})
     }
 
     /// ASSUMPTION: packet size is 2^n

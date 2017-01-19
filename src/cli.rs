@@ -198,7 +198,7 @@ impl Client {
                 info!("New player has joined"; "nr" => nr);
                 let nr = nr as usize;
                 if nr >= self.world.players.len() {
-                    self.world.players.resize(nr+1, Player::with_color(color)); //TODO
+                    self.world.players.resize(nr+1, Player::with_color(color));
                 }
                 self.world.players[nr].shape.color = color;
             },

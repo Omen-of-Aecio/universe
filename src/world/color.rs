@@ -10,4 +10,10 @@ impl Color {
             &Color::White => [1.0, 1.0, 1.0],
         }
     }
+    pub fn to_intensity(&self) -> f32 {
+     match self {
+            &Color::Black => 0.0,
+            &Color::White => 1.0,
+     }
+    }
 }

@@ -88,6 +88,16 @@ impl Server {
         Ok(())
     }
 
+		fn collide_bullet(&mut self, player: PlayerData, pos: Vec2, direction: Vec2) {
+			let player_number = player.nr;
+			let value = if self.world.players[player_number].shape.color == Color::White { 0 } else { 255 };
+			let ray = Ray::new(pos, direction);
+			let mut state = Ray::new_state(Color::White);
+			self.tilenet.solve(ray, &mut state);
+			let index = state.hit_tile;
+			self.tilenet.set(&value, (index.0, index.1));
+		}
+
     fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<()> {
         match msg {
             Message::Join => self.new_connection(src)?,
@@ -98,6 +108,7 @@ impl Server {
                 }
             },
             Message::ToggleGravity => self.world.gravity_on = !self.world.gravity_on,
+            Message::BulletFire { pos, direction } => self.collide_bullet(self.players.get(&src), pos, direction),
             _ => {}
         }
         Ok(())

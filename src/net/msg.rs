@@ -11,11 +11,12 @@ pub enum Message {
     WorldRect {x: usize, y: usize, width: usize, height: usize, pixels: Vec<u8>},
     PlayerPos (Vec<Vec2>),
     NewPlayer {nr: u32, color: Color},
-    
+
 
     // Messages from client
     Join,
     Input (PlayerInput),
     ToggleGravity,
+    BulletFire { pos: Vec2, direction: Vec2 },
 }
 

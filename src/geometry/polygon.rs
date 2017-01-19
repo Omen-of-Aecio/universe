@@ -67,7 +67,7 @@ impl CollableState for PolygonState {
 
 }
 
-impl Collable<u8, PolygonState> for Polygon {
+impl Collable<Tile, PolygonState> for Polygon {
     fn points(&self) -> Points {
         Points::new(Vector(self.pos.x, self.pos.y), &self.points)
     }

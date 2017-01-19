@@ -1,10 +1,12 @@
 use geometry::vec::Vec2;
+use geometry::ray::Ray;
 use world::World;
 use net::Socket;
 use net::msg::Message;
 use world::color::Color;
 use input::PlayerInput;
 use err::*;
+use tile_net::Collable;
 
 use num_traits::Float;
 
@@ -88,15 +90,20 @@ impl Server {
         Ok(())
     }
 
-		fn collide_bullet(&mut self, player: PlayerData, pos: Vec2, direction: Vec2) {
-			let player_number = player.nr;
-			let value = if self.world.players[player_number].shape.color == Color::White { 0 } else { 255 };
-			let ray = Ray::new(pos, direction);
-			let mut state = Ray::new_state(Color::White);
-			self.tilenet.solve(ray, &mut state);
-			let index = state.hit_tile;
-			self.tilenet.set(&value, (index.0, index.1));
-		}
+    fn collide_bullet(&mut self, player_nr: usize, pos: Vec2, direction: Vec2) {
+        let value = if let Color::White = self.world.players[player_nr].shape.color { 0 } else { 255 };
+        let mut ray = Ray::new(pos, direction);
+        let mut state = ray.new_state(Color::White);
+        ray.solve(&self.world.tilenet, &mut state);
+        match state.hit_tile {
+            Some(index) => {
+                self.world.tilenet.set(&value, (index.0 as usize, index.1 as usize));
+            },
+            None => {
+                // TODO delete bullet
+            }
+        }
+    }
 
     fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<()> {
         match msg {
@@ -108,7 +115,13 @@ impl Server {
                 }
             },
             Message::ToggleGravity => self.world.gravity_on = !self.world.gravity_on,
-            Message::BulletFire { pos, direction } => self.collide_bullet(self.players.get(&src), pos, direction),
+            Message::BulletFire { pos, direction } => {
+                let player_nr = match self.players.get(&src) {
+                    Some(player_data) => player_data.nr,
+                    None => bail!("Received BulletFire message from unregistered player."), // TODO don't know how to handle this
+                };
+                self.collide_bullet(player_nr, pos, direction);
+            },
             _ => {}
         }
         Ok(())

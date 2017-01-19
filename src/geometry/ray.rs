@@ -1,5 +1,7 @@
 use tile_net::*;
 use geometry::vec::Vec2;
+use world::color::Color;
+use global::Tile;
 
 pub struct Ray {
     pos: Vec2,
@@ -13,34 +15,43 @@ impl Ray {
             dir: direction,
         }
     }
-    pub fn new_state(color: Color) -> RayState {
+    pub fn new_state(&self, color: Color) -> RayState {
         RayState {
+            collision: false,
             hit_tile: None,
             color: color,
+            dir: self.dir,
         }
     }
 }
+static a: &'static [(f32, f32)] = &[(0.0, 0.0)];
 
-impl Collable for Ray {
+impl Collable<Tile, RayState> for Ray {
     fn points(&self) -> Points {
-        Points::new(Vector(self.pos.x, self.pos.y), &(0.0, 0.0))
+        Points::new(Vector(self.pos.x, self.pos.y), a)
     }
-    fn queued(&self) -> Vector {
-        Vector(self.dir.x, self.dir.y)
-    }
-    fn resolve<I>(&mut self, set: TileSet<Tile, I>, state: &mut RayState) -> bool {
-        state.hit_tile = state.get_last();
+    fn resolve<I>(&mut self, mut set: TileSet<Tile, I>, state: &mut RayState) -> bool
+        where I: Iterator<Item = (i32, i32)>
+    {
 
         let no_collision = match state.color {
             Color::White => set.all(|x| *x == 0),
             Color::Black => set.all(|x| *x != 0),
         };
-        state.hit_tile = Some(set.get_last());
+        state.hit_tile = Some(set.get_coords());
         no_collision
     }
 }
 
 pub struct RayState {
-    pub hit_tile: Option<(usize, usize)>,
+    pub collision: bool,
+    pub hit_tile: Option<(i32, i32)>,
     pub color: Color,
+    pub dir: Vec2,
+}
+
+impl CollableState for RayState {
+    fn queued(&self) -> Vector {
+        self.dir.into()
+    }
 }

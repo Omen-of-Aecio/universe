@@ -90,14 +90,18 @@ impl Server {
         Ok(())
     }
 
-    fn collide_bullet(&mut self, player_nr: usize, pos: Vec2, direction: Vec2) {
+    fn bullet_fire(&mut self, player_data: &PlayerData, pos: Vec2, direction: Vec2) {
+        let player_nr = player_data.nr;
+        let player_col = self.world.players[player_nr].shape.color;
+
         let value = if let Color::White = self.world.players[player_nr].shape.color { 0 } else { 255 };
         let mut ray = Ray::new(pos, direction);
-        let mut state = ray.new_state(Color::White);
+        let mut state = ray.new_state(player_col);
         ray.solve(&self.world.tilenet, &mut state);
         match state.hit_tile {
             Some(index) => {
                 self.world.tilenet.set(&value, (index.0 as usize, index.1 as usize));
+                // TODO send updated texture
             },
             None => {
                 // TODO delete bullet
@@ -116,9 +120,9 @@ impl Server {
             },
             Message::ToggleGravity => self.world.gravity_on = !self.world.gravity_on,
             Message::BulletFire { pos, direction } => {
-                let player_nr = self.players.get(&src).map(|x| x.nr);
-                if let Some(player_nr) = player_nr {
-                    self.collide_bullet(player_nr, pos, direction);
+                let player_data = self.players.get(&src).map(|x| x.clone());
+                if let Some(player_data) = player_data {
+                    self.bullet_fire(&player_data, pos, direction);
                 }
             },
             _ => {}
@@ -194,7 +198,7 @@ impl Server {
 
         let pixels: Vec<u8> = self.world.tilenet.view_box((x, x+w, y, y+h)).map(|x| *x.0).collect();
         assert!(pixels.len() == w*h);
-        let msg = Message::WorldRect { x: x, y: y, width: w, height: h, pixels: pixels};
+        let msg = Message::WorldRect { x: x, y: y, width: w, pixels: pixels};
         self.socket.send_reliably_to(msg, dest)?;
         Ok(())
     }

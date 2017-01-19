@@ -181,10 +181,8 @@ impl Client {
         match msg {
             Message::Welcome {width: _, height: _, you_index: _, players: _, white_base: _, black_base: _} => {
             },
-            Message::WorldRect {x, y, width, height, pixels} => {
-                if width * height != pixels.len() {
-                    bail!("Not enough pixels ({}) to cover rect ({}, {}; {}, {})", pixels.len(), x, y, width, height);
-                }
+            Message::WorldRect {x, y, width, pixels} => {
+                let height = pixels.len() / width;
                 self.receive_world(x, y, width, height, pixels);
             },
             Message::PlayerPos (pos) => {

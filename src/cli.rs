@@ -49,7 +49,7 @@ impl Client {
     pub fn new(server_addr: &str) -> Result<Client> {
 
         let mut socket = Client::create_socket();
-        let server = to_socket_addr(server_addr);
+        let server = to_socket_addr(server_addr)?;
 
         // Init connection
         socket.send_to(Message::Join, server).chain_err(|| "Cannot send Join message.")?;
@@ -273,20 +273,24 @@ impl Client {
 }
 
 
-fn to_socket_addr(addr: &str) -> SocketAddr{
+fn to_socket_addr(addr: &str) -> Result<SocketAddr> {
     // Assume IPv4. Try to parse.
     let parts: Vec<&str> = addr.split(":").collect();
-    assert!(parts.len() == 2);
+    if parts.len() != 2 {
+        bail!("IP address must be on the form X.X.X.X:port");
+    }
 
     let addr: Vec<u8> = parts[0].split(".").map(|x| x.parse::<u8>().unwrap()).collect();
-    assert!(addr.len() == 4);
+    if addr.len() != 4 {
+        bail!("IP address must be on the form X.X.X.X:port");
+    }
 
     let port = parts[1].parse::<u16>().unwrap();
 
-    SocketAddr::V4(
+    Ok(SocketAddr::V4(
         SocketAddrV4::new(
             Ipv4Addr::new(addr[0], addr[1], addr[2], addr[3]),
             port
         )
-    )
+    ))
 }

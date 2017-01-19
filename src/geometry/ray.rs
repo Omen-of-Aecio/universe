@@ -24,11 +24,11 @@ impl Ray {
         }
     }
 }
-static a: &'static [(f32, f32)] = &[(0.0, 0.0)];
+static NULL_VECTOR: &'static [(f32, f32)] = &[(0.0, 0.0)];
 
 impl Collable<Tile, RayState> for Ray {
     fn points(&self) -> Points {
-        Points::new(Vector(self.pos.x, self.pos.y), a)
+        Points::new(Vector(self.pos.x, self.pos.y), NULL_VECTOR)
     }
     fn resolve<I>(&mut self, mut set: TileSet<Tile, I>, state: &mut RayState) -> bool
         where I: Iterator<Item = (i32, i32)>

@@ -106,21 +106,20 @@ impl Server {
     }
 
     fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<()> {
+        // Will ignore packets from unregistered connections
         match msg {
             Message::Join => self.new_connection(src)?,
             Message::Input (input) => {
-                match self.players.get_mut(&src) {
-                    Some(ref mut player_data) => player_data.input = input,
-                    None => bail!("Received 'Input' messages from player with unregistered connection."),
+                if let Some(ref mut player_data) = self.players.get_mut(&src) {
+                    player_data.input = input;
                 }
             },
             Message::ToggleGravity => self.world.gravity_on = !self.world.gravity_on,
             Message::BulletFire { pos, direction } => {
-                let player_nr = match self.players.get(&src) {
-                    Some(player_data) => player_data.nr,
-                    None => bail!("Received BulletFire message from unregistered player."), // TODO don't know how to handle this
-                };
-                self.collide_bullet(player_nr, pos, direction);
+                let player_nr = self.players.get(&src).map(|x| x.nr);
+                if let Some(player_nr) = player_nr {
+                    self.collide_bullet(player_nr, pos, direction);
+                }
             },
             _ => {}
         }

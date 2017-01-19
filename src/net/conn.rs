@@ -122,11 +122,9 @@ impl<'a> Connection {
             Packet::Reliable {seq, msg} => {
                 received_msg = Some(msg);
                 ack_reply = Some(Packet::Ack {ack: seq});
-                info!("Recv"; "seq" => seq);
             },
             Packet::Ack {ack} => {
                 self.acknowledge(ack)?;
-                info!("Recv ack"; "ack" => ack);
             }
         };
         Ok((received_msg, ack_reply))

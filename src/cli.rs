@@ -34,9 +34,6 @@ pub struct Client {
     //   following is used only if INTERACTIVE camera mode
     zoom: f32,
     center: Vec2,
-    mouse_down: bool,
-    mouse_pos: Vec2,
-    mouse_pos_past: Vec2,
 
     // Networking
     socket: Socket,
@@ -78,9 +75,6 @@ impl Client {
                     cam_mode: CameraMode::FollowPlayer,
                     zoom: 1.0,
                     center: Vec2::new(0.0, 0.0),
-                    mouse_down: false,
-                    mouse_pos: Vec2::new(0.0, 0.0),
-                    mouse_pos_past: Vec2::new(0.0, 0.0),
 
                     socket: socket,
                     server: server,
@@ -103,18 +97,16 @@ impl Client {
             for ev in self.display.clone().poll_events() {
                 match ev {
                     glutin::Event::Closed => return Ok(()),
-                    glutin::Event::MouseMoved(x, y) => self.mouse_moved(x, y),
-                    glutin::Event::MouseWheel(MouseScrollDelta::LineDelta(_, y), _) => {
-                        self.mouse_wheel_line(y)
-                    }
-                    glutin::Event::MouseInput(ElementState::Pressed, button) => {
-                        self.mouse_press(button)
-                    }
-                    glutin::Event::MouseInput(ElementState::Released, button) => {
-                        self.mouse_release(button)
-                    }
-                    glutin::Event::KeyboardInput(_, _, _) => self.input.register_key(ev),
-                    glutin::Event::Resized(w, h) => window_size = (w, h),
+                    glutin::Event::MouseMoved(x, y) =>
+                        self.input.position_mouse(x, y),
+                    glutin::Event::MouseWheel(MouseScrollDelta::LineDelta(_, y), _) =>
+                        self.input.register_mouse_wheel(y),
+                    glutin::Event::MouseInput(state, button) =>
+                        self.input.register_mouse_input(state, button),
+                    glutin::Event::KeyboardInput(_, _, _) =>
+                        self.input.register_key(ev),
+                    glutin::Event::Resized(w, h) =>
+                        window_size = (w, h),
                     _ => (),
                 }
             }
@@ -161,15 +153,9 @@ impl Client {
         }
     }
 
-    fn handle_input(&mut self) -> Result<()> {
-        if self.input.key_toggled_down(KeyCode::G) {
-            self.socket.send_to(Message::ToggleGravity, self.server)?;
-        }
-        Ok(())
-    }
     fn send_input(&mut self) -> Result<()> {
         let msg = Message::Input (self.input.create_player_input());
-        self.socket.send_to(msg, self.server)?;
+        self.socket.send_reliably_to(msg, self.server)?;
         Ok(())
     }
 
@@ -220,39 +206,28 @@ impl Client {
     }
 
 
-    fn mouse_moved(&mut self, x: i32, y: i32) {
-        self.mouse_pos_past = self.mouse_pos;
-        self.mouse_pos = Vec2::new(x as f32, y as f32);
-        // Move the texture //
-        if self.mouse_down {
-            // let window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
-            let mut offset = (self.mouse_pos - self.mouse_pos_past) / self.zoom;
+    fn handle_input(&mut self) -> Result<()> {
+        if self.input.key_toggled_down(KeyCode::G) {
+            self.socket.send_to(Message::ToggleGravity, self.server)?;
+        }
+
+        // Mouse
+        if self.input.mouse() {
+            // Move the texture //
+            let mut offset = self.input.mouse_moved() / self.zoom;
             offset.x = -offset.x;
-            offset.y = offset.y;
             self.center += offset;
         }
-    }
 
-    fn mouse_wheel_line(&mut self, y: f32) {
-        // For each 'tick', it should *= factor
+        // Zooming
         const ZOOM_FACTOR: f32 = 1.2;
+        let y = self.input.mouse_wheel();
         if y > 0.0 {
             self.zoom *= f32::powf(ZOOM_FACTOR, y as f32);
         } else if y < 0.0 {
             self.zoom /= f32::powf(ZOOM_FACTOR, -y as f32);
         }
-    }
-
-    fn mouse_press(&mut self, button: MouseButton) {
-        if let MouseButton::Left = button {
-            self.mouse_down = true;
-        }
-    }
-
-    fn mouse_release(&mut self, button: MouseButton) {
-        if let MouseButton::Left = button {
-            self.mouse_down = false;
-        }
+        Ok(())
     }
 
     fn create_socket() -> Socket {

@@ -1,7 +1,8 @@
 use glium::glutin;
-use glium::glutin::{ElementState, VirtualKeyCode as KeyCode};
+use glium::glutin::{ElementState, VirtualKeyCode as KeyCode, MouseButton};
 // use glium::glutin::KeyCode;
 use glium::glutin::Event::KeyboardInput;
+use geometry::vec::Vec2;
 
 // TODO
 // Input isn't really made for ease of client-server
@@ -12,6 +13,14 @@ const NUM_KEYS: usize = 150;
 pub struct Input {
     key_down: [bool; NUM_KEYS],
     key_toggled: [bool; NUM_KEYS],
+
+    /// Only left mouse button at the moment
+    mouse: (i32, i32, bool),
+    /// How much the mouse has moved since the last frame 
+    past_mouse: (i32, i32),
+    /// How much wheel since last frame
+    mouse_wheel: f32,
+
 }
 
 impl Default for Input {
@@ -19,6 +28,9 @@ impl Default for Input {
         Input {
             key_down: [false; NUM_KEYS],
             key_toggled: [false; NUM_KEYS],
+            mouse: (0, 0, false),
+            past_mouse: (0,0),
+            mouse_wheel: 0.0,
         }
     }
 }
@@ -33,7 +45,12 @@ impl Input {
         for i in 0..NUM_KEYS {
             self.key_toggled[i] = false;
         }
+        self.mouse_wheel = 0.0;
+        self.past_mouse.0 = self.mouse.0;
+        self.past_mouse.1 = self.mouse.1;
     }
+
+    /* Interface to register input */
 
     pub fn register_key(&mut self, input: glutin::Event) {
         match input {
@@ -46,6 +63,24 @@ impl Input {
             _ => (), // Do nothing. Should probably log the error.
         }
     }
+    pub fn position_mouse(&mut self, x: i32, y: i32) {
+        self.mouse.0 = x;
+        self.mouse.1 = y;
+    }
+    pub fn register_mouse_wheel(&mut self, y: f32) {
+        self.mouse_wheel = y;
+    }
+    pub fn register_mouse_input(&mut self, state: ElementState, button: MouseButton) {
+        if let MouseButton::Left = button {
+           self.mouse.2 = match state {
+                ElementState::Pressed => true,
+                ElementState::Released => false,
+            };
+        }
+    }
+
+    
+    /* Interface to GET state */
 
     pub fn key_down(&self, keycode: KeyCode) -> bool {
         self.key_down[keycode as usize]
@@ -60,9 +95,21 @@ impl Input {
         self.key_down(keycode) && self.key_toggled(keycode)
     }
 
+    pub fn mouse_pos(&self) -> Vec2 {
+        Vec2::new(self.mouse.0 as f32, self.mouse.1 as f32)
+    }
+    pub fn mouse(&self) -> bool {
+        self.mouse.2
+    }
+    pub fn mouse_moved(&self) -> Vec2 {
+        Vec2::new((self.mouse.0 - self.past_mouse.0) as f32, (self.mouse.1 - self.past_mouse.1) as f32)
+    }
+    pub fn mouse_wheel(&self) -> f32 {
+        self.mouse_wheel
+    }
 
     pub fn register_key_down(&mut self, keycode: KeyCode) {
-        debug!("Key down"; "code" => keycode as i32);
+        // debug!("Key down"; "code" => keycode as i32);
         let keycode = keycode as usize;
         if !self.key_down[keycode] {
             // If this toggles the key...

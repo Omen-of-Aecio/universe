@@ -64,6 +64,7 @@ impl Socket {
         Packet::max_packet_size() // because Packet should probably be private to the net module
     }
 
+    /// Send unreliable message
     pub fn send_to(&mut self, msg: Message, dest: SocketAddr) -> Result<()> {
         let buffer = Packet::Unreliable {msg: msg}.encode();
         self.socket.send_to(&buffer, dest)?;
@@ -71,6 +72,7 @@ impl Socket {
         Ok(())
     }
 
+    /// Send reliable message
     pub fn send_reliably_to(&mut self, msg: Message, dest: SocketAddr) -> Result<()> {
         // Need to clone it here because of aliasing :/
         // IDEA: Could also let Connection::wrap_message take a clone of the UdpSocket and send the
@@ -79,7 +81,6 @@ impl Socket {
 
         let buffer = {
             let mut conn = self.get_connection_or_create(dest);
-            debug!("Send reliably");
             conn.wrap_message(msg)
         };
         socket.send_to(&buffer, dest)?;

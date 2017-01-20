@@ -5,7 +5,7 @@ use glium::glutin::{ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode 
 use input::Input;
 use world::World;
 use world::player::Player;
-use graphics::Graphics;
+use graphics::{Graphics, screen_to_world};
 use err::*;
 use rand;
 use rand::Rng;
@@ -23,6 +23,7 @@ enum CameraMode {
 
 pub struct Client {
     display: glium::Display,
+    window_size: (u32, u32),
     input: Input,
     graphics: Graphics,
     world: World,
@@ -65,8 +66,9 @@ impl Client {
 
                 let display = glutin::WindowBuilder::new().build_glium().unwrap();
                 let graphics = Graphics::new(display.clone(), &world);
-                let r = Ok(Client {
+                Ok(Client {
                     display: display,
+                    window_size: (0, 0),
                     input: Input::new(),
                     graphics: graphics,
                     world: world,
@@ -78,9 +80,7 @@ impl Client {
 
                     socket: socket,
                     server: server,
-                });
-                info!("Chk3");
-                r
+                })
             },
             _ => {
                 Err("Didn't receive Welcome message (in order...)".into())
@@ -89,7 +89,7 @@ impl Client {
 
     }
     pub fn run(&mut self) -> Result<()> {
-        let mut window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
+        self.window_size = self.display.get_window().unwrap().get_inner_size().unwrap();
         loop {
             // Input
             self.input.update();
@@ -106,7 +106,7 @@ impl Client {
                     glutin::Event::KeyboardInput(_, _, _) =>
                         self.input.register_key(ev),
                     glutin::Event::Resized(w, h) =>
-                        window_size = (w, h),
+                        self.window_size = (w, h),
                     _ => (),
                 }
             }
@@ -137,19 +137,23 @@ impl Client {
             }
 
             // Render
-            let cam_pos = match self.cam_mode {
-                CameraMode::Interactive => self.center,
-                CameraMode::FollowPlayer => self.world.players[self.player_nr].shape.pos,
-            };
+            let cam_pos = self.get_cam_pos();
             prof!["Render",
                   self.graphics.render(cam_pos,
                                        self.zoom,
-                                       window_size.0,
-                                       window_size.1,
+                                       self.window_size.0,
+                                       self.window_size.1,
                                        &self.world)];
             
             // vsync doesn't seem to work on Windows
             // thread::sleep(Duration::from_millis(15));
+        }
+    }
+
+    fn get_cam_pos(&self) -> Vec2 {
+        match self.cam_mode {
+            CameraMode::Interactive => self.center,
+            CameraMode::FollowPlayer => self.world.players[self.player_nr].shape.pos,
         }
     }
 
@@ -204,7 +208,7 @@ impl Client {
         }
         self.graphics.tilenet_renderer.upload_texture(&self.world.tilenet, x as u32, y as u32, w as u32, h as u32);
     }
-
+    
 
     fn handle_input(&mut self) -> Result<()> {
         if self.input.key_toggled_down(KeyCode::G) {
@@ -213,10 +217,22 @@ impl Client {
 
         // Mouse
         if self.input.mouse() {
-            // Move the texture //
+            // Update camera offset //
             let mut offset = self.input.mouse_moved() / self.zoom;
             offset.x = -offset.x;
             self.center += offset;
+
+            // Fire weapon //
+            let mouse_world_pos = screen_to_world(self.input.mouse_pos(),
+                self.get_cam_pos(), 
+                self.zoom,
+                self.window_size.0,
+                self.window_size.1);
+            let dir = mouse_world_pos - self.world.players[self.player_nr].shape.pos;
+            let msg = Message::BulletFire {direction: dir};
+            self.socket.send_reliably_to(msg, self.server)?;
+            info!("FIRING WEAPON"; "dir.x" => dir.x, "dir.y" => dir.y);
+            info!("y"; "mouse" => mouse_world_pos.y, "player" => self.world.players[self.player_nr].shape.pos.y);
         }
 
         // Zooming

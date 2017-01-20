@@ -15,6 +15,6 @@ pub enum Message {
     Join,
     Input (PlayerInput),
     ToggleGravity,
-    BulletFire { pos: Vec2, direction: Vec2 },
+    BulletFire { direction: Vec2 },
 }
 

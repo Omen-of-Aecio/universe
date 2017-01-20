@@ -90,18 +90,19 @@ impl Server {
         Ok(())
     }
 
-    fn bullet_fire(&mut self, player_data: &PlayerData, pos: Vec2, direction: Vec2) -> Result<()> {
+    fn bullet_fire(&mut self, player_data: &PlayerData, direction: Vec2) -> Result<()> {
         let player_nr = player_data.nr;
         let player_col = self.world.players[player_nr].shape.color;
+        let player_pos = self.world.players[player_nr].shape.pos;
 
-        let mut ray = Ray::new(pos, direction);
+        let mut ray = Ray::new(player_pos, direction);
         let mut state = ray.new_state(player_col);
         ray.solve(&self.world.tilenet, &mut state);
         match state.hit_tile {
             Some((x, y)) => {
                 let x = x as usize;
                 let y = y as usize;
-                let intensity = (player_col.to_intensity() * 255.0) as u8;
+                let intensity = 255 - (player_col.to_intensity() * 255.0) as u8;
                 self.world.tilenet.set(&intensity, (x, y));
                 // TODO send updated texture
                 let msg = self.wrap_world_rect(x, y, 1, 1)?;
@@ -124,10 +125,10 @@ impl Server {
                 }
             },
             Message::ToggleGravity => self.world.gravity_on = !self.world.gravity_on,
-            Message::BulletFire { pos, direction } => {
+            Message::BulletFire { direction } => {
                 let player_data = self.players.get(&src).map(|x| x.clone());
                 if let Some(player_data) = player_data {
-                    self.bullet_fire(&player_data, pos, direction);
+                    self.bullet_fire(&player_data, direction);
                 }
             },
             _ => {}

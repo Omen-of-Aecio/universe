@@ -105,13 +105,13 @@ impl Server {
                 let intensity = 255 - (player_col.to_intensity() * 255.0) as u8;
                 // self.world.tilenet.set(&intensity, (x, y));
                 self.world.tilenet.set_box(&intensity, (x-5, y-5), (x+5, y+5));
-                // TODO send updated texture
-                let msg = self.wrap_world_rect(x-5, y-5, 10, 10)?;
-                self.broadcast(&msg);
+                // TODO 10 vs 11
+                let msg = self.wrap_world_rect(x-5, y-5, 11, 11)?;
+                if let Some(msg) = msg {
+                    self.broadcast(&msg);
+                }
             },
-            None => {
-                // TODO delete bullet?
-            }
+            None => {}
         };
         Ok(())
     }
@@ -190,7 +190,9 @@ impl Server {
         for x in 0..blocks.0 {
             for y in 0..blocks.1 {
                 let msg = self.wrap_world_rect(x * dim.0, y * dim.0, dim.0, dim.1)?;
-                self.socket.send_reliably_to(msg, src)?;
+                if let Some(msg) = msg {
+                    self.socket.send_reliably_to(msg, src)?;
+                }
             }
         }
         self.broadcast_reliably(&Message::NewPlayer {nr: player_nr as u32, color: color})
@@ -200,13 +202,18 @@ impl Server {
     }
 
     /// Create message ready for sending
-    fn wrap_world_rect(&mut self, x: usize, y: usize, w: usize, h: usize) -> Result<Message> {
-        let w = min(x + w, self.world.tilenet.get_size().0) - x;
-        let h = min(y + h, self.world.tilenet.get_size().1) - y;
+    fn wrap_world_rect(&mut self, x: usize, y: usize, w: usize, h: usize) -> Result<Option<Message>> {
+        let w = min(x + w, self.world.tilenet.get_size().0) as isize - x as isize;
+        let h = min(y + h, self.world.tilenet.get_size().1) as isize - y as isize;
+        if w <= 0 || h <= 0 {
+            return Ok(None);
+        }
+        let w = w as usize;
+        let h = h as usize;
 
         let pixels: Vec<u8> = self.world.tilenet.view_box((x, x+w, y, y+h)).map(|x| *x.0).collect();
         assert!(pixels.len() == w*h);
-        Ok(Message::WorldRect { x: x, y: y, width: w, pixels: pixels})
+        Ok(Some(Message::WorldRect { x: x, y: y, width: w, pixels: pixels}))
     }
 
     /// ASSUMPTION: packet size is 2^n

@@ -81,7 +81,7 @@ impl Player {
 
 
         // Move X
-        const MAX_HEIGHT: f32 = 8.0;
+        const MAX_HEIGHT: f32 = 4.0;
         let q = self.shape.vel.scale(1.0, 0.0);
         let mut time_left = 1.0;
 

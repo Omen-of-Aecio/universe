@@ -103,9 +103,10 @@ impl Server {
                 let x = x as usize;
                 let y = y as usize;
                 let intensity = 255 - (player_col.to_intensity() * 255.0) as u8;
-                self.world.tilenet.set(&intensity, (x, y));
+                // self.world.tilenet.set(&intensity, (x, y));
+                self.world.tilenet.set_box(&intensity, (x-5, y-5), (x+5, x+5));
                 // TODO send updated texture
-                let msg = self.wrap_world_rect(x, y, 1, 1)?;
+                let msg = self.wrap_world_rect(x, y, 5, 5)?;
                 self.broadcast(&msg);
             },
             None => {

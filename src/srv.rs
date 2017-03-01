@@ -95,7 +95,7 @@ impl Server {
         let player_col = self.world.players[player_nr].shape.color;
         let player_pos = self.world.players[player_nr].shape.pos;
 
-        let mut ray = Ray::new(player_pos, direction);
+        let mut ray = Ray::new(player_pos, direction.scale_uni(10000.0));
         let mut state = ray.new_state(player_col);
         ray.solve(&self.world.tilenet, &mut state);
         match state.hit_tile {
@@ -104,9 +104,9 @@ impl Server {
                 let y = y as usize;
                 let intensity = 255 - (player_col.to_intensity() * 255.0) as u8;
                 // self.world.tilenet.set(&intensity, (x, y));
-                self.world.tilenet.set_box(&intensity, (x-5, y-5), (x+5, y+5));
+                self.world.tilenet.set_box(&intensity, (x-2, y-2), (x+2, y+2));
                 // TODO 10 vs 11
-                let msg = self.wrap_world_rect(x-5, y-5, 11, 11)?;
+                let msg = self.wrap_world_rect(x-2, y-2, 3, 3)?;
                 if let Some(msg) = msg {
                     self.broadcast(&msg);
                 }

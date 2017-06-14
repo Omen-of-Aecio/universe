@@ -1,53 +1,31 @@
 use std::vec::Vec;
 
+use specs;
+use specs::Join;
+
 use glium;
 use glium::{Display, Surface};
 
-use geometry::vec::Vec2;
-use world::World;
-use world::iter::PolygonIter;
+use cli::cam::Camera;
+use component::*;
 
 
 
 /// Renderer for polygons.
 /// The polygons are given in the constructor, and never changes. (for now)
 pub struct Ren {
-    end_indices: Vec<usize>,
-    // OpenGL
-    vertex_buffer: glium::VertexBuffer<Vertex>,
+    display: Display,
     prg: glium::Program,
 }
 
 impl Ren {
-    // TODO take a PolygonIterator as input
-    pub fn new(display: Display, polygons: PolygonIter) -> Ren {
-        let mut end_indices = Vec::new();
-        let mut pos = Vec::new();
-        let mut ori = Vec::new();
-
-
+    pub fn new(display: Display) -> Ren {
         let vert_src = include_str!("../../../shaders/xy_tr.vert");
         let frag_src = include_str!("../../../shaders/xy_tr.frag");
         let prg = glium::Program::from_source(&display, vert_src, frag_src, None).unwrap();
-        let mut vertices = Vec::new();
-
-        // Upload vertices
-        for p in polygons {
-            debug!("Add polygon");
-            for v in &p.points {
-                debug!("Add point");
-                // v: (f32, f32)
-                vertices.push(Vertex { pos: [v.0, v.1] });
-            }
-            end_indices.push(vertices.len() - 1);
-            pos.push(p.pos);
-            ori.push(p.ori);
-        }
-        let vertex_buffer = glium::VertexBuffer::new(&display, &vertices).unwrap();
 
         Ren {
-            end_indices: end_indices,
-            vertex_buffer: vertex_buffer,
+            display: display,
             prg: prg,
         }
 
@@ -55,29 +33,36 @@ impl Ren {
 
     pub fn render(&self,
                   target: &mut glium::Frame,
-                  center: Vec2,
-                  zoom: f32,
-                  width: u32,
-                  height: u32,
-                  world: &World) {
-        let index_buffer = glium::index::NoIndices(glium::index::PrimitiveType::TriangleFan);
+                  cam: Camera,
+                  world: &specs::World) {
+        let no_indices = glium::index::NoIndices(glium::index::PrimitiveType::TriangleFan);
 
-        // Very stupid and fragile solution.
-        for p in world.polygons_iter() {
+        // Every time just reupload everything...
+
+        let (shape, pos, color) = (world.read::<Shape>(),
+                                   world.read::<Pos>(),
+                                   world.read::<Color>());
+        for (shape, pos, color) in (&shape, &pos, &color).join() {
+
+            let mut vertices = Vec::new();
+            for v in &shape.points {
+                vertices.push(Vertex {pos: [v.0, v.1]});
+            }
+            let vertex_buffer = glium::VertexBuffer::new(&self.display, &vertices).unwrap();
             let uniforms = uniform! {
-                center: [p.pos.x, p.pos.y],
-                orientation: p.ori,
-                color: p.color.to_rgb(),
-                proj: super::proj_matrix(width as f32, height as f32, 0.0, 1.0),
-                view: super::view_matrix(center.x, center.y, zoom, zoom),
+                center: [pos.transl.x, pos.transl.y],
+                orientation: pos.angular,
+                color: color.to_rgb(),
+                proj: super::proj_matrix(cam.width as f32, cam.height as f32, 0.0, 1.0),
+                view: super::view_matrix(cam.center.x, cam.center.y, cam.zoom, cam.zoom),
             };
-
-            target.draw(&self.vertex_buffer,
-                      &index_buffer,
+            target.draw(&vertex_buffer,
+                      &no_indices,
                       &self.prg,
                       &uniforms,
                       &Default::default())
                 .unwrap();
+
         }
     }
 }

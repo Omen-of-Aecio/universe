@@ -3,6 +3,7 @@ use glium::glutin::{ElementState, VirtualKeyCode as KeyCode, MouseButton};
 // use glium::glutin::KeyCode;
 use glium::glutin::Event::KeyboardInput;
 use geometry::vec::Vec2;
+use component::PlayerInput;
 
 // TODO
 // Input isn't really made for ease of client-server
@@ -135,13 +136,4 @@ impl Input {
             g: self.key_down(KeyCode::G),
         }
     }
-}
-
-#[derive(Debug, Default, Copy, Clone, RustcEncodable, RustcDecodable)]
-pub struct PlayerInput {
-    pub up: bool,
-    pub down: bool,
-    pub left: bool,
-    pub right: bool,
-    pub g: bool,
 }

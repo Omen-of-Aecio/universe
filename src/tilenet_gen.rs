@@ -16,8 +16,8 @@ pub fn proc1(tiles: &mut TileNet<u8>) {
 
     let display = glutin::WindowBuilder::new().with_visibility(false).build_glium().unwrap();
 
-    let vert_src = include_str!("../../shaders/proc1.vert");
-    let frag_src = include_str!("../../shaders/proc1.frag");
+    let vert_src = include_str!("../shaders/proc1.vert");
+    let frag_src = include_str!("../shaders/proc1.frag");
     let shader_prg = glium::Program::from_source(&display, vert_src, frag_src, None).unwrap();
     let fullscreen_quad = vec![Vertex { pos: [-1.0, -1.0] },
                                Vertex { pos: [1.0, -1.0] },

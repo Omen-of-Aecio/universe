@@ -35,7 +35,7 @@ impl Packet{
         let msg: DecodingResult<Packet> = decode(&data);
         msg.chain_err(|| "Error in decoding the data. Perhaps the received packet was too big?")
     }
-    pub fn max_packet_size() -> usize {
+    pub fn max_packet_size() -> u32 {
         2.pow(N) + 100
     }
 }

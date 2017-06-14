@@ -1,7 +1,6 @@
 use glium;
 use glium::{Display, Surface};
 use geometry::vec::Vec2;
-use world::World;
 
 const MAX_NUM_VERTICES: usize = 8000;
 
@@ -77,8 +76,7 @@ impl Ren {
                   center: Vec2,
                   zoom: f32,
                   width: u32,
-                  height: u32,
-                  _: &World) {
+                  height: u32) {
 
         self.upload_vertices();
         let uniforms = uniform! {

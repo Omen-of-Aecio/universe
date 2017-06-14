@@ -8,7 +8,7 @@ extern crate bgjk;
 extern crate glium;
 extern crate isatty;
 extern crate rand;
-#[macro_use (o, slog_log, slog_trace, slog_debug, slog_info, slog_warn, slog_error)]
+#[macro_use (o, slog_log, slog_trace, slog_debug, slog_info)]
 extern crate slog;
 extern crate slog_json;
 #[macro_use]
@@ -20,23 +20,25 @@ extern crate tilenet_ren;
 extern crate time;
 #[macro_use]
 extern crate error_chain;
-
 extern crate clap;
 extern crate byteorder;
-
 extern crate bincode;
 extern crate rustc_serialize;
 extern crate num_traits;
+extern crate specs;
 
+pub mod err;
+pub mod net;
 pub mod geometry;
 pub mod global;
 pub mod graphics;
 pub mod input;
-pub mod world;
 pub mod cli;
 pub mod srv;
-pub mod net;
-pub mod err;
+pub mod tilenet_gen;
+pub mod collision;
+pub mod component;
+
 use clap::{Arg, App};
 
 use slog::{DrainExt, Level};
@@ -59,6 +61,15 @@ fn setup_logger() {
     };
     slog_scope::set_global_logger(logger);
 }
+
+
+pub fn i32_to_usize(mut from: (i32, i32)) -> (usize, usize) {
+    if from.0 < 0 { from.0 = 0; }
+    if from.1 < 0 { from.1 = 0; }
+    (from.0 as usize, from.1 as usize)
+}
+
+
 
 fn main() {
     setup_logger();
@@ -99,3 +110,40 @@ fn main() {
     std::process::exit(1);
 }
 
+
+// Functions that don't have a home...
+
+use tile_net::TileNet;
+use global::Tile;
+use component::*;
+use geometry::Vec2;
+
+pub fn map_tile_value_via_color(tile: &Tile, color: Color) -> Tile {
+	match (tile, color) {
+		(&0, Color::Black) => 255,
+		(&255, Color::Black) => 0,
+		_ => *tile,
+	}
+}
+pub fn get_normal(tilenet: &TileNet<Tile>, coord: (usize, usize), color: Color) -> Vec2 {
+    let cmap = map_tile_value_via_color;
+    /*
+    let kernel = match color {
+        Color::WHITE => [[1.0, 0.0, -1.0], [2.0, 0.0, -2.0], [1.0, 0.0, -1.0]],
+        Color::BLACK => [[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]],
+    };
+    */
+    let kernel = [[1.0, 0.0, -1.0], [2.0, 0.0, -2.0], [1.0, 0.0, -1.0]];
+    let mut dx = 0.0;
+    let mut dy = 0.0;
+    for (y, row) in kernel.iter().enumerate() {
+        for (x, _) in row.iter().enumerate() {
+            if let (Some(x_coord), Some(y_coord)) = ((coord.0 + x).checked_sub(1),
+                                                     (coord.1 + y).checked_sub(1)) {
+                tilenet.get((x_coord, y_coord)).map(|&v| dx += kernel[y][x] * cmap(&v, color) as f32 / 255.0);
+                tilenet.get((x_coord, y_coord)).map(|&v| dy += kernel[x][y] * cmap(&v, color) as f32 / 255.0);
+            }
+        }
+    }
+    Vec2::new(dx, dy)
+}

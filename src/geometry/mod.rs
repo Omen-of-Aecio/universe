@@ -1,8 +1,6 @@
 pub mod vec;
-pub mod polygon;
-pub mod ray;
 
-use geometry::vec::Vec2;
+pub use geometry::vec::Vec2;
 
 
 /// ...

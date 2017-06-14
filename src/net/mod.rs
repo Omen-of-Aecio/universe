@@ -8,7 +8,7 @@ use net::pkt::Packet;
 
 use std;
 use std::time::Duration;
-use std::net::{UdpSocket, SocketAddr};
+use std::net::{UdpSocket, SocketAddr, SocketAddrV4, Ipv4Addr};
 use std::iter::Iterator;
 use std::collections::hash_map::HashMap;
 use err::*;
@@ -34,7 +34,7 @@ impl Socket {
         Ok(Socket {
             socket: UdpSocket::bind(("0.0.0.0:".to_string() + port.to_string().as_str()).as_str())?,
             connections: HashMap::new(),
-            buffer: default_vec(Packet::max_packet_size()),
+            buffer: default_vec(Packet::max_packet_size() as usize),
         })
     }
 
@@ -60,7 +60,7 @@ impl Socket {
             socket: self,
         }
     }
-    pub fn max_packet_size() -> usize {
+    pub fn max_packet_size() -> u32 {
         Packet::max_packet_size() // because Packet should probably be private to the net module
     }
 
@@ -167,6 +167,30 @@ impl<'a> Iterator for SocketIter<'a> {
     }
 }
 
+
+pub fn to_socket_addr(addr: &str) -> Result<SocketAddr> {
+    // Assume IPv4. Try to parse.
+    let parts: Vec<&str> = addr.split(":").collect();
+    if parts.len() != 2 {
+        bail!("IP address must be on the form X.X.X.X:port");
+    }
+
+    let addr: Vec<u8> = parts[0].split(".").map(|x| x.parse::<u8>().unwrap()).collect();
+    if addr.len() != 4 {
+        bail!("IP address must be on the form X.X.X.X:port");
+    }
+
+    let port = parts[1].parse::<u16>().unwrap();
+
+    Ok(SocketAddr::V4(
+        SocketAddrV4::new(
+            Ipv4Addr::new(addr[0], addr[1], addr[2], addr[3]),
+            port
+        )
+    ))
+}
+
+
 fn default_vec<T: Default>(size: usize) -> Vec<T> {
     let mut zero_vec: Vec<T> = Vec::with_capacity(size);
     for _ in 0..size {
@@ -174,3 +198,5 @@ fn default_vec<T: Default>(size: usize) -> Vec<T> {
     }
     return zero_vec;
 }
+
+

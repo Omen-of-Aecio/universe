@@ -1,7 +1,7 @@
 use geometry::vec::Vec2;
 use component::*;
 
-#[derive(RustcEncodable, RustcDecodable, Clone)]
+#[derive(RustcEncodable, RustcDecodable, Clone, Debug)]
 pub struct SrvPlayer {
     pub id: u32,
     pub col: Color,
@@ -17,7 +17,7 @@ impl SrvPlayer {
     }
 }
 
-#[derive(RustcEncodable, RustcDecodable, Clone)]
+#[derive(RustcEncodable, RustcDecodable, Clone, Debug)]
 pub enum Message {
     // Messages from server
     Welcome {width: u32, height: u32, you: u32, players: Vec<SrvPlayer>, white_base: Vec2, black_base: Vec2},

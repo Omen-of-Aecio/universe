@@ -140,6 +140,7 @@ impl Server {
 
     fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<()> {
         // TODO a lot of potential for abstraction/simplification...
+        println!("{:?}", msg);
 
         // Will ignore packets from unregistered connections
         match msg {

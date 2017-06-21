@@ -5,6 +5,7 @@ use component::*;
 use tile_net::TileNet;
 use global::Tile;
 use srv::game::GameConfig;
+use geometry::Vec2;
 
 ////////////
 // Server
@@ -29,6 +30,7 @@ impl<'a> specs::System<'a> for JumpSys {
             let acc = jump.tick();
             let progress = jump.get_progress();
             if let Some(acc) = acc {
+                println!("Jump acc");
                 vel.transl.y += acc;
             }
             if let Some(progress) = progress {
@@ -52,11 +54,12 @@ impl<'a> specs::System<'a> for MoveSys {
 
     fn run(&mut self, data: Self::SystemData) {
         let (tilenet, game_conf, player, mut pos, mut vel, mut force, shape, color) = data;
+        println!("Gravity_on: {}", game_conf.gravity_on);
+        let gravity = if game_conf.gravity_on { game_conf.gravity } else { Vec2::null_vec() };
 
         for (_, pos, vel, force, shape, color) in
             (&player, &mut pos, &mut vel, &mut force, &shape, &color).join() {
-                println!("MoveSys vel: {:?}", vel.transl);
-                player_move(pos, vel, force, shape, color, &tilenet, game_conf.gravity);
+                player_move(pos, vel, force, shape, color, &tilenet, gravity);
         }
     }
 }
@@ -81,15 +84,19 @@ impl<'a> specs::System<'a> for InputSys {
             }
             if input.up {
                 if game_conf.gravity_on {
+                    println!("A");
                     if !jump.is_active() {
+                        println!("B");
                         *jump = Jump::new_active(JUMP_DURATION, JUMP_ACC);
                     }
                 } else {
+                    println!("C");
                     vel.transl.y += ACCELERATION;
                 }
             }
             if input.down {
                 if !game_conf.gravity_on {
+                    println!("D");
                     vel.transl.y -= ACCELERATION;
                 }
             }

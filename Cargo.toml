@@ -36,3 +36,6 @@ dev = ["clippy"]
 
 [profile.release]
 debug = true
+
+[profile.dev]
+codegen-units = 4

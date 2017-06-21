@@ -140,7 +140,6 @@ impl Server {
 
     fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<()> {
         // TODO a lot of potential for abstraction/simplification...
-        println!("{:?}", msg);
 
         // Will ignore packets from unregistered connections
         match msg {
@@ -203,7 +202,7 @@ impl Server {
 
     /// Create message ready for sending
     fn wrap_game_rect(&self, x: usize, y: usize, w: usize, h: usize) -> Result<Option<Message>> {
-        let (pixels, w, h) = self.game.get_tilenet_serial_rect(x, y, w, h);
+        let (pixels, w, _) = self.game.get_tilenet_serial_rect(x, y, w, h);
         Ok(Some(Message::WorldRect { x: x, y: y, width: w, pixels: pixels}))
     }
 

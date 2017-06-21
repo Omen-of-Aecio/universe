@@ -1,7 +1,6 @@
 #![cfg_attr(feature = "dev", allow(unstable_features))]
 #![cfg_attr(feature = "dev", feature(plugin))]
 #![cfg_attr(feature = "dev", plugin(clippy))]
-#![feature(loop_break_value)]
 
 extern crate bgjk;
 #[macro_use]

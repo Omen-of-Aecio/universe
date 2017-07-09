@@ -41,21 +41,22 @@ pub struct Force {
 pub enum Jump {
     Active {
         // state
-        progress: u32,
+        /// How many seconds have elapsed
+        progress: f32,
         // config
-        /// Duration of jump in frames
-        frames: u32,
-        /// Force to apply every frame (for now just acceleration)
+        /// Duration of jump in frames (constant)
+        duration: f32,
+        /// Force to apply every frame (for now just acceleration) (constant)
         force: f32,
     },
     Inactive,
 }
 
 impl Jump {
-    pub fn new_active(frames: u32, force: f32) -> Jump {
+    pub fn new_active(duration: f32, force: f32) -> Jump {
         Jump::Active {
-            progress: 0,
-            frames: frames,
+            progress: 0.0,
+            duration: duration,
             force: force,
         }
     }
@@ -68,11 +69,11 @@ impl Jump {
 
     /// Returns acceleration upward for this frame
     /// Returns None if jump is done.
-    pub fn tick(&mut self) -> Option<f32> {
+    pub fn tick(&mut self, delta_sec: f32) -> Option<f32> {
         match *self {
-            Jump::Active {ref mut progress, frames, force} => {
-                *progress += 1;
-                if *progress <= frames {
+            Jump::Active {ref mut progress, duration, force} => {
+                *progress += delta_sec;
+                if *progress <= duration {
                     Some(force)
                 } else {
                     None
@@ -84,7 +85,7 @@ impl Jump {
         }
     }
 
-    pub fn get_progress(&self) -> Option<u32> {
+    pub fn get_progress(&self) -> Option<f32> {
         match *self {
             Jump::Active { progress, ..} => Some(progress),
             Jump::Inactive => None,

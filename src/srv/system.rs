@@ -15,26 +15,26 @@ pub struct JumpSys;
 pub struct MoveSys;
 pub struct InputSys;
 
-const JUMP_DURATION: u32 = 4;
-const JUMP_DELAY: u32 = 20; // Delay before you can jump again
-const JUMP_ACC: f32 = 3.0;
+/// Velocity transformations such as gravity and friction
+pub struct VelSys;
+
 // (TODO extra friction when on ground?)
 
 impl<'a> specs::System<'a> for JumpSys {
-    type SystemData = (WriteStorage<'a, Jump>,
+    type SystemData = (Fetch<'a, GameConfig>,
+                       WriteStorage<'a, Jump>,
                        WriteStorage<'a, Vel>);
     fn run(&mut self, data: Self::SystemData) {
-        let (mut jump, mut vel) = data;
+        let (config, mut jump, mut vel) = data;
         for (jump, vel) in (&mut jump, &mut vel).join() {
             // Jump
-            let acc = jump.tick();
+            let acc = jump.tick(config.srv_tick_duration);
             let progress = jump.get_progress();
             if let Some(acc) = acc {
-                println!("Jump acc");
                 vel.transl.y += acc;
             }
             if let Some(progress) = progress {
-                if progress > JUMP_DELAY {
+                if progress > config.jump_delay {
                     *jump = Jump::Inactive; // Regain jumping (like a sort of double jump)
                 }
             }
@@ -44,27 +44,30 @@ impl<'a> specs::System<'a> for JumpSys {
 
 impl<'a> specs::System<'a> for MoveSys {
     type SystemData = (Fetch<'a, TileNet<Tile>>,
-                       Fetch<'a, GameConfig>, // gravity
+                       Fetch<'a, GameConfig>,
                        ReadStorage<'a, Player>,
                        WriteStorage<'a, Pos>,
                        WriteStorage<'a, Vel>,
-                       WriteStorage<'a, Force>,
                        ReadStorage<'a, Shape>,
                        ReadStorage<'a, Color>);
 
     fn run(&mut self, data: Self::SystemData) {
-        let (tilenet, game_conf, player, mut pos, mut vel, mut force, shape, color) = data;
-        println!("Gravity_on: {}", game_conf.gravity_on);
+        let (tilenet, game_conf, player, mut pos, mut vel, shape, color) = data;
         let gravity = if game_conf.gravity_on { game_conf.gravity } else { Vec2::null_vec() };
 
-        for (_, pos, vel, force, shape, color) in
-            (&player, &mut pos, &mut vel, &mut force, &shape, &color).join() {
-                player_move(pos, vel, force, shape, color, &tilenet, gravity);
+        for (_, pos, vel, shape, color) in
+            (&player, &mut pos, &mut vel, &shape, &color).join() {
+                player_move(pos, vel, shape, color, &tilenet);
+
+            // Friction
+            vel.transl = vel.transl * game_conf.air_fri;
+
+            // Gravity
+            vel.transl += gravity;
         }
     }
 }
 
-const ACCELERATION: f32 = 0.35;
 
 impl<'a> specs::System<'a> for InputSys {
     type SystemData = (Fetch<'a, GameConfig>,
@@ -73,33 +76,42 @@ impl<'a> specs::System<'a> for InputSys {
                        WriteStorage<'a, Vel>);
 
     fn run(&mut self, data: Self::SystemData) {
-        let (game_conf, input, mut jump, mut vel) = data;
+        let (conf, input, mut jump, mut vel) = data;
         for (input, jump, vel) in (&input, &mut jump, &mut vel).join() {
             if input.left {
-                vel.transl.x -= ACCELERATION;
+                vel.transl.x -= conf.hori_acc;
             }
             if input.right {
-                vel.transl.x += ACCELERATION;
+                vel.transl.x += conf.hori_acc;
 
             }
             if input.up {
-                if game_conf.gravity_on {
-                    println!("A");
+                if conf.gravity_on {
                     if !jump.is_active() {
-                        println!("B");
-                        *jump = Jump::new_active(JUMP_DURATION, JUMP_ACC);
+                        *jump = Jump::new_active(conf.jump_duration, conf.jump_acc);
                     }
                 } else {
-                    println!("C");
-                    vel.transl.y += ACCELERATION;
+                    vel.transl.y += conf.hori_acc;
                 }
             }
             if input.down {
-                if !game_conf.gravity_on {
-                    println!("D");
-                    vel.transl.y -= ACCELERATION;
+                if !conf.gravity_on {
+                    vel.transl.y -= conf.hori_acc;
                 }
             }
+        }
+    }
+}
+
+impl<'a> specs::System<'a> for VelSys {
+    type SystemData = (Fetch<'a, GameConfig>,
+                       WriteStorage<'a, Vel>);
+
+    fn run(&mut self, data: Self::SystemData) {
+        let (conf, mut vel) = data;
+        for vel in (&mut vel).join() {
+            vel.transl = vel.transl * conf.air_fri;
+            vel.transl += conf.gravity;
         }
     }
 }

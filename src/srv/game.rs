@@ -15,6 +15,7 @@ use specs::{Dispatcher, World, Join};
 use std::collections::HashMap;
 use std::vec::Vec;
 
+use conf::Config;
 
 pub struct Game {
     pub world: World,
@@ -39,8 +40,8 @@ pub struct Game {
 
 
 impl Game {
-    pub fn new(width: usize, height: usize, white_base: Vec2, black_base: Vec2) -> Game {
-        let gc = GameConfig::default();
+    pub fn new(conf: Config, white_base: Vec2, black_base: Vec2) -> Game {
+        let gc = GameConfig::new(&conf);
 
         let world = {
             let mut w = World::new();
@@ -55,7 +56,7 @@ impl Game {
             w.register::<PlayerInput>();
             
             // The ECS system owns the TileNet
-            let mut tilenet = TileNet::<Tile>::new(width, height);
+            let mut tilenet = TileNet::<Tile>::new(conf.world.width as usize, conf.world.height as usize);
 
 
             // Create bases
@@ -67,6 +68,7 @@ impl Game {
             
             w.add_resource(tilenet);
             w.add_resource(gc);
+            w.add_resource(conf.clone());
 
             w
         };
@@ -76,8 +78,8 @@ impl Game {
             game_conf: gc,
             players: HashMap::default(),
             player_id_seq: 0,
-            width: width,
-            height: height,
+            width: conf.world.width as usize,
+            height: conf.world.height as usize,
             white_base: white_base,
             black_base: black_base,
             vectors: Vec::new(),
@@ -202,14 +204,34 @@ pub fn map_tile_value_via_color(tile: &Tile, color: Color) -> Tile {
 
 #[derive(Copy,Clone)]
 pub struct GameConfig {
+    pub hori_acc: f32, 
+    pub jump_duration: f32,
+    pub jump_delay: f32,
+    pub jump_acc: f32,
     pub gravity: Vec2,
     pub gravity_on: bool,
+    pub srv_tick_duration: f32,
+    pub air_fri: Vec2,
 }
-impl Default for GameConfig {
-    fn default() -> GameConfig {
+impl GameConfig {
+    pub fn new(conf: &Config) -> GameConfig {
+        // Helper functions to convert seconds->ticks
+        let conv_duration = |n: f32| {
+            n * conf.srv.tps as f32
+        };
+        let conv_acc = |n: f32| {
+            n / (conf.srv.tps * conf.srv.tps) as f32
+        };
         GameConfig {
-            gravity: Vec2::new(0.0, -1.0),
+            hori_acc: conv_acc(conf.player.hori_acc),
+            jump_duration: conv_duration(conf.player.jump_duration),
+            jump_delay: conv_duration(conf.player.jump_delay),
+            jump_acc: conv_acc(conf.player.jump_acc),
+            gravity: Vec2::new(0.0, - conv_acc(conf.world.gravity)),
             gravity_on: false,
+            srv_tick_duration: conf.get_srv_tick_duration(),
+            air_fri: Vec2::new(conf.world.air_fri.0, conf.world.air_fri.1),
         }
     }
+
 }

@@ -85,16 +85,11 @@ impl Game {
     /// Returns (messages to send, messages to send reliably)
     pub fn update(&mut self, input: &Input) -> (Vec<Message>, Vec<Message>) {
         self.vectors.clear(); // clear debug geometry
-        *self.world.write_resource() = self.cam;
         let ret = self.handle_input(input);
         if let CameraMode::FollowPlayer = self.cam_mode {
             self.cam.center = self.get_player_transl();
         }
-        /*
-        for player in &mut self.players {
-            player.update(&self.tilenet, if self.gravity_on { self.gravity } else { Vec2::null_vec() });
-        }
-        */
+        *self.world.write_resource() = self.cam;
         ret
     }
 

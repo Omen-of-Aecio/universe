@@ -2,9 +2,13 @@
 #![cfg_attr(feature = "dev", feature(plugin))]
 #![cfg_attr(feature = "dev", plugin(clippy))]
 
-extern crate bgjk;
 #[macro_use]
 extern crate glium;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+#[macro_use]
+extern crate error_chain;
 extern crate isatty;
 extern crate rand;
 #[macro_use (o, slog_log, slog_trace, slog_debug, slog_info)]
@@ -17,14 +21,13 @@ extern crate slog_term;
 extern crate tile_net;
 extern crate tilenet_ren;
 extern crate time;
-#[macro_use]
-extern crate error_chain;
 extern crate clap;
 extern crate byteorder;
 extern crate bincode;
 extern crate rustc_serialize;
 extern crate num_traits;
 extern crate specs;
+extern crate toml;
 
 pub mod err;
 pub mod net;
@@ -37,12 +40,14 @@ pub mod srv;
 pub mod tilenet_gen;
 pub mod collision;
 pub mod component;
+pub mod conf;
 
 use clap::{Arg, App};
 
 use slog::{DrainExt, Level};
 use cli::Client;
 use srv::Server;
+use conf::Config;
 
 fn setup_logger() {
     let logger = if isatty::stderr_isatty() {
@@ -62,14 +67,6 @@ fn setup_logger() {
 }
 
 
-pub fn i32_to_usize(mut from: (i32, i32)) -> (usize, usize) {
-    if from.0 < 0 { from.0 = 0; }
-    if from.1 < 0 { from.1 = 0; }
-    (from.0 as usize, from.1 as usize)
-}
-
-
-
 fn main() {
     setup_logger();
     let options = App::new("Universe")
@@ -79,19 +76,26 @@ fn main() {
              .takes_value(true))
         .get_matches();
 
+    // Read config
+    let config = Config::from_file("config.toml").unwrap();
+
     let err = if let Some(connect) = options.value_of("connect") {
-        info!("Create client");
+
+        info!("Running client");
         let mut client = Client::new(connect).unwrap();
-        info!("Run client");
         let err = client.run();
+
         match err {
-            Ok(_) => std::process::exit(1),
+            Ok(_) => std::process::exit(0),
             Err(err) => err,
         }
     } else {
-        let err = Server::new().run();
+
+        info!("Running server");
+        let err = Server::new(config).run();
+
         match err {
-            Ok(_) => std::process::exit(1),
+            Ok(_) => std::process::exit(0),
             Err(err) => err,
         }
     };
@@ -100,13 +104,8 @@ fn main() {
         println!("  caused by: {}", e);
     }
 
-    /*
-    if let Some(backtrace) = err.backtrace() {
-        println!("backtrace: {:?}", backtrace);
-    }
-    */
 
-    std::process::exit(1);
+    std::process::exit(0);
 }
 
 
@@ -145,4 +144,10 @@ pub fn get_normal(tilenet: &TileNet<Tile>, coord: (usize, usize), color: Color) 
         }
     }
     Vec2::new(dx, dy)
+}
+
+pub fn i32_to_usize(mut from: (i32, i32)) -> (usize, usize) {
+    if from.0 < 0 { from.0 = 0; }
+    if from.1 < 0 { from.1 = 0; }
+    (from.0 as usize, from.1 as usize)
 }

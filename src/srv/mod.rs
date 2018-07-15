@@ -18,37 +18,35 @@ use std::collections::HashMap;
 use std::thread;
 use std::time::Duration;
 
+use conf::Config;
+
 pub mod system;
 pub mod game;
 
 use self::game::Game;
 
-const WORLD_SIZE: usize = 700;
-
-
 pub struct Server {
     game: Game,
     connections: HashMap<SocketAddr, specs::Entity>,
-
-    // Networking
     socket: Socket,
+
+    /// Frame duration in seconds
+    frame_duration: f32,
 }
 
-// Thoughts
-// How to store inputs for each player?
-// And apply the inputs
-
 impl Server {
-    pub fn new() -> Server {
-        let size = WORLD_SIZE as f32;
-        let mut game = Game::new(WORLD_SIZE, WORLD_SIZE, Vec2::new(size/4.0, size/2.0), Vec2::new(3.0*size/4.0, size/2.0));
+    pub fn new(config: Config) -> Server {
+        let mut game = Game::new(config.clone(),
+                                 Vec2::new((config.world.width/4) as f32, (config.world.height/2) as f32),
+                                 Vec2::new((3*config.world.width/4) as f32, (config.world.height/2) as f32));
         game.generate_world();
 
         Server {
             game: game,
             connections: HashMap::new(),
-
             socket: Socket::new(9123).unwrap(),
+
+            frame_duration: config.get_srv_frame_duration(),
         }
     }
     pub fn run(&mut self) -> Result<()> {
@@ -79,7 +77,7 @@ impl Server {
             prof!["Logic",
                 self.game.update(&mut dispatcher)
             ];
-            thread::sleep(Duration::from_millis(16));
+            thread::sleep(Duration::from_millis((self.frame_duration * 1000.0) as u64));
         }
 
     }

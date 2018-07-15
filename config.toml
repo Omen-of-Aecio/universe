@@ -1,14 +1,16 @@
-# Units are in pixels and seconds
+# Units are in pixels and seconds (actually atm probably not - the ECS system does not know the delta time)
 [player]
-hori_acc = 10
-jump_duration = 0.2
-jump_delay = 3
-jump_acc = 20
-gravity = 5
+hori_acc = 1000
+jump_duration = 0.05
+jump_delay = 0.5
+jump_acc = 8000
 
 [world]
 width = 700
 height = 700
+gravity = 1000
+air_fri = [0.98, 0.99]
+ground_fri = 0.5
 
 [srv]
-fps = 60
+tps = 60

@@ -118,7 +118,6 @@ impl Game {
     /// Return tilenet data as well as new cropped (w, h)
     pub fn get_tilenet_serial_rect(&self, x: usize, y: usize, w: usize, h: usize) -> (Vec<Tile>, usize, usize) {
         let tilenet = &*self.world.read_resource::<TileNet<Tile>>();
-        debug!("x: {}, y: {}, w: {}, h: {}", x, y, w, h);
         let w = min(x + w, tilenet.get_size().0) as isize - x as isize;
         let h = min(y + h, tilenet.get_size().1) as isize - y as isize;
         if w <= 0 || h <= 0 {
@@ -211,18 +210,30 @@ pub struct GameConfig {
     pub jump_acc: f32,
     pub gravity: Vec2,
     pub gravity_on: bool,
-    pub srv_frame_duration: f32,
+    pub srv_tick_duration: f32,
+    pub air_fri: Vec2,
+    pub ground_fri: f32,
 }
 impl GameConfig {
     pub fn new(conf: &Config) -> GameConfig {
+        // Helper functions to convert seconds->ticks
+        let conv_duration = |n: f32| {
+            n * conf.srv.tps as f32
+        };
+        let conv_acc = |n: f32| {
+            n / (conf.srv.tps * conf.srv.tps) as f32
+        };
         GameConfig {
-            hori_acc: conf.player.hori_acc,
+            hori_acc: conv_acc(conf.player.hori_acc),
             jump_duration: conf.player.jump_duration,
             jump_delay: conf.player.jump_delay,
-            jump_acc: conf.player.jump_acc,
-            gravity: Vec2::new(0.0, -1.0),
+            jump_acc: conv_acc(conf.player.jump_acc),
+            gravity: Vec2::new(0.0, - conv_acc(conf.world.gravity)),
             gravity_on: false,
-            srv_frame_duration: conf.get_srv_frame_duration()
+            srv_tick_duration: conf.get_srv_tick_duration(),
+            air_fri: Vec2::new(conf.world.air_fri.0, conf.world.air_fri.1),
+            ground_fri: conf.world.ground_fri,
         }
     }
+
 }

@@ -12,7 +12,6 @@ pub struct Config {
     pub player: PlayerConfig,
     pub world: WorldConfig,
     pub srv: ServerConfig,
-
 }
 
 #[derive(Deserialize, Clone)]
@@ -21,16 +20,20 @@ pub struct PlayerConfig {
     pub jump_duration: f32,
     pub jump_delay: f32,
     pub jump_acc: f32,
-    pub gravity: f32,
 }
 #[derive(Deserialize, Clone)]
 pub struct WorldConfig {
     pub width: u32,
     pub height: u32,
+    pub gravity: f32,
+    pub air_fri: (f32, f32),
+    pub ground_fri: f32,
 }
+
 #[derive(Deserialize, Clone)]
 pub struct ServerConfig {
-    pub fps: u32,
+    /// Ticks per second
+    pub tps: u32,
 }
 
 impl Config {
@@ -44,7 +47,7 @@ impl Config {
         Ok(toml::from_str(s)?)
     }
 
-    pub fn get_srv_frame_duration(&self) -> f32 {
-        (1.0 / self.srv.fps as f32)
+    pub fn get_srv_tick_duration(&self) -> f32 {
+        (1.0 / self.srv.tps as f32)
     }
 }

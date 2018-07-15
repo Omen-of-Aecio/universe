@@ -100,16 +100,7 @@ impl Client {
             }
             self.handle_input();
 
-            // Update game
-            let packets = self.game.update(&self.input);
-            for msg in packets.0 {
-                self.socket.send_to(msg, self.server)?;
-            }
-            for msg_reliable in packets.1 {
-                self.socket.send_reliably_to(msg_reliable, self.server)?;
-            }
-
-            // Networking
+            // Receive messages
             self.socket.update()?;
             let mut messages = Vec::new();
             for msg in self.socket.messages() {
@@ -120,6 +111,17 @@ impl Client {
                 self.handle_message(msg.0, msg.1)?;
             }
 
+            // Update game & send messages
+            let packets = self.game.update(&self.input);
+            for msg in packets.0 {
+                self.socket.send_to(msg, self.server)?;
+            }
+            for msg_reliable in packets.1 {
+                self.socket.send_reliably_to(msg_reliable, self.server)?;
+            }
+
+            // println!("Transl: {:?}", self.game.get_player_transl());
+            // println!("Campos: {:?}", self.game.cam.center);
 
             // Render
             prof!["Render",

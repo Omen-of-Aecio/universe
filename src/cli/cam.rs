@@ -7,9 +7,8 @@ pub struct Camera {
     pub center: Vec2,
     pub width: u32,
     pub height: u32
-
-        
 }
+
 impl Camera {
     pub fn new() -> Camera {
         let (width, height) = (100, 100);

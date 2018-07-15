@@ -11,8 +11,6 @@ use tilenet::TileNet;
 
 pub fn proc1(tiles: &mut TileNet<u8>) {
     let mut rng = rand::thread_rng();
-    let random_number = rng.gen::<f32>();
-    debug!("rand number"; "value" => random_number);
 
     let display = glutin::WindowBuilder::new().with_visibility(false).build_glium().unwrap();
 

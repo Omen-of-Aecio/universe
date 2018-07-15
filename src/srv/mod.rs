@@ -4,6 +4,7 @@ use net::msg::{Message};
 use err::*;
 use component::*;
 use specs;
+use specs::Join;
 use tilenet::{TileNet, Collable};
 use global::Tile;
 use collision::RayCollable;
@@ -31,8 +32,8 @@ pub struct Server {
     connections: HashMap<SocketAddr, specs::Entity>,
     socket: Socket,
 
-    /// Frame duration in seconds
-    frame_duration: f32,
+    /// Frame duration in seconds (used only for how long to sleep. FPS is in GameConfig)
+    tick_duration: f32,
 }
 
 impl Server {
@@ -47,7 +48,7 @@ impl Server {
             connections: HashMap::new(),
             socket: Socket::new(9123).unwrap(),
 
-            frame_duration: config.get_srv_frame_duration(),
+            tick_duration: config.get_srv_tick_duration(),
         }
     }
     pub fn run(&mut self) -> Result<()> {
@@ -78,7 +79,7 @@ impl Server {
             prof!["Logic",
                 self.game.update(&mut dispatcher)
             ];
-            thread::sleep(Duration::from_millis((self.frame_duration * 1000.0) as u64));
+            thread::sleep(Duration::from_millis((self.tick_duration * 1000.0) as u64));
         }
 
     }

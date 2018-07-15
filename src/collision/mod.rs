@@ -10,9 +10,8 @@ pub use self::ray::RayCollable;
 pub use self::polygon::PolygonCollable;
 
 
-const AIR_FRI: Vec2 = Vec2 { x: 0.91, y: 0.95 };
-
-pub fn player_move(pos: &mut Pos, vel: &mut Vel, force: &mut Force, shape: &Shape, color: &Color, tilenet: &TileNet<Tile>, gravity: Vec2) {
+/// Returns true if collision happened
+pub fn player_move(pos: &mut Pos, vel: &mut Vel, shape: &Shape, color: &Color, tilenet: &TileNet<Tile>) -> bool {
         /* KISS algorithm for moving 
          *  - not trying to be so physical
          * Tried several heuristics/meaasures to make it better. Keep them around to play with.
@@ -43,17 +42,17 @@ pub fn player_move(pos: &mut Pos, vel: &mut Vel, force: &mut Force, shape: &Shap
         // To keep track of how much we have moved up in the attempt
         let mut offset = 0.0;
 
+        let mut has_collided = false;
         while time_left > 0.0 {
             let (toc, poc, collision) = {
                 let mut collable = PolygonCollable::new(shape, color, pos, q, time_left);
                 collable.solve(&tilenet);
                 (collable.toc, collable.poc, collable.collision)
-                // TODO necessary because of mutability aliasing. Look for other solution?
-                //      e.g. make solve() return result or something
             };
 
 
             if collision {
+                has_collided = true;
                 // If we cannot move, try one pixel up
                 let mut moveup_collable = PolygonCollable::new(shape, color, pos, Vec2::new(0.0, 1.0), 1.0);
                 moveup_collable.solve(&tilenet);
@@ -107,13 +106,5 @@ pub fn player_move(pos: &mut Pos, vel: &mut Vel, force: &mut Force, shape: &Shap
             vel.transl.y = 0.0;
         }
 
-
-        // Friction
-        vel.transl = vel.transl * AIR_FRI;
-
-        // Gravity
-        vel.transl += gravity;
-
-        //
-        force.transl = Vec2::null_vec();
+        has_collided
 }

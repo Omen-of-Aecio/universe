@@ -1,0 +1,14 @@
+# Units are in pixels and seconds
+[player]
+hori_acc = 10
+jump_duration = 0.2
+jump_delay = 3
+jump_acc = 20
+gravity = 5
+
+[world]
+width = 700
+height = 700
+
+[srv]
+fps = 60

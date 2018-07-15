@@ -1,4 +1,4 @@
-/*
+target/
 *.bk
 !.gitignore
 !rustfmt.toml

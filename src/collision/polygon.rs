@@ -1,4 +1,4 @@
-use tile_net::*;
+use tilenet::*;
 use geometry::vec::Vec2;
 use global::Tile;
 use component::*;
@@ -78,7 +78,7 @@ impl<'a> Collable<Tile> for PolygonCollable<'a> {
             // Collision.
 
             self.collision = true;
-            self.poc = set.get_coords();
+            self.poc = set.get_last_coord();
             self.toc *= 0.9;
             self.current_try += 1;
 

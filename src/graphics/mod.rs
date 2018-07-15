@@ -1,7 +1,7 @@
 use specs;
 use tilenet_ren;
 use tilenet_ren::{MinifySamplerFilter};
-use tile_net::TileNet;
+use tilenet::TileNet;
 use global::Tile;
 use self::ren::{polygons, lines};
 

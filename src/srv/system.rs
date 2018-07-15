@@ -2,7 +2,7 @@ use specs;
 use specs::{Fetch, ReadStorage, WriteStorage, Join};
 use collision::player_move;
 use component::*;
-use tile_net::TileNet;
+use tilenet::TileNet;
 use global::Tile;
 use srv::game::GameConfig;
 use geometry::Vec2;

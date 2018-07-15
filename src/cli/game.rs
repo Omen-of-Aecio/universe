@@ -1,4 +1,4 @@
-use tile_net::TileNet;
+use tilenet::TileNet;
 
 use cli::cam::Camera;
 

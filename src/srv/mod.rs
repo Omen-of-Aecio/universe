@@ -4,7 +4,7 @@ use net::msg::{Message};
 use err::*;
 use component::*;
 use specs;
-use tile_net::{TileNet, Collable};
+use tilenet::{TileNet, Collable};
 use global::Tile;
 use collision::RayCollable;
 
@@ -17,6 +17,7 @@ use std::vec::Vec;
 use std::collections::HashMap;
 use std::thread;
 use std::time::Duration;
+use std::cmp::{max};
 
 use conf::Config;
 
@@ -117,21 +118,25 @@ impl Server {
             let tilenet = self.game.world.read_resource::<TileNet<Tile>>();
             ray.solve(&tilenet);
         }
-        match ray.hit_tile {
-            Some((x, y)) => {
-                let x = x as usize;
-                let y = y as usize;
+        match (ray.collision, ray.hit_tile) {
+            (true, Some((x, y))) => {
+                let x = max(x,0) as usize;
+                let y = max(y,0) as usize;
                 let intensity = 255 - (color.to_intensity() * 255.0) as u8;
+                let box_min = (x.checked_sub(5).unwrap_or(0),
+                               y.checked_sub(5).unwrap_or(0)); // min((x-5, y-5), (0,0))
                 {
                     let mut tilenet = self.game.world.write_resource::<TileNet<Tile>>();
-                    tilenet.set_box(&intensity, (x-5, y-5), (x+5, y+5));
+                    let box_min = (x.checked_sub(5).unwrap_or(0),
+                                   y.checked_sub(5).unwrap_or(0)); // min((x-5, y-5), (0,0))
+                    tilenet.set_box(&intensity, box_min, (x+5, y+5));
                 }
-                let msg = self.wrap_game_rect(x-5, y-5, 11, 11)?;
+                let msg = self.wrap_game_rect(box_min.0, box_min.1, 11, 11);
                 if let Some(msg) = msg {
                     Server::broadcast(&mut self.socket, self.connections.keys(), &msg)?;
                 }
             },
-            None => {}
+            _ => {}
         };
         Ok(())
     }
@@ -185,7 +190,7 @@ impl Server {
         let blocks = (self.game.get_width() / packet_w + 1, self.game.get_height() / packet_h + 1);
         for x in 0..blocks.0 {
             for y in 0..blocks.1 {
-                let msg = self.wrap_game_rect(x * packet_w, y * packet_w, packet_w, packet_h)?;
+                let msg = self.wrap_game_rect(x * packet_w, y * packet_w, packet_w, packet_h);
                 if let Some(msg) = msg {
                     self.socket.send_reliably_to(msg, src)?;
                 }
@@ -199,9 +204,14 @@ impl Server {
     }
 
     /// Create message ready for sending
-    fn wrap_game_rect(&self, x: usize, y: usize, w: usize, h: usize) -> Result<Option<Message>> {
-        let (pixels, w, _) = self.game.get_tilenet_serial_rect(x, y, w, h);
-        Ok(Some(Message::WorldRect { x: x, y: y, width: w, pixels: pixels}))
+    fn wrap_game_rect(&self, x: usize, y: usize, w: usize, h: usize) -> Option<Message> {
+        let (pixels, w, h) = self.game.get_tilenet_serial_rect(x, y, w, h);
+        if w * h == 0 {
+            warn!("zero-size chunk of the world requested");
+            None
+        } else {
+            Some(Message::WorldRect { x: x, y: y, width: w, pixels: pixels})
+        }
     }
 
     /// ASSUMPTION: packet size is 2^n

@@ -11,14 +11,15 @@ extern crate serde_derive;
 extern crate error_chain;
 extern crate isatty;
 extern crate rand;
-#[macro_use (o, slog_log, slog_trace, slog_debug, slog_info)]
+#[macro_use]
 extern crate slog;
 extern crate slog_json;
 #[macro_use]
 extern crate slog_scope;
 extern crate slog_stream;
 extern crate slog_term;
-extern crate tile_net;
+extern crate slog_async;
+extern crate tilenet;
 extern crate tilenet_ren;
 extern crate time;
 extern crate clap;
@@ -44,31 +45,53 @@ pub mod conf;
 
 use clap::{Arg, App};
 
-use slog::{DrainExt, Level};
+use slog::{Drain, Level};
 use cli::Client;
 use srv::Server;
 use conf::Config;
 
-fn setup_logger() {
-    let logger = if isatty::stderr_isatty() {
-        let drain = slog_term::streamer()
-            .async()
-            .stderr()
-            .full()
-            .use_utc_timestamp()
-            .build();
-        let d = slog::level_filter(Level::Debug, drain);
-        slog::Logger::root(d.fuse(), o![])
-    } else {
-        slog::Logger::root(slog_stream::stream(std::io::stderr(), slog_json::default()).fuse(),
-                           o![])
-    };
-    slog_scope::set_global_logger(logger);
+/*
+/// Custom Drain logic
+struct RuntimeLevelFilter<D>{
+   drain: D,
+   on: Arc<atomic::AtomicBool>,
 }
 
+impl<D> Drain for RuntimeLevelFilter<D>
+    where D : Drain {
+    type Ok = Option<D::Ok>;
+    type Err = Option<D::Err>;
+
+    fn log(&self,
+              record: &slog::Record,
+              values: &slog::OwnedKVList)
+              -> result::Result<Self::Ok, Self::Err> {
+          let level = if self.on.load(Ordering::Relaxed) {
+              slog::Level::Trace
+          } else {
+              slog::Level::Info
+          };
+
+          if record.level().is_at_least(level) {
+              self.drain.log(record, values)
+                  .map(Some)
+                  .map_err(Some)
+          } else {
+              Ok(None)
+          }
+      }
+  }
+*/
 
 fn main() {
-    setup_logger();
+    // Set up logger
+    let decorator = slog_term::TermDecorator::new().build();
+    let drain = slog_term::FullFormat::new(decorator).build().fuse();
+    let drain = slog_async::Async::new(drain).build().fuse();
+    let drain = drain.filter_level(Level::Debug).fuse();
+    let logger = slog::Logger::root(drain, o!());
+
+    let _guard = slog_scope::set_global_logger(logger);
     let options = App::new("Universe")
         .arg(Arg::with_name("connect")
              .short("c")
@@ -111,7 +134,7 @@ fn main() {
 
 // Functions that don't have a home...
 
-use tile_net::TileNet;
+use tilenet::TileNet;
 use global::Tile;
 use component::*;
 use geometry::Vec2;

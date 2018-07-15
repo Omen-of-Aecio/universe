@@ -1,5 +1,5 @@
 use std::ops::{Add, Sub, Mul, Div, AddAssign, SubAssign, MulAssign, DivAssign};
-use tile_net;
+use tilenet;
 
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Default, Debug, RustcEncodable, RustcDecodable)]
@@ -159,13 +159,13 @@ impl PartialEq for Vec2 {
     }
 }
 
-impl Into<tile_net::Vector> for Vec2 {
-    fn into(self) -> tile_net::Vector {
-        tile_net::Vector(self.x, self.y)
+impl Into<tilenet::Vector> for Vec2 {
+    fn into(self) -> tilenet::Vector {
+        tilenet::Vector(self.x, self.y)
     }
 }
-impl From<tile_net::Vector> for Vec2 {
-    fn from(v: tile_net::Vector) -> Vec2 {
+impl From<tilenet::Vector> for Vec2 {
+    fn from(v: tilenet::Vector) -> Vec2 {
         Vec2::new(v.0, v.1)
     }
 }

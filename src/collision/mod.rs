@@ -1,4 +1,4 @@
-use tile_net::{TileNet, Collable};
+use tilenet::{TileNet, Collable};
 use global::Tile;
 use component::*;
 use geometry::Vec2;

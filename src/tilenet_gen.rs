@@ -6,7 +6,7 @@ use glium::glutin;
 use rand;
 use rand::Rng;
 
-use tile_net::TileNet;
+use tilenet::TileNet;
 
 
 pub fn proc1(tiles: &mut TileNet<u8>) {

@@ -2,7 +2,7 @@ use glium;
 use glium::{DisplayBuild, glutin};
 use glium::glutin::{MouseScrollDelta, VirtualKeyCode as KeyCode};
 use graphics::Graphics;
-use tile_net::TileNet;
+use tilenet::TileNet;
 use global::Tile;
 
 use rand;

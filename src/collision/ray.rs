@@ -1,4 +1,4 @@
-use tile_net::*;
+use tilenet::*;
 use geometry::vec::Vec2;
 use component::Color;
 use global::Tile;
@@ -41,7 +41,8 @@ impl Collable<Tile> for RayCollable {
             Color::White => set.all(|x| *x == 0),
             Color::Black => set.all(|x| *x != 0),
         };
-        self.hit_tile = Some(set.get_coords());
+        self.hit_tile = Some(set.get_last_coord());
+        self.collision = !no_collision;
         no_collision
     }
 }

@@ -1,4 +1,4 @@
-use tile_net::TileNet;
+use tilenet::TileNet;
 
 use err::*;
 
@@ -118,9 +118,10 @@ impl Game {
     /// Return tilenet data as well as new cropped (w, h)
     pub fn get_tilenet_serial_rect(&self, x: usize, y: usize, w: usize, h: usize) -> (Vec<Tile>, usize, usize) {
         let tilenet = &*self.world.read_resource::<TileNet<Tile>>();
+        debug!("x: {}, y: {}, w: {}, h: {}", x, y, w, h);
         let w = min(x + w, tilenet.get_size().0) as isize - x as isize;
         let h = min(y + h, tilenet.get_size().1) as isize - y as isize;
-        if w == 0 || h == 0 {
+        if w <= 0 || h <= 0 {
             return (Vec::new(), 0, 0);
         }
         let w = w as usize;

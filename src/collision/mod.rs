@@ -9,6 +9,18 @@ mod ray;
 pub use self::ray::RayCollable;
 pub use self::polygon::PolygonCollable;
 
+pub fn bullet_move(pos: &mut Pos, vel: &mut Vel, shape: &Shape, color: &Color, tilenet: &TileNet<Tile>)
+        -> ((i32, i32), bool) {
+    // solve once
+    // if collision
+    //      mutate tilenet (maybe return the result)
+    //      delete entity
+    let mut collable = PolygonCollable::new(shape, color, pos, vel.transl, 1.0);
+    collable.solve(&tilenet);
+    // (collable.toc, collable.poc, collable.collision)
+    // TODO (copied the above forthe most part)
+    (collable.poc, collable.collision)
+}
 
 /// Returns true if collision happened
 pub fn player_move(pos: &mut Pos, vel: &mut Vel, shape: &Shape, color: &Color, tilenet: &TileNet<Tile>) -> bool {

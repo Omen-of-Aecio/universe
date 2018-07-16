@@ -52,11 +52,11 @@ impl Server {
         }
     }
     pub fn run(&mut self) -> Result<()> {
-        let mut dispatcher = DispatcherBuilder::new()
-            .add(MoveSys, "move", &[])
-            .add(JumpSys, "jump", &[])
-            .add(InputSys, "input", &[])
-            .build();
+        let mut builder = DispatcherBuilder::new();
+        builder.add(MoveSys, "move", &[]);
+        builder.add(JumpSys, "jump", &[]);
+        builder.add(InputSys, "input", &[]);
+        let mut dispatcher = builder.build();
 
         loop {
             // Networking
@@ -86,6 +86,7 @@ impl Server {
 
     // Made this static to avoid taking &mut self
     // TODO: for consistency, do so with broadcast_reliably as well.
+    //        .... or make it a member function of Socket? Or map connections?
     fn broadcast<'a, I>(socket: &mut Socket, connections: I, msg: &Message) -> Result<()>
         where I: Iterator<Item = &'a SocketAddr>
     {
@@ -101,46 +102,6 @@ impl Server {
         Ok(())
     }
 
-    fn bullet_fire(&mut self, player_id: u32, direction: Vec2) -> Result<()> {
-
-        let entity = self.game.get_player(player_id);
-        let (pos, color) = (
-            self.game.world.read::<Pos>(),
-            self.game.world.read::<Color>()
-        );
-        let (pos, color) = (
-            pos.get(entity).unwrap(),
-            color.get(entity).unwrap(),
-            );
-
-        let mut ray = RayCollable::new(pos.transl, direction, *color);
-
-        {
-            let tilenet = self.game.world.read_resource::<TileNet<Tile>>();
-            ray.solve(&tilenet);
-        }
-        match (ray.collision, ray.hit_tile) {
-            (true, Some((x, y))) => {
-                let x = max(x,0) as usize;
-                let y = max(y,0) as usize;
-                let intensity = 255 - (color.to_intensity() * 255.0) as u8;
-                let box_min = (x.checked_sub(5).unwrap_or(0),
-                               y.checked_sub(5).unwrap_or(0)); // min((x-5, y-5), (0,0))
-                {
-                    let mut tilenet = self.game.world.write_resource::<TileNet<Tile>>();
-                    let box_min = (x.checked_sub(5).unwrap_or(0),
-                                   y.checked_sub(5).unwrap_or(0)); // min((x-5, y-5), (0,0))
-                    tilenet.set_box(&intensity, box_min, (x+5, y+5));
-                }
-                let msg = self.wrap_game_rect(box_min.0, box_min.1, 11, 11);
-                if let Some(msg) = msg {
-                    Server::broadcast(&mut self.socket, self.connections.keys(), &msg)?;
-                }
-            },
-            _ => {}
-        };
-        Ok(())
-    }
 
     fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<()> {
         // TODO a lot of potential for abstraction/simplification...
@@ -150,15 +111,15 @@ impl Server {
             Message::Join => self.new_connection(src)?,
             Message::Input (input) => {
                 let entity = *self.connections.get(&src).ok_or_else(|| "SocketAddr not registererd as player")?;
-                let mut input_resource = self.game.world.write::<PlayerInput>();
+                let mut input_resource = self.game.world.write_storage::<PlayerInput>();
                 let input_ref = input_resource.get_mut(entity).ok_or_else(|| "Entity doesn't have input")?;
                 *input_ref = input;
             },
             Message::ToggleGravity => self.game.toggle_gravity(),
             Message::BulletFire { direction } => {
                 let entity = *self.connections.get(&src).ok_or_else(|| "SocketAddr not registererd as player")?;
-                let player_id = self.game.world.read::<Player>().get(entity).ok_or_else(|| "Entity not player")?.id;
-                self.bullet_fire(player_id, direction)?;
+                let player_id = self.game.world.read_storage::<Player>().get(entity).ok_or_else(|| "Entity not player")?.id;
+                self.game.bullet_fire(player_id, direction)?;
             },
             _ => {}
         }

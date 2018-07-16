@@ -12,7 +12,7 @@ use net::msg::SrvPlayer;
 use geometry::vec::Vec2;
 use component::*;
 use specs;
-use specs::{World, Join};
+use specs::{World, Join, Builder};
 
 use std::collections::HashMap;
 use std::vec::Vec;
@@ -145,7 +145,7 @@ impl Game {
     pub fn count_player_colors(&self) -> (u32, u32) {
         let mut count = (0, 0);
         let (player, color) = {
-            (self.world.read::<Player>(), self.world.read::<Color>())
+            (self.world.read_storage::<Player>(), self.world.read_storage::<Color>())
         };
         for (_, color) in (&player, &color).join() {
             match *color {
@@ -173,7 +173,7 @@ impl Game {
     }
 
     pub fn get_player_transl(&self) -> Vec2 {
-        let pos = self.world.read::<Pos>();
+        let pos = self.world.read_storage::<Pos>();
         pos.get(self.get_you()).unwrap().transl
     }
     pub fn get_you(&self) -> specs::Entity {
@@ -188,9 +188,9 @@ impl Game {
         let mapping = self.players.get(&srv_player.id).map(|x| *x);
         match mapping {
             Some(ref entity) => {
-                let (mut player, mut pos, mut color) = (self.world.write::<Player>(),
-                                                        self.world.write::<Pos>(),
-                                                        self.world.write::<Color>());
+                let (mut player, mut pos, mut color) = (self.world.write_storage::<Player>(),
+                                                        self.world.write_storage::<Pos>(),
+                                                        self.world.write_storage::<Color>());
                 player.get_mut(*entity).unwrap().id = srv_player.id;
                 pos.get_mut(*entity).unwrap().transl = srv_player.pos;
                 *color.get_mut(*entity).unwrap() = srv_player.col;

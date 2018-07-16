@@ -1,6 +1,5 @@
-use specs;
-use specs::{Fetch, ReadStorage, WriteStorage, Join};
-use collision::player_move;
+use specs::{self, Read, WriteExpect, ReadStorage, WriteStorage, Join, Entities};
+use collision::{player_move, bullet_move};
 use component::*;
 use tilenet::TileNet;
 use global::Tile;
@@ -12,16 +11,15 @@ use geometry::Vec2;
 
 pub struct JumpSys;
 /// For Player <-> TileNet collision
+/// (TODO) general movement of objects that have Shape, Force, Vel, Pos, Color
 pub struct MoveSys;
 pub struct InputSys;
 
-/// Velocity transformations such as gravity and friction
-pub struct VelSys;
 
 // (TODO extra friction when on ground?)
 
 impl<'a> specs::System<'a> for JumpSys {
-    type SystemData = (Fetch<'a, GameConfig>,
+    type SystemData = (Read<'a, GameConfig>,
                        WriteStorage<'a, Jump>,
                        WriteStorage<'a, Vel>);
     fn run(&mut self, data: Self::SystemData) {
@@ -43,41 +41,52 @@ impl<'a> specs::System<'a> for JumpSys {
 }
 
 impl<'a> specs::System<'a> for MoveSys {
-    type SystemData = (Fetch<'a, TileNet<Tile>>,
-                       Fetch<'a, GameConfig>,
+    type SystemData = (Entities<'a>,
+                       WriteExpect<'a, TileNet<Tile>>,
+                       Read<'a, GameConfig>,
                        ReadStorage<'a, Player>,
+                       ReadStorage<'a, Bullet>,
                        WriteStorage<'a, Pos>,
                        WriteStorage<'a, Vel>,
                        ReadStorage<'a, Shape>,
                        ReadStorage<'a, Color>);
 
     fn run(&mut self, data: Self::SystemData) {
-        let (tilenet, game_conf, player, mut pos, mut vel, shape, color) = data;
+        let (entities, mut tilenet, game_conf, player, bullet, mut pos, mut vel, shape, color) = data;
         let gravity = if game_conf.gravity_on { game_conf.gravity } else { Vec2::null_vec() };
 
-        for (_, pos, vel, shape, color) in
-                (&player, &mut pos, &mut vel, &shape, &color).join() {
+        // Players
+        for (_, entity, pos, vel, shape, color) in
+                (&player, &*entities, &mut pos, &mut vel, &shape, &color).join() {
             let has_collided = player_move(pos, vel, shape, color, &tilenet);
-
-
             // Friction
             vel.transl = vel.transl * game_conf.air_fri;
             if has_collided {
-                // debug!("O");
                 vel.transl.x *= game_conf.ground_fri;
-            } else {
-                // debug!("-");
             }
-
             // Gravity
             vel.transl += gravity;
+        }
+        // Bullets
+        for (bullet, entity, pos, vel, shape, color) in
+                (&bullet, &*entities, &mut pos, &mut vel, &shape, &color).join() {
+            let (poc, has_collided) = bullet_move(pos, vel, shape, color, &tilenet);
+            // Friction
+            vel.transl = vel.transl * game_conf.air_fri;
+            // Gravity
+            vel.transl += gravity;
+            // Effect
+            if has_collided {
+                bullet.explode((poc.0 as i32, poc.1 as i32), vel, &mut tilenet);
+                entities.delete(entity);
+            }
         }
     }
 }
 
 
 impl<'a> specs::System<'a> for InputSys {
-    type SystemData = (Fetch<'a, GameConfig>,
+    type SystemData = (Read<'a, GameConfig>,
                        ReadStorage<'a, PlayerInput>,
                        WriteStorage<'a, Jump>,
                        WriteStorage<'a, Vel>);
@@ -107,19 +116,6 @@ impl<'a> specs::System<'a> for InputSys {
                     vel.transl.y -= conf.hori_acc;
                 }
             }
-        }
-    }
-}
-
-impl<'a> specs::System<'a> for VelSys {
-    type SystemData = (Fetch<'a, GameConfig>,
-                       WriteStorage<'a, Vel>);
-
-    fn run(&mut self, data: Self::SystemData) {
-        let (conf, mut vel) = data;
-        for vel in (&mut vel).join() {
-            vel.transl = vel.transl * conf.air_fri;
-            vel.transl += conf.gravity;
         }
     }
 }

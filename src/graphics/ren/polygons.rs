@@ -39,10 +39,12 @@ impl Ren {
 
         // Every time just reupload everything...
 
-        let (shape, pos, color) = (world.read::<Shape>(),
-                                   world.read::<Pos>(),
-                                   world.read::<Color>());
+        let (shape, pos, color) = (world.read_storage::<Shape>(),
+                                   world.read_storage::<Pos>(),
+                                   world.read_storage::<Color>());
+        debug!("Render");
         for (shape, pos, color) in (&shape, &pos, &color).join() {
+            debug!("\t.");
 
             let mut vertices = Vec::new();
             for v in &shape.points {

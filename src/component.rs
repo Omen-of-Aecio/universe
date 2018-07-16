@@ -1,6 +1,8 @@
 use geometry::vec::Vec2;
 use specs;
 use specs::Component;
+use tilenet::TileNet;
+use global::Tile;
 
 #[derive(Copy, Clone, Default, RustcEncodable, RustcDecodable, Debug)]
 pub struct Pos {
@@ -155,6 +157,23 @@ pub struct PlayerInput {
 }
 
 
+use std::sync::{Arc, Mutex};
+type Explosion = Fn((i32, i32), &Vel, &mut TileNet<Tile>) + Send;
+// #[derive(Debug)]
+pub struct Bullet {
+    pub explosion: Arc<Mutex<Explosion>>,
+}
+impl Bullet {
+    pub fn new<F: Fn((i32, i32), &Vel, &mut TileNet<Tile>) + Send + 'static>(explosion: F) -> Bullet {
+        Bullet {
+            explosion: Arc::new(Mutex::new(explosion))
+        }
+    }
+    pub fn explode(&self, pos: (i32, i32), vel: &Vel, t: &mut TileNet<Tile>) {
+        self.explosion.lock().unwrap()(pos, vel, t)
+    }
+}
+
 
 //
 // Specifying storage for the different components
@@ -180,6 +199,9 @@ impl Component for Color {
 }
 impl Component for Player {
     type Storage = specs::VecStorage<Player>;
+}
+impl Component for Bullet {
+    type Storage = specs::VecStorage<Bullet>;
 }
 impl Component for PlayerInput {
     type Storage = specs::VecStorage<PlayerInput>;

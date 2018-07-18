@@ -9,13 +9,15 @@ mod ray;
 pub use self::ray::RayCollable;
 pub use self::polygon::PolygonCollable;
 
-pub fn bullet_move(pos: &mut Pos, vel: &mut Vel, shape: &Shape, color: &Color, tilenet: &TileNet<Tile>)
+use std::ops::Deref;
+
+pub fn bullet_move(pos: &mut Pos, vel: &mut Vel, shape: &Shape, color: &Color, tilenet: &TileNet<Tile>, delta_time: f32)
         -> ((i32, i32), bool) {
     // solve once
     // if collision
     //      mutate tilenet (maybe return the result)
     //      delete entity
-    let mut collable = PolygonCollable::new(shape, color, pos, vel.transl, 1.0);
+    let mut collable = PolygonCollable::new(shape, color, pos, vel.transl * delta_time, 1.0);
     collable.solve(&tilenet);
     // (collable.toc, collable.poc, collable.collision)
     // TODO (copied the above forthe most part)
@@ -23,7 +25,8 @@ pub fn bullet_move(pos: &mut Pos, vel: &mut Vel, shape: &Shape, color: &Color, t
 }
 
 /// Returns true if collision happened
-pub fn player_move(pos: &mut Pos, vel: &mut Vel, shape: &Shape, color: &Color, tilenet: &TileNet<Tile>) -> bool {
+pub fn player_move(pos: &mut Pos, vel: &mut Vel, shape: &Shape, color: &Color,
+                   tilenet: &TileNet<Tile>, delta_time: f32) -> bool {
         /* KISS algorithm for moving 
          *  - not trying to be so physical
          * Tried several heuristics/meaasures to make it better. Keep them around to play with.
@@ -48,7 +51,7 @@ pub fn player_move(pos: &mut Pos, vel: &mut Vel, shape: &Shape, color: &Color, t
 
         // Move X
         const MAX_HEIGHT: f32 = 4.0;
-        let q = vel.transl.scale(1.0, 0.0);
+        let q = vel.transl.scale(delta_time, 0.0);
         let mut time_left = 1.0;
 
         // To keep track of how much we have moved up in the attempt
@@ -111,7 +114,7 @@ pub fn player_move(pos: &mut Pos, vel: &mut Vel, shape: &Shape, color: &Color, t
 
 
         // Move Y
-        let mut collable = PolygonCollable::new(shape, color, pos, vel.transl.scale(0.0, 1.0), 1.0);
+        let mut collable = PolygonCollable::new(shape, color, pos, vel.transl.scale(0.0, delta_time), 1.0);
         collable.solve(&tilenet);
 
         if collable.collision {

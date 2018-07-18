@@ -19,6 +19,7 @@ use std::collections::HashMap;
 use std::thread;
 use std::time::Duration;
 use std::cmp::{max};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use conf::Config;
 
@@ -27,13 +28,29 @@ pub mod game;
 
 use self::game::Game;
 
+#[derive(Clone)]
+struct Connection {
+    entity: specs::Entity,
+    time_since_snapshot: f32,
+    snapshot_rate: f32,
+}
+impl Connection {
+    pub fn new(entity: specs::Entity, snapshot_rate: f32) -> Connection {
+        Connection {
+            entity,
+            time_since_snapshot: 0.0,
+            snapshot_rate,
+        }
+    }
+}
+
 pub struct Server {
     game: Game,
-    connections: HashMap<SocketAddr, specs::Entity>,
+    connections: HashMap<SocketAddr, Connection>,
     socket: Socket,
 
     /// Frame duration in seconds (used only for how long to sleep. FPS is in GameConfig)
-    tick_duration: f32,
+    tick_duration: Duration,
 }
 
 impl Server {
@@ -58,6 +75,7 @@ impl Server {
         builder.add(InputSys, "input", &[]);
         let mut dispatcher = builder.build();
 
+        let mut prev_time = SystemTime::now();
         loop {
             // Networking
             self.socket.update()?;
@@ -76,10 +94,16 @@ impl Server {
             Server::broadcast(&mut self.socket, self.connections.keys(), &message).chain_err(|| "Could not broadcast.")?;
 
             // Logic
+            let now = SystemTime::now();
+            let delta_time = now.duration_since(prev_time).expect("duration_since error");
             prof!["Logic",
-                self.game.update(&mut dispatcher)
+                self.game.update(&mut dispatcher, ::DeltaTime::from_duration(delta_time))
             ];
-            thread::sleep(Duration::from_millis((self.tick_duration * 1000.0) as u64));
+
+            if delta_time < self.tick_duration {
+                thread::sleep(self.tick_duration - delta_time);
+            }
+            prev_time = now;
         }
 
     }
@@ -108,17 +132,17 @@ impl Server {
 
         // Will ignore packets from unregistered connections
         match msg {
-            Message::Join => self.new_connection(src)?,
+            Message::Join {snapshot_rate} => self.new_connection(src, snapshot_rate)?,
             Message::Input (input) => {
-                let entity = *self.connections.get(&src).ok_or_else(|| "SocketAddr not registererd as player")?;
+                let con = self.connections.get(&src).ok_or_else(|| "SocketAddr not registererd as player")?;
                 let mut input_resource = self.game.world.write_storage::<PlayerInput>();
-                let input_ref = input_resource.get_mut(entity).ok_or_else(|| "Entity doesn't have input")?;
+                let input_ref = input_resource.get_mut(con.entity).ok_or_else(|| "Entity doesn't have input")?;
                 *input_ref = input;
             },
             Message::ToggleGravity => self.game.toggle_gravity(),
             Message::BulletFire { direction } => {
-                let entity = *self.connections.get(&src).ok_or_else(|| "SocketAddr not registererd as player")?;
-                let player_id = self.game.world.read_storage::<Player>().get(entity).ok_or_else(|| "Entity not player")?.id;
+                let con = self.connections.get(&src).ok_or_else(|| "SocketAddr not registererd as player")?;
+                let player_id = self.game.world.read_storage::<Player>().get(con.entity).ok_or_else(|| "Entity not player")?.id;
                 self.game.bullet_fire(player_id, direction)?;
             },
             _ => {}
@@ -127,13 +151,14 @@ impl Server {
     }
 
 
-    fn new_connection(&mut self, src: SocketAddr) -> Result<()> {
+    fn new_connection(&mut self, src: SocketAddr, snapshot_rate: f32) -> Result<()> {
         info!("New connection!");
         // Add new player
         let (w_count, b_count) = self.game.count_player_colors();
         let color = if w_count >= b_count { Color::Black } else { Color::White };
         let player_id = self.game.add_player(color);
-        let _ = self.connections.insert(src, self.game.get_player(player_id));
+        let _ = self.connections.insert(src, Connection::new(self.game.get_player(player_id), snapshot_rate));
+
         // Tell about the game size and other meta data
         self.socket.send_to(
             Message::Welcome {

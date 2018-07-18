@@ -41,7 +41,7 @@ impl Client {
         let server = to_socket_addr(server_addr)?;
 
         // Init connection
-        socket.send_to(Message::Join, server).chain_err(|| "Cannot send Join message.")?;
+        socket.send_to(Message::Join {snapshot_rate: 20.0}, server).chain_err(|| "Cannot send Join message.")?;
         // Get world metadata
         let (_, msg) = socket.recv().unwrap();
         // TODO reordering will be problematic here, expecting only a certain message

@@ -132,7 +132,19 @@ fn main() {
 }
 
 
-// Functions that don't have a home...
+// Stuff that don't have a home...
+
+#[derive(Default, Copy, Clone)]
+pub struct DeltaTime {
+    secs: f32,
+}
+impl DeltaTime {
+    pub fn from_duration(duration: std::time::Duration) -> DeltaTime {
+        DeltaTime {
+            secs: duration.as_secs() as f32 + (duration.subsec_nanos() as f32) / 1_000_000_000.0
+        }
+    }
+}
 
 use tilenet::TileNet;
 use global::Tile;

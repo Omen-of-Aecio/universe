@@ -5,6 +5,7 @@ use toml;
 use std::fs::File;
 use std::io::Read;
 use err::*;
+use std::time::Duration;
 
 
 #[derive(Deserialize, Clone)]
@@ -20,6 +21,8 @@ pub struct PlayerConfig {
     pub jump_duration: f32,
     pub jump_delay: f32,
     pub jump_acc: f32,
+    // Client config
+    // pub snapshot_rate: f32,
 }
 #[derive(Deserialize, Clone)]
 pub struct WorldConfig {
@@ -47,7 +50,7 @@ impl Config {
         Ok(toml::from_str(s)?)
     }
 
-    pub fn get_srv_tick_duration(&self) -> f32 {
-        (1.0 / self.srv.tps as f32)
+    pub fn get_srv_tick_duration(&self) -> Duration {
+        Duration::from_nanos((1_000_000_000.0 / self.srv.tps as f32) as u64)
     }
 }

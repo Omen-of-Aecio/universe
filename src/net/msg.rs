@@ -27,7 +27,7 @@ pub enum Message {
 
 
     // Messages from client
-    Join,
+    Join {snapshot_rate: f32},
     Input (PlayerInput),
     ToggleGravity,
     BulletFire { direction: Vec2 },

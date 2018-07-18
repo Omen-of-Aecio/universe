@@ -56,12 +56,6 @@ impl Game {
             let mut tilenet = TileNet::<Tile>::new(width as usize, height as usize);
 
 
-            // Create bases
-            let base_size: usize = 24;
-            let pos = (white_base.x as usize, white_base.y as usize);
-            tilenet.set_box(&0, (pos.0 - base_size, pos.1 - base_size), (pos.0 + base_size, pos.1 + base_size));
-            let pos = (black_base.x as usize, black_base.y as usize);
-            tilenet.set_box(&255, (pos.0 - base_size, pos.1 - base_size), (pos.0 + base_size, pos.1 + base_size));
             
             w.add_resource(tilenet);
             w.add_resource(cam);

@@ -14,6 +14,7 @@ use specs::{Dispatcher, World, Join, Builder};
 
 use std::collections::HashMap;
 use std::vec::Vec;
+use std::time::Duration;
 
 use conf::Config;
 
@@ -70,6 +71,7 @@ impl Game {
             w.add_resource(tilenet);
             w.add_resource(gc);
             w.add_resource(conf.clone());
+            w.add_resource(::DeltaTime::default());
 
             w
         };
@@ -88,17 +90,27 @@ impl Game {
     }
 
     pub fn generate_world(&mut self) {
-        tilenet_gen::proc1(&mut *self.world.write_resource::<TileNet<Tile>>());
+        let mut tilenet = self.world.write_resource::<TileNet<Tile>>();
+        tilenet_gen::proc1(&mut *tilenet);
+
+        // Create bases
+        let base_size: usize = 24;
+        let pos = (self.white_base.x as usize, self.white_base.y as usize);
+        tilenet.set_box(&0, (pos.0 - base_size, pos.1 - base_size), (pos.0 + base_size, pos.1 + base_size));
+        let pos = (self.black_base.x as usize, self.black_base.y as usize);
+        tilenet.set_box(&255, (pos.0 - base_size, pos.1 - base_size), (pos.0 + base_size, pos.1 + base_size));
         // world::gen::rings(&mut world.tilenet, 2);
     }
 
 
     /// Returns (messages to send, messages to send reliably)
-    pub fn update(&mut self, dispatcher: &mut Dispatcher) -> (Vec<Message>, Vec<Message>) {
+    pub fn update(&mut self, dispatcher: &mut Dispatcher, delta_time: ::DeltaTime) -> (Vec<Message>, Vec<Message>) {
         self.vectors.clear(); // clear debug geometry
         *self.world.write_resource::<GameConfig>() = self.game_conf;
+        *self.world.write_resource::<::DeltaTime>() = delta_time;
         dispatcher.dispatch(&mut self.world.res);
         self.world.maintain();
+
         (Vec::new(), Vec::new())
     }
 
@@ -234,25 +246,18 @@ pub struct GameConfig {
     pub jump_acc: f32,
     pub gravity: Vec2,
     pub gravity_on: bool,
-    pub srv_tick_duration: f32,
+    pub srv_tick_duration: Duration,
     pub air_fri: Vec2,
     pub ground_fri: f32,
 }
 impl GameConfig {
     pub fn new(conf: &Config) -> GameConfig {
-        // Helper functions to convert seconds->ticks
-        let conv_duration = |n: f32| {
-            n * conf.srv.tps as f32
-        };
-        let conv_acc = |n: f32| {
-            n / (conf.srv.tps * conf.srv.tps) as f32
-        };
         GameConfig {
-            hori_acc: conv_acc(conf.player.hori_acc),
+            hori_acc: conf.player.hori_acc,
             jump_duration: conf.player.jump_duration,
             jump_delay: conf.player.jump_delay,
-            jump_acc: conv_acc(conf.player.jump_acc),
-            gravity: Vec2::new(0.0, - conv_acc(conf.world.gravity)),
+            jump_acc: conf.player.jump_acc,
+            gravity: Vec2::new(0.0, - conf.world.gravity),
             gravity_on: false,
             srv_tick_duration: conf.get_srv_tick_duration(),
             air_fri: Vec2::new(conf.world.air_fri.0, conf.world.air_fri.1),

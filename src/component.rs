@@ -71,12 +71,12 @@ impl Jump {
 
     /// Returns acceleration upward for this frame
     /// Returns None if jump is done.
-    pub fn tick(&mut self, delta_sec: f32) -> Option<f32> {
+    pub fn tick(&mut self, delta_time: f32) -> Option<f32> {
         match *self {
             Jump::Active {ref mut progress, duration, force} => {
-                *progress += delta_sec;
+                *progress += delta_time;
                 if *progress <= duration {
-                    Some(force)
+                    Some(force * delta_time)
                 } else {
                     None
                 }

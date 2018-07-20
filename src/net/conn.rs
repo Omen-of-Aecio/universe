@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use net::msg::Message;
 use net::pkt::Packet;
-use err::Result;
+use err::*;
 use time::precise_time_ns;
 use std;
 use std::fmt::Debug;
@@ -48,7 +48,7 @@ impl<'a> Connection {
             if let &mut Some(ref mut sent_packet) = sent_packet {
                 if now > sent_packet.time + RESEND_INTERVAL_MS * 1000000 {
                     sent_packet.time = now;
-                    result.push(sent_packet.packet.encode());
+                    result.push(sent_packet.packet.encode().unwrap());
 
                 }
             }
@@ -57,11 +57,13 @@ impl<'a> Connection {
     }
 
 
-    pub fn acknowledge(&mut self, acked: u32) -> Result<()> {
+    pub fn acknowledge(&mut self, acked: u32) -> Result<(), Error> {
         self.update_send_window();
         // Get the seq number of the first element
         let first_seq = match self.send_window.front() {
-            None => bail!("Send window empty, but ack received."),
+            None => {
+                bail!("Send window empty, but ack received.");
+            }
             Some(first) => {
                 match first {
                     &Some(ref sent_packet) => sent_packet.seq,
@@ -105,14 +107,14 @@ impl<'a> Connection {
             }));
 
         self.seq += 1;
-        packet.encode()
+        packet.encode().unwrap()
     }
 
     /// Unwraps message from packet. If reliable, it will return Some(Packet) which should be sent
     /// as an acknowledgement.
     // Ideally, I would like to take a &[u8] here but it creates aliasing conflicts, as Socket will
     // have to send a slice of its own buffer.
-    pub fn unwrap_message(&mut self, packet: Packet) -> Result<(Option<Message>, Option<Packet>)> {
+    pub fn unwrap_message(&mut self, packet: Packet) -> Result<(Option<Message>, Option<Packet>), Error> {
         let mut received_msg = None;
         let mut ack_reply = None;
         match packet {

@@ -1,5 +1,6 @@
 use glium;
-use glium::{DisplayBuild, glutin};
+use glium::DisplayBuild;
+use glium::glutin;
 use glium::glutin::{MouseScrollDelta, VirtualKeyCode as KeyCode};
 use graphics::Graphics;
 use tilenet::TileNet;
@@ -35,13 +36,13 @@ pub struct Client {
 
 
 impl Client {
-    pub fn new(server_addr: &str) -> Result<Client> {
+    pub fn new(server_addr: &str) -> Result<Client, Error> {
 
         let mut socket = Client::create_socket();
         let server = to_socket_addr(server_addr)?;
 
         // Init connection
-        socket.send_to(Message::Join {snapshot_rate: 20.0}, server).chain_err(|| "Cannot send Join message.")?;
+        socket.send_to(Message::Join {snapshot_rate: 20.0}, server)?;
         // Get world metadata
         let (_, msg) = socket.recv().unwrap();
         // TODO reordering will be problematic here, expecting only a certain message
@@ -69,12 +70,12 @@ impl Client {
                 })
             },
             _ => {
-                Err("Didn't receive Welcome message (in order...)".into())
+                Err(format_err!("Didn't receive Welcome message (in order...)"))
             },
         }
 
     }
-    pub fn run(&mut self) -> Result<()> {
+    pub fn run(&mut self) -> Result<(), Error> {
         self.game.cam.update_win_size(&self.display);
         loop {
             // Input
@@ -142,7 +143,7 @@ impl Client {
 
 
     /// Currently just ignores unexpected messages
-    fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<()> {
+    fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<(), Error> {
         if src != self.server {
             bail!("Packet not from server");
         }

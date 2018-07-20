@@ -9,8 +9,6 @@ mod ray;
 pub use self::ray::RayCollable;
 pub use self::polygon::PolygonCollable;
 
-use std::ops::Deref;
-
 pub fn bullet_move(pos: &mut Pos, vel: &mut Vel, shape: &Shape, color: &Color, tilenet: &TileNet<Tile>, delta_time: f32)
         -> ((i32, i32), bool) {
     // solve once

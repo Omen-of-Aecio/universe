@@ -30,7 +30,7 @@ pub struct Socket {
 
 }
 impl Socket {
-    pub fn new(port: u16) -> Result<Socket> {
+    pub fn new(port: u16) -> Result<Socket, Error> {
         Ok(Socket {
             socket: UdpSocket::bind(("0.0.0.0:".to_string() + port.to_string().as_str()).as_str())?,
             connections: HashMap::new(),
@@ -40,7 +40,7 @@ impl Socket {
 
     /// A temporary simple (but brute force) solution to the need of occationally resending packets
     /// which haven't been acknowledged.
-    pub fn update(&mut self) -> Result<()>{
+    pub fn update(&mut self) -> Result<(), Error>{
         let socket = self.socket.try_clone()?; // because of aliasing
         for (addr, conn) in self.connections.iter_mut() {
             let to_resend = conn.get_resend_queue();
@@ -65,15 +65,15 @@ impl Socket {
     }
 
     /// Send unreliable message
-    pub fn send_to(&mut self, msg: Message, dest: SocketAddr) -> Result<()> {
-        let buffer = Packet::Unreliable {msg: msg}.encode();
+    pub fn send_to(&mut self, msg: Message, dest: SocketAddr) -> Result<(), Error> {
+        let buffer = Packet::Unreliable {msg: msg}.encode()?;
         self.socket.send_to(&buffer, dest)?;
 
         Ok(())
     }
 
     /// Send reliable message
-    pub fn send_reliably_to(&mut self, msg: Message, dest: SocketAddr) -> Result<()> {
+    pub fn send_reliably_to(&mut self, msg: Message, dest: SocketAddr) -> Result<(), Error> {
         // Need to clone it here because of aliasing :/
         // IDEA: Could also let Connection::wrap_message take a clone of the UdpSocket and send the
         // message itself. Connection could even know the UdpSocket and SocketAddr
@@ -102,13 +102,13 @@ impl Socket {
     // pub fn send_reliable_to_and_wait(&self, msg: Message, dest: SocketAddr) -> Result<()>
 
     /// Blocking, with timeout (3 sec)
-    pub fn recv(&mut self) -> Result<(SocketAddr, Message)> {
+    pub fn recv(&mut self) -> Result<(SocketAddr, Message), Error> {
         self.socket.set_nonblocking(false)?;
         self.socket.set_read_timeout(Some(Duration::new(3, 0)))?;
         self._recv()
     }
 
-    fn _recv(&mut self) -> Result<(SocketAddr, Message)> {
+    fn _recv(&mut self) -> Result<(SocketAddr, Message), Error> {
         let socket = self.socket.try_clone()?;
         // Since we may just receive an Ack, we loop until we receive an actual message
         Ok(loop {
@@ -119,7 +119,7 @@ impl Socket {
             if let Some(msg) = msg {
                 // Send Ack back if needed
                 if let Some(reply) = reply {
-                    let buffer = reply.encode();
+                    let buffer = reply.encode()?;
                     socket.send_to(&buffer, src)?;
                 }
                 break (src, msg);
@@ -133,9 +133,9 @@ pub struct SocketIter<'a> {
 }
 
 impl<'a> Iterator for SocketIter<'a> {
-    type Item = Result<(SocketAddr, Message)>;
+    type Item = Result<(SocketAddr, Message), Error>;
 
-    fn next(&mut self) -> Option<Result<(SocketAddr, Message)>> {
+    fn next(&mut self) -> Option<Result<(SocketAddr, Message), Error>> {
         match self.socket.socket.set_nonblocking(true) {
             Err(e) => return Some(Err(e.into())),
             Ok(_) => {},
@@ -148,13 +148,8 @@ impl<'a> Iterator for SocketIter<'a> {
                 Some(Ok(msg))
             },
             Err(e) => {
-                let end_messages = match e {
-                    Error(ErrorKind::Io(ref ioerr), _) => {
-                        match ioerr.kind() {
-                            std::io::ErrorKind::WouldBlock => true,
-                            _ => false,
-                        }
-                    },
+                let end_messages = match e.downcast_ref::<std::io::Error>().map(|e| e.kind()) {
+                    Some(std::io::ErrorKind::WouldBlock) => true,
                     _ => false,
                 };
                 if end_messages {
@@ -168,7 +163,7 @@ impl<'a> Iterator for SocketIter<'a> {
 }
 
 
-pub fn to_socket_addr(addr: &str) -> Result<SocketAddr> {
+pub fn to_socket_addr(addr: &str) -> Result<SocketAddr, Error> {
     // Assume IPv4. Try to parse.
     let parts: Vec<&str> = addr.split(":").collect();
     if parts.len() != 2 {

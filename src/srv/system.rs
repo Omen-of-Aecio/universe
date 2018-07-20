@@ -59,8 +59,8 @@ impl<'a> specs::System<'a> for MoveSys {
         let gravity = if game_conf.gravity_on { game_conf.gravity } else { Vec2::null_vec() };
 
         // Players
-        for (_, entity, pos, vel, shape, color) in
-                (&player, &*entities, &mut pos, &mut vel, &shape, &color).join() {
+        for (_, pos, vel, shape, color) in
+                (&player, &mut pos, &mut vel, &shape, &color).join() {
             let has_collided = player_move(pos, vel, shape, color, &tilenet, delta_time.secs);
             // Friction
             vel.transl = vel.transl * game_conf.air_fri; // TODO delta_time
@@ -81,7 +81,7 @@ impl<'a> specs::System<'a> for MoveSys {
             // Effect
             if has_collided {
                 bullet.explode((poc.0 as i32, poc.1 as i32), vel, &mut tilenet);
-                entities.delete(entity);
+                entities.delete(entity).unwrap();
             }
         }
     }
@@ -124,3 +124,5 @@ impl<'a> specs::System<'a> for InputSys {
         }
     }
 }
+
+

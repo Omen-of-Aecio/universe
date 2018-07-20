@@ -1,4 +1,5 @@
 use tilenet::TileNet;
+use net::msg::SrvPlayer;
 
 use cli::cam::Camera;
 
@@ -8,7 +9,6 @@ use glium::glutin::{VirtualKeyCode as KeyCode};
 use net::msg::Message;
 use input::Input;
 use global::Tile;
-use net::msg::SrvPlayer;
 use geometry::vec::Vec2;
 use component::*;
 use specs;

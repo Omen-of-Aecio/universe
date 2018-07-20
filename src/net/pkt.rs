@@ -2,9 +2,8 @@ use net::msg::Message;
 use err::*;
 
 
-use bincode;
-use bincode::rustc_serialize::{encode, decode, DecodingResult};
 use num_traits::int::PrimInt;
+use bincode;
 
 const N: u32 = 10; // max packet size = 2^N
 
@@ -13,7 +12,7 @@ const N: u32 = 10; // max packet size = 2^N
 ////////////
 
 /// `Packet` struct wraps a message in protocol-specific data.
-#[derive(Clone, RustcEncodable, RustcDecodable)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum Packet {
     Unreliable {
         msg: Message,
@@ -28,12 +27,12 @@ pub enum Packet {
 
 }
 impl Packet{ 
-    pub fn encode(&self) -> Vec<u8> {
-        encode(self, bincode::SizeLimit::Bounded((Packet::max_packet_size()) as u64)).unwrap()
+    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+        // TODO max packet size Packet::max_packet_size()
+        bincode::serialize(self).map_err(|_| format_err!("failed to serialize"))
     }
-    pub fn decode(data: &[u8]) -> Result<Packet> {
-        let msg: DecodingResult<Packet> = decode(&data);
-        msg.chain_err(|| "Error in decoding the data. Perhaps the received packet was too big?")
+    pub fn decode(data: &[u8]) -> Result<Packet, Error> {
+        bincode::deserialize(&data).map_err(|_| format_err!("failed to deserialize"))
     }
     pub fn max_packet_size() -> u32 {
         2.pow(N) + 100

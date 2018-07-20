@@ -4,10 +4,6 @@ use net::msg::{Message};
 use err::*;
 use component::*;
 use specs;
-use specs::Join;
-use tilenet::{TileNet, Collable};
-use global::Tile;
-use collision::RayCollable;
 
 use num_traits::Float;
 use specs::{DispatcherBuilder};
@@ -18,8 +14,7 @@ use std::vec::Vec;
 use std::collections::HashMap;
 use std::thread;
 use std::time::Duration;
-use std::cmp::{max};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
 
 use conf::Config;
 
@@ -68,7 +63,7 @@ impl Server {
             tick_duration: config.get_srv_tick_duration(),
         }
     }
-    pub fn run(&mut self) -> Result<()> {
+    pub fn run(&mut self) -> Result<(), Error> {
         let mut builder = DispatcherBuilder::new();
         builder.add(MoveSys, "move", &[]);
         builder.add(JumpSys, "jump", &[]);
@@ -83,15 +78,15 @@ impl Server {
             // Receive messages
             let mut messages = Vec::new();
             for msg in self.socket.messages() {
-                let msg = msg.chain_err(|| "Error in received message.")?;
+                let msg = msg?;
                 messages.push(msg);
             }
             for msg in messages {
-                self.handle_message(msg.0, msg.1).chain_err(|| "Error in handling message.")?;
+                self.handle_message(msg.0, msg.1)?;
             }
             // Send messages
             let message = Message::Players (self.game.get_srv_players());
-            Server::broadcast(&mut self.socket, self.connections.keys(), &message).chain_err(|| "Could not broadcast.")?;
+            Server::broadcast(&mut self.socket, self.connections.keys(), &message)?;
 
             // Logic
             let now = SystemTime::now();
@@ -111,7 +106,7 @@ impl Server {
     // Made this static to avoid taking &mut self
     // TODO: for consistency, do so with broadcast_reliably as well.
     //        .... or make it a member function of Socket? Or map connections?
-    fn broadcast<'a, I>(socket: &mut Socket, connections: I, msg: &Message) -> Result<()>
+    fn broadcast<'a, I>(socket: &mut Socket, connections: I, msg: &Message) -> Result<(), Error>
         where I: Iterator<Item = &'a SocketAddr>
     {
         for client in connections {
@@ -119,7 +114,7 @@ impl Server {
         }
         Ok(())
     }
-    fn broadcast_reliably(&mut self, msg: &Message) -> Result<()> {
+    fn broadcast_reliably(&mut self, msg: &Message) -> Result<(), Error> {
         for client in self.connections.keys() {
             self.socket.send_reliably_to(msg.clone(), *client)?;
         }
@@ -127,22 +122,23 @@ impl Server {
     }
 
 
-    fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<()> {
+    fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<(), Error> {
         // TODO a lot of potential for abstraction/simplification...
 
         // Will ignore packets from unregistered connections
         match msg {
             Message::Join {snapshot_rate} => self.new_connection(src, snapshot_rate)?,
             Message::Input (input) => {
-                let con = self.connections.get(&src).ok_or_else(|| "SocketAddr not registererd as player")?;
+                let con = self.connections.get(&src).ok_or_else(|| format_err!("SocketAddr not registererd as player"))?;
                 let mut input_resource = self.game.world.write_storage::<PlayerInput>();
-                let input_ref = input_resource.get_mut(con.entity).ok_or_else(|| "Entity doesn't have input")?;
+                let input_ref = input_resource.get_mut(con.entity).ok_or_else(|| format_err!("Entity doesn't have input"))?;
                 *input_ref = input;
             },
             Message::ToggleGravity => self.game.toggle_gravity(),
             Message::BulletFire { direction } => {
-                let con = self.connections.get(&src).ok_or_else(|| "SocketAddr not registererd as player")?;
-                let player_id = self.game.world.read_storage::<Player>().get(con.entity).ok_or_else(|| "Entity not player")?.id;
+                let con = self.connections.get(&src).ok_or_else(|| format_err!("SocketAddr not registererd as player"))?;
+                let player_id = self.game.world.read_storage::<Player>().get(con.entity)
+                                    .ok_or_else(|| format_err!("Entity not player"))?.id;
                 self.game.bullet_fire(player_id, direction)?;
             },
             _ => {}
@@ -151,7 +147,7 @@ impl Server {
     }
 
 
-    fn new_connection(&mut self, src: SocketAddr, snapshot_rate: f32) -> Result<()> {
+    fn new_connection(&mut self, src: SocketAddr, snapshot_rate: f32) -> Result<(), Error> {
         info!("New connection!");
         // Add new player
         let (w_count, b_count) = self.game.count_player_colors();
@@ -169,7 +165,7 @@ impl Server {
                 white_base: self.game.white_base,
                 black_base: self.game.black_base,
             },
-            src).chain_err(|| "Could not send Welcome packet.")?;
+            src)?;
 
         // Send it the whole game
         // We will need to split it up because of limited package size
@@ -184,8 +180,7 @@ impl Server {
             }
         }
         let srv_player = self.game.get_srv_player(player_id)?;
-        self.broadcast_reliably(&Message::NewPlayer (srv_player))
-            .chain_err(|| "Could not broadcast_reliably.")?;
+        self.broadcast_reliably(&Message::NewPlayer (srv_player))?;
 
         Ok(())
     }

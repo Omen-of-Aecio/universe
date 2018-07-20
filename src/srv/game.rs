@@ -1,3 +1,4 @@
+use net::msg::SrvPlayer;
 use tilenet::TileNet;
 
 use err::*;
@@ -5,7 +6,6 @@ use err::*;
 use std::cmp::min;
 use net::msg::Message;
 use global::Tile;
-use net::msg::SrvPlayer;
 use geometry::vec::Vec2;
 use component::*;
 use tilenet_gen;
@@ -129,7 +129,7 @@ impl Game {
     }
 
     // Access //
-    /// Return tilenet data as well as new cropped (w, h)
+    /// Return tilenet data as well as new cropped (w, h) to fit inside the world
     pub fn get_tilenet_serial_rect(&self, x: usize, y: usize, w: usize, h: usize) -> (Vec<Tile>, usize, usize) {
         let tilenet = &*self.world.read_resource::<TileNet<Tile>>();
         let w = min(x + w, tilenet.get_size().0) as isize - x as isize;
@@ -158,14 +158,14 @@ impl Game {
     }
     
     /// Create SrvPlayer from a player with id u32
-    pub fn get_srv_player(&self, id: u32) -> Result<SrvPlayer> {
-        let entity = *self.players.get(&id).ok_or_else(|| format!("Player with id {} not found.", id))?;
+    pub fn get_srv_player(&self, id: u32) -> Result<SrvPlayer, Error> {
+        let entity = *self.players.get(&id).ok_or_else(|| format_err!("Player with id {} not found.", id))?;
         let (player, color, pos) = (self.world.read_storage::<Player>(),
                                     self.world.read_storage::<Color>(),
                                     self.world.read_storage::<Pos>());
-        let player = player.get(entity).ok_or_else(|| format!("Player with id {} not found.", id))?;
-        let color = color.get(entity).ok_or_else(|| format!("Player with id {} not found.", id))?;
-        let pos = pos.get(entity).ok_or_else(|| format!("Player with id {} not found.", id))?;
+        let player = player.get(entity).ok_or_else(|| format_err!("Player with id {} not found.", id))?;
+        let color = color.get(entity).ok_or_else(|| format_err!("Player with id {} not found.", id))?;
+        let pos = pos.get(entity).ok_or_else(|| format_err!("Player with id {} not found.", id))?;
         Ok(SrvPlayer::new(player, *color, pos))
     }
     pub fn get_srv_players(&self) -> Vec<SrvPlayer> {
@@ -200,7 +200,7 @@ impl Game {
         self.player_id_seq
     }
 
-    pub fn bullet_fire(&mut self, player_id: u32, direction: Vec2) -> Result<()> {
+    pub fn bullet_fire(&mut self, player_id: u32, direction: Vec2) -> Result<(), Error> {
         let entity = self.get_player(player_id);
         let (pos, color) = {
             let pos = self.world.read_storage::<Pos>();
@@ -208,10 +208,10 @@ impl Game {
             (pos.get(entity).unwrap().clone(), col.get(entity).unwrap().clone())
         };
         let color2 = color.clone();
-        let explosion = move |pos: (i32, i32), vel: &Vel, tilenet: &mut TileNet<Tile>| {
+        let explosion = move |pos: (i32, i32), _vel: &Vel, tilenet: &mut TileNet<Tile>| {
                 tilenet.set(&((255.0 - color2.to_intensity()*255.0) as u8), (pos.0 as usize, pos.1 as usize));
             };
-        let entity = self.world.create_entity()
+        let _entity = self.world.create_entity()
             .with(Bullet::new(explosion))
             .with(pos)
             .with(Vel {transl: direction, angular: 1.0})
@@ -222,8 +222,23 @@ impl Game {
         Ok(())
     }
 
-    pub fn print(&self) {
-        // info!("TileNet"; "content" => format!["{:?}", self.get_tilenet()]);
+    pub fn create_snapshot(&self) -> Snapshot {
+
+        // for entity in self.world.entities.create_iter() {
+        // }
+
+        // This is somewhat of a manual thing and I wish there was a more automatic way.
+        let (shape, pos, vel, force, color, player, bullet)
+            = (self.world.entities(),
+               self.world.read_storage::<Shape>(),
+               self.world.read_storage::<Pos>(),
+               self.world.read_storage::<Vel>(),
+               self.world.read_storage::<Color>(),
+               self.world.read_storage::<Player>(),
+               self.world.read_storage::<Bullet>());
+        for (entity, player, pos, vel, shape, color) in (&player, &pos, &vel, &shape, &color) {
+            
+        }
     }
 }
 
@@ -235,8 +250,6 @@ pub fn map_tile_value_via_color(tile: &Tile, color: Color) -> Tile {
 	}
 }
 
-
-/* Should go, together with some logic, to some camera module (?) */
 
 #[derive(Copy,Clone,Default)]
 pub struct GameConfig {

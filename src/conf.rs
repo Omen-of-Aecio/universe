@@ -40,13 +40,13 @@ pub struct ServerConfig {
 }
 
 impl Config {
-    pub fn from_file(path: &str) -> Result<Config> {
+    pub fn from_file(path: &str) -> Result<Config, Error> {
         let mut file = File::open(path)?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
         Config::from_str(&contents)
     }
-    pub fn from_str(s: &str) -> Result<Config> {
+    pub fn from_str(s: &str) -> Result<Config, Error> {
         Ok(toml::from_str(s)?)
     }
 

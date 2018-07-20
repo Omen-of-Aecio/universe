@@ -4,7 +4,7 @@ use specs::Component;
 use tilenet::TileNet;
 use global::Tile;
 
-#[derive(Copy, Clone, Default, RustcEncodable, RustcDecodable, Debug)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize, Debug)]
 pub struct Pos {
     /// Position
     pub transl: Vec2,
@@ -21,7 +21,7 @@ impl Pos {
 }
 
 
-#[derive(Copy, Clone, Default, RustcEncodable, RustcDecodable, Debug)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize, Debug)]
 pub struct Vel {
     /// Positional velocity
     pub transl: Vec2,
@@ -30,7 +30,7 @@ pub struct Vel {
 }
 
 
-#[derive(Copy, Clone, Default, RustcEncodable, RustcDecodable, Debug)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize, Debug)]
 pub struct Force {
     /// Translational force
     pub transl: Vec2,
@@ -39,7 +39,7 @@ pub struct Force {
 }
 
 
-#[derive(Copy, Clone, RustcEncodable, RustcDecodable, Debug)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub enum Jump {
     Active {
         // state
@@ -96,7 +96,7 @@ impl Jump {
 }
 
 
-#[derive(Clone, RustcEncodable, RustcDecodable, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Shape {
     pub points: Vec<(f32, f32)>, // Vec<Vec2> later. Now: for convenience with TileNet
 }
@@ -113,7 +113,7 @@ impl Shape {
 }
 
 
-#[derive(Copy, Clone, RustcEncodable, RustcDecodable, Debug)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub enum Color {
     White, Black,
 }
@@ -147,7 +147,7 @@ impl Player {
 }
 
 
-#[derive(Copy, Clone, Default, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, Default, Debug, Serialize, Deserialize)]
 pub struct PlayerInput {
     pub up: bool,
     pub down: bool,

@@ -3,12 +3,12 @@
 #![cfg_attr(feature = "dev", plugin(clippy))]
 
 #[macro_use]
+extern crate failure;
+#[macro_use]
 extern crate glium;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
-extern crate error_chain;
 extern crate isatty;
 extern crate rand;
 #[macro_use]
@@ -25,7 +25,6 @@ extern crate time;
 extern crate clap;
 extern crate byteorder;
 extern crate bincode;
-extern crate rustc_serialize;
 extern crate num_traits;
 extern crate specs;
 extern crate toml;
@@ -123,10 +122,6 @@ fn main() {
         }
     };
     println!("Error: {}", err);
-    for e in err.iter().skip(1) {
-        println!("  caused by: {}", e);
-    }
-
 
     std::process::exit(0);
 }

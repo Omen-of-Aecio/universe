@@ -209,12 +209,11 @@ impl Game {
         for (id, entity) in snapshot.entities.iter() {
             use msg::Type;
             match entity {
-                Some(Entity {Type::Player, comps}) => {
+                Some(Entity {ty: Type::Player, comps}) => {
                     // TODO in the future: `if let Some(pos) = comps.pos()`
-                    if comps.0.present { 
-                    }
+                    let this_ent = self.game.world.entities().entity()...//TODO: problem how to find the right entity given, say, some UniqueID component
                 },
-                Some(Entity {Type::Bullet, components}) =>,
+                Some(Entity {ty: Type::Bullet, comps}) => (),
             }
         }
     }

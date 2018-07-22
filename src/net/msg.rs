@@ -76,6 +76,7 @@ impl Components {
     pub fn new(a: &Pos, b: &Vel, c: &Shape, d: &Color) -> Components {
         Components (SerOption::new(a), SerOption::new(b), SerOption::new(c), SerOption::new(d))
     }
+    /// Copy over the components that are marked as present in the other Components
     pub fn update(&mut self, other: &Components) {
         // TODO automatize
         if other.0.present { self.0 = other.0.clone(); }

@@ -47,15 +47,10 @@ impl Client {
         let (_, msg) = socket.recv().unwrap();
         // TODO reordering will be problematic here, expecting only a certain message
         match msg {
-            Message::Welcome {width, height, you, players, white_base, black_base} => {
+            Message::Welcome {width, height, you, white_base, black_base} => {
                 let display = glutin::WindowBuilder::new().build_glium().unwrap();
                 let mut game = Game::new(width, height, you, white_base, black_base, display.clone());
                 info!("Client received Welcome message");
-
-                for player in players {
-                    info!("Client add new player");
-                    game.update_player(player);
-                }
 
                 let graphics = Graphics::new(display.clone(), &*game.world.read_resource());
                 Ok(Client {
@@ -148,17 +143,15 @@ impl Client {
             bail!("Packet not from server");
         }
         match msg {
-            Message::Welcome {width: _, height: _, you: _, players: _, white_base: _, black_base: _} => {
+            Message::Welcome {width: _, height: _, you: _, white_base: _, black_base: _} => {
             },
             Message::WorldRect {x, y, width, pixels} => {
                 let height = pixels.len() / width;
                 self.update_tilenet_rect(x, y, width, height, pixels);
             },
-            Message::Players (players) => {
-                for player in players {
-                    self.game.update_player(player);
-                }
-            },
+            Message::State (snapshot) => {
+                self.game.apply_snapshot(snapshot);
+            }
             Message::NewPlayer (player) => {
                 info!("New player has joined"; "id" => player.id);
                 self.game.update_player(player);

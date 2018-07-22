@@ -96,7 +96,7 @@ impl Jump {
 }
 
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct Shape {
     pub points: Vec<(f32, f32)>, // Vec<Vec2> later. Now: for convenience with TileNet
 }
@@ -118,6 +118,11 @@ pub enum Color {
     White, Black,
 }
 
+impl Default for Color {
+    fn default() -> Color {
+        Color::White
+    }
+}
 impl Color {
     pub fn to_rgb(&self) -> [f32; 3] {
         match self {

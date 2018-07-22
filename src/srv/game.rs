@@ -1,4 +1,3 @@
-use net::msg::SrvPlayer;
 use tilenet::TileNet;
 
 use err::*;
@@ -12,9 +11,10 @@ use tilenet_gen;
 use specs;
 use specs::{Dispatcher, World, Join, Builder};
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::vec::Vec;
 use std::time::Duration;
+use net::msg;
 
 use conf::Config;
 
@@ -157,27 +157,6 @@ impl Game {
         self.height
     }
     
-    /// Create SrvPlayer from a player with id u32
-    pub fn get_srv_player(&self, id: u32) -> Result<SrvPlayer, Error> {
-        let entity = *self.players.get(&id).ok_or_else(|| format_err!("Player with id {} not found.", id))?;
-        let (player, color, pos) = (self.world.read_storage::<Player>(),
-                                    self.world.read_storage::<Color>(),
-                                    self.world.read_storage::<Pos>());
-        let player = player.get(entity).ok_or_else(|| format_err!("Player with id {} not found.", id))?;
-        let color = color.get(entity).ok_or_else(|| format_err!("Player with id {} not found.", id))?;
-        let pos = pos.get(entity).ok_or_else(|| format_err!("Player with id {} not found.", id))?;
-        Ok(SrvPlayer::new(player, *color, pos))
-    }
-    pub fn get_srv_players(&self) -> Vec<SrvPlayer> {
-        let (player, color, pos) = (self.world.read_storage::<Player>(),
-                                    self.world.read_storage::<Color>(),
-                                    self.world.read_storage::<Pos>());
-        (&player, &color, &pos).join().map(|data| {
-            let (player, color, pos) = data;
-            SrvPlayer::new(player, *color, pos)
-        }).collect()
-    }
-
     /// Add player if not already added
     pub fn add_player(&mut self, col: Color) -> u32 {
         self.player_id_seq += 1;
@@ -222,13 +201,9 @@ impl Game {
         Ok(())
     }
 
-    pub fn create_snapshot(&self) -> Snapshot {
-
-        // for entity in self.world.entities.create_iter() {
-        // }
-
+    pub fn create_snapshot(&self) -> msg::Snapshot {
         // This is somewhat of a manual thing and I wish there was a more automatic way.
-        let (shape, pos, vel, force, color, player, bullet)
+        let (entity, shape, pos, vel, color, player, bullet)
             = (self.world.entities(),
                self.world.read_storage::<Shape>(),
                self.world.read_storage::<Pos>(),
@@ -236,9 +211,26 @@ impl Game {
                self.world.read_storage::<Color>(),
                self.world.read_storage::<Player>(),
                self.world.read_storage::<Bullet>());
-        for (entity, player, pos, vel, shape, color) in (&player, &pos, &vel, &shape, &color) {
-            
+        let mut entities = BTreeMap::new();
+        for (entity, _player, pos, vel, shape, color) in (&*entity, &player, &pos, &vel, &shape, &color).join() {
+            entities.insert(entity.id(),
+                msg::Entity {
+                    ty: msg::Type::Player,
+                    id: entity.id(),
+                    components: msg::Components::new(pos, vel, shape, color)
+                }
+            );
         }
+        for (entity, _bullet, pos, vel, shape, color) in (&*entity, &bullet, &pos, &vel, &shape, &color).join() {
+            entities.insert(entity.id(),
+                msg::Entity {
+                    ty: msg::Type::Bullet,
+                    id: entity.id(),
+                    components: msg::Components::new(pos, vel, shape, color)
+                }
+            );
+        }
+        msg::Snapshot {entities: entities}
     }
 }
 

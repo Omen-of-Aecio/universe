@@ -12,7 +12,7 @@ use std::marker::PhantomData;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Message {
     // Messages from server
-    Welcome {width: u32, height: u32, you: u32, players: Vec<SrvPlayer>, white_base: Vec2, black_base: Vec2},
+    Welcome {width: u32, height: u32, you: u32, white_base: Vec2, black_base: Vec2},
     WorldRect {x: usize, y: usize, width: usize, pixels: Vec<u8>},
     State (Snapshot),
 
@@ -51,25 +51,31 @@ impl SrvPlayer {
 /// Incremental or entire snapshot of state at the server, to be sent to clients
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Snapshot {
-    pub entities: BTreeMap<u32, Entity>,
+    /// Hash map from (ID, type) to a list of components for this entity. If the value is None, it
+    /// means deletion of this entity
+    pub entities: BTreeMap<u32, Option<Entity>>,
 }
 
 /// Incremental or entire representation of an Entity
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Entity{
     pub ty: Type,
-    pub id: u32,
     pub components: Components,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub enum Type {Player, DeletePlayer, Bullet, DeleteBullet}
+pub enum Type {Player, Bullet}
 
 
 
+// TODO: derive getters for the fields, that return Option?
+//       ... or derive the whole struct with a macro/derive...
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Components ( SerOption<Pos>, SerOption<Vel>, SerOption<Shape>, SerOption<Color>);
 impl Components {
+    pub fn new(a: &Pos, b: &Vel, c: &Shape, d: &Color) -> Components {
+        Components (SerOption::new(a), SerOption::new(b), SerOption::new(c), SerOption::new(d))
+    }
     pub fn update(&mut self, other: &Components) {
         // TODO automatize
         if other.0.present { self.0 = other.0.clone(); }
@@ -87,6 +93,14 @@ impl Components {
 pub struct SerOption<T: Default> {
     pub present: bool,
     pub data: T,
+}
+impl<T: Default + Clone> SerOption<T> {
+    pub fn new(data: &T) -> SerOption<T> {
+        SerOption {
+            present: true,
+            data: data.clone(),
+        }
+    }
 }
 
 

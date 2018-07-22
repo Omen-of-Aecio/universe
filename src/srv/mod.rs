@@ -85,7 +85,8 @@ impl Server {
                 self.handle_message(msg.0, msg.1)?;
             }
             // Send messages
-            let message = Message::Players (self.game.get_srv_players());
+            // TODO: delta compression (easy to do)
+            let message = Message::State (self.game.create_snapshot());
             Server::broadcast(&mut self.socket, self.connections.keys(), &message)?;
 
             // Logic

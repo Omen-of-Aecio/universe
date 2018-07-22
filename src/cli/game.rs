@@ -205,6 +205,19 @@ impl Game {
             }
         }
     }
+    pub fn apply_snapshot(&mut self, snapshot: Snapshot) {
+        for (id, entity) in snapshot.entities.iter() {
+            use msg::Type;
+            match entity {
+                Some(Entity {Type::Player, comps}) => {
+                    // TODO in the future: `if let Some(pos) = comps.pos()`
+                    if comps.0.present { 
+                    }
+                },
+                Some(Entity {Type::Bullet, components}) =>,
+            }
+        }
+    }
 
     pub fn print(&self) {
         // info!("TileNet"; "content" => format!["{:?}", self.get_tilenet()]);

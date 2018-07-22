@@ -1,4 +1,10 @@
 # Currently/TODO
+- SNAPSHOT
+    maybe would make more sense to send a snapshot with Options...
+
+
+
+
 - while we can serialize the Snapshot...
     do we really have to deserialize it and then loop & apply to the ECS system?
     Is it possible to do so while deserializing? LATER. OPTIMIZATION.

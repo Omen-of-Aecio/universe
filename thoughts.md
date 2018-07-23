@@ -1,4 +1,6 @@
 # Currently/TODO
+- UniqueID on client side.. they are allocated by the server so what do I do about that... have to wait with adding them until next snapshot? Or add some temporary version for prediction. Which can go when we `maintain` the world.
+
 - SNAPSHOT
     maybe would make more sense to send a snapshot with Options...
 

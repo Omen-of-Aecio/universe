@@ -1,18 +1,17 @@
 use tilenet::TileNet;
-use net::msg::SrvPlayer;
 
 use cli::cam::Camera;
 
 use std::cmp::min;
 use glium;
 use glium::glutin::{VirtualKeyCode as KeyCode};
-use net::msg::Message;
+use net::msg::{self, Message, Snapshot, Type};
 use input::Input;
 use global::Tile;
 use geometry::vec::Vec2;
 use component::*;
 use specs;
-use specs::{World, Join, Builder};
+use specs::{World, Join, Builder, LazyUpdate};
 
 use std::collections::HashMap;
 use std::vec::Vec;
@@ -22,7 +21,7 @@ pub struct Game {
     pub world: World,
     pub cam: Camera,
 
-    players: HashMap<u32, specs::Entity>,
+    entities: HashMap<u32, specs::Entity>,
     you: u32,
 
     pub white_base: Vec2,
@@ -67,7 +66,7 @@ impl Game {
         Game {
             world: world,
             cam: cam,
-            players: HashMap::default(),
+            entities: HashMap::default(),
             you: you,
             white_base: white_base,
             black_base: black_base,
@@ -171,51 +170,27 @@ impl Game {
         pos.get(self.get_you()).unwrap().transl
     }
     pub fn get_you(&self) -> specs::Entity {
-        *self.players.get(&self.you).unwrap()
-    }
-    pub fn get_player(&self, id: u32) -> specs::Entity {
-        self.players[&id]
-    }
-
-    /// Add player if not already added
-    pub fn update_player(&mut self, srv_player: SrvPlayer) {
-        let mapping = self.players.get(&srv_player.id).map(|x| *x);
-        match mapping {
-            Some(ref entity) => {
-                let (mut player, mut pos, mut color) = (self.world.write_storage::<Player>(),
-                                                        self.world.write_storage::<Pos>(),
-                                                        self.world.write_storage::<Color>());
-                player.get_mut(*entity).unwrap().id = srv_player.id;
-                pos.get_mut(*entity).unwrap().transl = srv_player.pos;
-                *color.get_mut(*entity).unwrap() = srv_player.col;
-
-
-            },
-            None => {
-                let entity = self.world.create_entity()
-                    .with(Player::new(srv_player.id))
-                    .with(Pos::with_transl(srv_player.pos))
-                    .with(Vel::default())
-                    .with(Force::default())
-                    .with(Shape::new_quad(10.0, 10.0))
-                    .with(srv_player.col)
-                    .with(Jump::Inactive)
-                    .build();
-                self.players.insert(srv_player.id, entity);
-            }
-        }
+        unimplemented!();
     }
     pub fn apply_snapshot(&mut self, snapshot: Snapshot) {
+        let updater = self.world.read_resource::<LazyUpdate>();
         for (id, entity) in snapshot.entities.iter() {
-            use msg::Type;
             match entity {
-                Some(Entity {ty: Type::Player, comps}) => {
-                    // TODO in the future: `if let Some(pos) = comps.pos()`
-                    let this_ent = self.game.world.entities().entity()...//TODO: problem how to find the right entity given, say, some UniqueID component
+                &Some(msg::Entity {ty:_, components}) => {
+                    match self.entities.get(&id) {
+                        Some(this_ent) => {
+                            components.modify_existing(&*updater, *this_ent);
+                        }
+                        None => {
+                            // TODO: maybe need to care about type (Player/Bullet)
+                            components.insert(&*updater, &*self.world.entities());
+                        }
+                    }
+                    
                 },
-                Some(Entity {ty: Type::Bullet, comps}) => (),
             }
         }
+        self.world.maintain();
     }
 
     pub fn print(&self) {

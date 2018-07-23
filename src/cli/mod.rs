@@ -152,10 +152,6 @@ impl Client {
             Message::State (snapshot) => {
                 self.game.apply_snapshot(snapshot);
             }
-            Message::NewPlayer (player) => {
-                info!("New player has joined"; "id" => player.id);
-                self.game.update_player(player);
-            },
             _ => bail!("Wrong message type."),
 
         };

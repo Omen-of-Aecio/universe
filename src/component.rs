@@ -5,6 +5,9 @@ use tilenet::TileNet;
 use global::Tile;
 
 #[derive(Copy, Clone, Default, Serialize, Deserialize, Debug)]
+pub struct UniqueId (pub u32);
+
+#[derive(Copy, Clone, Default, Serialize, Deserialize, Debug)]
 pub struct Pos {
     /// Position
     pub transl: Vec2,
@@ -140,16 +143,7 @@ impl Color {
 
 /// Marks the object as a player
 #[derive(Copy, Clone, Default, Debug)]
-pub struct Player {
-    pub id: u32
-}
-impl Player {
-    pub fn new(id: u32) -> Player {
-        Player {
-            id: id
-        }
-    }
-}
+pub struct Player;
 
 
 #[derive(Copy, Clone, Default, Debug, Serialize, Deserialize)]
@@ -184,30 +178,33 @@ impl Bullet {
 // Specifying storage for the different components
 //
 
+impl Component for UniqueId {
+    type Storage = specs::VecStorage<Self>;
+}
 impl Component for Pos {
-    type Storage = specs::VecStorage<Pos>;
+    type Storage = specs::VecStorage<Self>;
 }
 impl Component for Vel {
-    type Storage = specs::VecStorage<Vel>;
+    type Storage = specs::VecStorage<Self>;
 }
 impl Component for Force {
-    type Storage = specs::VecStorage<Force>;
+    type Storage = specs::VecStorage<Self>;
 }
 impl Component for Jump {
-    type Storage = specs::VecStorage<Jump>;
+    type Storage = specs::VecStorage<Self>;
 }
 impl Component for Shape {
-    type Storage = specs::VecStorage<Shape>;
+    type Storage = specs::VecStorage<Self>;
 }
 impl Component for Color {
-    type Storage = specs::VecStorage<Color>;
+    type Storage = specs::VecStorage<Self>;
 }
 impl Component for Player {
-    type Storage = specs::VecStorage<Player>;
+    type Storage = specs::VecStorage<Self>;
 }
 impl Component for Bullet {
-    type Storage = specs::VecStorage<Bullet>;
+    type Storage = specs::VecStorage<Self>;
 }
 impl Component for PlayerInput {
-    type Storage = specs::VecStorage<PlayerInput>;
+    type Storage = specs::VecStorage<Self>;
 }

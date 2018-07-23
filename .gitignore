@@ -6,3 +6,4 @@ target/
 !src/
 !shaders/
 !Cargo.toml
+rusty-tags.*

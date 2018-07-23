@@ -8,6 +8,7 @@ use serde::{Serialize, Serializer, Deserialize, Deserializer, de::Visitor};
 use std::fmt;
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
+use specs::{self, Builder};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Message {
@@ -16,32 +17,11 @@ pub enum Message {
     WorldRect {x: usize, y: usize, width: usize, pixels: Vec<u8>},
     State (Snapshot),
 
-    Players (Vec<SrvPlayer>),
-    NewPlayer (SrvPlayer),
-
     // Messages from client
     Join {snapshot_rate: f32},
     Input (PlayerInput),
     ToggleGravity,
     BulletFire { direction: Vec2 },
-}
-
-
-// TODO old..
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SrvPlayer {
-    pub id: u32,
-    pub col: Color,
-    pub pos: Vec2,
-}
-impl SrvPlayer {
-    pub fn new(player: &Player, col: Color, pos: &Pos) -> SrvPlayer {
-        SrvPlayer {
-            id: player.id,
-            col: col,
-            pos: pos.transl,
-        }
-    }
 }
 
 
@@ -85,6 +65,41 @@ impl Components {
         if other.3.present { self.3 = other.3.clone(); }
         // for each field, set SerOption::serialize to `true` if the two versions differ
         // and to `false` if they are the same.
+    }
+    /*
+    pub fn pos(&self) -> Option<Pos> {
+        if self.0.present { Some(self.0.data) } else { None }
+    }
+    pub fn vel(&self) -> Option<Vel> {
+        if self.1.present { Some(self.1.data) } else { None }
+    }
+    pub fn shape(&self) -> Option<Shape> {
+        if self.2.present { Some(self.2.data) } else { None }
+    }
+    pub fn color(&self) -> Option<Color> {
+        if self.2.present { Some(self.2.data) } else { None }
+    }
+    */
+
+    /// Insert new entity into ECS with components
+    pub fn insert(&self, updater: &specs::LazyUpdate, entities: &specs::world::EntitiesRes) {
+        let mut builder = updater.create_entity(entities);
+        if self.0.present { builder = builder.with(self.0.data); }
+        else { warn!("Not all components present in received new entity") }
+        if self.1.present { builder = builder.with(self.1.data); }
+        else { warn!("Not all components present in received new entity") }
+        if self.2.present { builder = builder.with(self.2.data); }
+        else { warn!("Not all components present in received new entity") }
+        if self.3.present { builder = builder.with(self.3.data); }
+        else { warn!("Not all components present in received new entity") }
+        builder.build();
+    }
+    /// Apply to ECS system to some specific entity
+    pub fn modify_existing(&self, updater: &specs::LazyUpdate, entity: specs::Entity) {
+        if self.0.present { updater.insert(entity, self.0.data); }
+        if self.1.present { updater.insert(entity, self.1.data); }
+        if self.2.present { updater.insert(entity, self.2.data); }
+        if self.3.present { updater.insert(entity, self.3.data); }
     }
 }
 

@@ -22,8 +22,9 @@ pub struct Game {
     pub world: World,
     pub game_conf: GameConfig,
 
-    players: HashMap<u32, specs::Entity>,
-    player_id_seq: u32,
+    /// Mapping from unique ID to specs Entity
+    entities: HashMap<u32, specs::Entity>,
+    entity_id_seq: u32,
 
     /// Width of the generated world
     width: usize,
@@ -79,7 +80,7 @@ impl Game {
         Game {
             world: world,
             game_conf: gc,
-            players: HashMap::default(),
+            entities: HashMap::default(),
             player_id_seq: 0,
             width: conf.world.width as usize,
             height: conf.world.height as usize,
@@ -144,8 +145,8 @@ impl Game {
         assert!(pixels.len() == w*h);
         (pixels, w, h)
     }
-    pub fn get_player(&self, id: u32) -> specs::Entity {
-        self.players[&id]
+    pub fn get_entity(&self, id: u32) -> specs::Entity {
+        self.entity[&id]
     }
     pub fn toggle_gravity(&mut self) {
         self.game_conf.gravity_on = !self.game_conf.gravity_on;
@@ -158,14 +159,15 @@ impl Game {
     }
     
     /// Add player if not already added
-    pub fn add_player(&mut self, col: Color) -> u32 {
-        self.player_id_seq += 1;
+    pub fn add_player(&mut self, col: Color) {
+        self.entity_id_seq += 1;
         let transl = match col {
             Color::White => Vec2::new(self.white_base.x, self.white_base.y),
             Color::Black => Vec2::new(self.black_base.x, self.black_base.y),
         };
 
         let entity = self.world.create_entity()
+            .with(UniqueId (self.entity_id_seq))
             .with(Player::new(self.player_id_seq))
             .with(Pos::with_transl(transl))
             .with(Vel::default())
@@ -175,12 +177,11 @@ impl Game {
             .with(Jump::Inactive)
             .with(PlayerInput::default())
             .build();
-        self.players.insert(self.player_id_seq, entity);
-        self.player_id_seq
+        self.entities.insert(self.entity_id_seq, entity);
     }
 
     pub fn bullet_fire(&mut self, player_id: u32, direction: Vec2) -> Result<(), Error> {
-        let entity = self.get_player(player_id);
+        let entity = self.get_entity(player_id);
         let (pos, color) = {
             let pos = self.world.read_storage::<Pos>();
             let col = self.world.read_storage::<Color>();
@@ -190,7 +191,9 @@ impl Game {
         let explosion = move |pos: (i32, i32), _vel: &Vel, tilenet: &mut TileNet<Tile>| {
                 tilenet.set(&((255.0 - color2.to_intensity()*255.0) as u8), (pos.0 as usize, pos.1 as usize));
             };
+        self.entity_id_seq += 1;
         let _entity = self.world.create_entity()
+            .with(UniqueId (self.entity_id_seq))
             .with(Bullet::new(explosion))
             .with(pos)
             .with(Vel {transl: direction, angular: 1.0})

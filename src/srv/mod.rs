@@ -25,14 +25,15 @@ use self::game::Game;
 
 #[derive(Clone)]
 struct Connection {
-    entity: specs::Entity,
+    /// Unique id in the ECS
+    ecs_id: u32,
     time_since_snapshot: f32,
     snapshot_rate: f32,
 }
 impl Connection {
-    pub fn new(entity: specs::Entity, snapshot_rate: f32) -> Connection {
+    pub fn new(ecs_id: u32, snapshot_rate: f32) -> Connection {
         Connection {
-            entity,
+            ecs_id,
             time_since_snapshot: 0.0,
             snapshot_rate,
         }
@@ -162,7 +163,6 @@ impl Server {
                 width: self.game.get_width() as u32,
                 height: self.game.get_height() as u32,
                 you: player_id,
-                players: self.game.get_srv_players(),
                 white_base: self.game.white_base,
                 black_base: self.game.black_base,
             },
@@ -180,8 +180,6 @@ impl Server {
                 }
             }
         }
-        let srv_player = self.game.get_srv_player(player_id)?;
-        self.broadcast_reliably(&Message::NewPlayer (srv_player))?;
 
         Ok(())
     }

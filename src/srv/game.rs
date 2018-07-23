@@ -57,6 +57,7 @@ impl Game {
             w.register::<Color>();
             w.register::<Jump>();
             w.register::<PlayerInput>();
+            w.register::<UniqueId>();
             
             // The ECS system owns the TileNet
             let mut tilenet = TileNet::<Tile>::new(conf.world.width as usize, conf.world.height as usize);
@@ -73,6 +74,7 @@ impl Game {
             w.add_resource(gc);
             w.add_resource(conf.clone());
             w.add_resource(::DeltaTime::default());
+            w.add_resource(HashMap::<u32, specs::Entity>::new());
 
             w
         };
@@ -81,7 +83,7 @@ impl Game {
             world: world,
             game_conf: gc,
             entities: HashMap::default(),
-            player_id_seq: 0,
+            entity_id_seq: 0,
             width: conf.world.width as usize,
             height: conf.world.height as usize,
             white_base: white_base,
@@ -106,11 +108,11 @@ impl Game {
 
     /// Returns (messages to send, messages to send reliably)
     pub fn update(&mut self, dispatcher: &mut Dispatcher, delta_time: ::DeltaTime) -> (Vec<Message>, Vec<Message>) {
+        self.world.maintain();
         self.vectors.clear(); // clear debug geometry
         *self.world.write_resource::<GameConfig>() = self.game_conf;
         *self.world.write_resource::<::DeltaTime>() = delta_time;
         dispatcher.dispatch(&mut self.world.res);
-        self.world.maintain();
 
         (Vec::new(), Vec::new())
     }
@@ -146,7 +148,7 @@ impl Game {
         (pixels, w, h)
     }
     pub fn get_entity(&self, id: u32) -> specs::Entity {
-        self.entity[&id]
+        self.entities[&id]
     }
     pub fn toggle_gravity(&mut self) {
         self.game_conf.gravity_on = !self.game_conf.gravity_on;
@@ -158,17 +160,18 @@ impl Game {
         self.height
     }
     
-    /// Add player if not already added
-    pub fn add_player(&mut self, col: Color) {
+    /// Add player if not already added. Return its unique ID
+    pub fn add_player(&mut self, col: Color) -> u32 {
         self.entity_id_seq += 1;
         let transl = match col {
             Color::White => Vec2::new(self.white_base.x, self.white_base.y),
             Color::Black => Vec2::new(self.black_base.x, self.black_base.y),
         };
 
+        info!("Add player"; "id" => self.entity_id_seq);
         let entity = self.world.create_entity()
             .with(UniqueId (self.entity_id_seq))
-            .with(Player::new(self.player_id_seq))
+            .with(Player)
             .with(Pos::with_transl(transl))
             .with(Vel::default())
             .with(Force::default())
@@ -178,6 +181,7 @@ impl Game {
             .with(PlayerInput::default())
             .build();
         self.entities.insert(self.entity_id_seq, entity);
+        self.entity_id_seq
     }
 
     pub fn bullet_fire(&mut self, player_id: u32, direction: Vec2) -> Result<(), Error> {
@@ -206,8 +210,8 @@ impl Game {
 
     pub fn create_snapshot(&self) -> msg::Snapshot {
         // This is somewhat of a manual thing and I wish there was a more automatic way.
-        let (entity, shape, pos, vel, color, player, bullet)
-            = (self.world.entities(),
+        let (id, shape, pos, vel, color, player, bullet)
+            = (self.world.read_storage::<UniqueId>(),
                self.world.read_storage::<Shape>(),
                self.world.read_storage::<Pos>(),
                self.world.read_storage::<Vel>(),
@@ -215,25 +219,30 @@ impl Game {
                self.world.read_storage::<Player>(),
                self.world.read_storage::<Bullet>());
         let mut entities = BTreeMap::new();
-        for (entity, _player, pos, vel, shape, color) in (&*entity, &player, &pos, &vel, &shape, &color).join() {
-            entities.insert(entity.id(),
-                msg::Entity {
+        for (id, _player, pos, vel, shape, color) in (&id, &player, &pos, &vel, &shape, &color).join() {
+            entities.insert(id.0,
+                Some(msg::Entity {
                     ty: msg::Type::Player,
-                    id: entity.id(),
                     components: msg::Components::new(pos, vel, shape, color)
-                }
+                })
             );
         }
-        for (entity, _bullet, pos, vel, shape, color) in (&*entity, &bullet, &pos, &vel, &shape, &color).join() {
-            entities.insert(entity.id(),
-                msg::Entity {
+        for (id, _bullet, pos, vel, shape, color) in (&id, &bullet, &pos, &vel, &shape, &color).join() {
+            entities.insert(id.0,
+                Some(msg::Entity {
                     ty: msg::Type::Bullet,
-                    id: entity.id(),
                     components: msg::Components::new(pos, vel, shape, color)
-                }
+                })
             );
         }
         msg::Snapshot {entities: entities}
+    }
+    pub fn input(&mut self, id: u32, input: PlayerInput) -> Result<(), Error> {
+        let entity = self.entities.get(&id).ok_or_else(|| format_err!("Entity not found"))?;
+        let mut input_resource = self.world.write_storage::<PlayerInput>();
+        let input_ref = input_resource.get_mut(*entity).ok_or_else(|| format_err!("Entity doesn't have input"))?;
+        *input_ref = input;
+        Ok(())
     }
 }
 

@@ -11,7 +11,7 @@ use global::Tile;
 use geometry::vec::Vec2;
 use component::*;
 use specs;
-use specs::{World, Join, Builder, LazyUpdate};
+use specs::{World, Join, Builder, LazyUpdate, Dispatcher, DispatcherBuilder};
 
 use std::collections::HashMap;
 use std::vec::Vec;
@@ -21,7 +21,6 @@ pub struct Game {
     pub world: World,
     pub cam: Camera,
 
-    entities: HashMap<u32, specs::Entity>,
     you: u32,
 
     pub white_base: Vec2,
@@ -50,6 +49,7 @@ impl Game {
             w.register::<Shape>();
             w.register::<Color>();
             w.register::<Player>();
+            w.register::<UniqueId>();
             
             // The ECS system owns the TileNet
             let mut tilenet = TileNet::<Tile>::new(width as usize, height as usize);
@@ -58,15 +58,14 @@ impl Game {
             
             w.add_resource(tilenet);
             w.add_resource(cam);
+            w.add_resource(HashMap::<u32, specs::Entity>::new());
 
             w
         };
 
-
         Game {
             world: world,
             cam: cam,
-            entities: HashMap::default(),
             you: you,
             white_base: white_base,
             black_base: black_base,
@@ -76,13 +75,16 @@ impl Game {
     }
 
     /// Returns (messages to send, messages to send reliably)
-    pub fn update(&mut self, input: &Input) -> (Vec<Message>, Vec<Message>) {
+    pub fn update(&mut self, dispatcher: &mut Dispatcher, input: &Input) -> (Vec<Message>, Vec<Message>) {
+        self.world.maintain();
+        // ^^ XXX maintain before rest, because previously in this frame we handled input & network pacakets
         self.vectors.clear(); // clear debug geometry
         let ret = self.handle_input(input);
-        if let CameraMode::FollowPlayer = self.cam_mode {
-            self.cam.center = self.get_player_transl();
+        if let (CameraMode::FollowPlayer, Some(transl)) = (self.cam_mode, self.get_player_transl()) {
+            self.cam.center = transl;
         }
         *self.world.write_resource() = self.cam;
+        dispatcher.dispatch(&mut self.world.res);
         ret
     }
 
@@ -113,10 +115,12 @@ impl Game {
             }
 
             // Fire weapon //
-            let mouse_world_pos = self.cam.screen_to_world(input.mouse_pos());
-            let dir = mouse_world_pos - self.get_player_transl();
-            let msg = Message::BulletFire {direction: dir};
-            msg_reliable.push(msg);
+            if let Some(transl) = self.get_player_transl() {
+                let mouse_world_pos = self.cam.screen_to_world(input.mouse_pos());
+                let dir = mouse_world_pos - transl;
+                let msg = Message::BulletFire {direction: dir};
+                msg_reliable.push(msg);
+            }
         }
 
         // Zooming
@@ -165,30 +169,42 @@ impl Game {
         pixels
     }
 
-    pub fn get_player_transl(&self) -> Vec2 {
+    pub fn get_player_transl(&self) -> Option<Vec2> {
         let pos = self.world.read_storage::<Pos>();
-        pos.get(self.get_you()).unwrap().transl
+        self.get_you().and_then(|you| pos.get(you).map(|pos| pos.transl))
     }
-    pub fn get_you(&self) -> specs::Entity {
-        unimplemented!();
+    pub fn get_you(&self) -> Option<specs::Entity> {
+        self.get_entity(self.you)
+    }
+    pub fn get_entity(&self, id: u32) -> Option<specs::Entity> {
+        self.world.read_resource::<HashMap<u32, specs::Entity>>()
+            .get(&id).map(|x| *x)
     }
     pub fn apply_snapshot(&mut self, snapshot: Snapshot) {
+        {
         let updater = self.world.read_resource::<LazyUpdate>();
-        for (id, entity) in snapshot.entities.iter() {
+        for (id, entity) in snapshot.entities.into_iter() {
             match entity {
-                &Some(msg::Entity {ty:_, components}) => {
-                    match self.entities.get(&id) {
+                Some(msg::Entity {ty:_, components}) => {
+                    match self.get_entity(id) {
                         Some(this_ent) => {
-                            components.modify_existing(&*updater, *this_ent);
+                            components.modify_existing(&*updater, this_ent);
                         }
                         None => {
                             // TODO: maybe need to care about type (Player/Bullet)
-                            components.insert(&*updater, &*self.world.entities());
+                            components.insert(&*updater, &*self.world.entities(), id);
                         }
                     }
-                    
                 },
+                // This means the entity was deleted
+                None => {
+                    match self.get_entity(id) {
+                        Some(this_ent) => /* TODO:!! Remove entity */ unimplemented!(),
+                        None => error!("Server removed entity not owned by me"),
+                    }
+                }
             }
+        }
         }
         self.world.maintain();
     }

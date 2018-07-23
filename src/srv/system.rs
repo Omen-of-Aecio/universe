@@ -1,4 +1,4 @@
-use specs::{self, Read, WriteExpect, ReadStorage, WriteStorage, Join, Entities};
+use specs::{self, Read, Write, WriteExpect, ReadStorage, WriteStorage, Join, Entities, Entity};
 use collision::{player_move, bullet_move};
 use component::*;
 use tilenet::TileNet;
@@ -6,19 +6,16 @@ use global::Tile;
 use srv::game::GameConfig;
 use geometry::Vec2;
 use ::DeltaTime;
+use std::collections::HashMap;
 
 ////////////
 // Server
 
-pub struct JumpSys;
-/// For Player <-> TileNet collision
-/// (TODO) general movement of objects that have Shape, Force, Vel, Pos, Color
-pub struct MoveSys;
-pub struct InputSys;
 
 
 // (TODO extra friction when on ground?)
 
+pub struct JumpSys;
 impl<'a> specs::System<'a> for JumpSys {
     type SystemData = (Read<'a, DeltaTime>,
                        Read<'a, GameConfig>,
@@ -42,6 +39,9 @@ impl<'a> specs::System<'a> for JumpSys {
     }
 }
 
+/// For Player <-> TileNet collision
+/// (TODO) general movement of objects that have Shape, Force, Vel, Pos, Color
+pub struct MoveSys;
 impl<'a> specs::System<'a> for MoveSys {
     type SystemData = (Read<'a, DeltaTime>,
                        Entities<'a>,
@@ -88,6 +88,7 @@ impl<'a> specs::System<'a> for MoveSys {
 }
 
 
+pub struct InputSys;
 impl<'a> specs::System<'a> for InputSys {
     type SystemData = (Read<'a, DeltaTime>,
                        Read<'a, GameConfig>,
@@ -125,4 +126,23 @@ impl<'a> specs::System<'a> for InputSys {
     }
 }
 
+/// System to create a HashMap<u32, Entity>, which must be done every frame. Used on both
+/// client and server
+pub struct MaintainSys;
+impl<'a> specs::System<'a> for MaintainSys {
+    type SystemData = (Entities<'a>,
+                       ReadStorage<'a, UniqueId>,
+                       Write<'a, HashMap<u32, Entity>>);
+    fn run(&mut self, (entities, ids, mut map): Self::SystemData) {
+        let mut new_map = HashMap::new();
+        for (entity, id) in (&*entities, &ids).join() {
+            new_map.insert(id.0, entity);
+        }
+        info!("{:?}", new_map);
 
+        for entity in entities.join() {
+            info!("\t Entity");
+        }
+        *map = new_map;
+    }
+}

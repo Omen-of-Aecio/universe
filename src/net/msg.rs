@@ -81,8 +81,8 @@ impl Components {
     }
     */
 
-    /// Insert new entity into ECS with components
-    pub fn insert(&self, updater: &specs::LazyUpdate, entities: &specs::world::EntitiesRes) {
+    /// Insert new entity into ECS with components, with UniqueId `id`
+    pub fn insert(self, updater: &specs::LazyUpdate, entities: &specs::world::EntitiesRes, id: u32) {
         let mut builder = updater.create_entity(entities);
         if self.0.present { builder = builder.with(self.0.data); }
         else { warn!("Not all components present in received new entity") }
@@ -92,10 +92,11 @@ impl Components {
         else { warn!("Not all components present in received new entity") }
         if self.3.present { builder = builder.with(self.3.data); }
         else { warn!("Not all components present in received new entity") }
+        builder = builder.with(UniqueId (id));
         builder.build();
     }
     /// Apply to ECS system to some specific entity
-    pub fn modify_existing(&self, updater: &specs::LazyUpdate, entity: specs::Entity) {
+    pub fn modify_existing(self, updater: &specs::LazyUpdate, entity: specs::Entity) {
         if self.0.present { updater.insert(entity, self.0.data); }
         if self.1.present { updater.insert(entity, self.1.data); }
         if self.2.present { updater.insert(entity, self.2.data); }

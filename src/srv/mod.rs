@@ -69,6 +69,7 @@ impl Server {
         builder.add(MoveSys, "move", &[]);
         builder.add(JumpSys, "jump", &[]);
         builder.add(InputSys, "input", &[]);
+        builder.add(MaintainSys, "maintain", &[]);
         let mut dispatcher = builder.build();
 
         let mut prev_time = SystemTime::now();
@@ -131,17 +132,15 @@ impl Server {
         match msg {
             Message::Join {snapshot_rate} => self.new_connection(src, snapshot_rate)?,
             Message::Input (input) => {
-                let con = self.connections.get(&src).ok_or_else(|| format_err!("SocketAddr not registererd as player"))?;
-                let mut input_resource = self.game.world.write_storage::<PlayerInput>();
-                let input_ref = input_resource.get_mut(con.entity).ok_or_else(|| format_err!("Entity doesn't have input"))?;
-                *input_ref = input;
+                let con = self.connections.get(&src)
+                    .ok_or_else(|| format_err!("SocketAddr not registererd as player"))?;
+                self.game.input(con.ecs_id, input)?;
             },
             Message::ToggleGravity => self.game.toggle_gravity(),
             Message::BulletFire { direction } => {
-                let con = self.connections.get(&src).ok_or_else(|| format_err!("SocketAddr not registererd as player"))?;
-                let player_id = self.game.world.read_storage::<Player>().get(con.entity)
-                                    .ok_or_else(|| format_err!("Entity not player"))?.id;
-                self.game.bullet_fire(player_id, direction)?;
+                let con = self.connections.get(&src)
+                    .ok_or_else(|| format_err!("SocketAddr not registererd as player"))?;
+                self.game.bullet_fire(con.ecs_id, direction)?;
             },
             _ => {}
         }
@@ -155,7 +154,7 @@ impl Server {
         let (w_count, b_count) = self.game.count_player_colors();
         let color = if w_count >= b_count { Color::Black } else { Color::White };
         let player_id = self.game.add_player(color);
-        let _ = self.connections.insert(src, Connection::new(self.game.get_player(player_id), snapshot_rate));
+        let _ = self.connections.insert(src, Connection::new(player_id, snapshot_rate));
 
         // Tell about the game size and other meta data
         self.socket.send_to(

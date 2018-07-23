@@ -14,6 +14,8 @@ use rand::Rng;
 use net::{Socket, to_socket_addr};
 use net::msg::Message;
 use std::net::{SocketAddr};
+use specs::{DispatcherBuilder};
+use srv::system::MaintainSys;
 
 pub mod game;
 pub mod system;
@@ -72,6 +74,11 @@ impl Client {
     }
     pub fn run(&mut self) -> Result<(), Error> {
         self.game.cam.update_win_size(&self.display);
+
+        let mut builder = DispatcherBuilder::new();
+        builder.add(MaintainSys, "maintain", &[]);
+        let mut dispatcher = builder.build();
+
         loop {
             // Input
             self.input.update();
@@ -108,7 +115,7 @@ impl Client {
             }
 
             // Update game & send messages
-            let packets = self.game.update(&self.input);
+            let packets = self.game.update(&mut dispatcher, &self.input);
             for msg in packets.0 {
                 self.socket.send_to(msg, self.server)?;
             }

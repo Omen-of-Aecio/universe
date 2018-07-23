@@ -1,8 +1,13 @@
 = Currently/TODO =
-- LATEST: Client obviously does not see the bullets
-    should send a message that a player has shot a bullet (include position maybe, for robustness)
-    then update 
+- Note: * input * messages * world.maintain * update *
+    
+- UniqueID on client side.. they are allocated by the server so what do I do about that... have to wait with adding them until next snapshot? Or add some temporary version for prediction. Which can go when we `maintain` the world.
 
+- while we can serialize the Snapshot...
+    do we really have to deserialize it and then loop & apply to the ECS system?
+    Is it possible to do so while deserializing? LATER. OPTIMIZATION.
+    
+    
 - Remove Bullet when outside of screen
 - **no reliable way to see if standing on ground** (need for ground friction)
 

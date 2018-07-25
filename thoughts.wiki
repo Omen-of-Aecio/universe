@@ -1,33 +1,53 @@
-= Currently/TODO =
+= Scratch / Current =
+Snapshots...
+  - I think I will have to track changes to components after all.
+    Comparing Shapes every time seems expensive...
+    ... The problem I had last time was serializing ONLY changed components
+        Could get around that by building a HashMap<u32,Entity> by looping
+        over `(id, comp, modified_comp).join()` for all components.
+    HOWEVER:    then BOTH cli and srv have to use FlaggedStorage
+    HOWEVER:    modified_bits are not guaranteed to point to the same Entity
+
+
+PROBLEM with Snapshots: need to be reliable to be able to send changes!!
+    - better yet, with ACK but without resend.
+      - If no ACK for a while then MERGE the un-acked Snapshot with what will be sent.
+ -> NEED CHANGE IN `net`... Maybe a rewrite?
+
+* DELETING ENTITITES (registering a deletion on Server)
+   - delta compression can handle that
+
+
+
+
+
+= TODO =
 - Note: * input * messages * world.maintain * update *
     
-- UniqueID on client side.. they are allocated by the server so what do I do about that... have to wait with adding them until next snapshot? Or add some temporary version for prediction. Which can go when we `maintain` the world.
-
-- while we can serialize the Snapshot...
-    do we really have to deserialize it and then loop & apply to the ECS system?
-    Is it possible to do so while deserializing? LATER. OPTIMIZATION.
-    
+- **no reliable way to see if standing on ground** (need for ground friction)
     
 - Remove Bullet when outside of screen
-- **no reliable way to see if standing on ground** (need for ground friction)
 
-- Shooting: Bullet component
-    - Carries an "explosive" - a routine to explode environment?
-    - movement behaviour (actually just need an initial movement speed
-        - maybe requires to generalize MoveSys (to not just be for players)
-- Taking it further:
+- Bullet:
     - imagine a laser - not an object
     - give it (and other weapons) a certain degree of destruction
         - partial destruction of tiles? -> common air? Rather common ground.
 
 - How to deal with player actions? Maybe through ECS? For example letting Player have an array of actions
 
+- Generalize MoveSys
+
+
+
+= Optimizations =
 - Integrate Color + Shape? YES
 
+- while we can serialize the Snapshot...
+    Is it possible to do apply it *while* deserializing? LATER. OPTIMIZATION.
+    
 - Robust and adjustable granularity of sweeping in `tilenet`.
      - say a laser weapon... should absolutely sweep all tiles.
        maybe we need a method to sweep a certain diameter
-
 
 = TileNet =
 - solve: just return new Collable rather than mutate?
@@ -57,31 +77,33 @@ When user command/input is received:
  3. Move all players back
 
 == Roadmap ==
-1. Entity interpolation, snapshots, delta time
-2. Input Preduction
-3. Delta compression
+1. Entity interpolation, ~~snapshots~~, ~~delta time~~
+2. Delta compression
+3. Input Preduction
 (4. Lag Compensation)
 
-== Snapshots ==
-Easiest solution:
- - `full_snapshot`: includes Shape, Color ETC
- - `partial_snapshot`: only things that change such as Vel, Pos, etc
- - when a player joins or something else changes, we have to (manually) add to packet
 
-*Easier solution:*
- - Compare _snapshots_. `Snapshot { entities: BTreeMap<Entity> }`, make `Component` a struct ETC for linear operation.
- - PROBLEM: Snapshot is not enough since it may exclude things, need to save entire state per client!!!
-    - What about `Component (Option<Pos>,Option<Vel>, ...)`
-              and ummmmm somehow setting the unwanted fields to None or the like just when sending.
-              *need a switchable Option which takes space in memory but whose Serialization is optional*
- - PROBLEM: How to 
+= Fragmentation & partial Snapshots (partition entities) =
+* How to avoid big packets.. Should be maximum about 1 KB.
+    1) ~~Fragment at Packet.~~
+    2) Fragment into groups of Entities before sending.
+    3) Client specifies what percentage of state it wants every frame. 1.0 is too much.
+            and e.g. 0.5 means during 2 frames all state will be sent. Server will keep
+            track of the progress from frame to frame. Might need to look at Snapshot
+            then.
+        Cons: Client needs to interpolate components/entities individually. Maybe "shadow" components
+              that manifests this interpolation?
+              
+* Idea: bin packing entities
+    - need ACK but not resend on each packet (to know the state that the client has)
 
-
-*Harder solution*
- - Change `specs` to give diffs (what changed)
- - PROBLEM: Different package rates than tick rate.
-    -> History of diffs, sum up diffs needed. Only store what *frame* was last sent for each client.
-
+ - `net::Connection::estimate_rtt()`: estimate RRT based on reliable packets
+ - `net::Connection::is_acked(seq) -> bool` --- use to see if we need to resend
+        - but DISABLE AUTOMATIC RESEND
+ - Store last sent Snapshot and "Snapshot in progress" together with the progress?
+    - partition entities or bytes?
+    - or simplify by sending entire Snapshot in a second?
+    - 
 
 = Rendering =
  - Render tilenet 

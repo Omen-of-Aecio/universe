@@ -34,7 +34,8 @@ impl Socket {
         Ok(Socket {
             socket: UdpSocket::bind(("0.0.0.0:".to_string() + port.to_string().as_str()).as_str())?,
             connections: HashMap::new(),
-            buffer: default_vec(Packet::max_packet_size() as usize),
+            buffer: default_vec(Packet::max_payload_size() as usize + 100),
+                        // XXX 100 as a safe bet (headers and such)
         })
     }
 
@@ -60,8 +61,8 @@ impl Socket {
             socket: self,
         }
     }
-    pub fn max_packet_size() -> u32 {
-        Packet::max_packet_size() // because Packet should probably be private to the net module
+    pub fn max_payload_size() -> u32 {
+        Packet::max_payload_size() // because Packet should probably be private to the net module
     }
 
     /// Send unreliable message

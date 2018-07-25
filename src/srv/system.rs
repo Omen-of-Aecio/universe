@@ -138,10 +138,10 @@ impl<'a> specs::System<'a> for MaintainSys {
         for (entity, id) in (&*entities, &ids).join() {
             new_map.insert(id.0, entity);
         }
-        info!("{:?}", new_map);
+        // info!("{:?}", new_map);
 
         for entity in entities.join() {
-            info!("\t Entity");
+            // info!("\t Entity");
         }
         *map = new_map;
     }

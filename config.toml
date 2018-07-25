@@ -11,7 +11,7 @@ jump_acc = 8000
 width = 700
 height = 700
 gravity = 1200
-air_fri = [0.98, 0.99]
+air_fri = [0.999, 0.999]
 ground_fri = 0.5
 
 [srv]

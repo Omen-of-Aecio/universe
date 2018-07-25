@@ -29,6 +29,8 @@ struct Connection {
     ecs_id: u32,
     time_since_snapshot: f32,
     snapshot_rate: f32,
+    /// The last snapshot sent 
+    last_snapshot: Snapshot,
 }
 impl Connection {
     pub fn new(ecs_id: u32, snapshot_rate: f32) -> Connection {
@@ -36,6 +38,7 @@ impl Connection {
             ecs_id,
             time_since_snapshot: 0.0,
             snapshot_rate,
+            last_snapshot: Snapshot::default(), // empty snapshot (no state present)
         }
     }
 }
@@ -167,13 +170,15 @@ impl Server {
             },
             src)?;
 
-        // Send it the whole game
+        // Send it the whole world
         // We will need to split it up because of limited package size
-        let (packet_w, packet_h) = Server::packet_dim(Socket::max_packet_size() as usize);
+        let (packet_w, packet_h) = Server::packet_dim(Socket::max_payload_size() as usize);
         let blocks = (self.game.get_width() / packet_w + 1, self.game.get_height() / packet_h + 1);
+        info!("blocks {:?}", blocks);
         for x in 0..blocks.0 {
             for y in 0..blocks.1 {
-                let msg = self.wrap_game_rect(x * packet_w, y * packet_w, packet_w, packet_h);
+                // info!("world packet {},{}", x * packet_w, y * packet_);
+                let msg = self.wrap_game_rect(x * packet_w, y * packet_h, packet_w, packet_h);
                 if let Some(msg) = msg {
                     self.socket.send_reliably_to(msg, src)?;
                 }
@@ -195,7 +200,8 @@ impl Server {
     }
 
     /// ASSUMPTION: packet size is 2^n
-    fn packet_dim(packet_size: usize) -> (usize, usize) {
+    fn packet_dim(mut packet_size: usize) -> (usize, usize) {
+        packet_size -= 64; // Assume that the other fields take this amt of bytes...
         let n = (packet_size as f32).log(2.0).floor();
         (2.0.powf((n/2.0).ceil()) as usize, 2.0.powf((n/2.0).floor()) as usize)
     }

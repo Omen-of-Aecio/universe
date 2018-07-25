@@ -28,12 +28,21 @@ pub enum Message {
 
 // TAKE TWO
 
-/// Incremental or entire snapshot of state at the server, to be sent to clients
+/// Incremental or entire snapshot of state at the server, to be sent to clients.
+/// Also used by server to store what is known to be known by each client.
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Snapshot {
     /// Hash map from (ID, type) to a list of components for this entity. If the value is None, it
     /// means deletion of this entity
     pub entities: BTreeMap<u32, Option<Entity>>,
+}
+impl Snapshot {
+    /// Updates `self` with `other` (override all components).
+    /// Those components that do not match are set to `present` and will thus be sent. This
+    /// implements delta compression.
+    ///
+    /// Also looks for deleted components wrt `self`.
+    pub fn todo(){}
 }
 
 /// Incremental or entire representation of an Entity
@@ -82,7 +91,8 @@ impl Components {
     */
 
     /// Insert new entity into ECS with components, with UniqueId `id`
-    pub fn insert(self, updater: &specs::LazyUpdate, entities: &specs::world::EntitiesRes, id: u32) {
+    pub fn insert(self, updater: &specs::LazyUpdate, entities: &specs::world::EntitiesRes, id: u32) -> specs::Entity {
+        info!("Insert entity");
         let mut builder = updater.create_entity(entities);
         if self.0.present { builder = builder.with(self.0.data); }
         else { warn!("Not all components present in received new entity") }
@@ -93,7 +103,7 @@ impl Components {
         if self.3.present { builder = builder.with(self.3.data); }
         else { warn!("Not all components present in received new entity") }
         builder = builder.with(UniqueId (id));
-        builder.build();
+        builder.build()
     }
     /// Apply to ECS system to some specific entity
     pub fn modify_existing(self, updater: &specs::LazyUpdate, entity: specs::Entity) {

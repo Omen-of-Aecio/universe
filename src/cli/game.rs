@@ -180,7 +180,15 @@ impl Game {
         self.world.read_resource::<HashMap<u32, specs::Entity>>()
             .get(&id).map(|x| *x)
     }
+    /// Puts entity mapping into the HashMap resource. The HashMap is maintained every frame so
+    /// this only needs to be done when it otherwise poses a problem that the hashmap is not
+    /// immediately updated.
+    pub fn register_entity(&mut self, id: u32, ent: specs::Entity) {
+        self.world.write_resource::<HashMap<u32, specs::Entity>>()
+            .insert(id, ent);
+    }
     pub fn apply_snapshot(&mut self, snapshot: Snapshot) {
+        let mut added_entities: Vec<(u32, specs::Entity)> = Vec::new();
         {
         let updater = self.world.read_resource::<LazyUpdate>();
         for (id, entity) in snapshot.entities.into_iter() {
@@ -192,7 +200,8 @@ impl Game {
                         }
                         None => {
                             // TODO: maybe need to care about type (Player/Bullet)
-                            components.insert(&*updater, &*self.world.entities(), id);
+                            let ent = components.insert(&*updater, &*self.world.entities(), id);
+                            added_entities.push((id, ent));
                         }
                     }
                 },
@@ -206,7 +215,9 @@ impl Game {
             }
         }
         }
-        self.world.maintain();
+        for (id, ent) in added_entities {
+            self.register_entity(id, ent);
+        }
     }
 
     pub fn print(&self) {

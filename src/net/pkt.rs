@@ -5,14 +5,13 @@ use err::*;
 use num_traits::int::PrimInt;
 use bincode;
 
-const N: u32 = 10; // max packet size = 2^N
 
 ////////////
 // Packet //
 ////////////
 
 /// `Packet` struct wraps a message in protocol-specific data.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum Packet {
     Unreliable {
         msg: Message,
@@ -28,13 +27,21 @@ pub enum Packet {
 }
 impl Packet{ 
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
-        // TODO max packet size Packet::max_packet_size()
-        bincode::serialize(self).map_err(|_| format_err!("failed to serialize"))
+        let r = bincode::serialize(self)
+            .map_err(|_| format_err!("failed to serialize"))?;
+        if r.len() as u32 > Packet::max_payload_size() {
+            // TODO is it possible to somehow break the package up?
+            Err(format_err!("Tried to send too big Packet of size {}.", r.len()))
+        } else {
+            Ok(r)
+        }
     }
     pub fn decode(data: &[u8]) -> Result<Packet, Error> {
-        bincode::deserialize(&data).map_err(|_| format_err!("failed to deserialize"))
+        debug!("{}", data.len());
+        bincode::deserialize(&data)
+            .map_err(|_| format_err!("failed to deserialize"))
     }
-    pub fn max_packet_size() -> u32 {
-        2.pow(N) + 100
+    pub fn max_payload_size() -> u32 {
+        100 * 1024 // 100 KB
     }
 }

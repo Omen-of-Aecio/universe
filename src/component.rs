@@ -177,6 +177,58 @@ impl Bullet {
 //
 // Specifying storage for the different components
 //
+use specs::{storage::UnprotectedStorage, world::Index};
+use hibitset::BitSetLike;
+
+enum ComponentStorage<C, S>
+    where C: Component,
+          S: UnprotectedStorage<C> + Default {
+    Normal (S),
+    Flagged (specs::FlaggedStorage<C, S>),
+}
+impl<C, S> Default for ComponentStorage<C, S>
+    where C: Component,
+          S: UnprotectedStorage<C> + Default {
+    fn default() -> Self {
+        ComponentStorage::Normal (S::default())
+    }
+}
+
+impl<C, S> UnprotectedStorage<C> for ComponentStorage<C, S>
+    where C: Component,
+          S: UnprotectedStorage<C> + Default {
+    unsafe fn clean<B>(&mut self, has: B)
+    where B: BitSetLike {
+        match *self {
+            ComponentStorage::Normal (ref mut storage) => storage.clean(has),
+            ComponentStorage::Flagged (ref mut storage) => storage.clean(has),
+        }
+    }
+    unsafe fn get(&self, id: Index) -> &C {
+        match *self {
+            ComponentStorage::Normal (ref storage) => storage.get(id),
+            ComponentStorage::Flagged (ref storage) => storage.get(id),
+        }
+    }
+    unsafe fn get_mut(&mut self, id: Index) -> &mut C {
+        match *self {
+            ComponentStorage::Normal (ref mut storage) => storage.get_mut(id),
+            ComponentStorage::Flagged (ref mut storage) => storage.get_mut(id),
+        }
+    }
+    unsafe fn insert(&mut self, id: Index, value: C) {
+        match *self {
+            ComponentStorage::Normal (ref mut storage) => storage.insert(id, value),
+            ComponentStorage::Flagged (ref mut storage) => storage.insert(id, value),
+        }
+    }
+    unsafe fn remove(&mut self, id: Index) -> C {
+        match *self {
+            ComponentStorage::Normal (ref mut storage) => storage.remove(id),
+            ComponentStorage::Flagged (ref mut storage) => storage.remove(id),
+        }
+    }
+}
 
 impl Component for UniqueId {
     type Storage = specs::VecStorage<Self>;

@@ -29,8 +29,6 @@ struct Connection {
     ecs_id: u32,
     time_since_snapshot: f32,
     snapshot_rate: f32,
-    /// The last snapshot sent 
-    last_snapshot: Snapshot,
 }
 impl Connection {
     pub fn new(ecs_id: u32, snapshot_rate: f32) -> Connection {
@@ -38,7 +36,6 @@ impl Connection {
             ecs_id,
             time_since_snapshot: 0.0,
             snapshot_rate,
-            last_snapshot: Snapshot::default(), // empty snapshot (no state present)
         }
     }
 }

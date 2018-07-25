@@ -2,6 +2,7 @@
 #![cfg_attr(feature = "dev", feature(plugin))]
 #![cfg_attr(feature = "dev", plugin(clippy))]
 
+extern crate hibitset;
 #[macro_use]
 extern crate failure;
 #[macro_use]

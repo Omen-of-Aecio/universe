@@ -4,7 +4,7 @@ use specs::Component;
 use tilenet::TileNet;
 use global::Tile;
 
-#[derive(Copy, Clone, Default, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
 pub struct UniqueId (pub u32);
 
 #[derive(Copy, Clone, Default, Serialize, Deserialize, Debug)]
@@ -180,23 +180,34 @@ impl Bullet {
 use specs::{storage::UnprotectedStorage, world::Index};
 use hibitset::BitSetLike;
 
-enum ComponentStorage<C, S>
-    where C: Component,
-          S: UnprotectedStorage<C> + Default {
+pub enum ComponentStorage<C, S>
+where C: Component,
+      S: UnprotectedStorage<C> + Default {
     Normal (S),
     Flagged (specs::FlaggedStorage<C, S>),
 }
+impl<C, S> ComponentStorage<C, S>
+where C: Component,
+      S: UnprotectedStorage<C> + Default {
+    pub fn normal() -> Self {
+        ComponentStorage::Normal (S::default())
+    }
+    pub fn flagged() -> Self {
+        ComponentStorage::Flagged (specs::FlaggedStorage::default())
+    }
+}
+
 impl<C, S> Default for ComponentStorage<C, S>
-    where C: Component,
-          S: UnprotectedStorage<C> + Default {
+where C: Component,
+      S: UnprotectedStorage<C> + Default {
     fn default() -> Self {
         ComponentStorage::Normal (S::default())
     }
 }
 
 impl<C, S> UnprotectedStorage<C> for ComponentStorage<C, S>
-    where C: Component,
-          S: UnprotectedStorage<C> + Default {
+where C: Component,
+      S: UnprotectedStorage<C> + Default {
     unsafe fn clean<B>(&mut self, has: B)
     where B: BitSetLike {
         match *self {
@@ -230,33 +241,52 @@ impl<C, S> UnprotectedStorage<C> for ComponentStorage<C, S>
     }
 }
 
+impl<C, S> specs::Tracked for ComponentStorage<C, S>
+where C: Component,
+      S: UnprotectedStorage<C> + Default {
+    fn channels(&self) -> &specs::storage::TrackChannels {
+        match *self {
+            ComponentStorage::Normal (ref storage) =>
+                panic!("Using `ComponentStorage::Normal` as Tracked!"),
+            ComponentStorage::Flagged (ref storage) => storage.channels(),
+        }
+    }
+    fn channels_mut(&mut self) -> &mut specs::storage::TrackChannels {
+        match *self {
+            ComponentStorage::Normal (ref mut storage) =>
+                panic!("Using `ComponentStorage::Normal` as Tracked!"),
+            ComponentStorage::Flagged (ref mut storage) => storage.channels_mut(),
+        }
+    }
+}
+
 impl Component for UniqueId {
-    type Storage = specs::VecStorage<Self>;
+    type Storage = ComponentStorage<Self, specs::VecStorage<Self>>;
 }
 impl Component for Pos {
-    type Storage = specs::VecStorage<Self>;
+    type Storage = ComponentStorage<Self, specs::VecStorage<Self>>;
 }
 impl Component for Vel {
-    type Storage = specs::VecStorage<Self>;
+    type Storage = ComponentStorage<Self, specs::VecStorage<Self>>;
 }
 impl Component for Force {
-    type Storage = specs::VecStorage<Self>;
+    type Storage = ComponentStorage<Self, specs::VecStorage<Self>>;
 }
 impl Component for Jump {
-    type Storage = specs::VecStorage<Self>;
+    type Storage = ComponentStorage<Self, specs::VecStorage<Self>>;
 }
 impl Component for Shape {
-    type Storage = specs::VecStorage<Self>;
+    type Storage = ComponentStorage<Self, specs::VecStorage<Self>>;
 }
 impl Component for Color {
-    type Storage = specs::VecStorage<Self>;
+    type Storage = ComponentStorage<Self, specs::VecStorage<Self>>;
 }
 impl Component for Player {
-    type Storage = specs::VecStorage<Self>;
+    type Storage = ComponentStorage<Self, specs::VecStorage<Self>>;
 }
 impl Component for Bullet {
-    type Storage = specs::VecStorage<Self>;
+    type Storage = ComponentStorage<Self, specs::VecStorage<Self>>;
 }
 impl Component for PlayerInput {
-    type Storage = specs::VecStorage<Self>;
+    type Storage = ComponentStorage<Self, specs::VecStorage<Self>>;
 }

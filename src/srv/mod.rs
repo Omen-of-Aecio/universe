@@ -3,7 +3,6 @@ use net::Socket;
 use net::msg::{Message};
 use err::*;
 use component::*;
-use specs;
 
 use num_traits::Float;
 use specs::{DispatcherBuilder};
@@ -11,15 +10,17 @@ use srv::system::*;
 
 use std::net::SocketAddr;
 use std::vec::Vec;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::thread;
 use std::time::Duration;
 use std::time::SystemTime;
+use std::sync::Mutex;
 
 use conf::Config;
 
 pub mod system;
 pub mod game;
+pub mod diff;
 
 use self::game::Game;
 
@@ -27,14 +28,14 @@ use self::game::Game;
 struct Connection {
     /// Unique id in the ECS
     ecs_id: u32,
-    time_since_snapshot: f32,
+    last_snapshot: u32, // frame#
     snapshot_rate: f32,
 }
 impl Connection {
     pub fn new(ecs_id: u32, snapshot_rate: f32) -> Connection {
         Connection {
             ecs_id,
-            time_since_snapshot: 0.0,
+            last_snapshot: 0,
             snapshot_rate,
         }
     }
@@ -70,9 +71,13 @@ impl Server {
         builder.add(JumpSys, "jump", &[]);
         builder.add(InputSys, "input", &[]);
         builder.add(MaintainSys, "maintain", &[]);
+        builder.add(DiffSys, "diff", &[]);
         let mut dispatcher = builder.build();
 
         let mut prev_time = SystemTime::now();
+
+        // Used to store a 'queue' of snapshots that got ACK'd
+        let acked_msgs: Mutex<VecDeque<(SocketAddr, u32)>> = Mutex::new(VecDeque::new());
         loop {
             // Networking
             self.socket.update()?;
@@ -86,10 +91,37 @@ impl Server {
             for msg in messages {
                 self.handle_message(msg.0, msg.1)?;
             }
+
+            // Check ACKs
+            {
+                let mut acked_msgs = acked_msgs.lock().unwrap();
+                for (dest, frame) in acked_msgs.iter() {
+                    if let Some(con) = self.connections.get_mut(&dest) {
+                        if con.last_snapshot < *frame {
+                            con.last_snapshot = *frame;
+                        }
+                    }
+                }
+                *acked_msgs = VecDeque::new();
+            }
             // Send messages
-            // TODO: delta compression (easy to do)
-            let message = Message::State (self.game.create_snapshot());
-            Server::broadcast(&mut self.socket, self.connections.keys(), &message)?;
+            for (dest, con) in self.connections.iter() {
+                let message = Message::State (self.game.create_snapshot(con.last_snapshot));
+                let dest = dest.clone();
+                let current_frame = self.game.frame_nr();
+                self.socket.send_reliably_to(
+                    message,
+                    dest,
+                    Some(Box::new(|| {
+                        // if let Some(con) = self.connections.get_mut(&dest) {
+                            acked_msgs.lock().unwrap().push_back((dest, current_frame));
+                            // if con.last_snapshot < self.game.frame_nr() {
+                                // con.last_snapshot = self.game.frame_nr();
+                            // }
+                        // }
+                    })))?;
+            }
+            // Server::broadcast(&mut self.socket, self.connections.keys(), &message)?;
 
             // Logic
             let now = SystemTime::now();
@@ -106,23 +138,6 @@ impl Server {
 
     }
 
-    // Made this static to avoid taking &mut self
-    // TODO: for consistency, do so with broadcast_reliably as well.
-    //        .... or make it a member function of Socket? Or map connections?
-    fn broadcast<'a, I>(socket: &mut Socket, connections: I, msg: &Message) -> Result<(), Error>
-        where I: Iterator<Item = &'a SocketAddr>
-    {
-        for client in connections {
-            socket.send_to(msg.clone(), *client)?;
-        }
-        Ok(())
-    }
-    fn broadcast_reliably(&mut self, msg: &Message) -> Result<(), Error> {
-        for client in self.connections.keys() {
-            self.socket.send_reliably_to(msg.clone(), *client)?;
-        }
-        Ok(())
-    }
 
 
     fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<(), Error> {
@@ -174,10 +189,11 @@ impl Server {
         info!("blocks {:?}", blocks);
         for x in 0..blocks.0 {
             for y in 0..blocks.1 {
-                // info!("world packet {},{}", x * packet_w, y * packet_);
+                info!("world packet {},{}, {},{}", x * packet_w, y * packet_h, packet_w, packet_h);
                 let msg = self.wrap_game_rect(x * packet_w, y * packet_h, packet_w, packet_h);
+                // debug!("Msg: {:?}", msg);
                 if let Some(msg) = msg {
-                    self.socket.send_reliably_to(msg, src)?;
+                    self.socket.send_reliably_to(msg, src, None)?;
                 }
             }
         }

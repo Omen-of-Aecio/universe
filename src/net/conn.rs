@@ -1,10 +1,12 @@
-use std::collections::VecDeque;
-use net::msg::Message;
-use net::pkt::Packet;
+use std::{
+    self,
+    fmt::Debug,
+    collections::VecDeque,
+    net::{SocketAddr, UdpSocket},
+};
+use net::{msg::Message, pkt::Packet};
 use err::*;
 use time::precise_time_ns;
-use std;
-use std::fmt::Debug;
 
 #[derive(Clone)]
 pub struct SentPacket {
@@ -24,18 +26,20 @@ impl Debug for SentPacket {
 pub struct Connection {
     /// The sequence number of the next sent packet
     pub seq: u32,
-
     /// The first entry should always be Some.
     /// Some means that it's not yet acknowledged
     pub send_window: VecDeque<Option<SentPacket>>,
+
+    dest: SocketAddr,
 }
 const RESEND_INTERVAL_MS: u64 = 1000;
 
 impl<'a> Connection {
-    pub fn new() -> Connection {
+    pub fn new(dest: SocketAddr) -> Connection {
         Connection {
             seq: 0,
             send_window: VecDeque::new(),
+            dest: dest,
         }
     }
 
@@ -96,7 +100,10 @@ impl<'a> Connection {
 
     /// Wraps in a packet, encodes, and adds the packet to the send window queue. Returns the data
     /// enqueued.
-    pub fn wrap_message(&mut self, msg: Message) -> Vec<u8> {
+    pub fn send_message<'b>(&'b mut self,
+                        msg: Message,
+                        socket: UdpSocket,
+                        ack_handler: Option<Box<FnOnce() + 'a>>) -> Result<u32, Error> {
         let packet = Packet::Reliable {seq: self.seq, msg: msg};
         // debug!("Send"; "seq" => self.seq, "ack" => self.received+1);
         self.send_window.push_back(
@@ -106,29 +113,31 @@ impl<'a> Connection {
                 packet: packet.clone(),
             }));
 
+        debug!("SEND"; "len" => &packet.encode().unwrap().len());
         self.seq += 1;
-        packet.encode().unwrap()
+        socket.send_to(&packet.encode().unwrap(), self.dest)?;
+        Ok(self.seq - 1)
     }
 
     /// Unwraps message from packet. If reliable, it will return Some(Packet) which should be sent
-    /// as an acknowledgement.
+    /// as an acknowledgement. Needs `UdpSocket` for sending pack an eventual Ack
     // Ideally, I would like to take a &[u8] here but it creates aliasing conflicts, as Socket will
     // have to send a slice of its own buffer.
-    pub fn unwrap_message(&mut self, packet: Packet) -> Result<(Option<Message>, Option<Packet>), Error> {
+    pub fn unwrap_message(&mut self, packet: Packet, socket: UdpSocket) -> Result<Option<Message>, Error> {
         let mut received_msg = None;
-        let mut ack_reply = None;
         match packet {
             Packet::Unreliable {msg} => {
                 received_msg = Some(msg);
             },
             Packet::Reliable {seq, msg} => {
                 received_msg = Some(msg);
-                ack_reply = Some(Packet::Ack {ack: seq});
+                // ack_reply = Some(Packet::Ack {ack: seq});
+                socket.send_to(&Packet::Ack {ack: seq}.encode()?, self.dest)?;
             },
             Packet::Ack {ack} => {
                 self.acknowledge(ack)?;
             }
         };
-        Ok((received_msg, ack_reply))
+        Ok(received_msg)
     }
 }

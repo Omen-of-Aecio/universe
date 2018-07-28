@@ -42,6 +42,6 @@ impl Packet{
             .map_err(|_| format_err!("failed to deserialize"))
     }
     pub fn max_payload_size() -> u32 {
-        100 * 1024 // 100 KB
+        4 * 1024 // 4 KB
     }
 }

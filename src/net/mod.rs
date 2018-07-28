@@ -3,7 +3,7 @@ mod conn;
 mod pkt;
 
 use net::msg::Message;
-use net::conn::Connection;
+use net::conn::{Connection};
 use net::pkt::Packet;
 
 use std;
@@ -27,7 +27,7 @@ pub struct Socket {
     socket: UdpSocket,
     connections: HashMap<SocketAddr, Connection>,
     buffer: Vec<u8>,
-
+    
 }
 impl Socket {
     pub fn new(port: u16) -> Result<Socket, Error> {
@@ -39,8 +39,8 @@ impl Socket {
         })
     }
 
-    /// A temporary simple (but brute force) solution to the need of occationally resending packets
-    /// which haven't been acknowledged.
+    /// A temporary (TODO) simple (but brute force) solution to the need of occasionally resending
+    /// packets which haven't been acknowledged.
     pub fn update(&mut self) -> Result<(), Error>{
         let socket = self.socket.try_clone()?; // because of aliasing
         for (addr, conn) in self.connections.iter_mut() {
@@ -74,24 +74,24 @@ impl Socket {
     }
 
     /// Send reliable message
-    pub fn send_reliably_to(&mut self, msg: Message, dest: SocketAddr) -> Result<(), Error> {
+    pub fn send_reliably_to<'a>(&'a mut self,
+                    msg: Message,
+                    dest: SocketAddr,
+                    ack_handler: Option<Box<FnOnce() + 'a>>) -> Result<(), Error> {
         // Need to clone it here because of aliasing :/
         // IDEA: Could also let Connection::wrap_message take a clone of the UdpSocket and send the
         // message itself. Connection could even know the UdpSocket and SocketAddr
         let socket = self.socket.try_clone()?;
 
-        let buffer = {
-            let mut conn = self.get_connection_or_create(dest);
-            conn.wrap_message(msg)
-        };
-        socket.send_to(&buffer, dest)?;
+        let mut conn = self.get_connection_or_create(dest);
+        let seq = conn.send_message(msg, socket, ack_handler)?;
         Ok(())
     }
 
     fn get_connection_or_create<'a>(&'a mut self, dest: SocketAddr) -> &'a mut Connection {
         match self.connections.get(&dest).is_some() {
             false => {
-                let conn = Connection::new();
+                let conn = Connection::new(dest);
                 self.connections.insert(dest, conn);
             },
             true => {},
@@ -110,24 +110,20 @@ impl Socket {
     }
 
     fn _recv(&mut self) -> Result<(SocketAddr, Message), Error> {
-        let socket = self.socket.try_clone()?;
         // Since we may just receive an Ack, we loop until we receive an actual message
         Ok(loop {
+            let socket = self.socket.try_clone()?;
             let (amt, src) = self.socket.recv_from(&mut self.buffer)?;
             let packet = Packet::decode(&self.buffer[0..amt])?;
             let conn = self.get_connection_or_create(src);
-            let (msg, reply) = conn.unwrap_message(packet)?;
+            let msg = conn.unwrap_message(packet, socket)?;
             if let Some(msg) = msg {
-                // Send Ack back if needed
-                if let Some(reply) = reply {
-                    let buffer = reply.encode()?;
-                    socket.send_to(&buffer, src)?;
-                }
                 break (src, msg);
             }
         })
     }
 }
+
 
 pub struct SocketIter<'a> {
     socket: &'a mut Socket,

@@ -7,6 +7,7 @@ use net::msg::Message;
 use global::Tile;
 use geometry::vec::Vec2;
 use component::*;
+use srv::diff::{DiffHistory, Snapshot};
 use tilenet_gen;
 use specs;
 use specs::{Dispatcher, World, Join, Builder};
@@ -19,6 +20,7 @@ use net::msg;
 use conf::Config;
 
 pub struct Game {
+    frame: u32,
     pub world: World,
     pub game_conf: GameConfig,
 
@@ -48,16 +50,16 @@ impl Game {
         let world = {
             let mut w = World::new();
             // All components types should be registered before working with them
-            w.register::<Player>();
-            w.register::<Bullet>();
-            w.register::<Pos>();
-            w.register::<Vel>();
-            w.register::<Force>();
-            w.register::<Shape>();
-            w.register::<Color>();
-            w.register::<Jump>();
-            w.register::<PlayerInput>();
-            w.register::<UniqueId>();
+            w.register_with_storage::<_, Player>(|| ComponentStorage::normal());
+            w.register_with_storage::<_, Bullet>(|| ComponentStorage::normal());
+            w.register_with_storage::<_, Pos>(|| ComponentStorage::flagged());
+            w.register_with_storage::<_, Vel>(|| ComponentStorage::normal());
+            w.register_with_storage::<_, Force>(|| ComponentStorage::normal());
+            w.register_with_storage::<_, Shape>(|| ComponentStorage::flagged());
+            w.register_with_storage::<_, Color>(|| ComponentStorage::flagged());
+            w.register_with_storage::<_, Jump>(|| ComponentStorage::normal());
+            w.register_with_storage::<_, PlayerInput>(|| ComponentStorage::normal());
+            w.register_with_storage::<_, UniqueId>(|| ComponentStorage::normal());
             
             // The ECS system owns the TileNet
             let mut tilenet = TileNet::<Tile>::new(conf.world.width as usize, conf.world.height as usize);
@@ -75,11 +77,14 @@ impl Game {
             w.add_resource(conf.clone());
             w.add_resource(::DeltaTime::default());
             w.add_resource(HashMap::<u32, specs::Entity>::new());
+            let dh = DiffHistory::new(&w); // (NLL)
+            w.add_resource(dh);
 
             w
         };
 
         Game {
+            frame: 0,
             world: world,
             game_conf: gc,
             entities: HashMap::default(),
@@ -108,6 +113,7 @@ impl Game {
 
     /// Returns (messages to send, messages to send reliably)
     pub fn update(&mut self, dispatcher: &mut Dispatcher, delta_time: ::DeltaTime) -> (Vec<Message>, Vec<Message>) {
+        self.frame += 1;
         self.world.maintain();
         self.vectors.clear(); // clear debug geometry
         *self.world.write_resource::<GameConfig>() = self.game_conf;
@@ -208,35 +214,14 @@ impl Game {
         Ok(())
     }
 
-    pub fn create_snapshot(&self) -> msg::Snapshot {
-        // This is somewhat of a manual thing and I wish there was a more automatic way.
-        let (id, shape, pos, vel, color, player, bullet)
-            = (self.world.read_storage::<UniqueId>(),
-               self.world.read_storage::<Shape>(),
-               self.world.read_storage::<Pos>(),
-               self.world.read_storage::<Vel>(),
-               self.world.read_storage::<Color>(),
-               self.world.read_storage::<Player>(),
-               self.world.read_storage::<Bullet>());
-        let mut entities = BTreeMap::new();
-        for (id, _player, pos, vel, shape, color) in (&id, &player, &pos, &vel, &shape, &color).join() {
-            entities.insert(id.0,
-                Some(msg::Entity {
-                    ty: msg::Type::Player,
-                    components: msg::Components::new(pos, vel, shape, color)
-                })
-            );
-        }
-        for (id, _bullet, pos, vel, shape, color) in (&id, &bullet, &pos, &vel, &shape, &color).join() {
-            entities.insert(id.0,
-                Some(msg::Entity {
-                    ty: msg::Type::Bullet,
-                    components: msg::Components::new(pos, vel, shape, color)
-                })
-            );
-        }
-        msg::Snapshot {entities: entities}
+    pub fn create_snapshot(&self, since_frame: u32) -> Snapshot {
+        let diffs = self.world.read_resource::<DiffHistory>();
+        diffs.create_snapshot(since_frame, self.frame, &self.world)
     }
+    pub fn frame_nr(&self) -> u32 {
+        self.frame
+    }
+
     pub fn input(&mut self, id: u32, input: PlayerInput) -> Result<(), Error> {
         let entity = self.entities.get(&id).ok_or_else(|| format_err!("Entity not found"))?;
         let mut input_resource = self.world.write_storage::<PlayerInput>();

@@ -5,7 +5,8 @@ use cli::cam::Camera;
 use std::cmp::min;
 use glium;
 use glium::glutin::{VirtualKeyCode as KeyCode};
-use net::msg::{self, Message, Snapshot, Type};
+use net::msg::{self, Message};
+use srv::diff::{Snapshot, Entity};
 use input::Input;
 use global::Tile;
 use geometry::vec::Vec2;
@@ -42,14 +43,14 @@ impl Game {
         let world = {
             let mut w = World::new();
             // All components types should be registered before working with them
-            w.register::<Pos>();
-            w.register::<Vel>();
-            w.register::<Force>();
-            w.register::<Jump>();
-            w.register::<Shape>();
-            w.register::<Color>();
-            w.register::<Player>();
-            w.register::<UniqueId>();
+            w.register_with_storage::<_, Pos>(|| ComponentStorage::normal());
+            w.register_with_storage::<_, Vel>(|| ComponentStorage::normal());
+            w.register_with_storage::<_, Force>(|| ComponentStorage::normal());
+            w.register_with_storage::<_, Jump>(|| ComponentStorage::normal());
+            w.register_with_storage::<_, Shape>(|| ComponentStorage::normal());
+            w.register_with_storage::<_, Color>(|| ComponentStorage::normal());
+            w.register_with_storage::<_, Player>(|| ComponentStorage::normal());
+            w.register_with_storage::<_, UniqueId>(|| ComponentStorage::normal());
             
             // The ECS system owns the TileNet
             let mut tilenet = TileNet::<Tile>::new(width as usize, height as usize);
@@ -193,7 +194,7 @@ impl Game {
         let updater = self.world.read_resource::<LazyUpdate>();
         for (id, entity) in snapshot.entities.into_iter() {
             match entity {
-                Some(msg::Entity {ty:_, components}) => {
+                Some(Entity {components}) => {
                     match self.get_entity(id) {
                         Some(this_ent) => {
                             components.modify_existing(&*updater, this_ent);
@@ -208,7 +209,7 @@ impl Game {
                 // This means the entity was deleted
                 None => {
                     match self.get_entity(id) {
-                        Some(this_ent) => /* TODO:!! Remove entity */ unimplemented!(),
+                        Some(_this_ent) => /* TODO:!! Remove entity */ unimplemented!(),
                         None => error!("Server removed entity not owned by me"),
                     }
                 }

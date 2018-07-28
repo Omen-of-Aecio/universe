@@ -1,12 +1,23 @@
 = Scratch / Current =
-Snapshots...
-  - I think I will have to track changes to components after all.
-    Comparing Shapes every time seems expensive...
-    ... The problem I had last time was serializing ONLY changed components
-        Could get around that by building a HashMap<u32,Entity> by looping
-        over `(id, comp, modified_comp).join()` for all components.
-    HOWEVER:    then BOTH cli and srv have to use FlaggedStorage
-    HOWEVER:    modified_bits are not guaranteed to point to the same Entity
+NOW: Change `net` so that we can see what has been ACKed... handles?
+    - `net` idea: if we have one module for unreliable, and one for reliable messages.. way to stitch them together...
+    - considering to just pass a closure to `net` for the event when something is ACKED
+Closure problems:
+    - just mutate local state that is wrapped in internal mutability
+    - namely.. Mutex<Vec<SocketAddr>>
+
+*Question*.... how do we *fully* represent the client's knowledge?  Packets can be lost!!!
+    1) Ack every snapshot
+            - more general, maybe more future proof *Select*
+    3) ALWAYS send pos UNRELIABLY
+       ONLY ON CHANGE send shape, color - and do so RELIABLY
+       Levels? INIT, CHANGE, ALWAYS
+
+- Need one diff every frame  - just store the BitSets.
+- Procedure to create Snapshot from a certain tick in time, adding these diffs together.
+    -- Components start with all `None`, ...
+- `Components` can use Option rather than SerOption
+
 
 
 PROBLEM with Snapshots: need to be reliable to be able to send changes!!

@@ -2,6 +2,8 @@
 #![cfg_attr(feature = "dev", feature(plugin))]
 #![cfg_attr(feature = "dev", plugin(clippy))]
 
+#[macro_use]
+extern crate derive_more;
 extern crate hibitset;
 #[macro_use]
 extern crate failure;
@@ -123,6 +125,7 @@ fn main() {
         }
     };
     println!("Error: {}", err);
+    println!("Backtrace: {}", err.backtrace());
 
     std::process::exit(0);
 }

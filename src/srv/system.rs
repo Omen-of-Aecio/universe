@@ -7,6 +7,7 @@ use srv::game::GameConfig;
 use geometry::Vec2;
 use ::DeltaTime;
 use std::collections::HashMap;
+use srv::diff::*;
 
 ////////////
 // Server
@@ -138,11 +139,18 @@ impl<'a> specs::System<'a> for MaintainSys {
         for (entity, id) in (&*entities, &ids).join() {
             new_map.insert(id.0, entity);
         }
-        // info!("{:?}", new_map);
-
-        for entity in entities.join() {
-            // info!("\t Entity");
-        }
         *map = new_map;
+    }
+}
+
+/// System to generate diffs (bitsets for inserted/modified and removed components)
+pub struct DiffSys;
+impl<'a> specs::System<'a> for DiffSys {
+    type SystemData = (WriteExpect<'a, DiffHistory>,
+                       ReadStorage<'a, Pos>,
+                       ReadStorage<'a, Shape>,
+                       ReadStorage<'a, Color>);
+    fn run(&mut self, (mut diffs, pos, shape, color): Self::SystemData) {
+        diffs.add_diff(pos, shape, color);
     }
 }

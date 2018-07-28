@@ -120,7 +120,7 @@ impl Client {
                 self.socket.send_to(msg, self.server)?;
             }
             for msg_reliable in packets.1 {
-                self.socket.send_reliably_to(msg_reliable, self.server)?;
+                self.socket.send_reliably_to(msg_reliable, self.server, None)?;
             }
 
             // println!("Transl: {:?}", self.game.get_player_transl());

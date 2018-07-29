@@ -209,7 +209,10 @@ impl Game {
                 // This means the entity was deleted
                 None => {
                     match self.get_entity(id) {
-                        Some(_this_ent) => /* TODO:!! Remove entity */ unimplemented!(),
+                        Some(this_ent) => {
+                            self.world.entities().delete(this_ent).unwrap();
+                            println!("Delete entity!");
+                        }
                         None => error!("Server removed entity not owned by me"),
                     }
                 }

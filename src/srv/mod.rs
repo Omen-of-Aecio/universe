@@ -104,9 +104,12 @@ impl Server {
                 }
                 *acked_msgs = VecDeque::new();
             }
+            use bincode;
             // Send messages
             for (dest, con) in self.connections.iter() {
                 let message = Message::State (self.game.create_snapshot(con.last_snapshot));
+                info!("Snapshot"; "size" => bincode::serialized_size(&message).unwrap(),
+                                  "last snapshot" => con.last_snapshot);
                 let dest = dest.clone();
                 let current_frame = self.game.frame_nr();
                 self.socket.send_reliably_to(
@@ -115,6 +118,7 @@ impl Server {
                     Some(Box::new(|| {
                         // if let Some(con) = self.connections.get_mut(&dest) {
                             acked_msgs.lock().unwrap().push_back((dest, current_frame));
+                            debug!("A");
                             // if con.last_snapshot < self.game.frame_nr() {
                                 // con.last_snapshot = self.game.frame_nr();
                             // }
@@ -189,9 +193,8 @@ impl Server {
         info!("blocks {:?}", blocks);
         for x in 0..blocks.0 {
             for y in 0..blocks.1 {
-                info!("world packet {},{}, {},{}", x * packet_w, y * packet_h, packet_w, packet_h);
+                // info!("world packet {},{}, {},{}", x * packet_w, y * packet_h, packet_w, packet_h);
                 let msg = self.wrap_game_rect(x * packet_w, y * packet_h, packet_w, packet_h);
-                // debug!("Msg: {:?}", msg);
                 if let Some(msg) = msg {
                     self.socket.send_reliably_to(msg, src, None)?;
                 }

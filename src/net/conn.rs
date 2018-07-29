@@ -113,7 +113,6 @@ impl<'a> Connection {
                 packet: packet.clone(),
             }));
 
-        debug!("SEND"; "len" => &packet.encode().unwrap().len());
         self.seq += 1;
         socket.send_to(&packet.encode().unwrap(), self.dest)?;
         Ok(self.seq - 1)

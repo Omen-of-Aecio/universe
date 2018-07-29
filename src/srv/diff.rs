@@ -62,9 +62,7 @@ impl DiffHistory {
 
     fn get_diff_since(&self, since: u32, now: u32) -> Diff {
         let dt = now - since;
-        if dt > DIFF_HISTORY_MAX_LEN {
-            panic!("Trying to get diff of too long ago");
-        }
+        assert!(dt <= DIFF_HISTORY_MAX_LEN);
         let mut diff = Diff::default();
         for d in self.diffs.iter().skip((DIFF_HISTORY_MAX_LEN - dt) as usize) {
             diff &= d;
@@ -81,45 +79,85 @@ impl DiffHistory {
         let mut entities: HashMap<u32, Option<Entity>> = HashMap::new();
 
         // TODO handle since > DIFF_HISTORY_MAX_LEN
-        let diff = self.get_diff_since(since, now);
+        let dt = now - since;
+        if since == 0 || dt > DIFF_HISTORY_MAX_LEN {
+            // FULL SNAPSHOT
+            // TODO: Exactly the same as the `else`, but excluding the `diff` and `removed`
+            for (id, pos) in (&id, &pos).join() {
+                let id = id.0;
+                if let Some(Some(e)) = entities.get_mut(&id) {
+                    e.components.set_pos(pos);
+                }
+                if !entities.contains_key(&id) {
+                    let mut components = Components::default();
+                    components.set_pos(pos);
+                    entities.insert(id, Some(Entity { components }));
+                }
+            }
+            for (id, shape) in (&id, &shape).join() {
+                let id = id.0;
+                if let Some(Some(e)) = entities.get_mut(&id) {
+                    e.components.set_shape(shape);
+                }
+                if !entities.contains_key(&id) {
+                    let mut components = Components::default();
+                    components.set_shape(shape);
+                    entities.insert(id, Some(Entity { components }));
+                }
+            }
+            for (id, color) in (&id, &color).join() {
+                let id = id.0;
+                if let Some(Some(e)) = entities.get_mut(&id) {
+                    e.components.set_color(color);
+                }
+                if !entities.contains_key(&id) {
+                    let mut components = Components::default();
+                    components.set_color(color);
+                    entities.insert(id, Some(Entity { components }));
+                }
+            }
+        } else {
+            // DIFF
 
-        // Handle removals
-        for (id, _diff) in (&id, &diff.removed).join() {
-            let id = id.0;
-            entities.insert(id, None); // Signifies that entity `id` was removed
-        }
-        // Handle modifications & insertions
-        for (id, pos, _diff) in (&id, &pos, &diff.pos).join() {
-            let id = id.0;
-            if let Some(Some(e)) = entities.get_mut(&id) {
-                e.components.set_pos(pos);
+            let diff = self.get_diff_since(since, now);
+            // Handle removals
+            for (id, _diff) in (&id, &diff.removed).join() {
+                let id = id.0;
+                entities.insert(id, None); // Signifies that entity `id` was removed
             }
-            if !entities.contains_key(&id) {
-                let mut components = Components::default();
-                components.set_pos(pos);
-                entities.insert(id, Some(Entity { components }));
+            // Handle modifications & insertions
+            for (id, pos, _diff) in (&id, &pos, &diff.pos).join() {
+                let id = id.0;
+                if let Some(Some(e)) = entities.get_mut(&id) {
+                    e.components.set_pos(pos);
+                }
+                if !entities.contains_key(&id) {
+                    let mut components = Components::default();
+                    components.set_pos(pos);
+                    entities.insert(id, Some(Entity { components }));
+                }
             }
-        }
-        for (id, shape, _diff) in (&id, &shape, &diff.shape).join() {
-            let id = id.0;
-            if let Some(Some(e)) = entities.get_mut(&id) {
-                e.components.set_shape(shape);
+            for (id, shape, _diff) in (&id, &shape, &diff.shape).join() {
+                let id = id.0;
+                if let Some(Some(e)) = entities.get_mut(&id) {
+                    e.components.set_shape(shape);
+                }
+                if !entities.contains_key(&id) {
+                    let mut components = Components::default();
+                    components.set_shape(shape);
+                    entities.insert(id, Some(Entity { components }));
+                }
             }
-            if !entities.contains_key(&id) {
-                let mut components = Components::default();
-                components.set_shape(shape);
-                entities.insert(id, Some(Entity { components }));
-            }
-        }
-        for (id, color, _diff) in (&id, &color, &diff.color).join() {
-            let id = id.0;
-            if let Some(Some(e)) = entities.get_mut(&id) {
-                e.components.set_color(color);
-            }
-            if !entities.contains_key(&id) {
-                let mut components = Components::default();
-                components.set_color(color);
-                entities.insert(id, Some(Entity { components }));
+            for (id, color, _diff) in (&id, &color, &diff.color).join() {
+                let id = id.0;
+                if let Some(Some(e)) = entities.get_mut(&id) {
+                    e.components.set_color(color);
+                }
+                if !entities.contains_key(&id) {
+                    let mut components = Components::default();
+                    components.set_color(color);
+                    entities.insert(id, Some(Entity { components }));
+                }
             }
         }
         Snapshot {

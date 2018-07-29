@@ -2,7 +2,6 @@ use net::msg::Message;
 use err::*;
 
 
-use num_traits::int::PrimInt;
 use bincode;
 
 
@@ -37,7 +36,6 @@ impl Packet{
         }
     }
     pub fn decode(data: &[u8]) -> Result<Packet, Error> {
-        debug!("{}", data.len());
         bincode::deserialize(&data)
             .map_err(|_| format_err!("failed to deserialize"))
     }

@@ -77,7 +77,7 @@ impl Socket {
     pub fn send_reliably_to<'a>(&'a mut self,
                     msg: Message,
                     dest: SocketAddr,
-                    ack_handler: Option<Box<FnOnce() + 'a>>) -> Result<(), Error> {
+                    ack_handler: Option<Box<Fn() + 'static>>) -> Result<(), Error> {
         // Need to clone it here because of aliasing :/
         // IDEA: Could also let Connection::wrap_message take a clone of the UdpSocket and send the
         // message itself. Connection could even know the UdpSocket and SocketAddr

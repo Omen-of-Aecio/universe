@@ -8,13 +8,15 @@ use num_traits::Float;
 use specs::{DispatcherBuilder};
 use srv::system::*;
 
-use std::net::SocketAddr;
-use std::vec::Vec;
-use std::collections::{HashMap, VecDeque};
-use std::thread;
-use std::time::Duration;
-use std::time::SystemTime;
-use std::sync::Mutex;
+use std::{
+    collections::{HashMap, VecDeque},
+    net::SocketAddr,
+    rc::Rc,
+    sync::Mutex,
+    thread,
+    time::{Duration, SystemTime},
+    vec::Vec,
+};
 
 use conf::Config;
 
@@ -77,7 +79,7 @@ impl Server {
         let mut prev_time = SystemTime::now();
 
         // Used to store a 'queue' of snapshots that got ACK'd
-        let acked_msgs: Mutex<VecDeque<(SocketAddr, u32)>> = Mutex::new(VecDeque::new());
+        let acked_msgs: Rc<Mutex<VecDeque<(SocketAddr, u32)>>> = Rc::new(Mutex::new(VecDeque::new()));
         loop {
             // Networking
             self.socket.update()?;
@@ -108,24 +110,20 @@ impl Server {
             // Send messages
             for (dest, con) in self.connections.iter() {
                 let message = Message::State (self.game.create_snapshot(con.last_snapshot));
-                info!("Snapshot"; "size" => bincode::serialized_size(&message).unwrap(),
-                                  "last snapshot" => con.last_snapshot);
+                // debug!("Snapshot"; "size" => bincode::serialized_size(&message).unwrap(),
+                                  // "last snapshot" => con.last_snapshot);
                 let dest = dest.clone();
                 let current_frame = self.game.frame_nr();
+                let acked_msgs = acked_msgs.clone();
                 self.socket.send_reliably_to(
                     message,
                     dest,
-                    Some(Box::new(|| {
-                        // if let Some(con) = self.connections.get_mut(&dest) {
+                    // (WONDERING: a bit confused how I this closure ends up being 'static - what if the
+                    // Box dies?)
+                    Some(Box::new(move || {
                             acked_msgs.lock().unwrap().push_back((dest, current_frame));
-                            debug!("A");
-                            // if con.last_snapshot < self.game.frame_nr() {
-                                // con.last_snapshot = self.game.frame_nr();
-                            // }
-                        // }
                     })))?;
             }
-            // Server::broadcast(&mut self.socket, self.connections.keys(), &message)?;
 
             // Logic
             let now = SystemTime::now();

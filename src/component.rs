@@ -173,6 +173,13 @@ impl Bullet {
     }
 }
 
+/// Marks deletion of an entity - to be deleted in the `DiffSys` system.
+pub struct Delete;
+
+
+
+
+
 
 //
 // Specifying storage for the different components
@@ -260,6 +267,7 @@ where C: Component,
     }
 }
 
+
 impl Component for UniqueId {
     type Storage = ComponentStorage<Self, specs::VecStorage<Self>>;
 }
@@ -289,4 +297,7 @@ impl Component for Bullet {
 }
 impl Component for PlayerInput {
     type Storage = ComponentStorage<Self, specs::VecStorage<Self>>;
+}
+impl Component for Delete {
+    type Storage = ComponentStorage<Self, specs::VecStorage<Self>>; // TODO - NullStorage?
 }

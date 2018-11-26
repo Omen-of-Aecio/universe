@@ -211,7 +211,6 @@ impl Game {
                     match self.get_entity(id) {
                         Some(this_ent) => {
                             self.world.entities().delete(this_ent).unwrap();
-                            println!("Delete entity!");
                         }
                         None => error!("Server removed entity not owned by me"),
                     }

@@ -4,7 +4,6 @@ use std::collections::{VecDeque, HashMap};
 use std::ops;
 
 // TODO: Can probably make a macro to spew out at least `Diff` and `Components`
-// (TODO file structure...)
 const DIFF_HISTORY_MAX_LEN: u32 = 60;
 
 /// Holds history of diffs of the ECS, to be used by system::DiffSys
@@ -12,7 +11,6 @@ pub struct DiffHistory {
     frame: u32,
     diffs: VecDeque<Diff>,
     // state needed (holds the position read in the event streams)
-    rem_id: ReaderId<RemovedFlag>,
     pos_mod_id: ReaderId<ModifiedFlag>,
     pos_ins_id: ReaderId<InsertedFlag>,
     shape_mod_id: ReaderId<ModifiedFlag>,
@@ -28,7 +26,6 @@ impl DiffHistory {
         DiffHistory {
             frame: 0,
             diffs: VecDeque::default(),
-            rem_id: pos.track_removed(),
             pos_mod_id: pos.track_modified(),
             pos_ins_id: pos.track_inserted(),
             shape_mod_id: shape.track_modified(),
@@ -38,15 +35,15 @@ impl DiffHistory {
         }
     }
     /// Pushes a new diff to the history based on given components
-    pub fn add_diff(&mut self, pos:   ReadStorage<Pos>,
+    pub fn add_diff(&mut self, removed: Vec<UniqueId>,
+                               pos:   ReadStorage<Pos>,
                                shape: ReadStorage<Shape>,
                                color: ReadStorage<Color>) {
         self.frame += 1;
         let mut diff = Diff::default();
+        diff.removed = removed;
         pos.populate_modified(&mut self.pos_mod_id, &mut diff.pos);
         pos.populate_inserted(&mut self.pos_ins_id, &mut diff.pos);
-        pos.populate_removed(&mut self.rem_id, &mut diff.removed);
-        //^ NOTE: doesn't matter exactly what component we look at for removal
         
         shape.populate_modified(&mut self.shape_mod_id, &mut diff.shape);
         shape.populate_inserted(&mut self.shape_ins_id, &mut diff.shape);
@@ -65,7 +62,7 @@ impl DiffHistory {
         assert!(dt <= DIFF_HISTORY_MAX_LEN);
         let mut diff = Diff::default();
         for d in self.diffs.iter().skip((DIFF_HISTORY_MAX_LEN - dt) as usize) {
-            diff &= d;
+            diff |= d;
         }
         diff
     }
@@ -78,11 +75,10 @@ impl DiffHistory {
                world.read_storage::<Color>());
         let mut entities: HashMap<u32, Option<Entity>> = HashMap::new();
 
-        // TODO handle since > DIFF_HISTORY_MAX_LEN
         let dt = now - since;
         if since == 0 || dt > DIFF_HISTORY_MAX_LEN {
             // FULL SNAPSHOT
-            // TODO: Exactly the same as the `else`, but excluding the `diff` and `removed`
+            // NOTE: This is exactly the same as the `else`, but excluding the `diff` in the join
             for (id, pos) in (&id, &pos).join() {
                 let id = id.0;
                 if let Some(Some(e)) = entities.get_mut(&id) {
@@ -120,10 +116,11 @@ impl DiffHistory {
             // DIFF
 
             let diff = self.get_diff_since(since, now);
-            // Handle removals
-            for (id, _diff) in (&id, &diff.removed).join() {
-                let id = id.0;
-                entities.insert(id, None); // Signifies that entity `id` was removed
+            // Handle removals (TODO)
+            for id in diff.removed {
+                debug!("REMOVAL!!");
+                // None signifies that entity `id` was removed
+                entities.insert(id.0, None);
             }
             // Handle modifications & insertions
             for (id, pos, _diff) in (&id, &pos, &diff.pos).join() {
@@ -170,17 +167,17 @@ impl DiffHistory {
 /// What has been modified since last diff
 #[derive(Default, Clone)]
 pub struct Diff {
-    removed: BitSet,
+    removed: Vec<UniqueId>,
     pos: BitSet,
     shape: BitSet,
     color: BitSet,
 }
-impl<'a> ops::BitAndAssign<&'a Diff> for Diff {
-    fn bitand_assign(&mut self, rhs: &'a Diff) {
-        self.removed &= &rhs.removed;
-        self.pos &= &rhs.pos;
-        self.shape &= &rhs.shape;
-        self.color &= &rhs.color;
+impl<'a> ops::BitOrAssign<&'a Diff> for Diff {
+    fn bitor_assign(&mut self, rhs: &'a Diff) {
+        self.removed.append(&mut (rhs.removed.clone()));
+        self.pos |= &rhs.pos;
+        self.shape |= &rhs.shape;
+        self.color |= &rhs.color;
     }
 }
 

@@ -60,6 +60,7 @@ impl Game {
             w.register_with_storage::<_, Jump>(|| ComponentStorage::normal());
             w.register_with_storage::<_, PlayerInput>(|| ComponentStorage::normal());
             w.register_with_storage::<_, UniqueId>(|| ComponentStorage::normal());
+            w.register_with_storage::<_, Delete>(|| ComponentStorage::normal());
             
             // The ECS system owns the TileNet
             let mut tilenet = TileNet::<Tile>::new(conf.world.width as usize, conf.world.height as usize);

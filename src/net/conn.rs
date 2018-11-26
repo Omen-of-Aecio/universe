@@ -8,11 +8,11 @@ use net::{msg::Message, pkt::Packet};
 use err::*;
 use time::precise_time_ns;
 
-#[derive(Clone)]
 pub struct SentPacket {
     pub time: u64,
     pub seq: u32,
     pub packet: Packet,
+    ack_handler: Option<Box<Fn() + 'static>>,
 }
 
 impl Debug for SentPacket {
@@ -22,7 +22,6 @@ impl Debug for SentPacket {
 }
 
 
-#[derive(Clone)]
 pub struct Connection {
     /// The sequence number of the next sent packet
     pub seq: u32,
@@ -66,7 +65,8 @@ impl<'a> Connection {
         // Get the seq number of the first element
         let first_seq = match self.send_window.front() {
             None => {
-                bail!("Send window empty, but ack received.");
+                error!("Send window empty, but ack received.");
+                return Ok(()); // have to tolerate some faults
             }
             Some(first) => {
                 match first {
@@ -79,7 +79,14 @@ impl<'a> Connection {
         let index = (acked - first_seq) as usize;
 
         match self.send_window.get_mut(index) {
-            Some(sent_packet) => *sent_packet = None,
+            Some(sent_packet) => {
+                if let Some(ref sent_packet) = sent_packet {
+                    if let Some(ref handler) = sent_packet.ack_handler {
+                        handler()
+                    }
+                }
+                *sent_packet = None;
+            }
             None => bail!("Index out of bounds: {}", index),
         };
 
@@ -103,7 +110,7 @@ impl<'a> Connection {
     pub fn send_message<'b>(&'b mut self,
                         msg: Message,
                         socket: UdpSocket,
-                        ack_handler: Option<Box<FnOnce() + 'a>>) -> Result<u32, Error> {
+                        ack_handler: Option<Box<Fn() + 'static>>) -> Result<u32, Error> {
         let packet = Packet::Reliable {seq: self.seq, msg: msg};
         // debug!("Send"; "seq" => self.seq, "ack" => self.received+1);
         self.send_window.push_back(
@@ -111,6 +118,7 @@ impl<'a> Connection {
                 time: precise_time_ns(),
                 seq: self.seq,
                 packet: packet.clone(),
+                ack_handler: ack_handler,
             }));
 
         self.seq += 1;

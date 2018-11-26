@@ -1,4 +1,4 @@
-use specs::{self, Read, Write, WriteExpect, ReadStorage, WriteStorage, Join, Entities, Entity};
+use specs::{self, prelude::*};
 use collision::{player_move, bullet_move};
 use component::*;
 use tilenet::TileNet;
@@ -45,9 +45,10 @@ impl<'a> specs::System<'a> for JumpSys {
 pub struct MoveSys;
 impl<'a> specs::System<'a> for MoveSys {
     type SystemData = (Read<'a, DeltaTime>,
-                       Entities<'a>,
-                       WriteExpect<'a, TileNet<Tile>>,
+                       Read<'a, LazyUpdate>,
                        Read<'a, GameConfig>,
+                       WriteExpect<'a, TileNet<Tile>>,
+                       Entities<'a>,
                        ReadStorage<'a, Player>,
                        ReadStorage<'a, Bullet>,
                        WriteStorage<'a, Pos>,
@@ -56,7 +57,8 @@ impl<'a> specs::System<'a> for MoveSys {
                        ReadStorage<'a, Color>);
 
     fn run(&mut self, data: Self::SystemData) {
-        let (delta_time, entities, mut tilenet, game_conf, player, bullet, mut pos, mut vel, shape, color) = data;
+        let (delta_time, updater, game_conf, mut tilenet, entities,
+                 player, bullet, mut pos, mut vel, shape, color) = data;
         let gravity = if game_conf.gravity_on { game_conf.gravity } else { Vec2::null_vec() };
 
         // Players
@@ -82,7 +84,8 @@ impl<'a> specs::System<'a> for MoveSys {
             // Effect
             if has_collided {
                 bullet.explode((poc.0 as i32, poc.1 as i32), vel, &mut tilenet);
-                entities.delete(entity).unwrap();
+                updater.insert(entity, Delete);
+                debug!("Bullet remove");
             }
         }
     }
@@ -143,14 +146,27 @@ impl<'a> specs::System<'a> for MaintainSys {
     }
 }
 
-/// System to generate diffs (bitsets for inserted/modified and removed components)
+/// System to generate diffs (bitsets for inserted/modified and removed components).
+/// Also deletes elements marked by deletion.
+/// Used on server.
 pub struct DiffSys;
 impl<'a> specs::System<'a> for DiffSys {
     type SystemData = (WriteExpect<'a, DiffHistory>,
+                       Entities<'a>,
+                       ReadStorage<'a, UniqueId>,
+                       ReadStorage<'a, Delete>,
                        ReadStorage<'a, Pos>,
                        ReadStorage<'a, Shape>,
                        ReadStorage<'a, Color>);
-    fn run(&mut self, (mut diffs, pos, shape, color): Self::SystemData) {
-        diffs.add_diff(pos, shape, color);
+    fn run(&mut self, (mut diffs, entities, id, delete, pos, shape, color): Self::SystemData) {
+        // Delete entities marked for deletion
+        let mut removed: Vec<UniqueId> = Vec::new();
+        for (entity, id, _delete) in (&*entities, &id, &delete).join() {
+            entities.delete(entity);
+            removed.push(*id);
+        }
+        //
+        diffs.add_diff(removed, pos, shape, color);
     }
 }
+

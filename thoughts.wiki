@@ -1,32 +1,10 @@
+= Something cool =
+In `slog` you can make a useful filter!!!https://docs.rs/slog/2.3.2/slog/struct.Filter.html
+e.g. filter away things from `net` module
+
 = Scratch / Current =
-NOW: Change `net` so that we can see what has been ACKed... handles?
-    - `net` idea: if we have one module for unreliable, and one for reliable messages.. way to stitch them together...
-    - considering to just pass a closure to `net` for the event when something is ACKED
-Closure problems:
-    - just mutate local state that is wrapped in internal mutability
-    - namely.. Mutex<Vec<SocketAddr>>
-
-*Question*.... how do we *fully* represent the client's knowledge?  Packets can be lost!!!
-    1) Ack every snapshot
-            - more general, maybe more future proof *Select*
-    3) ALWAYS send pos UNRELIABLY
-       ONLY ON CHANGE send shape, color - and do so RELIABLY
-       Levels? INIT, CHANGE, ALWAYS
-
-- Need one diff every frame  - just store the BitSets.
-- Procedure to create Snapshot from a certain tick in time, adding these diffs together.
-    -- Components start with all `None`, ...
-- `Components` can use Option rather than SerOption
-
-
-
-PROBLEM with Snapshots: need to be reliable to be able to send changes!!
-    - better yet, with ACK but without resend.
-      - If no ACK for a while then MERGE the un-acked Snapshot with what will be sent.
- -> NEED CHANGE IN `net`... Maybe a rewrite?
-
-* DELETING ENTITITES (registering a deletion on Server)
-   - delta compression can handle that
+Need to send updated TileNet.
+Thinking about making changes in TileNet to internally construct rectangle of change.
 
 
 
@@ -51,6 +29,7 @@ PROBLEM with Snapshots: need to be reliable to be able to send changes!!
 
 
 = Optimizations =
+- Predictive encoding of TileNet.
 - Integrate Color + Shape? YES
 
 - while we can serialize the Snapshot...
@@ -59,6 +38,8 @@ PROBLEM with Snapshots: need to be reliable to be able to send changes!!
 - Robust and adjustable granularity of sweeping in `tilenet`.
      - say a laser weapon... should absolutely sweep all tiles.
        maybe we need a method to sweep a certain diameter
+
+- Snapshot packets should not be resent, but still ACKed
 
 = TileNet =
 - solve: just return new Collable rather than mutate?

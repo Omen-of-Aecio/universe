@@ -1,9 +1,7 @@
-target/
-*.bk
+/*
 !.gitignore
+!Cargo.toml
 !rustfmt.toml
 !scripts/
-!src/
 !shaders/
-!Cargo.toml
-rusty-tags.*
+!src/

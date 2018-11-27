@@ -45,6 +45,8 @@ pub mod collision;
 pub mod component;
 pub mod conf;
 
+mod MainState;
+
 use clap::{Arg, App};
 
 use slog::{Drain, Level};
@@ -85,49 +87,54 @@ impl<D> Drain for RuntimeLevelFilter<D>
   }
 */
 
-fn main() {
-    // Set up logger
+fn create_logger() -> slog::Logger {
     let decorator = slog_term::TermDecorator::new().build();
     let drain = slog_term::FullFormat::new(decorator).build().fuse();
     let drain = slog_async::Async::new(drain).build().fuse();
     let drain = drain.filter_level(Level::Debug).fuse();
-    let logger = slog::Logger::root(drain, o!());
+    slog::Logger::root(drain, o!())
+}
 
-    let _guard = slog_scope::set_global_logger(logger);
-    let options = App::new("Universe")
+fn parse_command_line_arguments<'a>() -> clap::ArgMatches<'a> {
+    App::new("Universe")
         .arg(Arg::with_name("connect")
              .short("c")
              .help("Run client and connect to specified server of form `ipaddress:port`")
              .takes_value(true))
-        .get_matches();
+        .get_matches()
+}
 
-    // Read config
-    let config = Config::from_file("config.toml").unwrap();
+fn main() {
 
-    let err = if let Some(connect) = options.value_of("connect") {
+    let mut zu = MainState::Main {
+        // logger: create_logger(),
+        _logger_guard: slog_scope::set_global_logger(create_logger()),
+        look: 10,
+        options: parse_command_line_arguments(),
+        config: None,
+    };
 
+    zu.config = Config::from_file("config.toml").ok();
+
+    run_client_or_server(&mut zu);
+}
+
+fn run_client_or_server(zu: &mut MainState::Main) {
+    let err = if let Some(connect) = zu.options.value_of("connect") {
         info!("Running client");
         let mut client = Client::new(connect).unwrap();
-        let err = client.run();
-
-        match err {
-            Ok(_) => std::process::exit(0),
-            Err(err) => err,
-        }
+        client.run()
     } else {
-
         info!("Running server");
-        let err = Server::new(config).run();
-
-        match err {
-            Ok(_) => std::process::exit(0),
-            Err(err) => err,
-        }
+        Server::new(zu.config.clone().unwrap()).run()
     };
-    println!("Error: {}", err);
-    println!("Backtrace: {}", err.backtrace());
-
-    std::process::exit(0);
+    match err {
+        Err(err) => {
+            println!("Error: {}", err);
+            println!("Backtrace: {}", err.backtrace());
+        }
+        _ => {}
+    };
 }
 
 

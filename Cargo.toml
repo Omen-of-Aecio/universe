@@ -4,32 +4,32 @@ version = "0.3.0"
 authors = ["Erlend Hofstad Langseth <3rlendhl@gmail.com>", "Kevin Robert Stravers <macocio@gmail.com>"]
 
 [dependencies]
-tilenet = { git = "https://github.com/Ploppz/TileNet", branch = "flagged-storage" }
-# tilenet = { path = "/home/ploppz/code/rust/tilenet" }
-tilenet_ren = { git = "https://github.com/Ploppz/tilenet-render", branch = "flagged-storage"}
-# tilenet_ren = { path = "/home/ploppz/code/rust/tilenet-ren"}
+bincode = "1.0"
+byteorder = "1.0"
+clap = "2.19"
 clippy = { version = "0.0", optional = true }
+derive_more = "0.11.0"
+failure = "0.1.1"
+glium = "0.15.0"
+hibitset = "0.5.0"
 isatty = "0.1"
+num-traits = "*"
+rand = "0"
+serde = "1.0"
+serde_derive = "1.0"
 slog = { version = "*", features = ["max_level_trace", "release_max_level_trace"] }
+slog-async = "2.3"
 slog-json = "*"
 slog-scope = "*"
 slog-stream = "*"
 slog-term = "*"
-slog-async = "2.3"
-time = "0"
-glium = "0.15.0"
-rand = "0"
-clap = "2.19"
-byteorder = "1.0"
-bincode = "1.0"
-num-traits = "*"
-failure = "0.1.1"
 specs = "0.12"
+tilenet = { git = "https://github.com/Ploppz/TileNet", branch = "flagged-storage" }
+# tilenet = { path = "/home/ploppz/code/rust/tilenet" }
+tilenet_ren = { git = "https://github.com/Ploppz/tilenet-render", branch = "flagged-storage"}
+# tilenet_ren = { path = "/home/ploppz/code/rust/tilenet-ren"}
+time = "0"
 toml = "0.4"
-serde = "1.0"
-serde_derive = "1.0"
-hibitset = "0.5.0"
-derive_more = "0.11.0"
 
 [features]
 default = []

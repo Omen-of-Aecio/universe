@@ -45,7 +45,7 @@ pub mod collision;
 pub mod component;
 pub mod conf;
 
-mod MainState;
+mod main_state;
 
 use clap::{Arg, App};
 
@@ -106,7 +106,7 @@ fn parse_command_line_arguments<'a>() -> clap::ArgMatches<'a> {
 
 fn main() {
 
-    let mut zu = MainState::Main {
+    let mut zu = main_state::Main {
         // logger: create_logger(),
         _logger_guard: slog_scope::set_global_logger(create_logger()),
         look: 10,
@@ -119,7 +119,7 @@ fn main() {
     run_client_or_server(&mut zu);
 }
 
-fn run_client_or_server(zu: &mut MainState::Main) {
+fn run_client_or_server(zu: &mut main_state::Main) {
     let err = if let Some(connect) = zu.options.value_of("connect") {
         info!("Running client");
         let mut client = Client::new(connect).unwrap();

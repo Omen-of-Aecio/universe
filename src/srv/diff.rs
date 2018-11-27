@@ -38,9 +38,9 @@ impl DiffHistory {
     pub fn add_diff(
         &mut self,
         removed: Vec<UniqueId>,
-        pos: ReadStorage<Pos>,
-        shape: ReadStorage<Shape>,
-        color: ReadStorage<Color>,
+        pos: &ReadStorage<Pos>,
+        shape: &ReadStorage<Shape>,
+        color: &ReadStorage<Color>,
     ) {
         self.frame += 1;
         let mut diff = Diff::default();
@@ -88,33 +88,43 @@ impl DiffHistory {
                 if let Some(Some(e)) = entities.get_mut(&id) {
                     e.components.set_pos(pos);
                 }
-                if !entities.contains_key(&id) {
+                // Linter replaces this:
+                //
+                // if !entities.contains_key(&id) {
+                //     let mut components = Components::default();
+                //     components.set_pos(pos);
+                //     entities.insert(id, Some(Entity { components }));
+                // }
+                //
+                // With this:
+                entities.entry(id).or_insert_with(|| {
                     let mut components = Components::default();
                     components.set_pos(pos);
-                    entities.insert(id, Some(Entity { components }));
-                }
+                    Some(Entity { components })
+                });
+                // End of replacement
             }
             for (id, shape) in (&id, &shape).join() {
                 let id = id.0;
                 if let Some(Some(e)) = entities.get_mut(&id) {
                     e.components.set_shape(shape);
                 }
-                if !entities.contains_key(&id) {
+                entities.entry(id).or_insert_with(|| {
                     let mut components = Components::default();
                     components.set_shape(shape);
-                    entities.insert(id, Some(Entity { components }));
-                }
+                    Some(Entity { components })
+                });
             }
             for (id, color) in (&id, &color).join() {
                 let id = id.0;
                 if let Some(Some(e)) = entities.get_mut(&id) {
-                    e.components.set_color(color);
+                    e.components.set_color(*color);
                 }
-                if !entities.contains_key(&id) {
+                entities.entry(id).or_insert_with(|| {
                     let mut components = Components::default();
-                    components.set_color(color);
-                    entities.insert(id, Some(Entity { components }));
-                }
+                    components.set_color(*color);
+                    Some(Entity { components })
+                });
             }
         } else {
             // DIFF
@@ -132,33 +142,33 @@ impl DiffHistory {
                 if let Some(Some(e)) = entities.get_mut(&id) {
                     e.components.set_pos(pos);
                 }
-                if !entities.contains_key(&id) {
+                entities.entry(id).or_insert_with(|| {
                     let mut components = Components::default();
                     components.set_pos(pos);
-                    entities.insert(id, Some(Entity { components }));
-                }
+                    Some(Entity { components })
+                });
             }
             for (id, shape, _diff) in (&id, &shape, &diff.shape).join() {
                 let id = id.0;
                 if let Some(Some(e)) = entities.get_mut(&id) {
                     e.components.set_shape(shape);
                 }
-                if !entities.contains_key(&id) {
+                entities.entry(id).or_insert_with(|| {
                     let mut components = Components::default();
                     components.set_shape(shape);
-                    entities.insert(id, Some(Entity { components }));
-                }
+                    Some(Entity { components })
+                });
             }
             for (id, color, _diff) in (&id, &color, &diff.color).join() {
                 let id = id.0;
                 if let Some(Some(e)) = entities.get_mut(&id) {
-                    e.components.set_color(color);
+                    e.components.set_color(*color);
                 }
-                if !entities.contains_key(&id) {
+                entities.entry(id).or_insert_with(|| {
                     let mut components = Components::default();
-                    components.set_color(color);
-                    entities.insert(id, Some(Entity { components }));
-                }
+                    components.set_color(*color);
+                    Some(Entity { components })
+                });
             }
         }
         Snapshot {
@@ -249,12 +259,12 @@ impl Components {
     }
 
     pub fn set_pos(&mut self, pos: &Pos) {
-        self.pos = Some(pos.clone());
+        self.pos = Some(*pos);
     }
     pub fn set_shape(&mut self, shape: &Shape) {
         self.shape = Some(shape.clone());
     }
-    pub fn set_color(&mut self, color: &Color) {
-        self.color = Some(color.clone());
+    pub fn set_color(&mut self, color: Color) {
+        self.color = Some(color);
     }
 }

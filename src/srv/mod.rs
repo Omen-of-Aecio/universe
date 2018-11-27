@@ -53,9 +53,9 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(config: Config) -> Server {
+    pub fn new(config: &Config) -> Server {
         let mut game = Game::new(
-            config.clone(),
+            config,
             Vec2::new(
                 (config.world.width / 4) as f32,
                 (config.world.height / 2) as f32,
@@ -68,7 +68,7 @@ impl Server {
         game.generate_world();
 
         Server {
-            game: game,
+            game,
             connections: HashMap::new(),
             socket: Socket::new(9123).unwrap(),
 
@@ -100,7 +100,7 @@ impl Server {
                 messages.push(msg);
             }
             for msg in messages {
-                self.handle_message(msg.0, msg.1)?;
+                self.handle_message(msg.0, &msg.1)?;
             }
 
             // Check ACKs
@@ -120,7 +120,7 @@ impl Server {
                 let message = Message::State(self.game.create_snapshot(con.last_snapshot));
                 // debug!("Snapshot"; "size" => bincode::serialized_size(&message).unwrap(),
                 // "last snapshot" => con.last_snapshot);
-                let dest = dest.clone();
+                let dest = *dest;
                 let current_frame = self.game.frame_nr();
                 let acked_msgs = acked_msgs.clone();
                 self.socket.send_reliably_to(
@@ -150,11 +150,11 @@ impl Server {
         }
     }
 
-    fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<(), Error> {
+    fn handle_message(&mut self, src: SocketAddr, msg: &Message) -> Result<(), Error> {
         // TODO a lot of potential for abstraction/simplification...
 
         // Will ignore packets from unregistered connections
-        match msg {
+        match *msg {
             Message::Join { snapshot_rate } => self.new_connection(src, snapshot_rate)?,
             Message::Input(input) => {
                 let con = self
@@ -231,10 +231,10 @@ impl Server {
             None
         } else {
             Some(Message::WorldRect {
-                x: x,
-                y: y,
+                x,
+                y,
                 width: w,
-                pixels: pixels,
+                pixels,
             })
         }
     }

@@ -18,7 +18,7 @@ impl RayCollable {
         RayCollable {
             pos: start_pos,
             dir: direction,
-            color: color,
+            color,
             collision: false,
             hit_tile: None,
         }

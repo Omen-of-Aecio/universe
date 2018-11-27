@@ -37,7 +37,7 @@ impl<'a> Connection {
         Connection {
             seq: 0,
             send_window: VecDeque::new(),
-            dest: dest,
+            dest,
         }
     }
 
@@ -47,8 +47,8 @@ impl<'a> Connection {
         self.update_send_window();
         let mut result = Vec::new();
         for sent_packet in self.send_window.iter_mut() {
-            if let &mut Some(ref mut sent_packet) = sent_packet {
-                if now > sent_packet.time + RESEND_INTERVAL_MS * 1000000 {
+            if let Some(ref mut sent_packet) = *sent_packet {
+                if now > sent_packet.time + RESEND_INTERVAL_MS * 1_000_000 {
                     sent_packet.time = now;
                     result.push(sent_packet.packet.encode().unwrap());
                 }
@@ -65,9 +65,9 @@ impl<'a> Connection {
                 error!("Send window empty, but ack received.");
                 return Ok(()); // have to tolerate some faults
             }
-            Some(first) => match first {
-                &Some(ref sent_packet) => sent_packet.seq,
-                &None => bail!("The first SentPacket is None."),
+            Some(first) => match *first {
+                Some(ref sent_packet) => sent_packet.seq,
+                None => bail!("The first SentPacket is None."),
             },
         };
 
@@ -108,19 +108,19 @@ impl<'a> Connection {
     pub fn send_message<'b>(
         &'b mut self,
         msg: Message,
-        socket: UdpSocket,
+        socket: &UdpSocket,
         ack_handler: Option<Box<Fn() + 'static>>,
     ) -> Result<u32, Error> {
         let packet = Packet::Reliable {
             seq: self.seq,
-            msg: msg,
+            msg,
         };
         // debug!("Send"; "seq" => self.seq, "ack" => self.received+1);
         self.send_window.push_back(Some(SentPacket {
             time: precise_time_ns(),
             seq: self.seq,
             packet: packet.clone(),
-            ack_handler: ack_handler,
+            ack_handler,
         }));
 
         self.seq += 1;
@@ -135,7 +135,7 @@ impl<'a> Connection {
     pub fn unwrap_message(
         &mut self,
         packet: Packet,
-        socket: UdpSocket,
+        socket: &UdpSocket,
     ) -> Result<Option<Message>, Error> {
         let mut received_msg = None;
         match packet {

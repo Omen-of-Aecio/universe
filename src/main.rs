@@ -131,15 +131,12 @@ fn run_client_or_server(s: &mut main_state::Main) {
         client.run()
     } else {
         info!("Running server");
-        Server::new(s.config.clone().unwrap()).run()
+        Server::new(s.config.as_ref().unwrap()).run()
     };
-    match err {
-        Err(err) => {
-            println!("Error: {}", err);
-            println!("Backtrace: {}", err.backtrace());
-        }
-        _ => {}
-    };
+    if let Err(err) = err {
+        println!("Error: {}", err);
+        println!("Backtrace: {}", err.backtrace());
+    }
 }
 
 // Stuff that don't have a home...
@@ -156,11 +153,11 @@ impl DeltaTime {
     }
 }
 
-pub fn map_tile_value_via_color(tile: &Tile, color: Color) -> Tile {
+pub fn map_tile_value_via_color(tile: Tile, color: Color) -> Tile {
     match (tile, color) {
-        (&0, Color::Black) => 255,
-        (&255, Color::Black) => 0,
-        _ => *tile,
+        (0, Color::Black) => 255,
+        (255, Color::Black) => 0,
+        _ => tile,
     }
 }
 pub fn get_normal(tilenet: &TileNet<Tile>, coord: (usize, usize), color: Color) -> Vec2 {
@@ -179,12 +176,12 @@ pub fn get_normal(tilenet: &TileNet<Tile>, coord: (usize, usize), color: Color) 
             if let (Some(x_coord), Some(y_coord)) =
                 ((coord.0 + x).checked_sub(1), (coord.1 + y).checked_sub(1))
             {
-                tilenet
-                    .get((x_coord, y_coord))
-                    .map(|&v| dx += kernel[y][x] * cmap(&v, color) as f32 / 255.0);
-                tilenet
-                    .get((x_coord, y_coord))
-                    .map(|&v| dy += kernel[x][y] * cmap(&v, color) as f32 / 255.0);
+                if let Some(&v) = tilenet.get((x_coord, y_coord)) {
+                    dx += kernel[y][x] * f32::from(cmap(v, color)) / 255.0;
+                }
+                if let Some(&v) = tilenet.get((x_coord, y_coord)) {
+                    dy += kernel[x][y] * f32::from(cmap(v, color)) / 255.0;
+                }
             }
         }
     }

@@ -60,7 +60,7 @@ impl Socket {
 
     /// Send unreliable message
     pub fn send_to(&mut self, msg: Message, dest: SocketAddr) -> Result<(), Error> {
-        let buffer = Packet::Unreliable { msg: msg }.encode()?;
+        let buffer = Packet::Unreliable { msg }.encode()?;
         self.socket.send_to(&buffer, dest)?;
 
         Ok(())
@@ -79,17 +79,14 @@ impl Socket {
         let socket = self.socket.try_clone()?;
 
         let conn = self.get_connection_or_create(dest);
-        conn.send_message(msg, socket, ack_handler)?;
+        conn.send_message(msg, &socket, ack_handler)?;
         Ok(())
     }
 
-    fn get_connection_or_create<'a>(&'a mut self, dest: SocketAddr) -> &'a mut Connection {
-        match self.connections.get(&dest).is_some() {
-            false => {
-                let conn = Connection::new(dest);
-                self.connections.insert(dest, conn);
-            }
-            true => {}
+    fn get_connection_or_create(&mut self, dest: SocketAddr) -> &mut Connection {
+        if self.connections.get(&dest).is_none() {
+            let conn = Connection::new(dest);
+            self.connections.insert(dest, conn);
         }
         self.connections.get_mut(&dest).unwrap()
     }
@@ -111,7 +108,7 @@ impl Socket {
             let (amt, src) = self.socket.recv_from(&mut self.buffer)?;
             let packet = Packet::decode(&self.buffer[0..amt])?;
             let conn = self.get_connection_or_create(src);
-            let msg = conn.unwrap_message(packet, socket)?;
+            let msg = conn.unwrap_message(packet, &socket)?;
             if let Some(msg) = msg {
                 break (src, msg);
             }
@@ -127,9 +124,8 @@ impl<'a> Iterator for SocketIter<'a> {
     type Item = Result<(SocketAddr, Message), Error>;
 
     fn next(&mut self) -> Option<Result<(SocketAddr, Message), Error>> {
-        match self.socket.socket.set_nonblocking(true) {
-            Err(e) => return Some(Err(e.into())),
-            Ok(_) => {}
+        if let Err(e) = self.socket.socket.set_nonblocking(true) {
+            return Some(Err(e.into()));
         }
 
         let msg = self.socket._recv();
@@ -153,13 +149,13 @@ impl<'a> Iterator for SocketIter<'a> {
 
 pub fn to_socket_addr(addr: &str) -> Result<SocketAddr, Error> {
     // Assume IPv4. Try to parse.
-    let parts: Vec<&str> = addr.split(":").collect();
+    let parts: Vec<&str> = addr.split(':').collect();
     if parts.len() != 2 {
         bail!("IP address must be on the form X.X.X.X:port");
     }
 
     let addr: Vec<u8> = parts[0]
-        .split(".")
+        .split('.')
         .map(|x| x.parse::<u8>().unwrap())
         .collect();
     if addr.len() != 4 {
@@ -179,5 +175,5 @@ fn default_vec<T: Default>(size: usize) -> Vec<T> {
     for _ in 0..size {
         zero_vec.push(T::default());
     }
-    return zero_vec;
+    zero_vec
 }

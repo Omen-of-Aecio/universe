@@ -13,7 +13,7 @@ pub fn bullet_move(
     pos: &mut Pos,
     vel: &mut Vel,
     shape: &Shape,
-    color: &Color,
+    color: Color,
     tilenet: &TileNet<Tile>,
     delta_time: f32,
 ) -> ((i32, i32), bool) {
@@ -33,7 +33,7 @@ pub fn player_move(
     pos: &mut Pos,
     vel: &mut Vel,
     shape: &Shape,
-    color: &Color,
+    color: Color,
     tilenet: &TileNet<Tile>,
     delta_time: f32,
 ) -> bool {
@@ -91,7 +91,7 @@ pub fn player_move(
             if HEURISTIC2 {
                 // Decrease x speed based on how steep the hill is
                 let up: Vec2 = Vec2::new(0.0, 1.0);
-                let normal = ::get_normal(&tilenet, ::i32_to_usize(poc), *color).normalize();
+                let normal = ::get_normal(&tilenet, ::i32_to_usize(poc), color).normalize();
                 let steepness = Vec2::dot(up, normal);
                 if steepness > 0.0 {
                     // Can't do pow of negative number (ceiling)

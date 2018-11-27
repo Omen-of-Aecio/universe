@@ -58,18 +58,18 @@ impl Client {
             } => {
                 let display = glutin::WindowBuilder::new().build_glium().unwrap();
                 let mut game =
-                    Game::new(width, height, you, white_base, black_base, display.clone());
+                    Game::new(width, height, you, white_base, black_base, &display);
                 info!("Client received Welcome message");
 
-                let graphics = Graphics::new(display.clone(), &*game.world.read_resource());
+                let graphics = Graphics::new(&display, &*game.world.read_resource());
                 Ok(Client {
                     input: Input::new(),
-                    game: game,
-                    display: display,
-                    graphics: graphics,
+                    game,
+                    display,
+                    graphics,
 
-                    socket: socket,
-                    server: server,
+                    socket,
+                    server,
                 })
             }
             _ => Err(format_err!("Didn't receive Welcome message (in order...)")),
@@ -96,7 +96,7 @@ impl Client {
                     glutin::Event::MouseInput(state, button) => {
                         self.input.register_mouse_input(state, button)
                     }
-                    glutin::Event::KeyboardInput(_, _, _) => self.input.register_key(ev),
+                    glutin::Event::KeyboardInput(_, _, _) => self.input.register_key(&ev),
                     glutin::Event::Resized(w, h) => {
                         self.game.cam.width = w;
                         self.game.cam.height = h;
@@ -153,13 +153,7 @@ impl Client {
             bail!("Packet not from server");
         }
         match msg {
-            Message::Welcome {
-                width: _,
-                height: _,
-                you: _,
-                white_base: _,
-                black_base: _,
-            } => {}
+            Message::Welcome { .. } => {}
             Message::WorldRect {
                 x,
                 y,
@@ -167,7 +161,7 @@ impl Client {
                 pixels,
             } => {
                 let height = pixels.len() / width;
-                self.update_tilenet_rect(x, y, width, height, pixels);
+                self.update_tilenet_rect(x, y, width, height, &pixels);
             }
             Message::State(snapshot) => {
                 self.game.apply_snapshot(snapshot);
@@ -177,13 +171,13 @@ impl Client {
         Ok(())
     }
 
-    fn update_tilenet_rect(&mut self, x: usize, y: usize, w: usize, h: usize, pixels: Vec<u8>) {
+    fn update_tilenet_rect(&mut self, x: usize, y: usize, w: usize, h: usize, pixels: &[u8]) {
         let tilenet = &mut *self.game.world.write_resource::<TileNet<Tile>>();
-        let mut i = 0;
+        let mut count = 0;
         for y in y..y + h {
             for x in x..x + w {
-                tilenet.set(&pixels[i], (x, y));
-                i += 1;
+                tilenet.set(&pixels[count], (x, y));
+                count += 1;
             }
         }
         self.graphics
@@ -196,10 +190,9 @@ impl Client {
         loop {
             let p: u16 = 10000 + (rng.gen::<u16>() % 50000);
             let socket = Socket::new(p);
-            match socket {
-                Ok(socket) => return socket,
-                Err(_) => {}
-            };
+            if let Ok(socket) = socket {
+                return socket;
+            }
         }
     }
 }

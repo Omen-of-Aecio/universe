@@ -13,23 +13,23 @@ impl Vec2 {
         Vec2 { x: 0.0, y: 0.0 }
     }
     pub fn new(x: f32, y: f32) -> Vec2 {
-        Vec2 { x: x, y: y }
+        Vec2 { x, y }
     }
-    pub fn length(&self) -> f32 {
+    pub fn length(self) -> f32 {
         (self.x * self.x + self.y * self.y).sqrt()
     }
-    pub fn length_squared(&self) -> f32 {
+    pub fn length_squared(self) -> f32 {
         (self.x * self.x + self.y * self.y)
     }
-    pub fn normalize(&self) -> Vec2 {
+    pub fn normalize(self) -> Vec2 {
         let len = self.length();
         Vec2::new(self.x / len, self.y / len)
     }
     /// TODO make clear that it clones?
-    pub fn scale(&self, x: f32, y: f32) -> Vec2 {
+    pub fn scale(self, x: f32, y: f32) -> Vec2 {
         Vec2::new(self.x * x, self.y * y)
     }
-    pub fn scale_uni(&self, s: f32) -> Vec2 {
+    pub fn scale_uni(self, s: f32) -> Vec2 {
         Vec2::new(self.x * s, self.y * s)
     }
 

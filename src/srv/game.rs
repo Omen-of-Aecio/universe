@@ -40,23 +40,23 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(conf: Config, white_base: Vec2, black_base: Vec2) -> Game {
+    pub fn new(conf: &Config, white_base: Vec2, black_base: Vec2) -> Game {
         let gc = GameConfig::new(&conf);
 
         let world = {
             let mut w = World::new();
             // All components types should be registered before working with them
-            w.register_with_storage::<_, Player>(|| ComponentStorage::normal());
-            w.register_with_storage::<_, Bullet>(|| ComponentStorage::normal());
-            w.register_with_storage::<_, Pos>(|| ComponentStorage::flagged());
-            w.register_with_storage::<_, Vel>(|| ComponentStorage::normal());
-            w.register_with_storage::<_, Force>(|| ComponentStorage::normal());
-            w.register_with_storage::<_, Shape>(|| ComponentStorage::flagged());
-            w.register_with_storage::<_, Color>(|| ComponentStorage::flagged());
-            w.register_with_storage::<_, Jump>(|| ComponentStorage::normal());
-            w.register_with_storage::<_, PlayerInput>(|| ComponentStorage::normal());
-            w.register_with_storage::<_, UniqueId>(|| ComponentStorage::normal());
-            w.register_with_storage::<_, Delete>(|| ComponentStorage::normal());
+            w.register_with_storage::<_, Player>(ComponentStorage::normal);
+            w.register_with_storage::<_, Bullet>(ComponentStorage::normal);
+            w.register_with_storage::<_, Pos>(ComponentStorage::flagged);
+            w.register_with_storage::<_, Vel>(ComponentStorage::normal);
+            w.register_with_storage::<_, Force>(ComponentStorage::normal);
+            w.register_with_storage::<_, Shape>(ComponentStorage::flagged);
+            w.register_with_storage::<_, Color>(ComponentStorage::flagged);
+            w.register_with_storage::<_, Jump>(ComponentStorage::normal);
+            w.register_with_storage::<_, PlayerInput>(ComponentStorage::normal);
+            w.register_with_storage::<_, UniqueId>(ComponentStorage::normal);
+            w.register_with_storage::<_, Delete>(ComponentStorage::normal);
 
             // The ECS system owns the TileNet
             let mut tilenet =
@@ -90,14 +90,14 @@ impl Game {
 
         Game {
             frame: 0,
-            world: world,
+            world,
             game_conf: gc,
             entities: HashMap::default(),
             entity_id_seq: 0,
             width: conf.world.width as usize,
             height: conf.world.height as usize,
-            white_base: white_base,
-            black_base: black_base,
+            white_base,
+            black_base,
             vectors: Vec::new(),
         }
     }
@@ -134,7 +134,7 @@ impl Game {
         self.vectors.clear(); // clear debug geometry
         *self.world.write_resource::<GameConfig>() = self.game_conf;
         *self.world.write_resource::<::DeltaTime>() = delta_time;
-        dispatcher.dispatch(&mut self.world.res);
+        dispatcher.dispatch(&self.world.res);
 
         (Vec::new(), Vec::new())
     }
@@ -225,11 +225,11 @@ impl Game {
             let pos = self.world.read_storage::<Pos>();
             let col = self.world.read_storage::<Color>();
             (
-                pos.get(entity).unwrap().clone(),
-                col.get(entity).unwrap().clone(),
+                *pos.get(entity).unwrap(),
+                *col.get(entity).unwrap(),
             )
         };
-        let color2 = color.clone();
+        let color2 = color;
         let explosion = move |pos: (i32, i32), _vel: &Vel, tilenet: &mut TileNet<Tile>| {
             tilenet.set(
                 &((255.0 - color2.to_intensity() * 255.0) as u8),
@@ -276,11 +276,11 @@ impl Game {
     }
 }
 
-pub fn map_tile_value_via_color(tile: &Tile, color: Color) -> Tile {
+pub fn map_tile_value_via_color(tile: Tile, color: Color) -> Tile {
     match (tile, color) {
-        (&0, Color::Black) => 255,
-        (&255, Color::Black) => 0,
-        _ => *tile,
+        (0, Color::Black) => 255,
+        (255, Color::Black) => 0,
+        _ => tile,
     }
 }
 

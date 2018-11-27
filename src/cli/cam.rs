@@ -9,16 +9,19 @@ pub struct Camera {
     pub height: u32,
 }
 
-impl Camera {
-    pub fn new() -> Camera {
+impl Default for Camera {
+    fn default() -> Camera {
         let (width, height) = (100, 100);
         Camera {
             zoom: 1.0,
             center: Vec2::new(width as f32 / 2.0, height as f32 / 2.0),
-            width: width,
-            height: height,
+            width,
+            height,
         }
     }
+}
+
+impl Camera {
     pub fn update_win_size(&mut self, display: &Display) {
         let win_size = display.get_window().unwrap().get_inner_size().unwrap();
         self.width = win_size.0;

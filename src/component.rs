@@ -17,7 +17,7 @@ pub struct Pos {
 impl Pos {
     pub fn with_transl(transl: Vec2) -> Pos {
         Pos {
-            transl: transl,
+            transl,
             angular: 0.0,
         }
     }
@@ -58,8 +58,8 @@ impl Jump {
     pub fn new_active(duration: f32, force: f32) -> Jump {
         Jump::Active {
             progress: 0.0,
-            duration: duration,
-            force: force,
+            duration,
+            force,
         }
     }
     pub fn is_active(&self) -> bool {
@@ -109,7 +109,7 @@ impl Shape {
         points.push((0.0, height));
         points.push((width, height));
         points.push((width, 0.0));
-        Shape { points: points }
+        Shape { points }
     }
 }
 
@@ -125,16 +125,16 @@ impl Default for Color {
     }
 }
 impl Color {
-    pub fn to_rgb(&self) -> [f32; 3] {
+    pub fn to_rgb(self) -> [f32; 3] {
         match self {
-            &Color::Black => [0.0, 0.0, 0.0],
-            &Color::White => [1.0, 1.0, 1.0],
+            Color::Black => [0.0, 0.0, 0.0],
+            Color::White => [1.0, 1.0, 1.0],
         }
     }
-    pub fn to_intensity(&self) -> f32 {
+    pub fn to_intensity(self) -> f32 {
         match self {
-            &Color::Black => 0.0,
-            &Color::White => 1.0,
+            Color::Black => 0.0,
+            Color::White => 1.0,
         }
     }
 }

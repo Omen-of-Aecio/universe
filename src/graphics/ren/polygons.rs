@@ -23,8 +23,8 @@ impl Ren {
         let prg = glium::Program::from_source(&display, vert_src, frag_src, None).unwrap();
 
         Ren {
-            display: display,
-            prg: prg,
+            display,
+            prg,
         }
     }
 

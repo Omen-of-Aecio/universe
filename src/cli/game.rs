@@ -39,22 +39,22 @@ impl Game {
         you: u32,
         white_base: Vec2,
         black_base: Vec2,
-        display: glium::Display,
+        display: &glium::Display,
     ) -> Game {
-        let mut cam = Camera::new();
-        cam.update_win_size(&display);
+        let mut cam = Camera::default();
+        cam.update_win_size(display);
 
         let world = {
             let mut w = World::new();
             // All components types should be registered before working with them
-            w.register_with_storage::<_, Pos>(|| ComponentStorage::normal());
-            w.register_with_storage::<_, Vel>(|| ComponentStorage::normal());
-            w.register_with_storage::<_, Force>(|| ComponentStorage::normal());
-            w.register_with_storage::<_, Jump>(|| ComponentStorage::normal());
-            w.register_with_storage::<_, Shape>(|| ComponentStorage::normal());
-            w.register_with_storage::<_, Color>(|| ComponentStorage::normal());
-            w.register_with_storage::<_, Player>(|| ComponentStorage::normal());
-            w.register_with_storage::<_, UniqueId>(|| ComponentStorage::normal());
+            w.register_with_storage::<_, Pos>(ComponentStorage::normal);
+            w.register_with_storage::<_, Vel>(ComponentStorage::normal);
+            w.register_with_storage::<_, Force>(ComponentStorage::normal);
+            w.register_with_storage::<_, Jump>(ComponentStorage::normal);
+            w.register_with_storage::<_, Shape>(ComponentStorage::normal);
+            w.register_with_storage::<_, Color>(ComponentStorage::normal);
+            w.register_with_storage::<_, Player>(ComponentStorage::normal);
+            w.register_with_storage::<_, UniqueId>(ComponentStorage::normal);
 
             // The ECS system owns the TileNet
             let mut tilenet = TileNet::<Tile>::new(width as usize, height as usize);
@@ -67,11 +67,11 @@ impl Game {
         };
 
         Game {
-            world: world,
-            cam: cam,
-            you: you,
-            white_base: white_base,
-            black_base: black_base,
+            world,
+            cam,
+            you,
+            white_base,
+            black_base,
             vectors: Vec::new(),
             cam_mode: CameraMode::FollowPlayer,
         }
@@ -92,7 +92,7 @@ impl Game {
             self.cam.center = transl;
         }
         *self.world.write_resource() = self.cam;
-        dispatcher.dispatch(&mut self.world.res);
+        dispatcher.dispatch(&self.world.res);
         ret
     }
 
@@ -191,8 +191,7 @@ impl Game {
     pub fn get_entity(&self, id: u32) -> Option<specs::Entity> {
         self.world
             .read_resource::<HashMap<u32, specs::Entity>>()
-            .get(&id)
-            .map(|x| *x)
+            .get(&id).cloned()
     }
     /// Puts entity mapping into the HashMap resource. The HashMap is maintained every frame so
     /// this only needs to be done when it otherwise poses a problem that the hashmap is not

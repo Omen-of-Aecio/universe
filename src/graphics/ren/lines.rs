@@ -15,17 +15,17 @@ pub struct Ren {
 }
 
 impl Ren {
-    pub fn new(display: Display) -> Ren {
+    pub fn new(display: &Display) -> Ren {
         let vert_src = include_str!("../../../shaders/xy_col_tr.vert");
         let frag_src = include_str!("../../../shaders/xy_col_tr.frag");
-        let prg = glium::Program::from_source(&display, vert_src, frag_src, None).unwrap();
-        let vertex_buffer = glium::VertexBuffer::empty(&display, MAX_NUM_VERTICES).unwrap();
+        let prg = glium::Program::from_source(display, vert_src, frag_src, None).unwrap();
+        let vertex_buffer = glium::VertexBuffer::empty(display, MAX_NUM_VERTICES).unwrap();
         Ren {
             geometry: Vec::new(),
             draw_col: (0.0, 1.0, 0.0),
 
-            prg: prg,
-            vertex_buffer: vertex_buffer,
+            prg,
+            vertex_buffer,
         }
     }
 

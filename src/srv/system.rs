@@ -40,23 +40,25 @@ impl<'a> specs::System<'a> for JumpSys {
     }
 }
 
+type MoveSysSpec<'a> = (
+    Read<'a, DeltaTime>,
+    Read<'a, LazyUpdate>,
+    Read<'a, GameConfig>,
+    WriteExpect<'a, TileNet<Tile>>,
+    Entities<'a>,
+    ReadStorage<'a, Player>,
+    ReadStorage<'a, Bullet>,
+    WriteStorage<'a, Pos>,
+    WriteStorage<'a, Vel>,
+    ReadStorage<'a, Shape>,
+    ReadStorage<'a, Color>,
+);
+
 /// For Player <-> TileNet collision
 /// (TODO) general movement of objects that have Shape, Force, Vel, Pos, Color
 pub struct MoveSys;
 impl<'a> specs::System<'a> for MoveSys {
-    type SystemData = (
-        Read<'a, DeltaTime>,
-        Read<'a, LazyUpdate>,
-        Read<'a, GameConfig>,
-        WriteExpect<'a, TileNet<Tile>>,
-        Entities<'a>,
-        ReadStorage<'a, Player>,
-        ReadStorage<'a, Bullet>,
-        WriteStorage<'a, Pos>,
-        WriteStorage<'a, Vel>,
-        ReadStorage<'a, Shape>,
-        ReadStorage<'a, Color>,
-    );
+    type SystemData = MoveSysSpec<'a>;
 
     fn run(&mut self, data: Self::SystemData) {
         let (
@@ -80,9 +82,9 @@ impl<'a> specs::System<'a> for MoveSys {
 
         // Players
         for (_, pos, vel, shape, color) in (&player, &mut pos, &mut vel, &shape, &color).join() {
-            let has_collided = player_move(pos, vel, shape, color, &tilenet, delta_time.secs);
+            let has_collided = player_move(pos, vel, shape, *color, &tilenet, delta_time.secs);
             // Friction
-            vel.transl = vel.transl * game_conf.air_fri; // TODO delta_time
+            vel.transl *= game_conf.air_fri; // TODO delta_time
             if has_collided {
                 vel.transl.x *= game_conf.ground_fri;
             }
@@ -94,9 +96,9 @@ impl<'a> specs::System<'a> for MoveSys {
             (&bullet, &*entities, &mut pos, &mut vel, &shape, &color).join()
         {
             let (poc, has_collided) =
-                bullet_move(pos, vel, shape, color, &tilenet, delta_time.secs);
+                bullet_move(pos, vel, shape, *color, &tilenet, delta_time.secs);
             // Friction
-            vel.transl = vel.transl * game_conf.air_fri;
+            vel.transl *= game_conf.air_fri;
             // Gravity
             vel.transl += gravity * delta_time.secs;
             // Effect
@@ -109,15 +111,17 @@ impl<'a> specs::System<'a> for MoveSys {
     }
 }
 
+type InputSysSpec<'a> = (
+    Read<'a, DeltaTime>,
+    Read<'a, GameConfig>,
+    ReadStorage<'a, PlayerInput>,
+    WriteStorage<'a, Jump>,
+    WriteStorage<'a, Vel>,
+);
+
 pub struct InputSys;
 impl<'a> specs::System<'a> for InputSys {
-    type SystemData = (
-        Read<'a, DeltaTime>,
-        Read<'a, GameConfig>,
-        ReadStorage<'a, PlayerInput>,
-        WriteStorage<'a, Jump>,
-        WriteStorage<'a, Vel>,
-    );
+    type SystemData = InputSysSpec<'a>;
 
     fn run(&mut self, data: Self::SystemData) {
         let (delta_time, conf, input, mut jump, mut vel) = data;
@@ -139,10 +143,8 @@ impl<'a> specs::System<'a> for InputSys {
                     vel.transl.y += conf.hori_acc * t;
                 }
             }
-            if input.down {
-                if !conf.gravity_on {
-                    vel.transl.y -= conf.hori_acc * t;
-                }
+            if input.down && !conf.gravity_on {
+                vel.transl.y -= conf.hori_acc * t;
             }
         }
     }
@@ -166,20 +168,21 @@ impl<'a> specs::System<'a> for MaintainSys {
     }
 }
 
+type SimplerType<'a> = (
+    WriteExpect<'a, DiffHistory>,
+    Entities<'a>,
+    ReadStorage<'a, UniqueId>,
+    ReadStorage<'a, Delete>,
+    ReadStorage<'a, Pos>,
+    ReadStorage<'a, Shape>,
+    ReadStorage<'a, Color>,
+);
 /// System to generate diffs (bitsets for inserted/modified and removed components).
 /// Also deletes elements marked by deletion.
 /// Used on server.
 pub struct DiffSys;
 impl<'a> specs::System<'a> for DiffSys {
-    type SystemData = (
-        WriteExpect<'a, DiffHistory>,
-        Entities<'a>,
-        ReadStorage<'a, UniqueId>,
-        ReadStorage<'a, Delete>,
-        ReadStorage<'a, Pos>,
-        ReadStorage<'a, Shape>,
-        ReadStorage<'a, Color>,
-    );
+    type SystemData = SimplerType<'a>;
     fn run(&mut self, (mut diffs, entities, id, delete, pos, shape, color): Self::SystemData) {
         // Delete entities marked for deletion
         let mut removed: Vec<UniqueId> = Vec::new();
@@ -188,6 +191,6 @@ impl<'a> specs::System<'a> for DiffSys {
             removed.push(*id);
         }
         //
-        diffs.add_diff(removed, pos, shape, color);
+        diffs.add_diff(removed, &pos, &shape, &color);
     }
 }

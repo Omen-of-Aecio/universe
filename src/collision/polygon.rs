@@ -5,7 +5,7 @@ use tilenet::*;
 
 pub struct PolygonCollable<'a> {
     pub shape: &'a Shape,
-    pub color: &'a Color,
+    pub color: Color,
     pub pos: &'a mut Pos,
 
     // State for collision alg
@@ -26,15 +26,15 @@ impl<'a> PolygonCollable<'a> {
     /// start_toc is what fraction of the velocity we start the algorithm with
     pub fn new(
         shape: &'a Shape,
-        color: &'a Color,
+        color: Color,
         pos: &'a mut Pos,
         vel: Vec2,
         start_toc: f32,
     ) -> PolygonCollable<'a> {
         PolygonCollable {
-            shape: shape,
-            color: color,
-            pos: pos,
+            shape,
+            color,
+            pos,
 
             queued_vel: vel,
             current_try: 0,
@@ -76,7 +76,7 @@ impl<'a> Collable<Tile> for PolygonCollable<'a> {
     where
         I: Iterator<Item = (i32, i32)>,
     {
-        let no_collision = match *self.color {
+        let no_collision = match self.color {
             Color::White => set.all(|x| *x == 0),
             Color::Black => set.all(|x| *x != 0),
         };

@@ -8,9 +8,9 @@ use glium;
 use glium::glutin::VirtualKeyCode as KeyCode;
 use global::Tile;
 use input::Input;
-use net::msg::{self, Message};
+use net::msg::Message;
 use specs;
-use specs::{Builder, Dispatcher, DispatcherBuilder, Join, LazyUpdate, World};
+use specs::{Dispatcher, Join, LazyUpdate, World};
 use srv::diff::{Entity, Snapshot};
 use std::cmp::min;
 

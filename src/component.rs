@@ -258,7 +258,7 @@ where
 {
     fn channels(&self) -> &specs::storage::TrackChannels {
         match *self {
-            ComponentStorage::Normal(ref storage) => {
+            ComponentStorage::Normal(_) => {
                 panic!("Using `ComponentStorage::Normal` as Tracked!")
             }
             ComponentStorage::Flagged(ref storage) => storage.channels(),
@@ -266,7 +266,7 @@ where
     }
     fn channels_mut(&mut self) -> &mut specs::storage::TrackChannels {
         match *self {
-            ComponentStorage::Normal(ref mut storage) => {
+            ComponentStorage::Normal(_) => {
                 panic!("Using `ComponentStorage::Normal` as Tracked!")
             }
             ComponentStorage::Flagged(ref mut storage) => storage.channels_mut(),

@@ -184,7 +184,7 @@ impl<'a> specs::System<'a> for DiffSys {
         // Delete entities marked for deletion
         let mut removed: Vec<UniqueId> = Vec::new();
         for (entity, id, _delete) in (&*entities, &id, &delete).join() {
-            entities.delete(entity);
+            let _ignore_result = entities.delete(entity);
             removed.push(*id);
         }
         //

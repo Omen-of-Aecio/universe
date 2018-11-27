@@ -12,8 +12,7 @@ use srv::diff::{DiffHistory, Snapshot};
 use std::cmp::min;
 use tilenet_gen;
 
-use net::msg;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::time::Duration;
 use std::vec::Vec;
 

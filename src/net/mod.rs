@@ -78,8 +78,8 @@ impl Socket {
         // message itself. Connection could even know the UdpSocket and SocketAddr
         let socket = self.socket.try_clone()?;
 
-        let mut conn = self.get_connection_or_create(dest);
-        let seq = conn.send_message(msg, socket, ack_handler)?;
+        let conn = self.get_connection_or_create(dest);
+        conn.send_message(msg, socket, ack_handler)?;
         Ok(())
     }
 

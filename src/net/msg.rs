@@ -4,9 +4,7 @@
 //! receive a complete snapshot. This snapshot should be transmitted reliably.
 use component::*;
 use geometry::vec::Vec2;
-use serde::{de::Visitor, Deserialize, Deserializer, Serializer};
 use srv::diff::*;
-use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Message {

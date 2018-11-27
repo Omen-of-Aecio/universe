@@ -115,7 +115,6 @@ impl Server {
                 }
                 *acked_msgs = VecDeque::new();
             }
-            use bincode;
             // Send messages
             for (dest, con) in self.connections.iter() {
                 let message = Message::State(self.game.create_snapshot(con.last_snapshot));

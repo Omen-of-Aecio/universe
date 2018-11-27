@@ -4,10 +4,10 @@ version = "0.3.0"
 authors = ["Erlend Hofstad Langseth <3rlendhl@gmail.com>", "Kevin Robert Stravers <macocio@gmail.com>"]
 
 [dependencies]
-# tilenet = { git = "https://github.com/Ploppz/TileNet" }
-tilenet = { path = "/home/ploppz/code/rust/tilenet" }
-# tilenet_ren = { git = "https://github.com/Ploppz/tilenet-render"}
-tilenet_ren = { path = "/home/ploppz/code/rust/tilenet-ren"}
+tilenet = { git = "https://github.com/Ploppz/TileNet", branch = "flagged-storage" }
+# tilenet = { path = "/home/ploppz/code/rust/tilenet" }
+tilenet_ren = { git = "https://github.com/Ploppz/tilenet-render", branch = "flagged-storage"}
+# tilenet_ren = { path = "/home/ploppz/code/rust/tilenet-ren"}
 clippy = { version = "0.0", optional = true }
 isatty = "0.1"
 slog = { version = "*", features = ["max_level_trace", "release_max_level_trace"] }

@@ -1,11 +1,11 @@
 use geometry::vec::Vec2;
+use global::Tile;
 use specs;
 use specs::Component;
 use tilenet::TileNet;
-use global::Tile;
 
 #[derive(Copy, Clone, Default, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
-pub struct UniqueId (pub u32);
+pub struct UniqueId(pub u32);
 
 #[derive(Copy, Clone, Default, Serialize, Deserialize, Debug)]
 pub struct Pos {
@@ -18,11 +18,10 @@ impl Pos {
     pub fn with_transl(transl: Vec2) -> Pos {
         Pos {
             transl: transl,
-            angular: 0.0
+            angular: 0.0,
         }
     }
 }
-
 
 #[derive(Copy, Clone, Default, Serialize, Deserialize, Debug)]
 pub struct Vel {
@@ -32,7 +31,6 @@ pub struct Vel {
     pub angular: f32,
 }
 
-
 #[derive(Copy, Clone, Default, Serialize, Deserialize, Debug)]
 pub struct Force {
     /// Translational force
@@ -40,7 +38,6 @@ pub struct Force {
     /// Torque
     pub angular: f32,
 }
-
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub enum Jump {
@@ -67,7 +64,7 @@ impl Jump {
     }
     pub fn is_active(&self) -> bool {
         match *self {
-            Jump::Active {..} => true,
+            Jump::Active { .. } => true,
             Jump::Inactive => false,
         }
     }
@@ -76,7 +73,11 @@ impl Jump {
     /// Returns None if jump is done.
     pub fn tick(&mut self, delta_time: f32) -> Option<f32> {
         match *self {
-            Jump::Active {ref mut progress, duration, force} => {
+            Jump::Active {
+                ref mut progress,
+                duration,
+                force,
+            } => {
                 *progress += delta_time;
                 if *progress <= duration {
                     Some(force * delta_time)
@@ -84,20 +85,17 @@ impl Jump {
                     None
                 }
             }
-            Jump::Inactive => {
-                None
-            }
+            Jump::Inactive => None,
         }
     }
 
     pub fn get_progress(&self) -> Option<f32> {
         match *self {
-            Jump::Active { progress, ..} => Some(progress),
+            Jump::Active { progress, .. } => Some(progress),
             Jump::Inactive => None,
         }
     }
 }
-
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct Shape {
@@ -115,10 +113,10 @@ impl Shape {
     }
 }
 
-
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub enum Color {
-    White, Black,
+    White,
+    Black,
 }
 
 impl Default for Color {
@@ -145,7 +143,6 @@ impl Color {
 #[derive(Copy, Clone, Default, Debug)]
 pub struct Player;
 
-
 #[derive(Copy, Clone, Default, Debug, Serialize, Deserialize)]
 pub struct PlayerInput {
     pub up: bool,
@@ -155,7 +152,6 @@ pub struct PlayerInput {
     pub g: bool,
 }
 
-
 use std::sync::{Arc, Mutex};
 type Explosion = Fn((i32, i32), &Vel, &mut TileNet<Tile>) + Send;
 // #[derive(Debug)]
@@ -163,9 +159,11 @@ pub struct Bullet {
     pub explosion: Arc<Mutex<Explosion>>,
 }
 impl Bullet {
-    pub fn new<F: Fn((i32, i32), &Vel, &mut TileNet<Tile>) + Send + 'static>(explosion: F) -> Bullet {
+    pub fn new<F: Fn((i32, i32), &Vel, &mut TileNet<Tile>) + Send + 'static>(
+        explosion: F,
+    ) -> Bullet {
         Bullet {
-            explosion: Arc::new(Mutex::new(explosion))
+            explosion: Arc::new(Mutex::new(explosion)),
         }
     }
     pub fn explode(&self, pos: (i32, i32), vel: &Vel, t: &mut TileNet<Tile>) {
@@ -176,97 +174,105 @@ impl Bullet {
 /// Marks deletion of an entity - to be deleted in the `DiffSys` system.
 pub struct Delete;
 
-
-
-
-
-
 //
 // Specifying storage for the different components
 //
-use specs::{storage::UnprotectedStorage, world::Index};
 use hibitset::BitSetLike;
+use specs::{storage::UnprotectedStorage, world::Index};
 
 pub enum ComponentStorage<C, S>
-where C: Component,
-      S: UnprotectedStorage<C> + Default {
-    Normal (S),
-    Flagged (specs::FlaggedStorage<C, S>),
+where
+    C: Component,
+    S: UnprotectedStorage<C> + Default,
+{
+    Normal(S),
+    Flagged(specs::FlaggedStorage<C, S>),
 }
 impl<C, S> ComponentStorage<C, S>
-where C: Component,
-      S: UnprotectedStorage<C> + Default {
+where
+    C: Component,
+    S: UnprotectedStorage<C> + Default,
+{
     pub fn normal() -> Self {
-        ComponentStorage::Normal (S::default())
+        ComponentStorage::Normal(S::default())
     }
     pub fn flagged() -> Self {
-        ComponentStorage::Flagged (specs::FlaggedStorage::default())
+        ComponentStorage::Flagged(specs::FlaggedStorage::default())
     }
 }
 
 impl<C, S> Default for ComponentStorage<C, S>
-where C: Component,
-      S: UnprotectedStorage<C> + Default {
+where
+    C: Component,
+    S: UnprotectedStorage<C> + Default,
+{
     fn default() -> Self {
-        ComponentStorage::Normal (S::default())
+        ComponentStorage::Normal(S::default())
     }
 }
 
 impl<C, S> UnprotectedStorage<C> for ComponentStorage<C, S>
-where C: Component,
-      S: UnprotectedStorage<C> + Default {
+where
+    C: Component,
+    S: UnprotectedStorage<C> + Default,
+{
     unsafe fn clean<B>(&mut self, has: B)
-    where B: BitSetLike {
+    where
+        B: BitSetLike,
+    {
         match *self {
-            ComponentStorage::Normal (ref mut storage) => storage.clean(has),
-            ComponentStorage::Flagged (ref mut storage) => storage.clean(has),
+            ComponentStorage::Normal(ref mut storage) => storage.clean(has),
+            ComponentStorage::Flagged(ref mut storage) => storage.clean(has),
         }
     }
     unsafe fn get(&self, id: Index) -> &C {
         match *self {
-            ComponentStorage::Normal (ref storage) => storage.get(id),
-            ComponentStorage::Flagged (ref storage) => storage.get(id),
+            ComponentStorage::Normal(ref storage) => storage.get(id),
+            ComponentStorage::Flagged(ref storage) => storage.get(id),
         }
     }
     unsafe fn get_mut(&mut self, id: Index) -> &mut C {
         match *self {
-            ComponentStorage::Normal (ref mut storage) => storage.get_mut(id),
-            ComponentStorage::Flagged (ref mut storage) => storage.get_mut(id),
+            ComponentStorage::Normal(ref mut storage) => storage.get_mut(id),
+            ComponentStorage::Flagged(ref mut storage) => storage.get_mut(id),
         }
     }
     unsafe fn insert(&mut self, id: Index, value: C) {
         match *self {
-            ComponentStorage::Normal (ref mut storage) => storage.insert(id, value),
-            ComponentStorage::Flagged (ref mut storage) => storage.insert(id, value),
+            ComponentStorage::Normal(ref mut storage) => storage.insert(id, value),
+            ComponentStorage::Flagged(ref mut storage) => storage.insert(id, value),
         }
     }
     unsafe fn remove(&mut self, id: Index) -> C {
         match *self {
-            ComponentStorage::Normal (ref mut storage) => storage.remove(id),
-            ComponentStorage::Flagged (ref mut storage) => storage.remove(id),
+            ComponentStorage::Normal(ref mut storage) => storage.remove(id),
+            ComponentStorage::Flagged(ref mut storage) => storage.remove(id),
         }
     }
 }
 
 impl<C, S> specs::Tracked for ComponentStorage<C, S>
-where C: Component,
-      S: UnprotectedStorage<C> + Default {
+where
+    C: Component,
+    S: UnprotectedStorage<C> + Default,
+{
     fn channels(&self) -> &specs::storage::TrackChannels {
         match *self {
-            ComponentStorage::Normal (ref storage) =>
-                panic!("Using `ComponentStorage::Normal` as Tracked!"),
-            ComponentStorage::Flagged (ref storage) => storage.channels(),
+            ComponentStorage::Normal(ref storage) => {
+                panic!("Using `ComponentStorage::Normal` as Tracked!")
+            }
+            ComponentStorage::Flagged(ref storage) => storage.channels(),
         }
     }
     fn channels_mut(&mut self) -> &mut specs::storage::TrackChannels {
         match *self {
-            ComponentStorage::Normal (ref mut storage) =>
-                panic!("Using `ComponentStorage::Normal` as Tracked!"),
-            ComponentStorage::Flagged (ref mut storage) => storage.channels_mut(),
+            ComponentStorage::Normal(ref mut storage) => {
+                panic!("Using `ComponentStorage::Normal` as Tracked!")
+            }
+            ComponentStorage::Flagged(ref mut storage) => storage.channels_mut(),
         }
     }
 }
-
 
 impl Component for UniqueId {
     type Storage = ComponentStorage<Self, specs::VecStorage<Self>>;

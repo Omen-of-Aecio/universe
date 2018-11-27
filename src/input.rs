@@ -1,13 +1,12 @@
 use glium::glutin;
-use glium::glutin::{ElementState, VirtualKeyCode as KeyCode, MouseButton};
+use glium::glutin::{ElementState, MouseButton, VirtualKeyCode as KeyCode};
 // use glium::glutin::KeyCode;
-use glium::glutin::Event::KeyboardInput;
-use geometry::vec::Vec2;
 use component::PlayerInput;
+use geometry::vec::Vec2;
+use glium::glutin::Event::KeyboardInput;
 
 // TODO
 // Input isn't really made for ease of client-server
-
 
 const NUM_KEYS: usize = 150;
 
@@ -17,11 +16,10 @@ pub struct Input {
 
     /// Only left mouse button at the moment
     mouse: (i32, i32, bool),
-    /// How much the mouse has moved since the last frame 
+    /// How much the mouse has moved since the last frame
     past_mouse: (i32, i32),
     /// How much wheel since last frame
     mouse_wheel: f32,
-
 }
 
 impl Default for Input {
@@ -30,7 +28,7 @@ impl Default for Input {
             key_down: [false; NUM_KEYS],
             key_toggled: [false; NUM_KEYS],
             mouse: (0, 0, false),
-            past_mouse: (0,0),
+            past_mouse: (0, 0),
             mouse_wheel: 0.0,
         }
     }
@@ -73,14 +71,13 @@ impl Input {
     }
     pub fn register_mouse_input(&mut self, state: ElementState, button: MouseButton) {
         if let MouseButton::Left = button {
-           self.mouse.2 = match state {
+            self.mouse.2 = match state {
                 ElementState::Pressed => true,
                 ElementState::Released => false,
             };
         }
     }
 
-    
     /* Interface to GET state */
 
     pub fn key_down(&self, keycode: KeyCode) -> bool {
@@ -103,7 +100,10 @@ impl Input {
         self.mouse.2
     }
     pub fn mouse_moved(&self) -> Vec2 {
-        Vec2::new((self.mouse.0 - self.past_mouse.0) as f32, (self.mouse.1 - self.past_mouse.1) as f32)
+        Vec2::new(
+            (self.mouse.0 - self.past_mouse.0) as f32,
+            (self.mouse.1 - self.past_mouse.1) as f32,
+        )
     }
     pub fn mouse_wheel(&self) -> f32 {
         self.mouse_wheel
@@ -129,10 +129,18 @@ impl Input {
 
     pub fn create_player_input(&self) -> PlayerInput {
         PlayerInput {
-            up: self.key_down(KeyCode::Up) || self.key_down(KeyCode::W) || self.key_down(KeyCode::F),
-            down: self.key_down(KeyCode::Down) || self.key_down(KeyCode::S) || self.key_down(KeyCode::S),
-            left: self.key_down(KeyCode::Left) || self.key_down(KeyCode::A) || self.key_down(KeyCode::R),
-            right: self.key_down(KeyCode::Right) || self.key_down(KeyCode::D) || self.key_down(KeyCode::T),
+            up: self.key_down(KeyCode::Up)
+                || self.key_down(KeyCode::W)
+                || self.key_down(KeyCode::F),
+            down: self.key_down(KeyCode::Down)
+                || self.key_down(KeyCode::S)
+                || self.key_down(KeyCode::S),
+            left: self.key_down(KeyCode::Left)
+                || self.key_down(KeyCode::A)
+                || self.key_down(KeyCode::R),
+            right: self.key_down(KeyCode::Right)
+                || self.key_down(KeyCode::D)
+                || self.key_down(KeyCode::T),
             g: self.key_down(KeyCode::G),
         }
     }

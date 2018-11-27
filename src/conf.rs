@@ -1,12 +1,11 @@
 //! Structs in this module are only used for deserialization of toml file, not for e.g.
 //! representation runtime.
 
-use toml;
+use err::*;
 use std::fs::File;
 use std::io::Read;
-use err::*;
 use std::time::Duration;
-
+use toml;
 
 #[derive(Deserialize, Clone)]
 pub struct Config {
@@ -17,7 +16,7 @@ pub struct Config {
 
 #[derive(Deserialize, Clone)]
 pub struct PlayerConfig {
-    pub hori_acc: f32, 
+    pub hori_acc: f32,
     pub jump_duration: f32,
     pub jump_delay: f32,
     pub jump_acc: f32,

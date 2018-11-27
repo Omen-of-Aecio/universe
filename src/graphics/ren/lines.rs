@@ -1,6 +1,6 @@
+use geometry::vec::Vec2;
 use glium;
 use glium::{Display, Surface};
-use geometry::vec::Vec2;
 
 const MAX_NUM_VERTICES: usize = 8000;
 
@@ -44,16 +44,19 @@ impl Ren {
         let arrow_angle: f32 = 2.7;
 
         let dir_angle: f32 = f32::atan2(dir.y, dir.x);
-        let a1: Vec2 = Vec2::new((dir_angle - arrow_angle).cos() * radius,
-                                 (dir_angle - arrow_angle).sin() * radius);
-        let a2: Vec2 = Vec2::new((dir_angle + arrow_angle).cos() * radius,
-                                 (dir_angle + arrow_angle).sin() * radius);
+        let a1: Vec2 = Vec2::new(
+            (dir_angle - arrow_angle).cos() * radius,
+            (dir_angle - arrow_angle).sin() * radius,
+        );
+        let a2: Vec2 = Vec2::new(
+            (dir_angle + arrow_angle).cos() * radius,
+            (dir_angle + arrow_angle).sin() * radius,
+        );
 
         self.add_line(start, start + dir);
         start += dir;
         self.add_line(start, start + a1);
         self.add_line(start, start + a2);
-
     }
     /// Clear all geometry.
     pub fn clear(&mut self) {
@@ -71,24 +74,28 @@ impl Ren {
         slice.write(&self.geometry);
     }
 
-    pub fn render(&mut self,
-                  target: &mut glium::Frame,
-                  center: Vec2,
-                  zoom: f32,
-                  width: u32,
-                  height: u32) {
-
+    pub fn render(
+        &mut self,
+        target: &mut glium::Frame,
+        center: Vec2,
+        zoom: f32,
+        width: u32,
+        height: u32,
+    ) {
         self.upload_vertices();
         let uniforms = uniform! {
             proj: super::proj_matrix(width as f32, height as f32, 0.0, 1.0),
             view: super::view_matrix(center.x, center.y, zoom, zoom),
         };
         let indices = glium::index::NoIndices(glium::index::PrimitiveType::LinesList);
-        target.draw(self.vertex_buffer.slice(0..self.geometry.len()).unwrap(),
-                  &indices,
-                  &self.prg,
-                  &uniforms,
-                  &Default::default())
+        target
+            .draw(
+                self.vertex_buffer.slice(0..self.geometry.len()).unwrap(),
+                &indices,
+                &self.prg,
+                &uniforms,
+                &Default::default(),
+            )
             .unwrap();
     }
 }

@@ -1,5 +1,5 @@
-use conf;
 use clap;
+use conf;
 use slog::Logger;
 
 pub struct Main<'a> {

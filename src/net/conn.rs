@@ -1,11 +1,11 @@
+use err::*;
+use net::{msg::Message, pkt::Packet};
 use std::{
     self,
-    fmt::Debug,
     collections::VecDeque,
+    fmt::Debug,
     net::{SocketAddr, UdpSocket},
 };
-use net::{msg::Message, pkt::Packet};
-use err::*;
 use time::precise_time_ns;
 
 pub struct SentPacket {
@@ -20,7 +20,6 @@ impl Debug for SentPacket {
         write!(f, "SentPacket; time = {}, seq = {}", self.time, self.seq)
     }
 }
-
 
 pub struct Connection {
     /// The sequence number of the next sent packet
@@ -52,13 +51,11 @@ impl<'a> Connection {
                 if now > sent_packet.time + RESEND_INTERVAL_MS * 1000000 {
                     sent_packet.time = now;
                     result.push(sent_packet.packet.encode().unwrap());
-
                 }
             }
         }
         result
     }
-
 
     pub fn acknowledge(&mut self, acked: u32) -> Result<(), Error> {
         self.update_send_window();
@@ -68,14 +65,12 @@ impl<'a> Connection {
                 error!("Send window empty, but ack received.");
                 return Ok(()); // have to tolerate some faults
             }
-            Some(first) => {
-                match first {
-                    &Some(ref sent_packet) => sent_packet.seq,
-                    &None => bail!("The first SentPacket is None."),
-                }
-            }
+            Some(first) => match first {
+                &Some(ref sent_packet) => sent_packet.seq,
+                &None => bail!("The first SentPacket is None."),
+            },
         };
-        
+
         let index = (acked - first_seq) as usize;
 
         match self.send_window.get_mut(index) {
@@ -96,7 +91,10 @@ impl<'a> Connection {
     /// Removes all None's that appear at the front of the send window queue
     fn update_send_window(&mut self) {
         loop {
-            let remove = match self.send_window.front() {Some(&None) => true, _ => false};
+            let remove = match self.send_window.front() {
+                Some(&None) => true,
+                _ => false,
+            };
             if remove {
                 self.send_window.pop_front();
             } else {
@@ -107,19 +105,23 @@ impl<'a> Connection {
 
     /// Wraps in a packet, encodes, and adds the packet to the send window queue. Returns the data
     /// enqueued.
-    pub fn send_message<'b>(&'b mut self,
-                        msg: Message,
-                        socket: UdpSocket,
-                        ack_handler: Option<Box<Fn() + 'static>>) -> Result<u32, Error> {
-        let packet = Packet::Reliable {seq: self.seq, msg: msg};
+    pub fn send_message<'b>(
+        &'b mut self,
+        msg: Message,
+        socket: UdpSocket,
+        ack_handler: Option<Box<Fn() + 'static>>,
+    ) -> Result<u32, Error> {
+        let packet = Packet::Reliable {
+            seq: self.seq,
+            msg: msg,
+        };
         // debug!("Send"; "seq" => self.seq, "ack" => self.received+1);
-        self.send_window.push_back(
-            Some(SentPacket {
-                time: precise_time_ns(),
-                seq: self.seq,
-                packet: packet.clone(),
-                ack_handler: ack_handler,
-            }));
+        self.send_window.push_back(Some(SentPacket {
+            time: precise_time_ns(),
+            seq: self.seq,
+            packet: packet.clone(),
+            ack_handler: ack_handler,
+        }));
 
         self.seq += 1;
         socket.send_to(&packet.encode().unwrap(), self.dest)?;
@@ -130,18 +132,22 @@ impl<'a> Connection {
     /// as an acknowledgement. Needs `UdpSocket` for sending pack an eventual Ack
     // Ideally, I would like to take a &[u8] here but it creates aliasing conflicts, as Socket will
     // have to send a slice of its own buffer.
-    pub fn unwrap_message(&mut self, packet: Packet, socket: UdpSocket) -> Result<Option<Message>, Error> {
+    pub fn unwrap_message(
+        &mut self,
+        packet: Packet,
+        socket: UdpSocket,
+    ) -> Result<Option<Message>, Error> {
         let mut received_msg = None;
         match packet {
-            Packet::Unreliable {msg} => {
+            Packet::Unreliable { msg } => {
                 received_msg = Some(msg);
-            },
-            Packet::Reliable {seq, msg} => {
+            }
+            Packet::Reliable { seq, msg } => {
                 received_msg = Some(msg);
                 // ack_reply = Some(Packet::Ack {ack: seq});
-                socket.send_to(&Packet::Ack {ack: seq}.encode()?, self.dest)?;
-            },
-            Packet::Ack {ack} => {
+                socket.send_to(&Packet::Ack { ack: seq }.encode()?, self.dest)?;
+            }
+            Packet::Ack { ack } => {
                 self.acknowledge(ack)?;
             }
         };

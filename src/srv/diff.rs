@@ -1,6 +1,6 @@
-use specs::{prelude::*, self, world::World};
 use component::*;
-use std::collections::{VecDeque, HashMap};
+use specs::{self, prelude::*, world::World};
+use std::collections::{HashMap, VecDeque};
 use std::ops;
 
 // TODO: Can probably make a macro to spew out at least `Diff` and `Components`
@@ -35,23 +35,26 @@ impl DiffHistory {
         }
     }
     /// Pushes a new diff to the history based on given components
-    pub fn add_diff(&mut self, removed: Vec<UniqueId>,
-                               pos:   ReadStorage<Pos>,
-                               shape: ReadStorage<Shape>,
-                               color: ReadStorage<Color>) {
+    pub fn add_diff(
+        &mut self,
+        removed: Vec<UniqueId>,
+        pos: ReadStorage<Pos>,
+        shape: ReadStorage<Shape>,
+        color: ReadStorage<Color>,
+    ) {
         self.frame += 1;
         let mut diff = Diff::default();
         diff.removed = removed;
         pos.populate_modified(&mut self.pos_mod_id, &mut diff.pos);
         pos.populate_inserted(&mut self.pos_ins_id, &mut diff.pos);
-        
+
         shape.populate_modified(&mut self.shape_mod_id, &mut diff.shape);
         shape.populate_inserted(&mut self.shape_ins_id, &mut diff.shape);
 
         color.populate_modified(&mut self.color_mod_id, &mut diff.color);
         color.populate_inserted(&mut self.color_ins_id, &mut diff.color);
         self.diffs.push_back(diff);
-    
+
         if self.diffs.len() > DIFF_HISTORY_MAX_LEN as usize {
             self.diffs.pop_front();
         }
@@ -68,11 +71,12 @@ impl DiffHistory {
     }
 
     pub fn create_snapshot(&self, since: u32, now: u32, world: &World) -> Snapshot {
-        let (id, shape, pos, color)
-            = (world.read_storage::<UniqueId>(),
-               world.read_storage::<Shape>(),
-               world.read_storage::<Pos>(),
-               world.read_storage::<Color>());
+        let (id, shape, pos, color) = (
+            world.read_storage::<UniqueId>(),
+            world.read_storage::<Shape>(),
+            world.read_storage::<Pos>(),
+            world.read_storage::<Color>(),
+        );
         let mut entities: HashMap<u32, Option<Entity>> = HashMap::new();
 
         let dt = now - since;
@@ -160,7 +164,7 @@ impl DiffHistory {
         Snapshot {
             reference: since,
             this: now,
-            entities
+            entities,
         }
     }
 }
@@ -181,9 +185,6 @@ impl<'a> ops::BitOrAssign<&'a Diff> for Diff {
     }
 }
 
-
-
-
 /// Incremental or entire snapshot of state at the server, to be sent to clients.
 /// Also used by server to store what is known to be known by each client.
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -199,7 +200,7 @@ pub struct Snapshot {
 
 /// Incremental or entire representation of an Entity
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Entity{
+pub struct Entity {
     pub components: Components,
 }
 
@@ -211,29 +212,40 @@ pub struct Components {
 }
 impl Components {
     /// (Client) Insert new entity into ECS with components, with UniqueId `id`
-    pub fn insert(self, updater: &specs::LazyUpdate, entities: &specs::world::EntitiesRes, id: u32) -> specs::Entity {
+    pub fn insert(
+        self,
+        updater: &specs::LazyUpdate,
+        entities: &specs::world::EntitiesRes,
+        id: u32,
+    ) -> specs::Entity {
         info!("Insert entity");
         let mut builder = updater.create_entity(entities);
         match self.pos {
             Some(c) => builder = builder.with(c),
-            None => warn!("Not all components present in received new entity")
+            None => warn!("Not all components present in received new entity"),
         }
         match self.shape {
             Some(c) => builder = builder.with(c),
-            None => warn!("Not all components present in received new entity")
+            None => warn!("Not all components present in received new entity"),
         }
         match self.color {
             Some(c) => builder = builder.with(c),
-            None => warn!("Not all components present in received new entity")
+            None => warn!("Not all components present in received new entity"),
         }
-        builder = builder.with(UniqueId (id));
+        builder = builder.with(UniqueId(id));
         builder.build()
     }
     /// (Client) Apply to ECS system to some specific entity
     pub fn modify_existing(self, updater: &specs::LazyUpdate, entity: specs::Entity) {
-        if let Some(c) = self.pos { updater.insert(entity, c); }
-        if let Some(c) = self.shape { updater.insert(entity, c); }
-        if let Some(c) = self.color { updater.insert(entity, c); }
+        if let Some(c) = self.pos {
+            updater.insert(entity, c);
+        }
+        if let Some(c) = self.shape {
+            updater.insert(entity, c);
+        }
+        if let Some(c) = self.color {
+            updater.insert(entity, c);
+        }
     }
 
     pub fn set_pos(&mut self, pos: &Pos) {

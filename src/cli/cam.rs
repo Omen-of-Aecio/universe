@@ -1,12 +1,12 @@
-use glium::Display;
 use geometry::Vec2;
+use glium::Display;
 
-#[derive(Copy,Clone)]
+#[derive(Copy, Clone)]
 pub struct Camera {
     pub zoom: f32,
     pub center: Vec2,
     pub width: u32,
-    pub height: u32
+    pub height: u32,
 }
 
 impl Camera {
@@ -31,7 +31,7 @@ impl Camera {
         // Translate by -screen_size/2
         // Scale by 1/zoom
         // Translate by center
-        ((screen_pos - screen_size.scale_uni(0.5)).scale_uni(1.0 / self.zoom) + center).scale(1.0, -1.0)
+        ((screen_pos - screen_size.scale_uni(0.5)).scale_uni(1.0 / self.zoom) + center)
+            .scale(1.0, -1.0)
     }
 }
-

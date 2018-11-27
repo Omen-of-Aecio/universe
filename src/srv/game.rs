@@ -2,20 +2,20 @@ use tilenet::TileNet;
 
 use err::*;
 
-use std::cmp::min;
-use net::msg::Message;
-use global::Tile;
-use geometry::vec::Vec2;
 use component::*;
-use srv::diff::{DiffHistory, Snapshot};
-use tilenet_gen;
+use geometry::vec::Vec2;
+use global::Tile;
+use net::msg::Message;
 use specs;
-use specs::{Dispatcher, World, Join, Builder};
+use specs::{Builder, Dispatcher, Join, World};
+use srv::diff::{DiffHistory, Snapshot};
+use std::cmp::min;
+use tilenet_gen;
 
-use std::collections::{BTreeMap, HashMap};
-use std::vec::Vec;
-use std::time::Duration;
 use net::msg;
+use std::collections::{BTreeMap, HashMap};
+use std::time::Duration;
+use std::vec::Vec;
 
 use conf::Config;
 
@@ -33,15 +33,12 @@ pub struct Game {
     /// Height of the generated world
     height: usize,
 
-
     pub white_base: Vec2,
     pub black_base: Vec2,
 
     // Extra graphics data (for debugging/visualization)
     pub vectors: Vec<(Vec2, Vec2)>,
 }
-
-
 
 impl Game {
     pub fn new(conf: Config, white_base: Vec2, black_base: Vec2) -> Game {
@@ -61,18 +58,26 @@ impl Game {
             w.register_with_storage::<_, PlayerInput>(|| ComponentStorage::normal());
             w.register_with_storage::<_, UniqueId>(|| ComponentStorage::normal());
             w.register_with_storage::<_, Delete>(|| ComponentStorage::normal());
-            
-            // The ECS system owns the TileNet
-            let mut tilenet = TileNet::<Tile>::new(conf.world.width as usize, conf.world.height as usize);
 
+            // The ECS system owns the TileNet
+            let mut tilenet =
+                TileNet::<Tile>::new(conf.world.width as usize, conf.world.height as usize);
 
             // Create bases
             let base_size: usize = 24;
             let pos = (white_base.x as usize, white_base.y as usize);
-            tilenet.set_box(&0, (pos.0 - base_size, pos.1 - base_size), (pos.0 + base_size, pos.1 + base_size));
+            tilenet.set_box(
+                &0,
+                (pos.0 - base_size, pos.1 - base_size),
+                (pos.0 + base_size, pos.1 + base_size),
+            );
             let pos = (black_base.x as usize, black_base.y as usize);
-            tilenet.set_box(&255, (pos.0 - base_size, pos.1 - base_size), (pos.0 + base_size, pos.1 + base_size));
-            
+            tilenet.set_box(
+                &255,
+                (pos.0 - base_size, pos.1 - base_size),
+                (pos.0 + base_size, pos.1 + base_size),
+            );
+
             w.add_resource(tilenet);
             w.add_resource(gc);
             w.add_resource(conf.clone());
@@ -105,15 +110,26 @@ impl Game {
         // Create bases
         let base_size: usize = 24;
         let pos = (self.white_base.x as usize, self.white_base.y as usize);
-        tilenet.set_box(&0, (pos.0 - base_size, pos.1 - base_size), (pos.0 + base_size, pos.1 + base_size));
+        tilenet.set_box(
+            &0,
+            (pos.0 - base_size, pos.1 - base_size),
+            (pos.0 + base_size, pos.1 + base_size),
+        );
         let pos = (self.black_base.x as usize, self.black_base.y as usize);
-        tilenet.set_box(&255, (pos.0 - base_size, pos.1 - base_size), (pos.0 + base_size, pos.1 + base_size));
+        tilenet.set_box(
+            &255,
+            (pos.0 - base_size, pos.1 - base_size),
+            (pos.0 + base_size, pos.1 + base_size),
+        );
         // world::gen::rings(&mut world.tilenet, 2);
     }
 
-
     /// Returns (messages to send, messages to send reliably)
-    pub fn update(&mut self, dispatcher: &mut Dispatcher, delta_time: ::DeltaTime) -> (Vec<Message>, Vec<Message>) {
+    pub fn update(
+        &mut self,
+        dispatcher: &mut Dispatcher,
+        delta_time: ::DeltaTime,
+    ) -> (Vec<Message>, Vec<Message>) {
         self.frame += 1;
         self.world.maintain();
         self.vectors.clear(); // clear debug geometry
@@ -124,11 +140,13 @@ impl Game {
         (Vec::new(), Vec::new())
     }
 
-
     /// Returns (white count, black count)
     pub fn count_player_colors(&self) -> (u32, u32) {
         let mut count = (0, 0);
-        let (player, color) = (self.world.read_storage::<Player>(), self.world.read_storage::<Color>());
+        let (player, color) = (
+            self.world.read_storage::<Player>(),
+            self.world.read_storage::<Color>(),
+        );
         for (_, color) in (&player, &color).join() {
             match *color {
                 Color::Black => count.0 += 1,
@@ -140,7 +158,13 @@ impl Game {
 
     // Access //
     /// Return tilenet data as well as new cropped (w, h) to fit inside the world
-    pub fn get_tilenet_serial_rect(&self, x: usize, y: usize, w: usize, h: usize) -> (Vec<Tile>, usize, usize) {
+    pub fn get_tilenet_serial_rect(
+        &self,
+        x: usize,
+        y: usize,
+        w: usize,
+        h: usize,
+    ) -> (Vec<Tile>, usize, usize) {
         let tilenet = &*self.world.read_resource::<TileNet<Tile>>();
         let w = min(x + w, tilenet.get_size().0) as isize - x as isize;
         let h = min(y + h, tilenet.get_size().1) as isize - y as isize;
@@ -150,8 +174,11 @@ impl Game {
         let w = w as usize;
         let h = h as usize;
 
-        let pixels: Vec<u8> = tilenet.view_box((x, x+w, y, y+h)).map(|x| *x.0).collect();
-        assert!(pixels.len() == w*h);
+        let pixels: Vec<u8> = tilenet
+            .view_box((x, x + w, y, y + h))
+            .map(|x| *x.0)
+            .collect();
+        assert!(pixels.len() == w * h);
         (pixels, w, h)
     }
     pub fn get_entity(&self, id: u32) -> specs::Entity {
@@ -166,7 +193,7 @@ impl Game {
     pub fn get_height(&self) -> usize {
         self.height
     }
-    
+
     /// Add player if not already added. Return its unique ID
     pub fn add_player(&mut self, col: Color) -> u32 {
         self.entity_id_seq += 1;
@@ -176,8 +203,10 @@ impl Game {
         };
 
         info!("Add player"; "id" => self.entity_id_seq);
-        let entity = self.world.create_entity()
-            .with(UniqueId (self.entity_id_seq))
+        let entity = self
+            .world
+            .create_entity()
+            .with(UniqueId(self.entity_id_seq))
             .with(Player)
             .with(Pos::with_transl(transl))
             .with(Vel::default())
@@ -196,18 +225,29 @@ impl Game {
         let (pos, color) = {
             let pos = self.world.read_storage::<Pos>();
             let col = self.world.read_storage::<Color>();
-            (pos.get(entity).unwrap().clone(), col.get(entity).unwrap().clone())
+            (
+                pos.get(entity).unwrap().clone(),
+                col.get(entity).unwrap().clone(),
+            )
         };
         let color2 = color.clone();
         let explosion = move |pos: (i32, i32), _vel: &Vel, tilenet: &mut TileNet<Tile>| {
-                tilenet.set(&((255.0 - color2.to_intensity()*255.0) as u8), (pos.0 as usize, pos.1 as usize));
-            };
+            tilenet.set(
+                &((255.0 - color2.to_intensity() * 255.0) as u8),
+                (pos.0 as usize, pos.1 as usize),
+            );
+        };
         self.entity_id_seq += 1;
-        let _entity = self.world.create_entity()
-            .with(UniqueId (self.entity_id_seq))
+        let _entity = self
+            .world
+            .create_entity()
+            .with(UniqueId(self.entity_id_seq))
             .with(Bullet::new(explosion))
             .with(pos)
-            .with(Vel {transl: direction, angular: 1.0})
+            .with(Vel {
+                transl: direction,
+                angular: 1.0,
+            })
             .with(Force::default())
             .with(Shape::new_quad(4.0, 4.0))
             .with(color)
@@ -224,26 +264,30 @@ impl Game {
     }
 
     pub fn input(&mut self, id: u32, input: PlayerInput) -> Result<(), Error> {
-        let entity = self.entities.get(&id).ok_or_else(|| format_err!("Entity not found"))?;
+        let entity = self
+            .entities
+            .get(&id)
+            .ok_or_else(|| format_err!("Entity not found"))?;
         let mut input_resource = self.world.write_storage::<PlayerInput>();
-        let input_ref = input_resource.get_mut(*entity).ok_or_else(|| format_err!("Entity doesn't have input"))?;
+        let input_ref = input_resource
+            .get_mut(*entity)
+            .ok_or_else(|| format_err!("Entity doesn't have input"))?;
         *input_ref = input;
         Ok(())
     }
 }
 
 pub fn map_tile_value_via_color(tile: &Tile, color: Color) -> Tile {
-	match (tile, color) {
-		(&0, Color::Black) => 255,
-		(&255, Color::Black) => 0,
-		_ => *tile,
-	}
+    match (tile, color) {
+        (&0, Color::Black) => 255,
+        (&255, Color::Black) => 0,
+        _ => *tile,
+    }
 }
 
-
-#[derive(Copy,Clone,Default)]
+#[derive(Copy, Clone, Default)]
 pub struct GameConfig {
-    pub hori_acc: f32, 
+    pub hori_acc: f32,
     pub jump_duration: f32,
     pub jump_delay: f32,
     pub jump_acc: f32,
@@ -260,12 +304,11 @@ impl GameConfig {
             jump_duration: conf.player.jump_duration,
             jump_delay: conf.player.jump_delay,
             jump_acc: conf.player.jump_acc,
-            gravity: Vec2::new(0.0, - conf.world.gravity),
+            gravity: Vec2::new(0.0, -conf.world.gravity),
             gravity_on: false,
             srv_tick_duration: conf.get_srv_tick_duration(),
             air_fri: Vec2::new(conf.world.air_fri.0, conf.world.air_fri.1),
             ground_fri: conf.world.ground_fri,
         }
     }
-
 }

@@ -1,4 +1,4 @@
-use std::ops::{Add, Sub, Mul, Div, AddAssign, SubAssign, MulAssign, DivAssign};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 use tilenet;
 
 #[allow(non_camel_case_types)]
@@ -32,7 +32,6 @@ impl Vec2 {
     pub fn scale_uni(&self, s: f32) -> Vec2 {
         Vec2::new(self.x * s, self.y * s)
     }
-
 
     pub fn dot(a: Vec2, b: Vec2) -> f32 {
         a.x * b.x + a.y * b.y
@@ -111,8 +110,6 @@ impl DivAssign for Vec2 {
     }
 }
 
-
-
 /// / Operators Vec2 & float ////
 impl Add<f32> for Vec2 {
     type Output = Vec2;
@@ -170,7 +167,6 @@ impl From<tilenet::Vector> for Vec2 {
     }
 }
 
-
 // impl MulAssign for Vec2 {
 // fn mul_assign(&mut self, other: f32) {
 // self.x *= other;
@@ -186,7 +182,6 @@ impl From<tilenet::Vector> for Vec2 {
 // }
 // }
 //
-
 
 // TODO
 // impl slog::Serialize for Vec3 {

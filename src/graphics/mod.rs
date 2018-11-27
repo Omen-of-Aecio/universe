@@ -1,9 +1,9 @@
-use specs;
-use tilenet_ren;
-use tilenet_ren::{MinifySamplerFilter};
-use tilenet::TileNet;
+use self::ren::{lines, polygons};
 use global::Tile;
-use self::ren::{polygons, lines};
+use specs;
+use tilenet::TileNet;
+use tilenet_ren;
+use tilenet_ren::MinifySamplerFilter;
 
 use cli::cam::Camera;
 
@@ -36,22 +36,27 @@ impl Graphics {
             line_renderer: lines::Ren::new(display.clone()),
         };
         g.tilenet_renderer.set_bg_col(0.1, 0.05, 0.05);
-        g.tilenet_renderer.set_minify_filter(MinifySamplerFilter::Linear);
+        g.tilenet_renderer
+            .set_minify_filter(MinifySamplerFilter::Linear);
         g.tilenet_renderer.set_smooth(false);
         // g.tilenet_renderer.set_magnify_filter(MagnifySamplerFilter::Linear);
-    
+
         g
     }
 
-
     pub fn render(&mut self, cam: Camera, world: &specs::World) {
-        let mut target = self.display.draw();        // target: glium::Frame
+        let mut target = self.display.draw(); // target: glium::Frame
         target.clear_color(0.0, 0.0, 0.0, 1.0);
 
-        self.tilenet_renderer.render(&mut target, (cam.center.x, cam.center.y), cam.zoom, cam.width, cam.height);
+        self.tilenet_renderer.render(
+            &mut target,
+            (cam.center.x, cam.center.y),
+            cam.zoom,
+            cam.width,
+            cam.height,
+        );
         self.poly_renderer.render(&mut target, cam, world);
 
         target.finish().unwrap();
     }
 }
-

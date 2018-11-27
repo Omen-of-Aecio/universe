@@ -1,7 +1,7 @@
-use tilenet::*;
+use component::*;
 use geometry::vec::Vec2;
 use global::Tile;
-use component::*;
+use tilenet::*;
 
 pub struct PolygonCollable<'a> {
     pub shape: &'a Shape,
@@ -24,7 +24,13 @@ pub struct PolygonCollable<'a> {
 
 impl<'a> PolygonCollable<'a> {
     /// start_toc is what fraction of the velocity we start the algorithm with
-    pub fn new(shape: &'a Shape, color: &'a Color, pos: &'a mut Pos, vel: Vec2, start_toc: f32) -> PolygonCollable<'a> {
+    pub fn new(
+        shape: &'a Shape,
+        color: &'a Color,
+        pos: &'a mut Pos,
+        vel: Vec2,
+        start_toc: f32,
+    ) -> PolygonCollable<'a> {
         PolygonCollable {
             shape: shape,
             color: color,
@@ -55,7 +61,10 @@ impl<'a> PolygonCollable<'a> {
 
 impl<'a> Collable<Tile> for PolygonCollable<'a> {
     fn points(&self) -> Points {
-        Points::new(Vector(self.pos.transl.x, self.pos.transl.y), &self.shape.points)
+        Points::new(
+            Vector(self.pos.transl.x, self.pos.transl.y),
+            &self.shape.points,
+        )
     }
     fn queued(&self) -> Vector {
         (self.queued_vel * self.toc).into()
@@ -64,7 +73,8 @@ impl<'a> Collable<Tile> for PolygonCollable<'a> {
     // fn presolve(&mut self) { }
 
     fn resolve<I>(&mut self, mut set: TileSet<Tile, I>) -> bool
-        where I: Iterator<Item = (i32, i32)>
+    where
+        I: Iterator<Item = (i32, i32)>,
     {
         let no_collision = match *self.color {
             Color::White => set.all(|x| *x == 0),

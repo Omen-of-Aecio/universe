@@ -1,7 +1,7 @@
-use tilenet::*;
-use geometry::vec::Vec2;
 use component::Color;
+use geometry::vec::Vec2;
 use global::Tile;
+use tilenet::*;
 
 pub struct RayCollable {
     pos: Vec2,
@@ -34,9 +34,9 @@ impl Collable<Tile> for RayCollable {
         Points::new(Vector(self.pos.x, self.pos.y), NULL_VECTOR)
     }
     fn resolve<I>(&mut self, mut set: TileSet<Tile, I>) -> bool
-        where I: Iterator<Item = (i32, i32)>
+    where
+        I: Iterator<Item = (i32, i32)>,
     {
-
         let no_collision = match self.color {
             Color::White => set.all(|x| *x == 0),
             Color::Black => set.all(|x| *x != 0),

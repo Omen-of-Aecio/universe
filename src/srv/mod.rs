@@ -1,11 +1,11 @@
-use geometry::vec::Vec2;
-use net::Socket;
-use net::msg::{Message};
-use err::*;
 use component::*;
+use err::*;
+use geometry::vec::Vec2;
+use net::msg::Message;
+use net::Socket;
 
 use num_traits::Float;
-use specs::{DispatcherBuilder};
+use specs::DispatcherBuilder;
 use srv::system::*;
 
 use std::{
@@ -20,9 +20,9 @@ use std::{
 
 use conf::Config;
 
-pub mod system;
-pub mod game;
 pub mod diff;
+pub mod game;
+pub mod system;
 
 use self::game::Game;
 
@@ -54,9 +54,17 @@ pub struct Server {
 
 impl Server {
     pub fn new(config: Config) -> Server {
-        let mut game = Game::new(config.clone(),
-                                 Vec2::new((config.world.width/4) as f32, (config.world.height/2) as f32),
-                                 Vec2::new((3*config.world.width/4) as f32, (config.world.height/2) as f32));
+        let mut game = Game::new(
+            config.clone(),
+            Vec2::new(
+                (config.world.width / 4) as f32,
+                (config.world.height / 2) as f32,
+            ),
+            Vec2::new(
+                (3 * config.world.width / 4) as f32,
+                (config.world.height / 2) as f32,
+            ),
+        );
         game.generate_world();
 
         Server {
@@ -79,7 +87,8 @@ impl Server {
         let mut prev_time = SystemTime::now();
 
         // Used to store a 'queue' of snapshots that got ACK'd
-        let acked_msgs: Rc<Mutex<VecDeque<(SocketAddr, u32)>>> = Rc::new(Mutex::new(VecDeque::new()));
+        let acked_msgs: Rc<Mutex<VecDeque<(SocketAddr, u32)>>> =
+            Rc::new(Mutex::new(VecDeque::new()));
         loop {
             // Networking
             self.socket.update()?;
@@ -109,9 +118,9 @@ impl Server {
             use bincode;
             // Send messages
             for (dest, con) in self.connections.iter() {
-                let message = Message::State (self.game.create_snapshot(con.last_snapshot));
+                let message = Message::State(self.game.create_snapshot(con.last_snapshot));
                 // debug!("Snapshot"; "size" => bincode::serialized_size(&message).unwrap(),
-                                  // "last snapshot" => con.last_snapshot);
+                // "last snapshot" => con.last_snapshot);
                 let dest = dest.clone();
                 let current_frame = self.game.frame_nr();
                 let acked_msgs = acked_msgs.clone();
@@ -121,15 +130,18 @@ impl Server {
                     // (WONDERING: a bit confused how I this closure ends up being 'static - what if the
                     // Box dies?)
                     Some(Box::new(move || {
-                            acked_msgs.lock().unwrap().push_back((dest, current_frame));
-                    })))?;
+                        acked_msgs.lock().unwrap().push_back((dest, current_frame));
+                    })),
+                )?;
             }
 
             // Logic
             let now = SystemTime::now();
             let delta_time = now.duration_since(prev_time).expect("duration_since error");
-            prof!["Logic",
-                self.game.update(&mut dispatcher, ::DeltaTime::from_duration(delta_time))
+            prof![
+                "Logic",
+                self.game
+                    .update(&mut dispatcher, ::DeltaTime::from_duration(delta_time))
             ];
 
             if delta_time < self.tick_duration {
@@ -137,41 +149,47 @@ impl Server {
             }
             prev_time = now;
         }
-
     }
-
-
 
     fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<(), Error> {
         // TODO a lot of potential for abstraction/simplification...
 
         // Will ignore packets from unregistered connections
         match msg {
-            Message::Join {snapshot_rate} => self.new_connection(src, snapshot_rate)?,
-            Message::Input (input) => {
-                let con = self.connections.get(&src)
+            Message::Join { snapshot_rate } => self.new_connection(src, snapshot_rate)?,
+            Message::Input(input) => {
+                let con = self
+                    .connections
+                    .get(&src)
                     .ok_or_else(|| format_err!("SocketAddr not registererd as player"))?;
                 self.game.input(con.ecs_id, input)?;
-            },
+            }
             Message::ToggleGravity => self.game.toggle_gravity(),
             Message::BulletFire { direction } => {
-                let con = self.connections.get(&src)
+                let con = self
+                    .connections
+                    .get(&src)
                     .ok_or_else(|| format_err!("SocketAddr not registererd as player"))?;
                 self.game.bullet_fire(con.ecs_id, direction)?;
-            },
+            }
             _ => {}
         }
         Ok(())
     }
 
-
     fn new_connection(&mut self, src: SocketAddr, snapshot_rate: f32) -> Result<(), Error> {
         info!("New connection!");
         // Add new player
         let (w_count, b_count) = self.game.count_player_colors();
-        let color = if w_count >= b_count { Color::Black } else { Color::White };
+        let color = if w_count >= b_count {
+            Color::Black
+        } else {
+            Color::White
+        };
         let player_id = self.game.add_player(color);
-        let _ = self.connections.insert(src, Connection::new(player_id, snapshot_rate));
+        let _ = self
+            .connections
+            .insert(src, Connection::new(player_id, snapshot_rate));
 
         // Tell about the game size and other meta data
         self.socket.send_to(
@@ -182,12 +200,16 @@ impl Server {
                 white_base: self.game.white_base,
                 black_base: self.game.black_base,
             },
-            src)?;
+            src,
+        )?;
 
         // Send it the whole world
         // We will need to split it up because of limited package size
         let (packet_w, packet_h) = Server::packet_dim(Socket::max_payload_size() as usize);
-        let blocks = (self.game.get_width() / packet_w + 1, self.game.get_height() / packet_h + 1);
+        let blocks = (
+            self.game.get_width() / packet_w + 1,
+            self.game.get_height() / packet_h + 1,
+        );
         info!("blocks {:?}", blocks);
         for x in 0..blocks.0 {
             for y in 0..blocks.1 {
@@ -209,7 +231,12 @@ impl Server {
             warn!("zero-size chunk of the world requested");
             None
         } else {
-            Some(Message::WorldRect { x: x, y: y, width: w, pixels: pixels})
+            Some(Message::WorldRect {
+                x: x,
+                y: y,
+                width: w,
+                pixels: pixels,
+            })
         }
     }
 
@@ -217,6 +244,9 @@ impl Server {
     fn packet_dim(mut packet_size: usize) -> (usize, usize) {
         packet_size -= 64; // Assume that the other fields take this amt of bytes...
         let n = (packet_size as f32).log(2.0).floor();
-        (2.0.powf((n/2.0).ceil()) as usize, 2.0.powf((n/2.0).floor()) as usize)
+        (
+            2.0.powf((n / 2.0).ceil()) as usize,
+            2.0.powf((n / 2.0).floor()) as usize,
+        )
     }
 }

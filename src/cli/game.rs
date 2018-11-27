@@ -2,21 +2,20 @@ use tilenet::TileNet;
 
 use cli::cam::Camera;
 
-use std::cmp::min;
-use glium;
-use glium::glutin::{VirtualKeyCode as KeyCode};
-use net::msg::{self, Message};
-use srv::diff::{Snapshot, Entity};
-use input::Input;
-use global::Tile;
-use geometry::vec::Vec2;
 use component::*;
+use geometry::vec::Vec2;
+use glium;
+use glium::glutin::VirtualKeyCode as KeyCode;
+use global::Tile;
+use input::Input;
+use net::msg::{self, Message};
 use specs;
-use specs::{World, Join, Builder, LazyUpdate, Dispatcher, DispatcherBuilder};
+use specs::{Builder, Dispatcher, DispatcherBuilder, Join, LazyUpdate, World};
+use srv::diff::{Entity, Snapshot};
+use std::cmp::min;
 
 use std::collections::HashMap;
 use std::vec::Vec;
-
 
 pub struct Game {
     pub world: World,
@@ -33,10 +32,15 @@ pub struct Game {
     cam_mode: CameraMode,
 }
 
-
-
 impl Game {
-    pub fn new(width: u32, height: u32, you: u32, white_base: Vec2, black_base: Vec2, display: glium::Display) -> Game {
+    pub fn new(
+        width: u32,
+        height: u32,
+        you: u32,
+        white_base: Vec2,
+        black_base: Vec2,
+        display: glium::Display,
+    ) -> Game {
         let mut cam = Camera::new();
         cam.update_win_size(&display);
 
@@ -51,12 +55,10 @@ impl Game {
             w.register_with_storage::<_, Color>(|| ComponentStorage::normal());
             w.register_with_storage::<_, Player>(|| ComponentStorage::normal());
             w.register_with_storage::<_, UniqueId>(|| ComponentStorage::normal());
-            
+
             // The ECS system owns the TileNet
             let mut tilenet = TileNet::<Tile>::new(width as usize, height as usize);
 
-
-            
             w.add_resource(tilenet);
             w.add_resource(cam);
             w.add_resource(HashMap::<u32, specs::Entity>::new());
@@ -76,19 +78,23 @@ impl Game {
     }
 
     /// Returns (messages to send, messages to send reliably)
-    pub fn update(&mut self, dispatcher: &mut Dispatcher, input: &Input) -> (Vec<Message>, Vec<Message>) {
+    pub fn update(
+        &mut self,
+        dispatcher: &mut Dispatcher,
+        input: &Input,
+    ) -> (Vec<Message>, Vec<Message>) {
         self.world.maintain();
         // ^^ XXX maintain before rest, because previously in this frame we handled input & network pacakets
         self.vectors.clear(); // clear debug geometry
         let ret = self.handle_input(input);
-        if let (CameraMode::FollowPlayer, Some(transl)) = (self.cam_mode, self.get_player_transl()) {
+        if let (CameraMode::FollowPlayer, Some(transl)) = (self.cam_mode, self.get_player_transl())
+        {
             self.cam.center = transl;
         }
         *self.world.write_resource() = self.cam;
         dispatcher.dispatch(&mut self.world.res);
         ret
     }
-
 
     /// Returns (messages to send, messages to send reliably)
     fn handle_input(&mut self, input: &Input) -> (Vec<Message>, Vec<Message>) {
@@ -119,7 +125,7 @@ impl Game {
             if let Some(transl) = self.get_player_transl() {
                 let mouse_world_pos = self.cam.screen_to_world(input.mouse_pos());
                 let dir = mouse_world_pos - transl;
-                let msg = Message::BulletFire {direction: dir};
+                let msg = Message::BulletFire { direction: dir };
                 msg_reliable.push(msg);
             }
         }
@@ -133,17 +139,18 @@ impl Game {
             self.cam.zoom /= f32::powf(ZOOM_FACTOR, -y as f32);
         }
 
-
-        msg_reliable.push( Message::Input (input.create_player_input()) );
+        msg_reliable.push(Message::Input(input.create_player_input()));
         (msg, msg_reliable)
     }
-
 
     /// Returns (white count, black count)
     pub fn count_player_colors(&self) -> (u32, u32) {
         let mut count = (0, 0);
         let (player, color) = {
-            (self.world.read_storage::<Player>(), self.world.read_storage::<Color>())
+            (
+                self.world.read_storage::<Player>(),
+                self.world.read_storage::<Color>(),
+            )
         };
         for (_, color) in (&player, &color).join() {
             match *color {
@@ -165,58 +172,63 @@ impl Game {
         let w = w as usize;
         let h = h as usize;
 
-        let pixels: Vec<u8> = tilenet.view_box((x, x+w, y, y+h)).map(|x| *x.0).collect();
-        assert!(pixels.len() == w*h);
+        let pixels: Vec<u8> = tilenet
+            .view_box((x, x + w, y, y + h))
+            .map(|x| *x.0)
+            .collect();
+        assert!(pixels.len() == w * h);
         pixels
     }
 
     pub fn get_player_transl(&self) -> Option<Vec2> {
         let pos = self.world.read_storage::<Pos>();
-        self.get_you().and_then(|you| pos.get(you).map(|pos| pos.transl))
+        self.get_you()
+            .and_then(|you| pos.get(you).map(|pos| pos.transl))
     }
     pub fn get_you(&self) -> Option<specs::Entity> {
         self.get_entity(self.you)
     }
     pub fn get_entity(&self, id: u32) -> Option<specs::Entity> {
-        self.world.read_resource::<HashMap<u32, specs::Entity>>()
-            .get(&id).map(|x| *x)
+        self.world
+            .read_resource::<HashMap<u32, specs::Entity>>()
+            .get(&id)
+            .map(|x| *x)
     }
     /// Puts entity mapping into the HashMap resource. The HashMap is maintained every frame so
     /// this only needs to be done when it otherwise poses a problem that the hashmap is not
     /// immediately updated.
     pub fn register_entity(&mut self, id: u32, ent: specs::Entity) {
-        self.world.write_resource::<HashMap<u32, specs::Entity>>()
+        self.world
+            .write_resource::<HashMap<u32, specs::Entity>>()
             .insert(id, ent);
     }
     pub fn apply_snapshot(&mut self, snapshot: Snapshot) {
         let mut added_entities: Vec<(u32, specs::Entity)> = Vec::new();
         {
-        let updater = self.world.read_resource::<LazyUpdate>();
-        for (id, entity) in snapshot.entities.into_iter() {
-            match entity {
-                Some(Entity {components}) => {
-                    match self.get_entity(id) {
-                        Some(this_ent) => {
-                            components.modify_existing(&*updater, this_ent);
-                        }
-                        None => {
-                            // TODO: maybe need to care about type (Player/Bullet)
-                            let ent = components.insert(&*updater, &*self.world.entities(), id);
-                            added_entities.push((id, ent));
+            let updater = self.world.read_resource::<LazyUpdate>();
+            for (id, entity) in snapshot.entities.into_iter() {
+                match entity {
+                    Some(Entity { components }) => {
+                        match self.get_entity(id) {
+                            Some(this_ent) => {
+                                components.modify_existing(&*updater, this_ent);
+                            }
+                            None => {
+                                // TODO: maybe need to care about type (Player/Bullet)
+                                let ent = components.insert(&*updater, &*self.world.entities(), id);
+                                added_entities.push((id, ent));
+                            }
                         }
                     }
-                },
-                // This means the entity was deleted
-                None => {
-                    match self.get_entity(id) {
+                    // This means the entity was deleted
+                    None => match self.get_entity(id) {
                         Some(this_ent) => {
                             self.world.entities().delete(this_ent).unwrap();
                         }
                         None => error!("Server removed entity not owned by me"),
-                    }
+                    },
                 }
             }
-        }
         }
         for (id, ent) in added_entities {
             self.register_entity(id, ent);
@@ -228,10 +240,8 @@ impl Game {
     }
 }
 
-
-
 /* Should go, together with some logic, to some camera module (?) */
-#[derive(Copy,Clone)]
+#[derive(Copy, Clone)]
 #[allow(unused)]
 enum CameraMode {
     Interactive,

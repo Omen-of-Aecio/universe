@@ -9,8 +9,6 @@ use glium::{Display, Surface};
 use cli::cam::Camera;
 use component::*;
 
-
-
 /// Renderer for polygons.
 /// The polygons are given in the constructor, and never changes. (for now)
 pub struct Ren {
@@ -28,25 +26,22 @@ impl Ren {
             display: display,
             prg: prg,
         }
-
     }
 
-    pub fn render(&self,
-                  target: &mut glium::Frame,
-                  cam: Camera,
-                  world: &specs::World) {
+    pub fn render(&self, target: &mut glium::Frame, cam: Camera, world: &specs::World) {
         let no_indices = glium::index::NoIndices(glium::index::PrimitiveType::TriangleFan);
 
         // Every time just reupload everything...
 
-        let (shape, pos, color) = (world.read_storage::<Shape>(),
-                                   world.read_storage::<Pos>(),
-                                   world.read_storage::<Color>());
+        let (shape, pos, color) = (
+            world.read_storage::<Shape>(),
+            world.read_storage::<Pos>(),
+            world.read_storage::<Color>(),
+        );
         for (shape, pos, color) in (&shape, &pos, &color).join() {
-
             let mut vertices = Vec::new();
             for v in &shape.points {
-                vertices.push(Vertex {pos: [v.0, v.1]});
+                vertices.push(Vertex { pos: [v.0, v.1] });
             }
             let vertex_buffer = glium::VertexBuffer::new(&self.display, &vertices).unwrap();
             let uniforms = uniform! {
@@ -56,17 +51,18 @@ impl Ren {
                 proj: super::proj_matrix(cam.width as f32, cam.height as f32, 0.0, 1.0),
                 view: super::view_matrix(cam.center.x, cam.center.y, cam.zoom, cam.zoom),
             };
-            target.draw(&vertex_buffer,
-                      &no_indices,
-                      &self.prg,
-                      &uniforms,
-                      &Default::default())
+            target
+                .draw(
+                    &vertex_buffer,
+                    &no_indices,
+                    &self.prg,
+                    &uniforms,
+                    &Default::default(),
+                )
                 .unwrap();
-
         }
     }
 }
-
 
 #[derive(Copy, Clone)]
 struct Vertex {

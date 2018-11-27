@@ -3,27 +3,27 @@
 #![cfg_attr(feature = "dev", plugin(clippy))]
 
 #[macro_use]
-extern crate derive_more;
-extern crate hibitset;
-#[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate glium;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate isatty;
-extern crate rand;
 #[macro_use]
 extern crate slog;
-extern crate slog_json;
 #[macro_use]
 extern crate slog_scope;
+
 extern crate bincode;
 extern crate byteorder;
 extern crate clap;
+extern crate derive_more;
+extern crate hibitset;
+extern crate isatty;
 extern crate num_traits;
+extern crate rand;
+extern crate serde;
 extern crate slog_async;
+extern crate slog_json;
 extern crate slog_stream;
 extern crate slog_term;
 extern crate specs;
@@ -49,11 +49,14 @@ pub mod tilenet_gen;
 mod main_state;
 
 use clap::{App, Arg};
-
 use cli::Client;
+use component::*;
 use conf::Config;
+use geometry::Vec2;
+use global::Tile;
 use slog::{Drain, Level};
 use srv::Server;
+use tilenet::TileNet;
 
 /*
 /// Custom Drain logic
@@ -108,7 +111,7 @@ fn parse_command_line_arguments<'a>() -> clap::ArgMatches<'a> {
 }
 
 fn main() {
-    let mut zu = main_state::Main {
+    let mut s = main_state::Main {
         // logger: create_logger(),
         _logger_guard: slog_scope::set_global_logger(create_logger()),
         look: 10,
@@ -116,19 +119,19 @@ fn main() {
         config: None,
     };
 
-    zu.config = Config::from_file("config.toml").ok();
+    s.config = Config::from_file("config.toml").ok();
 
-    run_client_or_server(&mut zu);
+    run_client_or_server(&mut s);
 }
 
-fn run_client_or_server(zu: &mut main_state::Main) {
-    let err = if let Some(connect) = zu.options.value_of("connect") {
+fn run_client_or_server(s: &mut main_state::Main) {
+    let err = if let Some(connect) = s.options.value_of("connect") {
         info!("Running client");
         let mut client = Client::new(connect).unwrap();
         client.run()
     } else {
         info!("Running server");
-        Server::new(zu.config.clone().unwrap()).run()
+        Server::new(s.config.clone().unwrap()).run()
     };
     match err {
         Err(err) => {
@@ -152,11 +155,6 @@ impl DeltaTime {
         }
     }
 }
-
-use component::*;
-use geometry::Vec2;
-use global::Tile;
-use tilenet::TileNet;
 
 pub fn map_tile_value_via_color(tile: &Tile, color: Color) -> Tile {
     match (tile, color) {

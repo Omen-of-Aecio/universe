@@ -17,7 +17,7 @@ use glocals::{*, game::Game};
 
 impl Client {
     pub fn new(server_addr: &str) -> Result<Client, Error> {
-        let mut socket = Client::create_socket();
+        let mut socket = create_socket();
         let server = to_socket_addr(server_addr)?;
 
         // Init connection
@@ -88,7 +88,7 @@ pub fn run(client: &mut Client) -> Result<(), Error> {
                 _ => (),
             }
         }
-        client.handle_input();
+        handle_input(client);
 
         // Receive messages
         client.socket.update()?;
@@ -98,7 +98,7 @@ pub fn run(client: &mut Client) -> Result<(), Error> {
             messages.push(msg);
         }
         for msg in messages {
-            client.handle_message(msg.0, msg.1)?;
+            handle_message(client, msg.0, msg.1)?;
         }
 
         // Update game & send messages
@@ -124,60 +124,59 @@ pub fn run(client: &mut Client) -> Result<(), Error> {
         // thread::sleep(Duration::from_millis(15));
     }
 }
-impl Client {
-    fn handle_input(&mut self) {
-        // Some interactivity for debugging
-        if self.input.key_down(KeyCode::Comma) && self.input.key_toggled(KeyCode::Comma) {
-            self.graphics.tilenet_renderer.toggle_smooth();
+
+fn handle_input(s: &mut Client) {
+    // Some interactivity for debugging
+    if s.input.key_down(KeyCode::Comma) && s.input.key_toggled(KeyCode::Comma) {
+        s.graphics.tilenet_renderer.toggle_smooth();
+    }
+}
+
+/// Currently just ignores unexpected messages
+fn handle_message(s: &mut Client, src: SocketAddr, msg: Message) -> Result<(), Error> {
+    if src != s.server {
+        bail!("Packet not from server");
+    }
+    match msg {
+        Message::Welcome { .. } => {}
+        Message::WorldRect {
+            x,
+            y,
+            width,
+            pixels,
+        } => {
+            let height = pixels.len() / width;
+            update_tilenet_rect(s, x, y, width, height, &pixels);
+        }
+        Message::State(snapshot) => {
+            s.game.apply_snapshot(snapshot);
+        }
+        _ => bail!("Wrong message type."),
+    };
+    Ok(())
+}
+
+fn update_tilenet_rect(s: &mut Client, x: usize, y: usize, w: usize, h: usize, pixels: &[u8]) {
+    let tilenet = &mut *s.game.world.write_resource::<TileNet<Tile>>();
+    let mut count = 0;
+    for y in y..y + h {
+        for x in x..x + w {
+            tilenet.set(&pixels[count], (x, y));
+            count += 1;
         }
     }
+    s.graphics
+        .tilenet_renderer
+        .upload_texture(tilenet, x as u32, y as u32, w as u32, h as u32);
+}
 
-    /// Currently just ignores unexpected messages
-    fn handle_message(&mut self, src: SocketAddr, msg: Message) -> Result<(), Error> {
-        if src != self.server {
-            bail!("Packet not from server");
-        }
-        match msg {
-            Message::Welcome { .. } => {}
-            Message::WorldRect {
-                x,
-                y,
-                width,
-                pixels,
-            } => {
-                let height = pixels.len() / width;
-                self.update_tilenet_rect(x, y, width, height, &pixels);
-            }
-            Message::State(snapshot) => {
-                self.game.apply_snapshot(snapshot);
-            }
-            _ => bail!("Wrong message type."),
-        };
-        Ok(())
-    }
-
-    fn update_tilenet_rect(&mut self, x: usize, y: usize, w: usize, h: usize, pixels: &[u8]) {
-        let tilenet = &mut *self.game.world.write_resource::<TileNet<Tile>>();
-        let mut count = 0;
-        for y in y..y + h {
-            for x in x..x + w {
-                tilenet.set(&pixels[count], (x, y));
-                count += 1;
-            }
-        }
-        self.graphics
-            .tilenet_renderer
-            .upload_texture(tilenet, x as u32, y as u32, w as u32, h as u32);
-    }
-
-    fn create_socket() -> Socket {
-        let mut rng = rand::thread_rng();
-        loop {
-            let p: u16 = 10000 + (rng.gen::<u16>() % 50000);
-            let socket = Socket::new(p);
-            if let Ok(socket) = socket {
-                return socket;
-            }
+fn create_socket() -> Socket {
+    let mut rng = rand::thread_rng();
+    loop {
+        let p: u16 = 10000 + (rng.gen::<u16>() % 50000);
+        let socket = Socket::new(p);
+        if let Ok(socket) = socket {
+            return socket;
         }
     }
 }

@@ -46,7 +46,7 @@ pub mod net;
 pub mod srv;
 pub mod tilenet_gen;
 
-mod main_state;
+mod glocals;
 
 use clap::{App, Arg};
 use cli::Client;
@@ -57,39 +57,6 @@ use global::Tile;
 use slog::{Drain, Level};
 use srv::Server;
 use tilenet::TileNet;
-
-/*
-/// Custom Drain logic
-struct RuntimeLevelFilter<D>{
-   drain: D,
-   on: Arc<atomic::AtomicBool>,
-}
-
-impl<D> Drain for RuntimeLevelFilter<D>
-    where D : Drain {
-    type Ok = Option<D::Ok>;
-    type Err = Option<D::Err>;
-
-    fn log(&self,
-              record: &slog::Record,
-              values: &slog::OwnedKVList)
-              -> result::Result<Self::Ok, Self::Err> {
-          let level = if self.on.load(Ordering::Relaxed) {
-              slog::Level::Trace
-          } else {
-              slog::Level::Info
-          };
-
-          if record.level().is_at_least(level) {
-              self.drain.log(record, values)
-                  .map(Some)
-                  .map_err(Some)
-          } else {
-              Ok(None)
-          }
-      }
-  }
-*/
 
 fn create_logger() -> slog::Logger {
     let decorator = slog_term::TermDecorator::new().build();
@@ -110,8 +77,15 @@ fn parse_command_line_arguments<'a>() -> clap::ArgMatches<'a> {
         .get_matches()
 }
 
+fn get_nums(a: u32, b: u32) -> impl Iterator<Item = u32> {
+    (a..b).filter(|x| x % 100 == 0)
+}
+
 fn main() {
-    let mut s = main_state::Main {
+    for i in get_nums(100, 300) {
+        println!["{}", i];
+    }
+    let mut s = glocals::Main {
         // logger: create_logger(),
         _logger_guard: slog_scope::set_global_logger(create_logger()),
         look: 10,
@@ -124,7 +98,7 @@ fn main() {
     run_client_or_server(&mut s);
 }
 
-fn run_client_or_server(s: &mut main_state::Main) {
+fn run_client_or_server(s: &mut glocals::Main) {
     let err = if let Some(connect) = s.options.value_of("connect") {
         info!("Running client");
         let mut client = Client::new(connect).unwrap();

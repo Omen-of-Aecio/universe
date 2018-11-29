@@ -1,23 +1,18 @@
+use clap;
+use conf;
 use geometry::vec::Vec2;
 use glium;
 use graphics::Graphics;
 use input::Input;
 use net::Socket;
-use specs::World;
-use specs;
-use std::net::SocketAddr;
-use std::vec::Vec;
-use std::{
-    collections::HashMap,
-    time::Duration,
-};
+use self::game::Game;
+use specs::{self, World};
+use std::{collections::HashMap, net::SocketAddr, time::Duration, vec::Vec};
 
 pub mod cam;
 pub mod game;
 pub mod system;
-use self::game::Game;
-use clap;
-use conf;
+
 
 pub struct Main<'a> {
     pub _logger_guard: slog_scope::GlobalLoggerGuard,

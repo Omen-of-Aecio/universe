@@ -34,7 +34,6 @@ extern crate toml;
 
 pub mod global;
 
-pub mod cli;
 pub mod collision;
 pub mod component;
 pub mod conf;
@@ -49,7 +48,7 @@ pub mod tilenet_gen;
 mod glocals;
 
 use clap::{App, Arg};
-use cli::Client;
+use glocals::Client;
 use component::*;
 use conf::Config;
 use geometry::Vec2;

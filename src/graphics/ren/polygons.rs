@@ -6,7 +6,7 @@ use specs::Join;
 use glium;
 use glium::{Display, Surface};
 
-use cli::cam::Camera;
+use glocals::cam::Camera;
 use component::*;
 
 /// Renderer for polygons.

@@ -1,6 +1,6 @@
 use tilenet::TileNet;
 
-use cli::cam::Camera;
+use super::cam::Camera;
 
 use component::*;
 use geometry::vec::Vec2;

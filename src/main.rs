@@ -15,6 +15,7 @@ extern crate slog_scope;
 
 extern crate bincode;
 extern crate byteorder;
+#[macro_use]
 extern crate clap;
 extern crate derive_more;
 extern crate hibitset;
@@ -68,6 +69,8 @@ fn create_logger() -> slog::Logger {
 
 fn parse_command_line_arguments<'a>() -> clap::ArgMatches<'a> {
     App::new("Universe")
+        .version("0.1.0")
+        .author(crate_authors!["\n"])
         .arg(
             Arg::with_name("connect")
                 .short("c")

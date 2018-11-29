@@ -77,14 +77,7 @@ fn parse_command_line_arguments<'a>() -> clap::ArgMatches<'a> {
         .get_matches()
 }
 
-fn get_nums(a: u32, b: u32) -> impl Iterator<Item = u32> {
-    (a..b).filter(|x| x % 100 == 0)
-}
-
 fn main() {
-    for i in get_nums(100, 300) {
-        println!["{}", i];
-    }
     let mut s = glocals::Main {
         // logger: create_logger(),
         _logger_guard: slog_scope::set_global_logger(create_logger()),

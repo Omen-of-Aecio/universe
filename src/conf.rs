@@ -2,10 +2,7 @@
 //! representation runtime.
 
 use err::*;
-use std::fs::File;
-use std::io::Read;
-use std::str::FromStr;
-use std::time::Duration;
+use std::{fs::File, io::Read, str::FromStr, time::Duration};
 use toml;
 
 #[derive(Deserialize, Clone)]

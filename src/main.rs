@@ -102,7 +102,7 @@ fn run_client_or_server(s: &mut glocals::Main) {
     let err = if let Some(connect) = s.options.value_of("connect") {
         info!("Running client");
         let mut client = Client::new(connect).unwrap();
-        client.run()
+        cli::run(&mut client)
     } else {
         info!("Running server");
         Server::new(s.config.as_ref().unwrap()).run()

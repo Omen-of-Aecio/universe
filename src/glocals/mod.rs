@@ -1,20 +1,9 @@
 use glium;
-use glium::glutin;
-use glium::glutin::{MouseScrollDelta, VirtualKeyCode as KeyCode};
-use glium::DisplayBuild;
-use global::Tile;
 use graphics::Graphics;
-use tilenet::TileNet;
 
-use err::*;
 use input::Input;
-use rand;
-use rand::Rng;
 
-use net::msg::Message;
-use net::{to_socket_addr, Socket};
-use specs::DispatcherBuilder;
-use srv::system::MaintainSys;
+use net::Socket;
 use std::net::SocketAddr;
 
 pub mod cam;

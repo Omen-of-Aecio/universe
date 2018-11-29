@@ -55,7 +55,7 @@ use conf::Config;
 use geometry::Vec2;
 use global::Tile;
 use slog::{Drain, Level};
-use srv::Server;
+use glocals::Server;
 use tilenet::TileNet;
 
 fn create_logger() -> slog::Logger {

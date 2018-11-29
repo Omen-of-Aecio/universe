@@ -21,7 +21,7 @@ pub struct Game {
     pub world: World,
     pub cam: Camera,
 
-    you: u32,
+    pub you: u32,
 
     pub white_base: Vec2,
     pub black_base: Vec2,

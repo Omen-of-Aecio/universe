@@ -3,7 +3,7 @@ use err::*;
 use geometry::vec::Vec2;
 use net::msg::Message;
 use net::Socket;
-
+use glocals::*;
 use num_traits::Float;
 use specs::DispatcherBuilder;
 use srv::system::*;
@@ -23,16 +23,8 @@ use conf::Config;
 pub mod diff;
 pub mod game;
 pub mod system;
-
 use self::game::Game;
 
-#[derive(Clone)]
-struct Connection {
-    /// Unique id in the ECS
-    ecs_id: u32,
-    last_snapshot: u32, // frame#
-    snapshot_rate: f32,
-}
 impl Connection {
     pub fn new(ecs_id: u32, snapshot_rate: f32) -> Connection {
         Connection {
@@ -41,15 +33,6 @@ impl Connection {
             snapshot_rate,
         }
     }
-}
-
-pub struct Server {
-    game: Game,
-    connections: HashMap<SocketAddr, Connection>,
-    socket: Socket,
-
-    /// Frame duration in seconds (used only for how long to sleep. FPS is in GameConfig)
-    tick_duration: Duration,
 }
 
 impl Server {

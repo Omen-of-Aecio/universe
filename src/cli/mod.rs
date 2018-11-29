@@ -1,21 +1,18 @@
-use glium::glutin;
-use glium::glutin::{MouseScrollDelta, VirtualKeyCode as KeyCode};
+use err::*;
 use glium::DisplayBuild;
+use glium::glutin::{MouseScrollDelta, VirtualKeyCode as KeyCode};
+use glium::glutin;
 use global::Tile;
 use graphics::Graphics;
-use tilenet::TileNet;
-
-use err::*;
 use input::Input;
-use rand;
-use rand::Rng;
-
 use net::msg::Message;
 use net::{to_socket_addr, Socket};
+use rand::Rng;
+use rand;
 use specs::DispatcherBuilder;
 use srv::system::MaintainSys;
 use std::net::SocketAddr;
-
+use tilenet::TileNet;
 use glocals::{*, game::Game};
 
 impl Client {

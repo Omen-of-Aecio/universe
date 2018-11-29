@@ -4,7 +4,7 @@ use geometry::Vec2;
 use global::Tile;
 use specs::{self, prelude::*};
 use srv::diff::*;
-use srv::game::GameConfig;
+use glocals::GameConfig;
 use std::collections::HashMap;
 use tilenet::TileNet;
 use DeltaTime;

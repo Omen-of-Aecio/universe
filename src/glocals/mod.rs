@@ -1,11 +1,12 @@
+use geometry::vec::Vec2;
 use glium;
 use graphics::Graphics;
-
 use input::Input;
-
 use net::Socket;
+use specs::World;
+use specs;
 use std::net::SocketAddr;
-
+use std::vec::Vec;
 use std::{
     collections::HashMap,
     time::Duration,
@@ -37,7 +38,7 @@ pub struct Client {
 }
 
 pub struct Server {
-    pub game: ::srv::game::Game,
+    pub game: ServerGame,
     pub connections: HashMap<SocketAddr, Connection>,
     pub socket: Socket,
 
@@ -51,4 +52,38 @@ pub struct Connection {
     pub ecs_id: u32,
     pub last_snapshot: u32, // frame#
     pub snapshot_rate: f32,
+}
+
+pub struct ServerGame {
+    pub frame: u32,
+    pub world: World,
+    pub game_conf: GameConfig,
+
+    /// Mapping from unique ID to specs Entity
+    pub entities: HashMap<u32, specs::Entity>,
+    pub entity_id_seq: u32,
+
+    /// Width of the generated world
+    pub width: usize,
+    /// Height of the generated world
+    pub height: usize,
+
+    pub white_base: Vec2,
+    pub black_base: Vec2,
+
+    // Extra graphics data (for debugging/visualization)
+    pub vectors: Vec<(Vec2, Vec2)>,
+}
+
+#[derive(Copy, Clone, Default)]
+pub struct GameConfig {
+    pub hori_acc: f32,
+    pub jump_duration: f32,
+    pub jump_delay: f32,
+    pub jump_acc: f32,
+    pub gravity: Vec2,
+    pub gravity_on: bool,
+    pub srv_tick_duration: Duration,
+    pub air_fri: Vec2,
+    pub ground_fri: f32,
 }

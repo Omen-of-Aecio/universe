@@ -1,46 +1,21 @@
-use tilenet::TileNet;
-
-use err::*;
-
 use component::*;
+use conf::Config;
+use err::*;
 use geometry::vec::Vec2;
 use global::Tile;
+use glocals::*;
 use net::msg::Message;
-use specs;
 use specs::{Builder, Dispatcher, Join, World};
+use specs;
 use srv::diff::{DiffHistory, Snapshot};
 use std::cmp::min;
+use std::collections::HashMap;
+use std::vec::Vec;
+use tilenet::TileNet;
 use tilenet_gen;
 
-use std::collections::HashMap;
-use std::time::Duration;
-use std::vec::Vec;
-
-use conf::Config;
-
-pub struct Game {
-    frame: u32,
-    pub world: World,
-    pub game_conf: GameConfig,
-
-    /// Mapping from unique ID to specs Entity
-    entities: HashMap<u32, specs::Entity>,
-    entity_id_seq: u32,
-
-    /// Width of the generated world
-    width: usize,
-    /// Height of the generated world
-    height: usize,
-
-    pub white_base: Vec2,
-    pub black_base: Vec2,
-
-    // Extra graphics data (for debugging/visualization)
-    pub vectors: Vec<(Vec2, Vec2)>,
-}
-
-impl Game {
-    pub fn new(conf: &Config, white_base: Vec2, black_base: Vec2) -> Game {
+impl ServerGame {
+    pub fn new(conf: &Config, white_base: Vec2, black_base: Vec2) -> ServerGame {
         let gc = GameConfig::new(&conf);
 
         let world = {
@@ -88,7 +63,7 @@ impl Game {
             w
         };
 
-        Game {
+        ServerGame {
             frame: 0,
             world,
             game_conf: gc,
@@ -284,18 +259,6 @@ pub fn map_tile_value_via_color(tile: Tile, color: Color) -> Tile {
     }
 }
 
-#[derive(Copy, Clone, Default)]
-pub struct GameConfig {
-    pub hori_acc: f32,
-    pub jump_duration: f32,
-    pub jump_delay: f32,
-    pub jump_acc: f32,
-    pub gravity: Vec2,
-    pub gravity_on: bool,
-    pub srv_tick_duration: Duration,
-    pub air_fri: Vec2,
-    pub ground_fri: f32,
-}
 impl GameConfig {
     pub fn new(conf: &Config) -> GameConfig {
         GameConfig {

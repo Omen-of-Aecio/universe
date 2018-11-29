@@ -1,29 +1,27 @@
 use component::*;
+use conf::Config;
 use err::*;
 use geometry::vec::Vec2;
-use net::msg::Message;
-use net::Socket;
 use glocals::*;
+use net::Socket;
+use net::msg::Message;
 use num_traits::Float;
 use specs::DispatcherBuilder;
 use srv::system::*;
-
 use std::{
     collections::{HashMap, VecDeque},
     net::SocketAddr,
     rc::Rc,
     sync::Mutex,
     thread,
-    time::{Duration, SystemTime},
+    time::SystemTime,
     vec::Vec,
 };
 
-use conf::Config;
 
 pub mod diff;
 pub mod game;
 pub mod system;
-use self::game::Game;
 
 impl Connection {
     pub fn new(ecs_id: u32, snapshot_rate: f32) -> Connection {
@@ -37,7 +35,7 @@ impl Connection {
 
 impl Server {
     pub fn new(config: &Config) -> Server {
-        let mut game = Game::new(
+        let mut game = ServerGame::new(
             config,
             Vec2::new(
                 (config.world.width / 4) as f32,

@@ -59,34 +59,38 @@ use slog::{Drain, Level};
 use glocals::Server;
 use tilenet::TileNet;
 
-fn create_logger() -> slog::Logger {
+fn create_logger(s: &mut Option<slog_scope::GlobalLoggerGuard>) {
     let decorator = slog_term::TermDecorator::new().build();
     let drain = slog_term::FullFormat::new(decorator).build().fuse();
     let drain = slog_async::Async::new(drain).build().fuse();
     let drain = drain.filter_level(Level::Debug).fuse();
-    slog::Logger::root(drain, o!())
+    *s = Some(slog_scope::set_global_logger(slog::Logger::root(drain, o!())));
 }
 
-fn parse_command_line_arguments<'a>() -> clap::ArgMatches<'a> {
-    App::new("Universe")
-        .version("0.1.0")
-        .author(crate_authors!["\n"])
-        .arg(
-            Arg::with_name("connect")
-                .short("c")
-                .help("Run client and connect to specified server of form `ipaddress:port`")
-                .takes_value(true),
-        )
-        .get_matches()
+fn parse_command_line_arguments<'a>(s: &mut clap::ArgMatches<'a>) {
+    *s = {
+        App::new("Universe")
+            .version("0.1.0")
+            .author(crate_authors!["\n"])
+            .arg(
+                Arg::with_name("connect")
+                    .short("c")
+                    .help("Run client and connect to specified server of form `ipaddress:port`")
+                    .takes_value(true),
+            )
+            .get_matches()
+    };
+}
+
+fn load_configuration_file(s: &mut Option<conf::Config>) {
+    *s = Config::from_file("config.toml").ok();
 }
 
 fn main() {
-    let mut s = glocals::Main {
-        _logger_guard: slog_scope::set_global_logger(create_logger()),
-        options: parse_command_line_arguments(),
-        config: Config::from_file("config.toml").ok(),
-    };
-
+    let mut s = glocals::Main::default();
+    create_logger(&mut s._logger_guard);
+    parse_command_line_arguments(&mut s.options);
+    load_configuration_file(&mut s.config);
     run_client_or_server(&mut s);
 }
 

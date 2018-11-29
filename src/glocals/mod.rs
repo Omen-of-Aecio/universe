@@ -14,8 +14,9 @@ pub mod game;
 pub mod system;
 
 
+#[derive(Default)]
 pub struct Main<'a> {
-    pub _logger_guard: slog_scope::GlobalLoggerGuard,
+    pub _logger_guard: Option<slog_scope::GlobalLoggerGuard>,
     pub config: Option<conf::Config>,
     pub options: clap::ArgMatches<'a>,
 }

@@ -45,6 +45,7 @@ pub mod net;
 pub mod srv;
 pub mod tilenet_gen;
 
+mod cli;
 mod glocals;
 
 use clap::{App, Arg};

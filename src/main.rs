@@ -84,12 +84,9 @@ fn main() {
     let mut s = glocals::Main {
         // logger: create_logger(),
         _logger_guard: slog_scope::set_global_logger(create_logger()),
-        look: 10,
         options: parse_command_line_arguments(),
-        config: None,
+        config: Config::from_file("config.toml").ok(),
     };
-
-    s.config = Config::from_file("config.toml").ok();
 
     run_client_or_server(&mut s);
 }

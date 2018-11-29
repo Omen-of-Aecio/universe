@@ -77,27 +77,6 @@ impl ServerGame {
         }
     }
 
-    pub fn generate_world(&mut self) {
-        let mut tilenet = self.world.write_resource::<TileNet<Tile>>();
-        tilenet_gen::proc1(&mut *tilenet);
-
-        // Create bases
-        let base_size: usize = 24;
-        let pos = (self.white_base.x as usize, self.white_base.y as usize);
-        tilenet.set_box(
-            &0,
-            (pos.0 - base_size, pos.1 - base_size),
-            (pos.0 + base_size, pos.1 + base_size),
-        );
-        let pos = (self.black_base.x as usize, self.black_base.y as usize);
-        tilenet.set_box(
-            &255,
-            (pos.0 - base_size, pos.1 - base_size),
-            (pos.0 + base_size, pos.1 + base_size),
-        );
-        // world::gen::rings(&mut world.tilenet, 2);
-    }
-
     /// Returns (messages to send, messages to send reliably)
     pub fn update(
         &mut self,
@@ -274,3 +253,25 @@ impl GameConfig {
         }
     }
 }
+
+pub fn generate_world(s: &mut ServerGame) {
+    let mut tilenet = s.world.write_resource::<TileNet<Tile>>();
+    tilenet_gen::proc1(&mut *tilenet);
+
+    // Create bases
+    let base_size: usize = 24;
+    let pos = (s.white_base.x as usize, s.white_base.y as usize);
+    tilenet.set_box(
+        &0,
+        (pos.0 - base_size, pos.1 - base_size),
+        (pos.0 + base_size, pos.1 + base_size),
+    );
+    let pos = (s.black_base.x as usize, s.black_base.y as usize);
+    tilenet.set_box(
+        &255,
+        (pos.0 - base_size, pos.1 - base_size),
+        (pos.0 + base_size, pos.1 + base_size),
+    );
+    // world::gen::rings(&mut world.tilenet, 2);
+}
+

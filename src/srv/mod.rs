@@ -18,10 +18,11 @@ use std::{
     vec::Vec,
 };
 
-
 pub mod diff;
 pub mod game;
 pub mod system;
+
+use self::game::generate_world;
 
 impl Connection {
     pub fn new(ecs_id: u32, snapshot_rate: f32) -> Connection {
@@ -46,7 +47,7 @@ impl Server {
                 (config.world.height / 2) as f32,
             ),
         );
-        game.generate_world();
+        generate_world(&mut game);
 
         Server {
             game,
@@ -54,80 +55,6 @@ impl Server {
             socket: Socket::new(9123).unwrap(),
 
             tick_duration: config.get_srv_tick_duration(),
-        }
-    }
-    pub fn run(&mut self) -> Result<(), Error> {
-        let mut builder = DispatcherBuilder::new();
-        builder.add(MoveSys, "move", &[]);
-        builder.add(JumpSys, "jump", &[]);
-        builder.add(InputSys, "input", &[]);
-        builder.add(MaintainSys, "maintain", &[]);
-        builder.add(DiffSys, "diff", &[]);
-        let mut dispatcher = builder.build();
-
-        let mut prev_time = SystemTime::now();
-
-        // Used to store a 'queue' of snapshots that got ACK'd
-        let acked_msgs: Rc<Mutex<VecDeque<(SocketAddr, u32)>>> =
-            Rc::new(Mutex::new(VecDeque::new()));
-        loop {
-            // Networking
-            self.socket.update()?;
-
-            // Receive messages
-            let mut messages = Vec::new();
-            for msg in self.socket.messages() {
-                let msg = msg?;
-                messages.push(msg);
-            }
-            for msg in messages {
-                self.handle_message(msg.0, &msg.1)?;
-            }
-
-            // Check ACKs
-            {
-                let mut acked_msgs = acked_msgs.lock().unwrap();
-                for (dest, frame) in acked_msgs.iter() {
-                    if let Some(con) = self.connections.get_mut(&dest) {
-                        if con.last_snapshot < *frame {
-                            con.last_snapshot = *frame;
-                        }
-                    }
-                }
-                *acked_msgs = VecDeque::new();
-            }
-            // Send messages
-            for (dest, con) in self.connections.iter() {
-                let message = Message::State(self.game.create_snapshot(con.last_snapshot));
-                // debug!("Snapshot"; "size" => bincode::serialized_size(&message).unwrap(),
-                // "last snapshot" => con.last_snapshot);
-                let dest = *dest;
-                let current_frame = self.game.frame_nr();
-                let acked_msgs = acked_msgs.clone();
-                self.socket.send_reliably_to(
-                    message,
-                    dest,
-                    // (WONDERING: a bit confused how I this closure ends up being 'static - what if the
-                    // Box dies?)
-                    Some(Box::new(move || {
-                        acked_msgs.lock().unwrap().push_back((dest, current_frame));
-                    })),
-                )?;
-            }
-
-            // Logic
-            let now = SystemTime::now();
-            let delta_time = now.duration_since(prev_time).expect("duration_since error");
-            prof![
-                "Logic",
-                self.game
-                    .update(&mut dispatcher, ::DeltaTime::from_duration(delta_time))
-            ];
-
-            if delta_time < self.tick_duration {
-                thread::sleep(self.tick_duration - delta_time);
-            }
-            prev_time = now;
         }
     }
 
@@ -228,5 +155,80 @@ impl Server {
             2.0.powf((n / 2.0).ceil()) as usize,
             2.0.powf((n / 2.0).floor()) as usize,
         )
+    }
+}
+
+pub fn run(s: &mut Server) -> Result<(), Error> {
+    let mut builder = DispatcherBuilder::new();
+    builder.add(MoveSys, "move", &[]);
+    builder.add(JumpSys, "jump", &[]);
+    builder.add(InputSys, "input", &[]);
+    builder.add(MaintainSys, "maintain", &[]);
+    builder.add(DiffSys, "diff", &[]);
+    let mut dispatcher = builder.build();
+
+    let mut prev_time = SystemTime::now();
+
+    // Used to store a 'queue' of snapshots that got ACK'd
+    let acked_msgs: Rc<Mutex<VecDeque<(SocketAddr, u32)>>> =
+        Rc::new(Mutex::new(VecDeque::new()));
+    loop {
+        // Networking
+        s.socket.update()?;
+
+        // Receive messages
+        let mut messages = Vec::new();
+        for msg in s.socket.messages() {
+            let msg = msg?;
+            messages.push(msg);
+        }
+        for msg in messages {
+            s.handle_message(msg.0, &msg.1)?;
+        }
+
+        // Check ACKs
+        {
+            let mut acked_msgs = acked_msgs.lock().unwrap();
+            for (dest, frame) in acked_msgs.iter() {
+                if let Some(con) = s.connections.get_mut(&dest) {
+                    if con.last_snapshot < *frame {
+                        con.last_snapshot = *frame;
+                    }
+                }
+            }
+            *acked_msgs = VecDeque::new();
+        }
+        // Send messages
+        for (dest, con) in s.connections.iter() {
+            let message = Message::State(s.game.create_snapshot(con.last_snapshot));
+            // debug!("Snapshot"; "size" => bincode::serialized_size(&message).unwrap(),
+            // "last snapshot" => con.last_snapshot);
+            let dest = *dest;
+            let current_frame = s.game.frame_nr();
+            let acked_msgs = acked_msgs.clone();
+            s.socket.send_reliably_to(
+                message,
+                dest,
+                // (WONDERING: a bit confused how I this closure ends up being 'static - what if the
+                // Box dies?)
+                Some(Box::new(move || {
+                    acked_msgs.lock().unwrap().push_back((dest, current_frame));
+                })),
+            )?;
+        }
+
+        // Logic
+        let now = SystemTime::now();
+        let delta_time = now.duration_since(prev_time).expect("duration_since error");
+        prof![
+            "Logic",
+            s.game
+                .update(&mut dispatcher, ::DeltaTime::from_duration(delta_time))
+        ];
+
+        if delta_time < s.tick_duration {
+            thread::sleep(s.tick_duration - delta_time);
+        }
+        prev_time = now;
     }
 }

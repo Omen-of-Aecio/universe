@@ -101,7 +101,7 @@ fn run_client_or_server(s: &mut glocals::Main) {
         cli::run(&mut client)
     } else {
         info!("Running server");
-        Server::new(s.config.as_ref().unwrap()).run()
+        srv::run(&mut Server::new(s.config.as_ref().unwrap()))
     };
     if let Err(err) = err {
         println!("Error: {}", err);

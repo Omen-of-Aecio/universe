@@ -32,7 +32,7 @@ extern crate tilenet_ren;
 extern crate time;
 extern crate toml;
 
-mod global;
+mod macros;
 // ---
 mod addons;
 mod conf;

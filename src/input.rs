@@ -2,7 +2,7 @@ use glium::glutin;
 use glium::glutin::{ElementState, MouseButton, VirtualKeyCode as KeyCode};
 // use glium::glutin::KeyCode;
 use component::PlayerInput;
-use geometry::vec::Vec2;
+use libs::geometry::vec::Vec2;
 use glium::glutin::Event::KeyboardInput;
 
 // TODO

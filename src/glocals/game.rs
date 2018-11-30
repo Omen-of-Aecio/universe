@@ -3,7 +3,7 @@ use tilenet::TileNet;
 use super::cam::Camera;
 
 use component::*;
-use geometry::vec::Vec2;
+use libs::geometry::vec::Vec2;
 use glium;
 use glium::glutin::VirtualKeyCode as KeyCode;
 use global::Tile;

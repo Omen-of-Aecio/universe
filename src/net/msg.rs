@@ -3,7 +3,7 @@
 //! Only upon explicit request (or join) of a client does the client
 //! receive a complete snapshot. This snapshot should be transmitted reliably.
 use component::*;
-use geometry::vec::Vec2;
+use libs::geometry::vec::Vec2;
 use addons::srv::diff::*;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

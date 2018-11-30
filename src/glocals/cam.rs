@@ -1,4 +1,4 @@
-use geometry::Vec2;
+use libs::geometry::Vec2;
 use glium::Display;
 
 #[derive(Copy, Clone)]

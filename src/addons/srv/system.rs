@@ -1,7 +1,7 @@
 use super::DeltaTime;
 use collision::{bullet_move, player_move};
 use component::*;
-use geometry::Vec2;
+use libs::geometry::Vec2;
 use global::Tile;
 use glocals::GameConfig;
 use specs::{self, prelude::*};

@@ -1,7 +1,7 @@
 use component::*;
 use conf::Config;
 use err::*;
-use geometry::vec::Vec2;
+use libs::geometry::vec::Vec2;
 use glocals::*;
 use net::msg::Message;
 use net::Socket;

@@ -1,6 +1,6 @@
 pub mod vec;
 
-pub use geometry::vec::Vec2;
+pub use libs::geometry::vec::Vec2;
 
 /// ...
 ///

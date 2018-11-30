@@ -1,7 +1,7 @@
 use self::game::Game;
 use clap;
 use conf;
-use geometry::vec::Vec2;
+use libs::geometry::vec::Vec2;
 use glium;
 use graphics::Graphics;
 use input::Input;

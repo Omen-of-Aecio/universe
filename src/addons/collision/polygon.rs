@@ -67,7 +67,8 @@ impl<'a> Collable<Tile> for PolygonCollable<'a> {
         )
     }
     fn queued(&self) -> Vector {
-        (self.queued_vel * self.toc).into()
+        let queued = self.queued_vel * self.toc;
+        Vector(queued.x, queued.y)
     }
 
     // fn presolve(&mut self) { }
@@ -82,7 +83,8 @@ impl<'a> Collable<Tile> for PolygonCollable<'a> {
         };
         if no_collision {
             // If there is no collision (we only collide with non-zero tiles)
-            self.pos.transl += Vec2::from(self.queued());
+            let queued = self.queued();
+            self.pos.transl += Vec2::new(queued.0, queued.1);
             true
         } else {
             // Collision.

@@ -1,9 +1,7 @@
 pub mod vec;
 
-pub use libs::geometry::vec::Vec2;
+pub use self::vec::Vec2;
 
-/// ...
-///
 /// Returns alpha where the ray first collides with the box.
 pub fn ray_vs_unit_box(point: Vec2, dir: Vec2, box_x: usize, box_y: usize) -> Option<f32> {
     let box_x = box_x as f32;

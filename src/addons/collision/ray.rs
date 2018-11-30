@@ -28,7 +28,8 @@ static NULL_VECTOR: &'static [(f32, f32)] = &[(0.0, 0.0)];
 
 impl Collable<Tile> for RayCollable {
     fn queued(&self) -> Vector {
-        self.dir.into()
+        let dir = self.dir;
+        Vector(dir.x, dir.y)
     }
     fn points(&self) -> Points {
         Points::new(Vector(self.pos.x, self.pos.y), NULL_VECTOR)

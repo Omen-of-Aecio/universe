@@ -33,7 +33,7 @@ toml = "0.4"
 
 [features]
 default = []
-dev = ["clippy"]
+dev = []
 
 [profile.release]
 debug = true

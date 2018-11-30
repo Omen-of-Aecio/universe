@@ -47,7 +47,7 @@ impl DeltaTime {
 }
 
 pub fn create_server(config: &Config) -> Server {
-    let mut game = ServerGame::new(
+    let mut game = game::create_servergame(
         config,
         Vec2::new(
             (config.world.width / 4) as f32,
@@ -80,15 +80,15 @@ fn handle_message(s: &mut Server, src: SocketAddr, msg: &Message) -> Result<(), 
                 .connections
                 .get(&src)
                 .ok_or_else(|| format_err!("SocketAddr not registererd as player"))?;
-            s.game.input(con.ecs_id, input)?;
+            game::input(&mut s.game, con.ecs_id, input)?;
         }
-        Message::ToggleGravity => s.game.toggle_gravity(),
+        Message::ToggleGravity => game::toggle_gravity(&mut s.game),
         Message::BulletFire { direction } => {
             let con = s
                 .connections
                 .get(&src)
                 .ok_or_else(|| format_err!("SocketAddr not registererd as player"))?;
-            s.game.bullet_fire(con.ecs_id, direction)?;
+            game::bullet_fire(&mut s.game, con.ecs_id, direction)?;
         }
         _ => {}
     }
@@ -98,13 +98,13 @@ fn handle_message(s: &mut Server, src: SocketAddr, msg: &Message) -> Result<(), 
 fn new_connection(s: &mut Server, src: SocketAddr, snapshot_rate: f32) -> Result<(), Error> {
     info!("New connection!");
     // Add new player
-    let (w_count, b_count) = s.game.count_player_colors();
+    let (w_count, b_count) = game::count_player_colors(&s.game);
     let color = if w_count >= b_count {
         Color::Black
     } else {
         Color::White
     };
-    let player_id = s.game.add_player(color);
+    let player_id = game::add_player(&mut s.game, color);
     let _ = s
         .connections
         .insert(src, Connection::new(player_id, snapshot_rate));
@@ -112,8 +112,8 @@ fn new_connection(s: &mut Server, src: SocketAddr, snapshot_rate: f32) -> Result
     // Tell about the game size and other meta data
     s.socket.send_to(
         Message::Welcome {
-            width: s.game.get_width() as u32,
-            height: s.game.get_height() as u32,
+            width: game::get_width(&s.game) as u32,
+            height: game::get_height(&s.game) as u32,
             you: player_id,
             white_base: s.game.white_base,
             black_base: s.game.black_base,
@@ -125,8 +125,8 @@ fn new_connection(s: &mut Server, src: SocketAddr, snapshot_rate: f32) -> Result
     // We will need to split it up because of limited package size
     let (packet_w, packet_h) = packet_dim(Socket::max_payload_size() as usize);
     let blocks = (
-        s.game.get_width() / packet_w + 1,
-        s.game.get_height() / packet_h + 1,
+        game::get_width(&s.game) / packet_w + 1,
+        game::get_height(&s.game) / packet_h + 1,
     );
     info!("blocks {:?}", blocks);
     for x in 0..blocks.0 {
@@ -144,7 +144,7 @@ fn new_connection(s: &mut Server, src: SocketAddr, snapshot_rate: f32) -> Result
 
 /// Create message ready for sending
 fn wrap_game_rect(s: &Server, x: usize, y: usize, w: usize, h: usize) -> Option<Message> {
-    let (pixels, w, h) = s.game.get_tilenet_serial_rect(x, y, w, h);
+    let (pixels, w, h) = game::get_tilenet_serial_rect(&s.game, x, y, w, h);
     if w * h == 0 {
         warn!("zero-size chunk of the world requested");
         None
@@ -209,11 +209,11 @@ pub fn run(s: &mut Server) -> Result<(), Error> {
         }
         // Send messages
         for (dest, con) in s.connections.iter() {
-            let message = Message::State(s.game.create_snapshot(con.last_snapshot));
+            let message = Message::State(game::create_snapshot(&s.game, con.last_snapshot));
             // debug!("Snapshot"; "size" => bincode::serialized_size(&message).unwrap(),
             // "last snapshot" => con.last_snapshot);
             let dest = *dest;
-            let current_frame = s.game.frame_nr();
+            let current_frame = game::frame_nr(&s.game);
             let acked_msgs = acked_msgs.clone();
             s.socket.send_reliably_to(
                 message,
@@ -231,8 +231,11 @@ pub fn run(s: &mut Server) -> Result<(), Error> {
         let delta_time = now.duration_since(prev_time).expect("duration_since error");
         prof![
             "Logic",
-            s.game
-                .update(&mut dispatcher, DeltaTime::from_duration(delta_time))
+            game::update(
+                &mut s.game,
+                &mut dispatcher,
+                DeltaTime::from_duration(delta_time)
+            )
         ];
 
         if delta_time < s.tick_duration {

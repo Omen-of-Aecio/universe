@@ -34,6 +34,19 @@ impl Connection {
     }
 }
 
+#[derive(Clone, Copy, Default)]
+pub struct DeltaTime {
+    secs: f32,
+}
+
+impl DeltaTime {
+    pub fn from_duration(duration: std::time::Duration) -> DeltaTime {
+        DeltaTime {
+            secs: duration.as_secs() as f32 + (duration.subsec_nanos() as f32) / 1_000_000_000.0,
+        }
+    }
+}
+
 impl Server {
     pub fn new(config: &Config) -> Server {
         let mut game = ServerGame::new(
@@ -223,7 +236,7 @@ pub fn run(s: &mut Server) -> Result<(), Error> {
         prof![
             "Logic",
             s.game
-                .update(&mut dispatcher, ::DeltaTime::from_duration(delta_time))
+                .update(&mut dispatcher, DeltaTime::from_duration(delta_time))
         ];
 
         if delta_time < s.tick_duration {

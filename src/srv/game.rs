@@ -11,6 +11,7 @@ use srv::diff::{DiffHistory, Snapshot};
 use std::cmp::min;
 use std::collections::HashMap;
 use std::vec::Vec;
+use super::DeltaTime;
 use tilenet::TileNet;
 use tilenet_gen;
 
@@ -55,7 +56,7 @@ impl ServerGame {
             w.add_resource(tilenet);
             w.add_resource(gc);
             w.add_resource(conf.clone());
-            w.add_resource(::DeltaTime::default());
+            w.add_resource(DeltaTime::default());
             w.add_resource(HashMap::<u32, specs::Entity>::new());
             let dh = DiffHistory::new(&w); // (NLL)
             w.add_resource(dh);
@@ -81,13 +82,13 @@ impl ServerGame {
     pub fn update(
         &mut self,
         dispatcher: &mut Dispatcher,
-        delta_time: ::DeltaTime,
+        delta_time: DeltaTime,
     ) -> (Vec<Message>, Vec<Message>) {
         self.frame += 1;
         self.world.maintain();
         self.vectors.clear(); // clear debug geometry
         *self.world.write_resource::<GameConfig>() = self.game_conf;
-        *self.world.write_resource::<::DeltaTime>() = delta_time;
+        *self.world.write_resource::<DeltaTime>() = delta_time;
         dispatcher.dispatch(&self.world.res);
 
         (Vec::new(), Vec::new())

@@ -91,7 +91,7 @@ pub fn player_move(
             if HEURISTIC2 {
                 // Decrease x speed based on how steep the hill is
                 let up: Vec2 = Vec2::new(0.0, 1.0);
-                let normal = ::get_normal(&tilenet, ::i32_to_usize(poc), color).normalize();
+                let normal = get_normal(&tilenet, i32_to_usize(poc), color).normalize();
                 let steepness = Vec2::dot(up, normal);
                 if steepness > 0.0 {
                     // Can't do pow of negative number (ceiling)
@@ -128,4 +128,50 @@ pub fn player_move(
     }
 
     has_collided
+}
+
+pub fn map_tile_value_via_color(tile: Tile, color: Color) -> Tile {
+    match (tile, color) {
+        (0, Color::Black) => 255,
+        (255, Color::Black) => 0,
+        _ => tile,
+    }
+}
+
+pub fn get_normal(tilenet: &TileNet<Tile>, coord: (usize, usize), color: Color) -> Vec2 {
+    let cmap = map_tile_value_via_color;
+    /*
+    let kernel = match color {
+        Color::WHITE => [[1.0, 0.0, -1.0], [2.0, 0.0, -2.0], [1.0, 0.0, -1.0]],
+        Color::BLACK => [[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]],
+    };
+    */
+    let kernel = [[1.0, 0.0, -1.0], [2.0, 0.0, -2.0], [1.0, 0.0, -1.0]];
+    let mut dx = 0.0;
+    let mut dy = 0.0;
+    for (y, row) in kernel.iter().enumerate() {
+        for (x, _) in row.iter().enumerate() {
+            if let (Some(x_coord), Some(y_coord)) =
+                ((coord.0 + x).checked_sub(1), (coord.1 + y).checked_sub(1))
+            {
+                if let Some(&v) = tilenet.get((x_coord, y_coord)) {
+                    dx += kernel[y][x] * f32::from(cmap(v, color)) / 255.0;
+                }
+                if let Some(&v) = tilenet.get((x_coord, y_coord)) {
+                    dy += kernel[x][y] * f32::from(cmap(v, color)) / 255.0;
+                }
+            }
+        }
+    }
+    Vec2::new(dx, dy)
+}
+
+pub fn i32_to_usize(mut from: (i32, i32)) -> (usize, usize) {
+    if from.0 < 0 {
+        from.0 = 0;
+    }
+    if from.1 < 0 {
+        from.1 = 0;
+    }
+    (from.0 as usize, from.1 as usize)
 }

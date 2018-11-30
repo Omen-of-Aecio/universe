@@ -1,5 +1,5 @@
 use super::DeltaTime;
-use collision::{bullet_move, player_move};
+use addons::collision::{bullet_move, player_move};
 use component::*;
 use libs::geometry::Vec2;
 use global::Tile;

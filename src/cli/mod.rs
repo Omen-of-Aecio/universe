@@ -1,19 +1,19 @@
 use err::*;
-use glium::DisplayBuild;
-use glium::glutin::{MouseScrollDelta, VirtualKeyCode as KeyCode};
 use glium::glutin;
+use glium::glutin::{MouseScrollDelta, VirtualKeyCode as KeyCode};
+use glium::DisplayBuild;
 use global::Tile;
+use glocals::{game::Game, *};
 use graphics::Graphics;
 use input::Input;
 use net::msg::Message;
 use net::{to_socket_addr, Socket};
-use rand::Rng;
 use rand;
+use rand::Rng;
 use specs::DispatcherBuilder;
 use srv::system::MaintainSys;
 use std::net::SocketAddr;
 use tilenet::TileNet;
-use glocals::{*, game::Game};
 
 impl Client {
     pub fn new(server_addr: &str) -> Result<Client, Error> {
@@ -39,8 +39,7 @@ impl Client {
                 black_base,
             } => {
                 let display = glutin::WindowBuilder::new().build_glium().unwrap();
-                let mut game =
-                    Game::new(width, height, you, white_base, black_base, &display);
+                let mut game = Game::new(width, height, you, white_base, black_base, &display);
                 info!("Client received Welcome message");
 
                 let graphics = Graphics::new(&display, &*game.world.read_resource());
@@ -107,7 +106,8 @@ pub fn run(client: &mut Client) -> Result<(), Error> {
             client.socket.send_to(msg, client.server)?;
         }
         for msg_reliable in packets.1 {
-            client.socket
+            client
+                .socket
                 .send_reliably_to(msg_reliable, client.server, None)?;
         }
 

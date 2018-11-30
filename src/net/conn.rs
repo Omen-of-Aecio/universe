@@ -111,10 +111,7 @@ impl<'a> Connection {
         socket: &UdpSocket,
         ack_handler: Option<Box<Fn() + 'static>>,
     ) -> Result<u32, Error> {
-        let packet = Packet::Reliable {
-            seq: self.seq,
-            msg,
-        };
+        let packet = Packet::Reliable { seq: self.seq, msg };
         // debug!("Send"; "seq" => self.seq, "ack" => self.received+1);
         self.send_window.push_back(Some(SentPacket {
             time: precise_time_ns(),

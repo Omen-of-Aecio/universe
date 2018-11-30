@@ -36,7 +36,6 @@ pub struct ServerConfig {
     pub tps: u32,
 }
 
-
 impl FromStr for Config {
     type Err = Error;
     fn from_str(s: &str) -> Result<Config, Error> {

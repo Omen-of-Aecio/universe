@@ -1,3 +1,4 @@
+use super::DeltaTime;
 use component::*;
 use conf::Config;
 use err::*;
@@ -5,13 +6,12 @@ use geometry::vec::Vec2;
 use global::Tile;
 use glocals::*;
 use net::msg::Message;
-use specs::{Builder, Dispatcher, Join, World};
 use specs;
+use specs::{Builder, Dispatcher, Join, World};
 use srv::diff::{DiffHistory, Snapshot};
 use std::cmp::min;
 use std::collections::HashMap;
 use std::vec::Vec;
-use super::DeltaTime;
 use tilenet::TileNet;
 use tilenet_gen;
 
@@ -179,10 +179,7 @@ impl ServerGame {
         let (pos, color) = {
             let pos = self.world.read_storage::<Pos>();
             let col = self.world.read_storage::<Color>();
-            (
-                *pos.get(entity).unwrap(),
-                *col.get(entity).unwrap(),
-            )
+            (*pos.get(entity).unwrap(), *col.get(entity).unwrap())
         };
         let color2 = color;
         let explosion = move |pos: (i32, i32), _vel: &Vel, tilenet: &mut TileNet<Tile>| {
@@ -275,4 +272,3 @@ pub fn generate_world(s: &mut ServerGame) {
     );
     // world::gen::rings(&mut world.tilenet, 2);
 }
-

@@ -1,3 +1,4 @@
+use super::DeltaTime;
 use collision::{bullet_move, player_move};
 use component::*;
 use geometry::Vec2;
@@ -6,7 +7,6 @@ use glocals::GameConfig;
 use specs::{self, prelude::*};
 use srv::diff::*;
 use std::collections::HashMap;
-use super::DeltaTime;
 use tilenet::TileNet;
 
 ////////////

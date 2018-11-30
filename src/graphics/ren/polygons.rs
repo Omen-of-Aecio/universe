@@ -6,8 +6,8 @@ use specs::Join;
 use glium;
 use glium::{Display, Surface};
 
-use glocals::cam::Camera;
 use component::*;
+use glocals::cam::Camera;
 
 /// Renderer for polygons.
 /// The polygons are given in the constructor, and never changes. (for now)
@@ -22,10 +22,7 @@ impl Ren {
         let frag_src = include_str!("../../../shaders/xy_tr.frag");
         let prg = glium::Program::from_source(&display, vert_src, frag_src, None).unwrap();
 
-        Ren {
-            display,
-            prg,
-        }
+        Ren { display, prg }
     }
 
     pub fn render(&self, target: &mut glium::Frame, cam: Camera, world: &specs::World) {

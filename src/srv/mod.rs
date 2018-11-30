@@ -3,8 +3,8 @@ use conf::Config;
 use err::*;
 use geometry::vec::Vec2;
 use glocals::*;
-use net::Socket;
 use net::msg::Message;
+use net::Socket;
 use num_traits::Float;
 use specs::DispatcherBuilder;
 use srv::system::*;
@@ -183,8 +183,7 @@ pub fn run(s: &mut Server) -> Result<(), Error> {
     let mut prev_time = SystemTime::now();
 
     // Used to store a 'queue' of snapshots that got ACK'd
-    let acked_msgs: Rc<Mutex<VecDeque<(SocketAddr, u32)>>> =
-        Rc::new(Mutex::new(VecDeque::new()));
+    let acked_msgs: Rc<Mutex<VecDeque<(SocketAddr, u32)>>> = Rc::new(Mutex::new(VecDeque::new()));
     loop {
         // Networking
         s.socket.update()?;

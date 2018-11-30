@@ -191,7 +191,8 @@ impl Game {
     pub fn get_entity(&self, id: u32) -> Option<specs::Entity> {
         self.world
             .read_resource::<HashMap<u32, specs::Entity>>()
-            .get(&id).cloned()
+            .get(&id)
+            .cloned()
     }
     /// Puts entity mapping into the HashMap resource. The HashMap is maintained every frame so
     /// this only needs to be done when it otherwise poses a problem that the hashmap is not

@@ -35,12 +35,12 @@ extern crate toml;
 mod global;
 // ---
 mod cli;
-mod glocals;
 mod collision;
 mod component;
 mod conf;
 mod err;
 mod geometry;
+mod glocals;
 mod graphics;
 mod input;
 mod net;
@@ -64,7 +64,10 @@ fn create_logger(s: &mut Option<slog_scope::GlobalLoggerGuard>) {
     let drain = slog_term::FullFormat::new(decorator).build().fuse();
     let drain = slog_async::Async::new(drain).build().fuse();
     let drain = drain.filter_level(Level::Debug).fuse();
-    *s = Some(slog_scope::set_global_logger(slog::Logger::root(drain, o!())));
+    *s = Some(slog_scope::set_global_logger(slog::Logger::root(
+        drain,
+        o!(),
+    )));
 }
 
 fn load_configuration_file(s: &mut Option<conf::Config>) {

@@ -1,3 +1,4 @@
+use self::game::Game;
 use clap;
 use conf;
 use geometry::vec::Vec2;
@@ -5,14 +6,12 @@ use glium;
 use graphics::Graphics;
 use input::Input;
 use net::Socket;
-use self::game::Game;
 use specs::{self, World};
 use std::{collections::HashMap, net::SocketAddr, time::Duration, vec::Vec};
 
 pub mod cam;
 pub mod game;
 pub mod system;
-
 
 #[derive(Default)]
 pub struct Main<'a> {

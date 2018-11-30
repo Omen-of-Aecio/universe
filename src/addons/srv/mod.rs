@@ -7,7 +7,7 @@ use net::msg::Message;
 use net::Socket;
 use num_traits::Float;
 use specs::DispatcherBuilder;
-use srv::system::*;
+use self::system::*;
 use std::{
     collections::{HashMap, VecDeque},
     net::SocketAddr,

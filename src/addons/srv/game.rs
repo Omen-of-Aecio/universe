@@ -8,7 +8,7 @@ use glocals::*;
 use net::msg::Message;
 use specs;
 use specs::{Builder, Dispatcher, Join, World};
-use srv::diff::{DiffHistory, Snapshot};
+use super::diff::{DiffHistory, Snapshot};
 use std::cmp::min;
 use std::collections::HashMap;
 use std::vec::Vec;

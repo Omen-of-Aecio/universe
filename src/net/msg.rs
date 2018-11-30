@@ -4,7 +4,7 @@
 //! receive a complete snapshot. This snapshot should be transmitted reliably.
 use component::*;
 use geometry::vec::Vec2;
-use srv::diff::*;
+use addons::srv::diff::*;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Message {

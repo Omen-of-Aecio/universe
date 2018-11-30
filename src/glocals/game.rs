@@ -11,7 +11,7 @@ use input::Input;
 use net::msg::Message;
 use specs;
 use specs::{Dispatcher, Join, LazyUpdate, World};
-use srv::diff::{Entity, Snapshot};
+use addons::srv::diff::{Entity, Snapshot};
 use std::cmp::min;
 
 use std::collections::HashMap;

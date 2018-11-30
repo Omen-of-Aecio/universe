@@ -34,7 +34,7 @@ extern crate toml;
 
 mod global;
 // ---
-mod cli;
+mod addons;
 mod collision;
 mod component;
 mod conf;
@@ -44,7 +44,6 @@ mod glocals;
 mod graphics;
 mod input;
 mod net;
-mod srv;
 mod tilenet_gen;
 
 use clap::{App, Arg};
@@ -88,10 +87,10 @@ fn run_client_or_server(s: &mut glocals::Main) {
     let err = if let Some(connect) = s.options.value_of("connect") {
         info!("Running client");
         let mut client = Client::new(connect).unwrap();
-        cli::run(&mut client)
+        addons::cli::run(&mut client)
     } else {
         info!("Running server");
-        srv::run(&mut Server::new(s.config.as_ref().unwrap()))
+        addons::srv::run(&mut Server::new(s.config.as_ref().unwrap()))
     };
     if let Err(err) = err {
         println!("Error: {}", err);

@@ -11,7 +11,7 @@ use net::{to_socket_addr, Socket};
 use rand;
 use rand::Rng;
 use specs::DispatcherBuilder;
-use srv::system::MaintainSys;
+use addons::srv::system::MaintainSys;
 use std::net::SocketAddr;
 use tilenet::TileNet;
 

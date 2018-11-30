@@ -1,12 +1,12 @@
+use self::system::*;
 use glocals::component::*;
 use glocals::conf::Config;
-use libs::geometry::vec::Vec2;
 use glocals::*;
+use libs::geometry::vec::Vec2;
 use libs::net::msg::Message;
 use libs::net::Socket;
 use num_traits::Float;
 use specs::DispatcherBuilder;
-use self::system::*;
 use std::{
     collections::{HashMap, VecDeque},
     net::SocketAddr,

@@ -1,18 +1,18 @@
+use super::diff::{DiffHistory, Snapshot};
 use super::DeltaTime;
+use addons::tilenet_gen;
 use glocals::component::*;
 use glocals::conf::Config;
-use libs::geometry::vec::Vec2;
 use glocals::Tile;
 use glocals::*;
+use libs::geometry::vec::Vec2;
 use libs::net::msg::Message;
 use specs;
 use specs::{Builder, Dispatcher, Join, World};
-use super::diff::{DiffHistory, Snapshot};
 use std::cmp::min;
 use std::collections::HashMap;
 use std::vec::Vec;
 use tilenet::TileNet;
-use addons::tilenet_gen;
 
 impl ServerGame {
     pub fn new(conf: &Config, white_base: Vec2, black_base: Vec2) -> ServerGame {

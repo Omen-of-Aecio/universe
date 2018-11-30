@@ -1,5 +1,5 @@
-use libs::net::msg::Message;
 use glocals::Error;
+use libs::net::msg::Message;
 
 use bincode;
 

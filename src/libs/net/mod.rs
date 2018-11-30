@@ -3,9 +3,9 @@ pub mod msg;
 mod pkt;
 
 use self::conn::Connection;
-use libs::net::msg::Message;
 use self::pkt::Packet;
 use glocals::Error;
+use libs::net::msg::Message;
 
 use std;
 use std::collections::hash_map::HashMap;

@@ -1,9 +1,9 @@
 use glium::glutin;
 use glium::glutin::{ElementState, MouseButton, VirtualKeyCode as KeyCode};
 // use glium::glutin::KeyCode;
+use glium::glutin::Event::KeyboardInput;
 use glocals::component::PlayerInput;
 use libs::geometry::vec::Vec2;
-use glium::glutin::Event::KeyboardInput;
 
 // TODO
 // Input isn't really made for ease of client-server

@@ -1,11 +1,11 @@
+use super::diff::*;
 use super::DeltaTime;
 use addons::collision::{bullet_move, player_move};
 use glocals::component::*;
-use libs::geometry::Vec2;
-use glocals::Tile;
 use glocals::GameConfig;
+use glocals::Tile;
+use libs::geometry::Vec2;
 use specs::{self, prelude::*};
-use super::diff::*;
 use std::collections::HashMap;
 use tilenet::TileNet;
 

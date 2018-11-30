@@ -1,16 +1,16 @@
+use super::graphics::Graphics;
+use addons::srv::system::MaintainSys;
 use glium::glutin;
 use glium::glutin::{MouseScrollDelta, VirtualKeyCode as KeyCode};
 use glium::DisplayBuild;
+use glocals::input::Input;
 use glocals::Tile;
 use glocals::{game::Game, *};
-use super::graphics::Graphics;
-use glocals::input::Input;
 use libs::net::msg::Message;
 use libs::net::{to_socket_addr, Socket};
 use rand;
 use rand::Rng;
 use specs::DispatcherBuilder;
-use addons::srv::system::MaintainSys;
 use std::net::SocketAddr;
 use tilenet::TileNet;
 

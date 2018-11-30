@@ -1,6 +1,6 @@
-use libs::geometry::vec::Vec2;
 use glium;
 use glium::{Display, Surface};
+use libs::geometry::vec::Vec2;
 
 const MAX_NUM_VERTICES: usize = 8000;
 

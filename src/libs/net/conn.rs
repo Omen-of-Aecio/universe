@@ -1,5 +1,5 @@
-use glocals::Error;
 use super::{msg::Message, pkt::Packet};
+use glocals::Error;
 use std::{
     self,
     collections::VecDeque,

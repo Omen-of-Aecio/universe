@@ -2,16 +2,16 @@ use tilenet::TileNet;
 
 use super::cam::Camera;
 
-use glocals::component::*;
-use libs::geometry::vec::Vec2;
+use super::input::Input;
+use addons::srv::diff::{Entity, Snapshot};
 use glium;
 use glium::glutin::VirtualKeyCode as KeyCode;
+use glocals::component::*;
 use glocals::Tile;
-use super::input::Input;
+use libs::geometry::vec::Vec2;
 use libs::net::msg::Message;
 use specs;
 use specs::{Dispatcher, Join, LazyUpdate, World};
-use addons::srv::diff::{Entity, Snapshot};
 use std::cmp::min;
 
 use std::collections::HashMap;

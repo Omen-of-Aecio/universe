@@ -1,5 +1,5 @@
-use libs::geometry::Vec2;
 use glium::Display;
+use libs::geometry::Vec2;
 
 #[derive(Copy, Clone)]
 pub struct Camera {

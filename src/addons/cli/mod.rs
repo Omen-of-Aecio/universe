@@ -4,7 +4,7 @@ use glium::glutin::{MouseScrollDelta, VirtualKeyCode as KeyCode};
 use glium::DisplayBuild;
 use global::Tile;
 use glocals::{game::Game, *};
-use graphics::Graphics;
+use super::graphics::Graphics;
 use input::Input;
 use libs::net::msg::Message;
 use libs::net::{to_socket_addr, Socket};

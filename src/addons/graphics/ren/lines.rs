@@ -16,8 +16,8 @@ pub struct Ren {
 
 impl Ren {
     pub fn new(display: &Display) -> Ren {
-        let vert_src = include_str!("../../../shaders/xy_col_tr.vert");
-        let frag_src = include_str!("../../../shaders/xy_col_tr.frag");
+        let vert_src = include_str!("../../../../shaders/xy_col_tr.vert");
+        let frag_src = include_str!("../../../../shaders/xy_col_tr.frag");
         let prg = glium::Program::from_source(display, vert_src, frag_src, None).unwrap();
         let vertex_buffer = glium::VertexBuffer::empty(display, MAX_NUM_VERTICES).unwrap();
         Ren {

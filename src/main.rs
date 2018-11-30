@@ -39,7 +39,6 @@ mod component;
 mod conf;
 mod err;
 mod glocals;
-mod graphics;
 mod libs;
 mod input;
 mod tilenet_gen;

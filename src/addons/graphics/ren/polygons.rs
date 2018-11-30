@@ -18,8 +18,8 @@ pub struct Ren {
 
 impl Ren {
     pub fn new(display: Display) -> Ren {
-        let vert_src = include_str!("../../../shaders/xy_tr.vert");
-        let frag_src = include_str!("../../../shaders/xy_tr.frag");
+        let vert_src = include_str!("../../../../shaders/xy_tr.vert");
+        let frag_src = include_str!("../../../../shaders/xy_tr.frag");
         let prg = glium::Program::from_source(&display, vert_src, frag_src, None).unwrap();
 
         Ren { display, prg }

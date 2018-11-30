@@ -3,7 +3,7 @@ use clap;
 use conf;
 use libs::geometry::vec::Vec2;
 use glium;
-use graphics::Graphics;
+use addons::graphics::Graphics;
 use input::Input;
 use libs::net::Socket;
 use specs::{self, World};

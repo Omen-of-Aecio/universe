@@ -1,5 +1,4 @@
 #![macro_use]
-pub type Tile = u8;
 
 #[macro_export]
 macro_rules! time_ns {

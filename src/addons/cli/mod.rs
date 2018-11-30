@@ -2,7 +2,7 @@ use err::*;
 use glium::glutin;
 use glium::glutin::{MouseScrollDelta, VirtualKeyCode as KeyCode};
 use glium::DisplayBuild;
-use global::Tile;
+use glocals::Tile;
 use glocals::{game::Game, *};
 use super::graphics::Graphics;
 use input::Input;

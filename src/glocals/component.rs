@@ -1,5 +1,5 @@
 use libs::geometry::vec::Vec2;
-use global::Tile;
+use glocals::Tile;
 use specs;
 use specs::Component;
 use tilenet::TileNet;

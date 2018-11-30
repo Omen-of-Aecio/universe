@@ -1,6 +1,6 @@
 use glocals::component::*;
 use libs::geometry::Vec2;
-use global::Tile;
+use glocals::Tile;
 use tilenet::{Collable, TileNet};
 
 mod polygon;

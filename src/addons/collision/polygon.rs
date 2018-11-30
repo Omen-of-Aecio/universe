@@ -1,6 +1,6 @@
 use glocals::component::*;
 use libs::geometry::vec::Vec2;
-use global::Tile;
+use glocals::Tile;
 use tilenet::*;
 
 pub struct PolygonCollable<'a> {

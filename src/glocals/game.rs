@@ -6,7 +6,7 @@ use glocals::component::*;
 use libs::geometry::vec::Vec2;
 use glium;
 use glium::glutin::VirtualKeyCode as KeyCode;
-use global::Tile;
+use glocals::Tile;
 use input::Input;
 use libs::net::msg::Message;
 use specs;

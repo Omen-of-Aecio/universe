@@ -1,5 +1,5 @@
 use self::ren::{lines, polygons};
-use global::Tile;
+use glocals::Tile;
 use specs;
 use tilenet::TileNet;
 use tilenet_ren;

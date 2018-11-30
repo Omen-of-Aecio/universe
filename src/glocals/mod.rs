@@ -14,6 +14,8 @@ pub mod component;
 pub mod game;
 pub mod system;
 
+pub type Tile = u8;
+
 #[derive(Default)]
 pub struct Main<'a> {
     pub _logger_guard: Option<slog_scope::GlobalLoggerGuard>,

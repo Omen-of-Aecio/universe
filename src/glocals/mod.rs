@@ -5,7 +5,7 @@ use libs::geometry::vec::Vec2;
 use glium;
 use graphics::Graphics;
 use input::Input;
-use net::Socket;
+use libs::net::Socket;
 use specs::{self, World};
 use std::{collections::HashMap, net::SocketAddr, time::Duration, vec::Vec};
 

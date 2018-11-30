@@ -2,9 +2,9 @@ mod conn;
 pub mod msg;
 mod pkt;
 
-use net::conn::Connection;
-use net::msg::Message;
-use net::pkt::Packet;
+use self::conn::Connection;
+use libs::net::msg::Message;
+use self::pkt::Packet;
 
 use err::*;
 use std;

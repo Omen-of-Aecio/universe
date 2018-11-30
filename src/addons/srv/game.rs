@@ -5,7 +5,7 @@ use err::*;
 use libs::geometry::vec::Vec2;
 use global::Tile;
 use glocals::*;
-use net::msg::Message;
+use libs::net::msg::Message;
 use specs;
 use specs::{Builder, Dispatcher, Join, World};
 use super::diff::{DiffHistory, Snapshot};

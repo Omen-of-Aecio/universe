@@ -8,7 +8,7 @@ use glium;
 use glium::glutin::VirtualKeyCode as KeyCode;
 use global::Tile;
 use input::Input;
-use net::msg::Message;
+use libs::net::msg::Message;
 use specs;
 use specs::{Dispatcher, Join, LazyUpdate, World};
 use addons::srv::diff::{Entity, Snapshot};

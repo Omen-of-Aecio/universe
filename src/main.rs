@@ -43,7 +43,6 @@ mod glocals;
 mod graphics;
 mod libs;
 mod input;
-mod net;
 mod tilenet_gen;
 
 use clap::{App, Arg};

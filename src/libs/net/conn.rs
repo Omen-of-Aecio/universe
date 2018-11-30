@@ -1,5 +1,5 @@
 use err::*;
-use net::{msg::Message, pkt::Packet};
+use super::{msg::Message, pkt::Packet};
 use std::{
     self,
     collections::VecDeque,

@@ -1,5 +1,5 @@
 use err::*;
-use net::msg::Message;
+use libs::net::msg::Message;
 
 use bincode;
 

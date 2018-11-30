@@ -48,14 +48,9 @@ mod srv;
 mod tilenet_gen;
 
 use clap::{App, Arg};
-use component::*;
 use conf::Config;
-use geometry::Vec2;
-use global::Tile;
-use glocals::Client;
-use glocals::Server;
+use glocals::{Client, Server};
 use slog::{Drain, Level};
-use tilenet::TileNet;
 
 // ---
 

@@ -1,4 +1,4 @@
-use err::*;
+use glocals::Error;
 use super::{msg::Message, pkt::Packet};
 use std::{
     self,

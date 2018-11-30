@@ -7,7 +7,7 @@ use libs::geometry::vec::Vec2;
 use glium;
 use glium::glutin::VirtualKeyCode as KeyCode;
 use glocals::Tile;
-use input::Input;
+use super::input::Input;
 use libs::net::msg::Message;
 use specs;
 use specs::{Dispatcher, Join, LazyUpdate, World};

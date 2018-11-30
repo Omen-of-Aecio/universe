@@ -1,7 +1,6 @@
 use super::DeltaTime;
 use glocals::component::*;
-use conf::Config;
-use err::*;
+use glocals::conf::Config;
 use libs::geometry::vec::Vec2;
 use glocals::Tile;
 use glocals::*;
@@ -13,7 +12,7 @@ use std::cmp::min;
 use std::collections::HashMap;
 use std::vec::Vec;
 use tilenet::TileNet;
-use tilenet_gen;
+use addons::tilenet_gen;
 
 impl ServerGame {
     pub fn new(conf: &Config, white_base: Vec2, black_base: Vec2) -> ServerGame {

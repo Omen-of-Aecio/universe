@@ -1,20 +1,21 @@
+pub mod cam;
+pub mod component;
+pub mod conf;
+pub mod input;
+pub mod game;
+pub mod system;
+
 use self::game::Game;
 use clap;
-use conf;
 use libs::geometry::vec::Vec2;
 use glium;
 use addons::graphics::Graphics;
-use input::Input;
 use libs::net::Socket;
 use specs::{self, World};
 use std::{collections::HashMap, net::SocketAddr, time::Duration, vec::Vec};
 
-pub mod cam;
-pub mod component;
-pub mod game;
-pub mod system;
-
 pub type Tile = u8;
+pub use failure::Error;
 
 #[derive(Default)]
 pub struct Main<'a> {
@@ -25,7 +26,7 @@ pub struct Main<'a> {
 
 pub struct Client {
     pub game: Game,
-    pub input: Input,
+    pub input: input::Input,
     pub display: glium::Display,
     pub graphics: Graphics,
 

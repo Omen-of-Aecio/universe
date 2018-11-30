@@ -1,11 +1,10 @@
-use err::*;
 use glium::glutin;
 use glium::glutin::{MouseScrollDelta, VirtualKeyCode as KeyCode};
 use glium::DisplayBuild;
 use glocals::Tile;
 use glocals::{game::Game, *};
 use super::graphics::Graphics;
-use input::Input;
+use glocals::input::Input;
 use libs::net::msg::Message;
 use libs::net::{to_socket_addr, Socket};
 use rand;

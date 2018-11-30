@@ -1,8 +1,8 @@
 //! Structs in this module are only used for deserialization of toml file, not for e.g.
 //! representation runtime.
 
-use err::*;
 use std::{fs::File, io::Read, str::FromStr, time::Duration};
+use super::Error;
 use toml;
 
 #[derive(Deserialize, Clone)]

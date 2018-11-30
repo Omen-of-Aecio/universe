@@ -5,8 +5,8 @@ mod pkt;
 use self::conn::Connection;
 use libs::net::msg::Message;
 use self::pkt::Packet;
+use glocals::Error;
 
-use err::*;
 use std;
 use std::collections::hash_map::HashMap;
 use std::iter::Iterator;

@@ -35,15 +35,11 @@ extern crate toml;
 mod macros;
 // ---
 mod addons;
-mod conf;
-mod err;
 mod glocals;
 mod libs;
-mod input;
-mod tilenet_gen;
 
 use clap::{App, Arg};
-use conf::Config;
+use glocals::conf::{self, Config};
 use glocals::{Client, Server};
 use slog::{Drain, Level};
 

@@ -1,6 +1,5 @@
 use glocals::component::*;
-use conf::Config;
-use err::*;
+use glocals::conf::Config;
 use libs::geometry::vec::Vec2;
 use glocals::*;
 use libs::net::msg::Message;

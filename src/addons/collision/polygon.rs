@@ -1,4 +1,4 @@
-use component::*;
+use glocals::component::*;
 use libs::geometry::vec::Vec2;
 use global::Tile;
 use tilenet::*;

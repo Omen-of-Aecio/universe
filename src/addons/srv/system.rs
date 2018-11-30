@@ -1,6 +1,6 @@
 use super::DeltaTime;
 use addons::collision::{bullet_move, player_move};
-use component::*;
+use glocals::component::*;
 use libs::geometry::Vec2;
 use global::Tile;
 use glocals::GameConfig;

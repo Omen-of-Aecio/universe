@@ -10,6 +10,7 @@ use specs::{self, World};
 use std::{collections::HashMap, net::SocketAddr, time::Duration, vec::Vec};
 
 pub mod cam;
+pub mod component;
 pub mod game;
 pub mod system;
 

@@ -2,7 +2,7 @@
 //! Snapshots are incremental: only that which has changed is sent to clients.
 //! Only upon explicit request (or join) of a client does the client
 //! receive a complete snapshot. This snapshot should be transmitted reliably.
-use component::*;
+use glocals::component::*;
 use libs::geometry::vec::Vec2;
 use addons::srv::diff::*;
 

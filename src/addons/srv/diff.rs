@@ -1,4 +1,4 @@
-use component::*;
+use glocals::component::*;
 use specs::{self, prelude::*, world::World};
 use std::collections::{HashMap, VecDeque};
 use std::ops;

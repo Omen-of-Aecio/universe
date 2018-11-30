@@ -1,5 +1,5 @@
 use super::DeltaTime;
-use component::*;
+use glocals::component::*;
 use conf::Config;
 use err::*;
 use libs::geometry::vec::Vec2;

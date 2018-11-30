@@ -2,7 +2,7 @@ use tilenet::TileNet;
 
 use super::cam::Camera;
 
-use component::*;
+use glocals::component::*;
 use libs::geometry::vec::Vec2;
 use glium;
 use glium::glutin::VirtualKeyCode as KeyCode;

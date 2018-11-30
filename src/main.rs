@@ -35,7 +35,6 @@ extern crate toml;
 mod global;
 // ---
 mod addons;
-mod component;
 mod conf;
 mod err;
 mod glocals;

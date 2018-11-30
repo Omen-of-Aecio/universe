@@ -46,30 +46,30 @@ impl DeltaTime {
     }
 }
 
-impl Server {
-    pub fn new(config: &Config) -> Server {
-        let mut game = ServerGame::new(
-            config,
-            Vec2::new(
-                (config.world.width / 4) as f32,
-                (config.world.height / 2) as f32,
-            ),
-            Vec2::new(
-                (3 * config.world.width / 4) as f32,
-                (config.world.height / 2) as f32,
-            ),
-        );
-        generate_world(&mut game);
+pub fn create_server(config: &Config) -> Server {
+    let mut game = ServerGame::new(
+        config,
+        Vec2::new(
+            (config.world.width / 4) as f32,
+            (config.world.height / 2) as f32,
+        ),
+        Vec2::new(
+            (3 * config.world.width / 4) as f32,
+            (config.world.height / 2) as f32,
+        ),
+    );
+    generate_world(&mut game);
 
-        Server {
-            game,
-            connections: HashMap::new(),
-            socket: Socket::new(9123).unwrap(),
+    Server {
+        game,
+        connections: HashMap::new(),
+        socket: Socket::new(9123).unwrap(),
 
-            tick_duration: config.get_srv_tick_duration(),
-        }
+        tick_duration: config.get_srv_tick_duration(),
     }
+}
 
+impl Server {
     fn handle_message(&mut self, src: SocketAddr, msg: &Message) -> Result<(), Error> {
         // TODO a lot of potential for abstraction/simplification...
 

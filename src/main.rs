@@ -36,7 +36,6 @@ mod libs;
 
 use clap::{App, Arg};
 use glocals::conf::{self, Config};
-use glocals::{Client, Server};
 use slog::{Drain, Level};
 
 // ---
@@ -72,13 +71,15 @@ fn parse_command_line_arguments<'a>(s: &mut clap::ArgMatches<'a>) {
 }
 
 fn run_client_or_server(s: &mut glocals::Main) {
-    let err = if let Some(connect) = s.options.value_of("connect") {
+    let options = s.options.clone();
+    let err = if let Some(connect) = options.value_of("connect") {
         info!("Running client");
-        let mut client = Client::new(connect).unwrap();
+        let mut client = addons::cli::create_client(connect).unwrap();
         addons::cli::run(&mut client)
     } else {
         info!("Running server");
-        addons::srv::run(&mut Server::new(s.config.as_ref().unwrap()))
+        let mut server = addons::srv::create_server(s.config.as_ref().unwrap());
+        addons::srv::run(&mut server)
     };
     if let Err(err) = err {
         println!("Error: {}", err);

@@ -14,46 +14,44 @@ use specs::DispatcherBuilder;
 use std::net::SocketAddr;
 use tilenet::TileNet;
 
-impl Client {
-    pub fn new(server_addr: &str) -> Result<Client, Error> {
-        let mut socket = create_socket();
-        let server = to_socket_addr(server_addr)?;
+pub fn create_client(server_addr: &str) -> Result<Client, Error> {
+    let mut socket = create_socket();
+    let server = to_socket_addr(server_addr)?;
 
-        // Init connection
-        socket.send_to(
-            Message::Join {
-                snapshot_rate: 20.0,
-            },
-            server,
-        )?;
-        // Get world metadata
-        let (_, msg) = socket.recv().unwrap();
-        // TODO reordering will be problematic here, expecting only a certain message
-        match msg {
-            Message::Welcome {
-                width,
-                height,
-                you,
-                white_base,
-                black_base,
-            } => {
-                let display = glutin::WindowBuilder::new().build_glium().unwrap();
-                let mut game = Game::new(width, height, you, white_base, black_base, &display);
-                info!("Client received Welcome message");
+    // Init connection
+    socket.send_to(
+        Message::Join {
+            snapshot_rate: 20.0,
+        },
+        server,
+    )?;
+    // Get world metadata
+    let (_, msg) = socket.recv().unwrap();
+    // TODO reordering will be problematic here, expecting only a certain message
+    match msg {
+        Message::Welcome {
+            width,
+            height,
+            you,
+            white_base,
+            black_base,
+        } => {
+            let display = glutin::WindowBuilder::new().build_glium().unwrap();
+            let mut game = Game::new(width, height, you, white_base, black_base, &display);
+            info!("Client received Welcome message");
 
-                let graphics = Graphics::new(&display, &*game.world.read_resource());
-                Ok(Client {
-                    input: Input::new(),
-                    game,
-                    display,
-                    graphics,
+            let graphics = Graphics::new(&display, &*game.world.read_resource());
+            Ok(Client {
+                input: Input::new(),
+                game,
+                display,
+                graphics,
 
-                    socket,
-                    server,
-                })
-            }
-            _ => Err(format_err!("Didn't receive Welcome message (in order...)")),
+                socket,
+                server,
+            })
         }
+        _ => Err(format_err!("Didn't receive Welcome message (in order...)")),
     }
 }
 

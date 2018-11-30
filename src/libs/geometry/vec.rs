@@ -133,6 +133,7 @@ impl Mul<f32> for Vec2 {
         }
     }
 }
+
 impl Div<f32> for Vec2 {
     type Output = Vec2;
     fn div(self, n: f32) -> Vec2 {

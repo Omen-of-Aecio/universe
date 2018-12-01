@@ -9,10 +9,12 @@ use libs::geometry::vec::Vec2;
 // Input isn't really made for ease of client-server
 
 const NUM_KEYS: usize = 150;
+struct Keys([bool; NUM_KEYS]);
 
+#[derive(Default)]
 pub struct Input {
-    key_down: [bool; NUM_KEYS],
-    key_toggled: [bool; NUM_KEYS],
+    key_down: Keys,
+    key_toggled: Keys,
 
     /// Only left mouse button at the moment
     mouse: (i32, i32, bool),
@@ -22,15 +24,9 @@ pub struct Input {
     mouse_wheel: f32,
 }
 
-impl Default for Input {
-    fn default() -> Input {
-        Input {
-            key_down: [false; NUM_KEYS],
-            key_toggled: [false; NUM_KEYS],
-            mouse: (0, 0, false),
-            past_mouse: (0, 0),
-            mouse_wheel: 0.0,
-        }
+impl Default for Keys {
+    fn default() -> Keys {
+        Keys([false; 150])
     }
 }
 
@@ -39,10 +35,10 @@ impl Input {
         Input::default()
     }
 
-    // Mainly resets key_toggled
+    // Mainly resets key_toggled.0
     pub fn update(&mut self) {
         for i in 0..NUM_KEYS {
-            self.key_toggled[i] = false;
+            self.key_toggled.0[i] = false;
         }
         self.mouse_wheel = 0.0;
         self.past_mouse.0 = self.mouse.0;
@@ -81,11 +77,11 @@ impl Input {
     /* Interface to GET state */
 
     pub fn key_down(&self, keycode: KeyCode) -> bool {
-        self.key_down[keycode as usize]
+        self.key_down.0[keycode as usize]
     }
 
     pub fn key_toggled(&self, keycode: KeyCode) -> bool {
-        self.key_toggled[keycode as usize]
+        self.key_toggled.0[keycode as usize]
     }
 
     /// True if key was just pressed down this frame.
@@ -112,19 +108,19 @@ impl Input {
     pub fn register_key_down(&mut self, keycode: KeyCode) {
         // debug!("Key down"; "code" => keycode as i32);
         let keycode = keycode as usize;
-        if !self.key_down[keycode] {
+        if !self.key_down.0[keycode] {
             // If this toggles the key...
-            self.key_toggled[keycode] = true;
+            self.key_toggled.0[keycode] = true;
         }
-        self.key_down[keycode] = true;
+        self.key_down.0[keycode] = true;
     }
     pub fn register_key_up(&mut self, keycode: KeyCode) {
         let keycode = keycode as usize;
-        if self.key_down[keycode] {
+        if self.key_down.0[keycode] {
             // If this toggles the key...
-            self.key_toggled[keycode] = true;
+            self.key_toggled.0[keycode] = true;
         }
-        self.key_down[keycode] = false;
+        self.key_down.0[keycode] = false;
     }
 
     pub fn create_player_input(&self) -> PlayerInput {

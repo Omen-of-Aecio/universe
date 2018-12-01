@@ -1,6 +1,6 @@
 use tilenet::TileNet;
 
-use super::cam::Camera;
+use libs::geometry::cam::Camera;
 
 use super::input::Input;
 use addons::srv::diff::{Entity, Snapshot};
@@ -29,54 +29,10 @@ pub struct Game {
     // Extra graphics data (for debugging/visualization)
     pub vectors: Vec<(Vec2, Vec2)>,
 
-    cam_mode: CameraMode,
+    pub cam_mode: CameraMode,
 }
 
 impl Game {
-    pub fn new(
-        width: u32,
-        height: u32,
-        you: u32,
-        white_base: Vec2,
-        black_base: Vec2,
-        display: &glium::Display,
-    ) -> Game {
-        let mut cam = Camera::default();
-        cam.update_win_size(display);
-
-        let world = {
-            let mut w = World::new();
-            // All components types should be registered before working with them
-            w.register_with_storage::<_, Pos>(ComponentStorage::normal);
-            w.register_with_storage::<_, Vel>(ComponentStorage::normal);
-            w.register_with_storage::<_, Force>(ComponentStorage::normal);
-            w.register_with_storage::<_, Jump>(ComponentStorage::normal);
-            w.register_with_storage::<_, Shape>(ComponentStorage::normal);
-            w.register_with_storage::<_, Color>(ComponentStorage::normal);
-            w.register_with_storage::<_, Player>(ComponentStorage::normal);
-            w.register_with_storage::<_, UniqueId>(ComponentStorage::normal);
-
-            // The ECS system owns the TileNet
-            let mut tilenet = TileNet::<Tile>::new(width as usize, height as usize);
-
-            w.add_resource(tilenet);
-            w.add_resource(cam);
-            w.add_resource(HashMap::<u32, specs::Entity>::new());
-
-            w
-        };
-
-        Game {
-            world,
-            cam,
-            you,
-            white_base,
-            black_base,
-            vectors: Vec::new(),
-            cam_mode: CameraMode::FollowPlayer,
-        }
-    }
-
     /// Returns (messages to send, messages to send reliably)
     pub fn update(
         &mut self,
@@ -243,7 +199,7 @@ impl Game {
 /* Should go, together with some logic, to some camera module (?) */
 #[derive(Copy, Clone)]
 #[allow(unused)]
-enum CameraMode {
+pub enum CameraMode {
     Interactive,
     FollowPlayer,
 }

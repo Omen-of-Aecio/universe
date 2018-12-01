@@ -5,7 +5,7 @@ use tilenet::TileNet;
 use tilenet_ren;
 use tilenet_ren::MinifySamplerFilter;
 
-use glocals::cam::Camera;
+use libs::geometry::cam::Camera;
 
 use glium::{Display, Surface};
 

@@ -1,4 +1,3 @@
-pub mod cam;
 pub mod component;
 pub mod conf;
 pub mod game;

@@ -1,17 +1,22 @@
-use super::graphics::Graphics;
-use addons::srv::system::MaintainSys;
-use glium::glutin;
+use addons::srv::{diff::{Entity, Snapshot}, system::MaintainSys};
 use glium::glutin::{MouseScrollDelta, VirtualKeyCode as KeyCode};
-use glium::DisplayBuild;
-use glocals::input::Input;
-use glocals::Tile;
-use glocals::{game::Game, *};
+use glium::{self, glutin, Display, DisplayBuild};
+use glocals::{Tile, input::Input, game::Game, game::CameraMode, *};
+use glocals::component::*;
+use libs::geometry::cam::Camera;
+use libs::geometry::vec::Vec2;
 use libs::net::msg::Message;
 use libs::net::{to_socket_addr, Socket};
-use rand;
 use rand::Rng;
+use rand;
 use specs::DispatcherBuilder;
+use specs::{Dispatcher, Join, LazyUpdate, World};
+use specs;
+use std::cmp::min;
+use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::vec::Vec;
+use super::graphics::Graphics;
 use tilenet::TileNet;
 
 pub fn create_client(server_addr: &str) -> Result<Client, Error> {
@@ -37,7 +42,7 @@ pub fn create_client(server_addr: &str) -> Result<Client, Error> {
             black_base,
         } => {
             let display = glutin::WindowBuilder::new().build_glium().unwrap();
-            let mut game = Game::new(width, height, you, white_base, black_base, &display);
+            let mut game = create_game(width, height, you, white_base, black_base, &display);
             info!("Client received Welcome message");
 
             let graphics = Graphics::new(&display, &*game.world.read_resource());
@@ -55,8 +60,66 @@ pub fn create_client(server_addr: &str) -> Result<Client, Error> {
     }
 }
 
+pub fn update_win_size(camera: &mut Camera, display: &Display) {
+    match display.get_window() {
+        Some(x) => {
+            match x.get_inner_size() {
+                Some((x, y)) => {
+                    camera.update_win_size((x, y));
+                }
+                None => {}
+            }
+        }
+        None => {}
+    }
+}
+
+pub fn create_game(
+    width: u32,
+    height: u32,
+    you: u32,
+    white_base: Vec2,
+    black_base: Vec2,
+    display: &glium::Display,
+) -> Game {
+    let mut cam = Camera::default();
+    update_win_size(&mut cam, display);
+
+    let world = {
+        let mut w = World::new();
+        // All components types should be registered before working with them
+        w.register_with_storage::<_, Pos>(ComponentStorage::normal);
+        w.register_with_storage::<_, Vel>(ComponentStorage::normal);
+        w.register_with_storage::<_, Force>(ComponentStorage::normal);
+        w.register_with_storage::<_, Jump>(ComponentStorage::normal);
+        w.register_with_storage::<_, Shape>(ComponentStorage::normal);
+        w.register_with_storage::<_, Color>(ComponentStorage::normal);
+        w.register_with_storage::<_, Player>(ComponentStorage::normal);
+        w.register_with_storage::<_, UniqueId>(ComponentStorage::normal);
+
+        // The ECS system owns the TileNet
+        let mut tilenet = TileNet::<Tile>::new(width as usize, height as usize);
+
+        w.add_resource(tilenet);
+        w.add_resource(cam);
+        w.add_resource(HashMap::<u32, specs::Entity>::new());
+
+        w
+    };
+
+    Game {
+        world,
+        cam,
+        you,
+        white_base,
+        black_base,
+        vectors: Vec::new(),
+        cam_mode: CameraMode::FollowPlayer,
+    }
+}
+
 pub fn run(client: &mut Client) -> Result<(), Error> {
-    client.game.cam.update_win_size(&client.display);
+    update_win_size(&mut client.game.cam, &client.display);
 
     let mut builder = DispatcherBuilder::new();
     builder.add(MaintainSys, "maintain", &[]);

@@ -1,3 +1,4 @@
+pub mod cam;
 pub mod vec;
 
 pub use self::vec::Vec2;

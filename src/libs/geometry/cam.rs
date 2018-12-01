@@ -1,5 +1,5 @@
 use glium::Display;
-use libs::geometry::Vec2;
+use super::Vec2;
 
 #[derive(Copy, Clone)]
 pub struct Camera {
@@ -22,10 +22,9 @@ impl Default for Camera {
 }
 
 impl Camera {
-    pub fn update_win_size(&mut self, display: &Display) {
-        let win_size = display.get_window().unwrap().get_inner_size().unwrap();
-        self.width = win_size.0;
-        self.height = win_size.1;
+    pub fn update_win_size(&mut self, size: (u32, u32)) {
+        self.width = size.0;
+        self.height = size.1;
     }
     pub fn screen_to_world(&self, screen_pos: Vec2) -> Vec2 {
         let screen_size = Vec2::new(self.width as f32, self.height as f32);

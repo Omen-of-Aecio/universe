@@ -280,6 +280,65 @@ pub fn create_game(
     }
 }
 
+pub fn collect_input(client: &mut Client) -> Result<(), Error> {
+    client.input.update();
+    // Handle input events
+    for ev in client.display.clone().poll_events() {
+        match ev {
+            glutin::Event::Closed => return Ok(()),
+            glutin::Event::MouseMoved(x, y) => client.input.position_mouse(x, y),
+            glutin::Event::MouseWheel(MouseScrollDelta::LineDelta(_, y), _) => {
+                client.input.register_mouse_wheel(y)
+            }
+            glutin::Event::MouseInput(state, button) => {
+                client.input.register_mouse_input(state, button)
+            }
+            glutin::Event::KeyboardInput(_, _, _) => client.input.register_key(&ev),
+            glutin::Event::Resized(w, h) => {
+                client.game.cam.width = w;
+                client.game.cam.height = h;
+            }
+            _ => (),
+        }
+    }
+    Ok(())
+}
+
+pub fn receive_and_handle_messages(client: &mut Client) -> Result<(), Error> {
+    // Receive messages
+    client.socket.update()?;
+    let mut messages = Vec::new();
+    for msg in client.socket.messages() {
+        let msg = msg?;
+        messages.push(msg);
+    }
+    for msg in messages {
+        handle_message(client, msg.0, msg.1)?;
+    }
+    Ok(())
+}
+
+pub fn update_and_send_messages(client: &mut Client, dispatcher: &mut Dispatcher) -> Result<(), Error> {
+    // Update game & send messages
+    let packets = update(&mut client.game, dispatcher, &client.input);
+    for msg in packets.0 {
+        client.socket.send_to(msg, client.server)?;
+    }
+    for msg_reliable in packets.1 {
+        client
+            .socket
+            .send_reliably_to(msg_reliable, client.server, None)?;
+    }
+    Ok(())
+}
+
+pub fn render_game_scene(client: &mut Client) {
+    prof![
+        "Render",
+        client.graphics.render(client.game.cam, &client.game.world)
+    ];
+}
+
 pub fn run(client: &mut Client) -> Result<(), Error> {
     update_win_size(&mut client.game.cam, &client.display);
 
@@ -288,60 +347,12 @@ pub fn run(client: &mut Client) -> Result<(), Error> {
     let mut dispatcher = builder.build();
 
     loop {
-        // Input
-        client.input.update();
-        // Handle input events
-        for ev in client.display.clone().poll_events() {
-            match ev {
-                glutin::Event::Closed => return Ok(()),
-                glutin::Event::MouseMoved(x, y) => client.input.position_mouse(x, y),
-                glutin::Event::MouseWheel(MouseScrollDelta::LineDelta(_, y), _) => {
-                    client.input.register_mouse_wheel(y)
-                }
-                glutin::Event::MouseInput(state, button) => {
-                    client.input.register_mouse_input(state, button)
-                }
-                glutin::Event::KeyboardInput(_, _, _) => client.input.register_key(&ev),
-                glutin::Event::Resized(w, h) => {
-                    client.game.cam.width = w;
-                    client.game.cam.height = h;
-                }
-                _ => (),
-            }
-        }
+        collect_input(client)?;
         handle_input(client);
-
-        // Receive messages
-        client.socket.update()?;
-        let mut messages = Vec::new();
-        for msg in client.socket.messages() {
-            let msg = msg?;
-            messages.push(msg);
-        }
-        for msg in messages {
-            handle_message(client, msg.0, msg.1)?;
-        }
-
-        // Update game & send messages
-        let packets = update(&mut client.game, &mut dispatcher, &client.input);
-        for msg in packets.0 {
-            client.socket.send_to(msg, client.server)?;
-        }
-        for msg_reliable in packets.1 {
-            client
-                .socket
-                .send_reliably_to(msg_reliable, client.server, None)?;
-        }
-
-        // println!("Transl: {:?}", client.game.get_player_transl());
-        // println!("Campos: {:?}", client.game.cam.center);
-
+        receive_and_handle_messages(client)?;
+        update_and_send_messages(client, &mut dispatcher)?;
+        render_game_scene(client);
         // Render
-        prof![
-            "Render",
-            client.graphics.render(client.game.cam, &client.game.world)
-        ];
-
         // vsync doesn't seem to work on Windows
         // thread::sleep(Duration::from_millis(15));
     }

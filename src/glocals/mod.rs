@@ -35,7 +35,8 @@ pub struct Client<'a> {
     pub server: SocketAddr,
 }
 
-pub struct Server {
+pub struct Server<'a> {
+    pub main: Main<'a>,
     pub game: ServerGame,
     pub connections: HashMap<SocketAddr, Connection>,
     pub socket: Socket,

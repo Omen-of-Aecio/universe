@@ -78,7 +78,7 @@ fn run_client_or_server(s: glocals::Main) {
         addons::cli::run(&mut client)
     } else {
         info!("Running server");
-        let mut server = addons::srv::create_server(s.config.as_ref().unwrap());
+        let mut server = addons::srv::create_server(s);
         addons::srv::run(&mut server)
     };
     if let Err(err) = err {

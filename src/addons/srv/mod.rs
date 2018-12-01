@@ -46,9 +46,10 @@ impl DeltaTime {
     }
 }
 
-pub fn create_server(config: &Config) -> Server {
+pub fn create_server<'a>(s: Main<'a>) -> Server<'a> {
+    let config = s.config.clone().unwrap();
     let mut game = game::create_servergame(
-        config,
+        &config,
         Vec2::new(
             (config.world.width / 4) as f32,
             (config.world.height / 2) as f32,
@@ -61,6 +62,7 @@ pub fn create_server(config: &Config) -> Server {
     generate_world(&mut game);
 
     Server {
+        main: s,
         game,
         connections: HashMap::new(),
         socket: Socket::new(9123).unwrap(),

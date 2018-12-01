@@ -182,7 +182,7 @@ pub fn update(
     ret
 }
 
-pub fn create_client(server_addr: &str) -> Result<Client, Error> {
+pub fn create_client<'a>(s: Main<'a>, server_addr: &str) -> Result<Client<'a>, Error> {
     let mut socket = create_socket();
     let server = to_socket_addr(server_addr)?;
 
@@ -210,6 +210,7 @@ pub fn create_client(server_addr: &str) -> Result<Client, Error> {
 
             let graphics = Graphics::new(&display, &*game.world.read_resource());
             Ok(Client {
+                main: s,
                 input: Input::new(),
                 game,
                 display,

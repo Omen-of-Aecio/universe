@@ -70,11 +70,11 @@ fn parse_command_line_arguments<'a>(s: &mut clap::ArgMatches<'a>) {
     };
 }
 
-fn run_client_or_server(s: &mut glocals::Main) {
+fn run_client_or_server(s: glocals::Main) {
     let options = s.options.clone();
     let err = if let Some(connect) = options.value_of("connect") {
         info!("Running client");
-        let mut client = addons::cli::create_client(connect).unwrap();
+        let mut client = addons::cli::create_client(s, connect).unwrap();
         addons::cli::run(&mut client)
     } else {
         info!("Running server");
@@ -94,5 +94,5 @@ fn main() {
     create_logger(&mut s._logger_guard);
     parse_command_line_arguments(&mut s.options);
     load_configuration_file(&mut s.config);
-    run_client_or_server(&mut s);
+    run_client_or_server(s);
 }

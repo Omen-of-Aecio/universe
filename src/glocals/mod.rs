@@ -23,7 +23,8 @@ pub struct Main<'a> {
     pub options: clap::ArgMatches<'a>,
 }
 
-pub struct Client {
+pub struct Client<'a> {
+    pub main: Main<'a>,
     pub game: Game,
     pub input: input::Input,
     pub display: glium::Display,

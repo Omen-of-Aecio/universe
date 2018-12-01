@@ -1,5 +1,4 @@
 use super::Vec2;
-use glium::Display;
 
 #[derive(Copy, Clone)]
 pub struct Camera {

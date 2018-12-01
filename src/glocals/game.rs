@@ -2,12 +2,6 @@ use tilenet::TileNet;
 
 use libs::geometry::cam::Camera;
 
-use super::input::Input;
-use addons::srv::diff::{Entity, Snapshot};
-use glium;
-use glium::glutin::VirtualKeyCode as KeyCode;
-use glocals::component::*;
-use glocals::Tile;
 use libs::geometry::vec::Vec2;
 use libs::net::msg::Message;
 use specs;

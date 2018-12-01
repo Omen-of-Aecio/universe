@@ -6,7 +6,8 @@ use addons::srv::{
 use glium::glutin::{MouseScrollDelta, VirtualKeyCode as KeyCode};
 use glium::{self, glutin, Display, DisplayBuild};
 use glocals::component::*;
-use glocals::{game::CameraMode, game::Game, input::Input, Tile, *};
+use glocals::{game::CameraMode, game::Game, Tile, *};
+use libs::input::Input;
 use libs::geometry::cam::Camera;
 use libs::geometry::vec::Vec2;
 use libs::net::msg::Message;

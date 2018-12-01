@@ -1,13 +1,13 @@
 pub mod component;
 pub mod conf;
 pub mod game;
-pub mod input;
 pub mod system;
 
 use self::game::Game;
 use addons::graphics::Graphics;
 use clap;
 use glium;
+use libs::input;
 use libs::geometry::vec::Vec2;
 use libs::net::Socket;
 use specs::{self, World};

@@ -46,7 +46,6 @@ impl Input {
     }
 
     /* Interface to register input */
-
     pub fn register_key(&mut self, input: &glutin::Event) {
         match *input {
             KeyboardInput(ElementState::Pressed, _, Some(keycode)) => {

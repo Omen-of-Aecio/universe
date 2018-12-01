@@ -1,23 +1,185 @@
-use addons::srv::{diff::{Entity, Snapshot}, system::MaintainSys};
+use super::graphics::Graphics;
+use addons::srv::{
+    diff::{Entity, Snapshot},
+    system::MaintainSys,
+};
 use glium::glutin::{MouseScrollDelta, VirtualKeyCode as KeyCode};
 use glium::{self, glutin, Display, DisplayBuild};
-use glocals::{Tile, input::Input, game::Game, game::CameraMode, *};
 use glocals::component::*;
+use glocals::{game::CameraMode, game::Game, input::Input, Tile, *};
 use libs::geometry::cam::Camera;
 use libs::geometry::vec::Vec2;
 use libs::net::msg::Message;
 use libs::net::{to_socket_addr, Socket};
-use rand::Rng;
 use rand;
+use rand::Rng;
+use specs;
 use specs::DispatcherBuilder;
 use specs::{Dispatcher, Join, LazyUpdate, World};
-use specs;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::vec::Vec;
-use super::graphics::Graphics;
 use tilenet::TileNet;
+
+/// Puts entity mapping into the HashMap resource. The HashMap is maintained every frame so
+/// this only needs to be done when it otherwise poses a problem that the hashmap is not
+/// immediately updated.
+pub fn register_entity(s: &mut Game, id: u32, ent: specs::Entity) {
+    s.world
+        .write_resource::<HashMap<u32, specs::Entity>>()
+        .insert(id, ent);
+}
+pub fn apply_snapshot(s: &mut Game, snapshot: Snapshot) {
+    let mut added_entities: Vec<(u32, specs::Entity)> = Vec::new();
+    {
+        let updater = s.world.read_resource::<LazyUpdate>();
+        for (id, entity) in snapshot.entities.into_iter() {
+            match entity {
+                Some(Entity { components }) => {
+                    match get_entity(s, id) {
+                        Some(this_ent) => {
+                            components.modify_existing(&*updater, this_ent);
+                        }
+                        None => {
+                            // TODO: maybe need to care about type (Player/Bullet)
+                            let ent = components.insert(&*updater, &*s.world.entities(), id);
+                            added_entities.push((id, ent));
+                        }
+                    }
+                }
+                // This means the entity was deleted
+                None => match get_entity(s, id) {
+                    Some(this_ent) => {
+                        s.world.entities().delete(this_ent).unwrap();
+                    }
+                    None => error!("Server removed entity not owned by me"),
+                },
+            }
+        }
+    }
+    for (id, ent) in added_entities {
+        register_entity(s, id, ent);
+    }
+}
+
+pub fn print(s: &Game) {
+    // info!("TileNet"; "content" => format!["{:?}", self.get_tilenet()]);
+}
+pub fn get_player_transl(s: &Game) -> Option<Vec2> {
+    let pos = s.world.read_storage::<Pos>();
+    get_you(s).and_then(|you| pos.get(you).map(|pos| pos.transl))
+}
+pub fn get_you(s: &Game) -> Option<specs::Entity> {
+    get_entity(s, s.you)
+}
+pub fn get_entity(s: &Game, id: u32) -> Option<specs::Entity> {
+    s.world
+        .read_resource::<HashMap<u32, specs::Entity>>()
+        .get(&id)
+        .cloned()
+}
+// Access //
+pub fn get_tilenet_serial_rect(s: &Game, x: usize, y: usize, w: usize, h: usize) -> Vec<Tile> {
+    let tilenet = &*s.world.read_resource::<TileNet<Tile>>();
+    let w = min(x + w, tilenet.get_size().0) as isize - x as isize;
+    let h = min(y + h, tilenet.get_size().1) as isize - y as isize;
+    if w == 0 || h == 0 {
+        return Vec::new();
+    }
+    let w = w as usize;
+    let h = h as usize;
+
+    let pixels: Vec<u8> = tilenet
+        .view_box((x, x + w, y, y + h))
+        .map(|x| *x.0)
+        .collect();
+    assert!(pixels.len() == w * h);
+    pixels
+}
+
+/// Returns (white count, black count)
+pub fn count_player_colors(s: &Game) -> (u32, u32) {
+    let mut count = (0, 0);
+    let (player, color) = {
+        (
+            s.world.read_storage::<Player>(),
+            s.world.read_storage::<Color>(),
+        )
+    };
+    for (_, color) in (&player, &color).join() {
+        match *color {
+            Color::Black => count.0 += 1,
+            Color::White => count.1 += 1,
+        }
+    }
+    count
+}
+
+/// Returns (messages to send, messages to send reliably)
+fn handle_game_input(s: &mut Game, input: &Input) -> (Vec<Message>, Vec<Message>) {
+    let mut msg = Vec::new();
+    let mut msg_reliable = Vec::new();
+    if input.key_toggled_down(KeyCode::G) {
+        msg.push(Message::ToggleGravity)
+    }
+
+    // Zooming..
+    if input.key_down(KeyCode::N) {
+        s.cam.zoom += 0.1;
+    }
+    if input.key_down(KeyCode::E) {
+        s.cam.zoom -= 0.1;
+    }
+
+    // Mouse
+    if input.mouse() {
+        // Update camera offset //
+        if let CameraMode::Interactive = s.cam_mode {
+            let mut offset = input.mouse_moved() / s.cam.zoom;
+            offset.x = -offset.x;
+            s.cam.center += offset;
+        }
+
+        // Fire weapon //
+        if let Some(transl) = get_player_transl(s) {
+            let mouse_world_pos = s.cam.screen_to_world(input.mouse_pos());
+            let dir = mouse_world_pos - transl;
+            let msg = Message::BulletFire { direction: dir };
+            msg_reliable.push(msg);
+        }
+    }
+
+    // Zooming
+    const ZOOM_FACTOR: f32 = 1.2;
+    let y = input.mouse_wheel();
+    if y > 0.0 {
+        s.cam.zoom *= f32::powf(ZOOM_FACTOR, y as f32);
+    } else if y < 0.0 {
+        s.cam.zoom /= f32::powf(ZOOM_FACTOR, -y as f32);
+    }
+
+    msg_reliable.push(Message::Input(input.create_player_input()));
+    (msg, msg_reliable)
+}
+
+/// Returns (messages to send, messages to send reliably)
+pub fn update(
+    s: &mut Game,
+    dispatcher: &mut Dispatcher,
+    input: &Input,
+) -> (Vec<Message>, Vec<Message>) {
+    s.world.maintain();
+    // ^^ XXX maintain before rest, because previously in this frame we handled input & network pacakets
+    s.vectors.clear(); // clear debug geometry
+    let ret = handle_game_input(s, input);
+    if let (CameraMode::FollowPlayer, Some(transl)) = (s.cam_mode, get_player_transl(s)) {
+        s.cam.center = transl;
+    }
+    *s.world.write_resource() = s.cam;
+    dispatcher.dispatch(&s.world.res);
+    ret
+}
 
 pub fn create_client(server_addr: &str) -> Result<Client, Error> {
     let mut socket = create_socket();
@@ -62,14 +224,12 @@ pub fn create_client(server_addr: &str) -> Result<Client, Error> {
 
 pub fn update_win_size(camera: &mut Camera, display: &Display) {
     match display.get_window() {
-        Some(x) => {
-            match x.get_inner_size() {
-                Some((x, y)) => {
-                    camera.update_win_size((x, y));
-                }
-                None => {}
+        Some(x) => match x.get_inner_size() {
+            Some((x, y)) => {
+                camera.update_win_size((x, y));
             }
-        }
+            None => {}
+        },
         None => {}
     }
 }
@@ -161,7 +321,7 @@ pub fn run(client: &mut Client) -> Result<(), Error> {
         }
 
         // Update game & send messages
-        let packets = client.game.update(&mut dispatcher, &client.input);
+        let packets = update(&mut client.game, &mut dispatcher, &client.input);
         for msg in packets.0 {
             client.socket.send_to(msg, client.server)?;
         }
@@ -209,7 +369,7 @@ fn handle_message(s: &mut Client, src: SocketAddr, msg: Message) -> Result<(), E
             update_tilenet_rect(s, x, y, width, height, &pixels);
         }
         Message::State(snapshot) => {
-            s.game.apply_snapshot(snapshot);
+            apply_snapshot(&mut s.game, snapshot);
         }
         _ => bail!("Wrong message type."),
     };

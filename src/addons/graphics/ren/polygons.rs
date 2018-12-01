@@ -6,8 +6,8 @@ use specs::Join;
 use glium;
 use glium::{Display, Surface};
 
-use libs::geometry::cam::Camera;
 use glocals::component::*;
+use libs::geometry::cam::Camera;
 
 /// Renderer for polygons.
 /// The polygons are given in the constructor, and never changes. (for now)

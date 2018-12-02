@@ -1,6 +1,3 @@
-pub mod game;
-pub mod system;
-
 use clap;
 use glium;
 use libs::geometry::cam::Camera;
@@ -136,6 +133,8 @@ pub enum CameraMode {
     Interactive,
     FollowPlayer,
 }
+
+// ---
 
 impl Default for CameraMode {
     fn default() -> CameraMode {

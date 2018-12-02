@@ -29,9 +29,9 @@ extern crate toml;
 
 mod macros;
 // ---
-mod addons;
 mod glocals;
 mod libs;
+mod mediators;
 
 use clap::{App, Arg};
 use slog::{Drain, Level};

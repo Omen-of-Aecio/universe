@@ -30,7 +30,7 @@ use std::sync::{Arc, Mutex};
 // ---
 
 fn create_logger(s: &mut Threads) {
-    let (tx, rx) = std::sync::mpsc::sync_channel(1);
+    let (tx, rx) = std::sync::mpsc::sync_channel(1000);
     let buffer_full_count = Arc::new(Mutex::new(0));
     s.log_channel = Some(tx);
     s.log_channel_full_count = buffer_full_count.clone();

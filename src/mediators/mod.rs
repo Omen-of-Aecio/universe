@@ -46,13 +46,12 @@ pub fn entry_point_logger(s: EntryPointLogger) {
                 message,
                 kvpairs,
             }) => {
-                println!["{}: [{}]: {}, {:#?}", loglevel, context, message, kvpairs];
+                println!["{}: {:?}: {:?}, {:#?}", loglevel, context, message, kvpairs];
             }
             Err(RecvError {}) => {
                 break;
             }
         }
-        println!["Niter"];
     }
-    println!["Exited"];
+    println!["128: \"LGGR\": \"Thread exiting\", {}", "{}"];
 }

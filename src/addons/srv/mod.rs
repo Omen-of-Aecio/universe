@@ -211,21 +211,21 @@ pub fn run(s: &mut Server) -> Result<(), Error> {
         }
         // Send messages
         for (dest, con) in s.connections.iter() {
-            let message = Message::State(game::create_snapshot(&s.game, con.last_snapshot));
-            // debug!("Snapshot"; "size" => bincode::serialized_size(&message).unwrap(),
-            // "last snapshot" => con.last_snapshot);
-            let dest = *dest;
-            let current_frame = game::frame_nr(&s.game);
-            let acked_msgs = acked_msgs.clone();
-            s.socket.send_reliably_to(
-                message,
-                dest,
-                // (WONDERING: a bit confused how I this closure ends up being 'static - what if the
-                // Box dies?)
-                Some(Box::new(move || {
-                    acked_msgs.lock().unwrap().push_back((dest, current_frame));
-                })),
-            )?;
+            // let message = Message::State(game::create_snapshot(&s.game, con.last_snapshot));
+            // // debug!("Snapshot"; "size" => bincode::serialized_size(&message).unwrap(),
+            // // "last snapshot" => con.last_snapshot);
+            // let dest = *dest;
+            // let current_frame = game::frame_nr(&s.game);
+            // let acked_msgs = acked_msgs.clone();
+            // s.socket.send_reliably_to(
+            //     message,
+            //     dest,
+            //     // (WONDERING: a bit confused how I this closure ends up being 'static - what if the
+            //     // Box dies?)
+            //     Some(Box::new(move || {
+            //         acked_msgs.lock().unwrap().push_back((dest, current_frame));
+            //     })),
+            // )?;
         }
 
         // Logic

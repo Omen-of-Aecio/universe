@@ -64,7 +64,6 @@ pub fn create_servergame(conf: &Config, white_base: Vec2, black_base: Vec2) -> S
 
     ServerGame {
         frame: 0,
-        world,
         game_conf: gc,
         entities: HashMap::default(),
         entity_id_seq: 0,
@@ -83,29 +82,30 @@ pub fn update(
     delta_time: DeltaTime,
 ) -> (Vec<Message>, Vec<Message>) {
     s.frame += 1;
-    s.world.maintain();
+    // s.world.maintain();
     s.vectors.clear(); // clear debug geometry
-    *s.world.write_resource::<GameConfig>() = s.game_conf;
-    *s.world.write_resource::<DeltaTime>() = delta_time;
-    dispatcher.dispatch(&s.world.res);
+    // *s.world.write_resource::<GameConfig>() = s.game_conf;
+    // *s.world.write_resource::<DeltaTime>() = delta_time;
+    // dispatcher.dispatch(&s.world.res);
 
     (Vec::new(), Vec::new())
 }
 
 /// Returns (white count, black count)
 pub fn count_player_colors(s: &ServerGame) -> (u32, u32) {
-    let mut count = (0, 0);
-    let (player, color) = (
-        s.world.read_storage::<Player>(),
-        s.world.read_storage::<Color>(),
-    );
-    for (_, color) in (&player, &color).join() {
-        match *color {
-            Color::Black => count.0 += 1,
-            Color::White => count.1 += 1,
-        }
-    }
-    count
+    // let mut count = (0, 0);
+    // let (player, color) = (
+    //     s.world.read_storage::<Player>(),
+    //     s.world.read_storage::<Color>(),
+    // );
+    // for (_, color) in (&player, &color).join() {
+    //     match *color {
+    //         Color::Black => count.0 += 1,
+    //         Color::White => count.1 += 1,
+    //     }
+    // }
+    // count
+    (0, 0)
 }
 
 // Access //
@@ -117,21 +117,22 @@ pub fn get_tilenet_serial_rect(
     w: usize,
     h: usize,
 ) -> (Vec<Tile>, usize, usize) {
-    let tilenet = &*s.world.read_resource::<TileNet<Tile>>();
-    let w = min(x + w, tilenet.get_size().0) as isize - x as isize;
-    let h = min(y + h, tilenet.get_size().1) as isize - y as isize;
-    if w <= 0 || h <= 0 {
-        return (Vec::new(), 0, 0);
-    }
-    let w = w as usize;
-    let h = h as usize;
+    // let tilenet = &*s.world.read_resource::<TileNet<Tile>>();
+    // let w = min(x + w, tilenet.get_size().0) as isize - x as isize;
+    // let h = min(y + h, tilenet.get_size().1) as isize - y as isize;
+    // if w <= 0 || h <= 0 {
+    //     return (Vec::new(), 0, 0);
+    // }
+    // let w = w as usize;
+    // let h = h as usize;
 
-    let pixels: Vec<u8> = tilenet
-        .view_box((x, x + w, y, y + h))
-        .map(|x| *x.0)
-        .collect();
-    assert!(pixels.len() == w * h);
-    (pixels, w, h)
+    // let pixels: Vec<u8> = tilenet
+    //     .view_box((x, x + w, y, y + h))
+    //     .map(|x| *x.0)
+    //     .collect();
+    // assert!(pixels.len() == w * h);
+    // (pixels, w, h)
+    (Vec::new(), 0, 0)
 }
 pub fn get_entity(s: &ServerGame, id: u32) -> specs::Entity {
     s.entities[&id]
@@ -155,73 +156,73 @@ pub fn add_player(s: &mut ServerGame, col: Color) -> u32 {
     };
 
     info!("Add player"; "id" => s.entity_id_seq);
-    let entity = s
-        .world
-        .create_entity()
-        .with(UniqueId(s.entity_id_seq))
-        .with(Player)
-        .with(Pos::with_transl(transl))
-        .with(Vel::default())
-        .with(Force::default())
-        .with(Shape::new_quad(10.0, 10.0))
-        .with(col)
-        .with(Jump::Inactive)
-        .with(PlayerInput::default())
-        .build();
-    s.entities.insert(s.entity_id_seq, entity);
+    // let entity = s
+    //     .world
+    //     .create_entity()
+    //     .with(UniqueId(s.entity_id_seq))
+    //     .with(Player)
+    //     .with(Pos::with_transl(transl))
+    //     .with(Vel::default())
+    //     .with(Force::default())
+    //     .with(Shape::new_quad(10.0, 10.0))
+    //     .with(col)
+    //     .with(Jump::Inactive)
+    //     .with(PlayerInput::default())
+    //     .build();
+    // s.entities.insert(s.entity_id_seq, entity);
     s.entity_id_seq
 }
 
 pub fn bullet_fire(s: &mut ServerGame, player_id: u32, direction: Vec2) -> Result<(), Error> {
-    let entity = get_entity(s, player_id);
-    let (pos, color) = {
-        let pos = s.world.read_storage::<Pos>();
-        let col = s.world.read_storage::<Color>();
-        (*pos.get(entity).unwrap(), *col.get(entity).unwrap())
-    };
-    let color2 = color;
-    let explosion = move |pos: (i32, i32), _vel: &Vel, tilenet: &mut TileNet<Tile>| {
-        tilenet.set(
-            &((255.0 - color2.to_intensity() * 255.0) as u8),
-            (pos.0 as usize, pos.1 as usize),
-        );
-    };
-    s.entity_id_seq += 1;
-    let _entity = s
-        .world
-        .create_entity()
-        .with(UniqueId(s.entity_id_seq))
-        .with(Bullet::new(explosion))
-        .with(pos)
-        .with(Vel {
-            transl: direction,
-            angular: 1.0,
-        })
-        .with(Force::default())
-        .with(Shape::new_quad(4.0, 4.0))
-        .with(color)
-        .build();
+    // let entity = get_entity(s, player_id);
+    // let (pos, color) = {
+    //     let pos = s.world.read_storage::<Pos>();
+    //     let col = s.world.read_storage::<Color>();
+    //     (*pos.get(entity).unwrap(), *col.get(entity).unwrap())
+    // };
+    // let color2 = color;
+    // let explosion = move |pos: (i32, i32), _vel: &Vel, tilenet: &mut TileNet<Tile>| {
+    //     tilenet.set(
+    //         &((255.0 - color2.to_intensity() * 255.0) as u8),
+    //         (pos.0 as usize, pos.1 as usize),
+    //     );
+    // };
+    // s.entity_id_seq += 1;
+    // let _entity = s
+    //     .world
+    //     .create_entity()
+    //     .with(UniqueId(s.entity_id_seq))
+    //     .with(Bullet::new(explosion))
+    //     .with(pos)
+    //     .with(Vel {
+    //         transl: direction,
+    //         angular: 1.0,
+    //     })
+    //     .with(Force::default())
+    //     .with(Shape::new_quad(4.0, 4.0))
+    //     .with(color)
+    //     .build();
     Ok(())
 }
 
-pub fn create_snapshot(s: &ServerGame, since_frame: u32) -> Snapshot {
-    let diffs = s.world.read_resource::<DiffHistory>();
-    diffs.create_snapshot(since_frame, s.frame, &s.world)
-}
+// pub fn create_snapshot(s: &ServerGame, since_frame: u32) -> Snapshot {
+    // let diffs = s.world.read_resource::<DiffHistory>();
+    // diffs.create_snapshot(since_frame, s.frame, &s.world)
+// }
 pub fn frame_nr(s: &ServerGame) -> u32 {
     s.frame
 }
 
 pub fn input(s: &mut ServerGame, id: u32, input: PlayerInput) -> Result<(), Error> {
-    let entity = s
-        .entities
-        .get(&id)
-        .ok_or_else(|| format_err!("Entity not found"))?;
-    let mut input_resource = s.world.write_storage::<PlayerInput>();
-    let input_ref = input_resource
-        .get_mut(*entity)
-        .ok_or_else(|| format_err!("Entity doesn't have input"))?;
-    *input_ref = input;
+    // let entity = s
+    //     .entities
+    //     .get(&id)
+    //     .ok_or_else(|| format_err!("Entity not found"))?;
+    // let mut input_resource = s.world.write_storage::<PlayerInput>();
+    // let input_ref = input_resource
+    //     .get_mut(*entity)
+    //     .ok_or_else(|| format_err!("Entity doesn't have input"))?;
+    // *input_ref = input;
     Ok(())
 }
 
@@ -250,22 +251,22 @@ impl GameConfig {
 }
 
 pub fn generate_world(s: &mut ServerGame) {
-    let mut tilenet = s.world.write_resource::<TileNet<Tile>>();
-    tilenet_gen::proc1(&mut *tilenet);
+    // let mut tilenet = s.world.write_resource::<TileNet<Tile>>();
+    // tilenet_gen::proc1(&mut *tilenet);
 
-    // Create bases
-    let base_size: usize = 24;
-    let pos = (s.white_base.x as usize, s.white_base.y as usize);
-    tilenet.set_box(
-        &0,
-        (pos.0 - base_size, pos.1 - base_size),
-        (pos.0 + base_size, pos.1 + base_size),
-    );
-    let pos = (s.black_base.x as usize, s.black_base.y as usize);
-    tilenet.set_box(
-        &255,
-        (pos.0 - base_size, pos.1 - base_size),
-        (pos.0 + base_size, pos.1 + base_size),
-    );
+    // // Create bases
+    // let base_size: usize = 24;
+    // let pos = (s.white_base.x as usize, s.white_base.y as usize);
+    // tilenet.set_box(
+    //     &0,
+    //     (pos.0 - base_size, pos.1 - base_size),
+    //     (pos.0 + base_size, pos.1 + base_size),
+    // );
+    // let pos = (s.black_base.x as usize, s.black_base.y as usize);
+    // tilenet.set_box(
+    //     &255,
+    //     (pos.0 - base_size, pos.1 - base_size),
+    //     (pos.0 + base_size, pos.1 + base_size),
+    // );
     // world::gen::rings(&mut world.tilenet, 2);
 }

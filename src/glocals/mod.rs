@@ -55,7 +55,6 @@ pub struct Connection {
 
 pub struct ServerGame {
     pub frame: u32,
-    pub world: World,
     pub game_conf: GameConfig,
 
     /// Mapping from unique ID to specs Entity

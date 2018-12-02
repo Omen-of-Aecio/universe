@@ -59,8 +59,8 @@ fn parse_command_line_arguments<'a>(s: &mut clap::ArgMatches<'a>) {
 }
 
 fn run_client_or_server(s: &mut glocals::Main) {
-    let options = s.options.clone();
-    if let Some(_connect) = options.value_of("connect") {
+    let commandline = s.commandline.clone();
+    if let Some(_connect) = commandline.value_of("connect") {
     } else {
     };
 }
@@ -75,7 +75,7 @@ fn wait_for_threads_to_exit(mut s: glocals::Main) {
 fn main() {
     let mut s = glocals::Main::default();
     create_logger(&mut s.threads);
-    parse_command_line_arguments(&mut s.options);
+    parse_command_line_arguments(&mut s.commandline);
     run_client_or_server(&mut s);
     wait_for_threads_to_exit(s);
 }

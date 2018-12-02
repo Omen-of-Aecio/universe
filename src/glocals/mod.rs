@@ -11,12 +11,10 @@ use std::{
     vec::Vec,
 };
 
-pub type Tile = u8;
-
 #[derive(Default)]
 pub struct Main<'a> {
     pub config: Config,
-    pub options: clap::ArgMatches<'a>,
+    pub commandline: clap::ArgMatches<'a>,
     pub threads: Threads,
 }
 
@@ -116,8 +114,7 @@ pub struct PlayerConfig {
     pub jump_duration: f32,
     pub jump_delay: f32,
     pub jump_acc: f32,
-    // Client config
-    // pub snapshot_rate: f32,
+    pub snapshot_rate: f32,
 }
 #[derive(Default, Deserialize, Clone)]
 pub struct WorldConfig {
@@ -130,8 +127,7 @@ pub struct WorldConfig {
 
 #[derive(Default, Deserialize, Clone)]
 pub struct ServerConfig {
-    /// Ticks per second
-    pub tps: u32,
+    pub ticks_per_second: u32,
 }
 
 #[derive(Default)]

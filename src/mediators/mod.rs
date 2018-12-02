@@ -1,5 +1,5 @@
 use glocals::{EntryPointLogger, LogMessage, Threads};
-use std::sync::mpsc::{RecvError, TrySendError};
+use std::{collections::HashMap, sync::mpsc::{RecvError, TrySendError}};
 
 pub fn log<T: Into<String>>(
     threads: &mut Threads,
@@ -53,5 +53,5 @@ pub fn entry_point_logger(s: EntryPointLogger) {
             }
         }
     }
-    println!["128: \"LGGR\": \"Thread exiting\", {}", "{}"];
+    println!["128: \"LGGR\": \"Thread exiting\", {:#?}", HashMap::<String, String>::new()];
 }

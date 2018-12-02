@@ -1,19 +1,19 @@
 use glocals::{EntryPointLogger, LogMessage, Threads};
 use std::{collections::HashMap, sync::mpsc::{RecvError, TrySendError}};
 
-pub fn log<T: Into<String>>(
+pub fn log<T: Clone + Into<String>>(
     threads: &mut Threads,
     level: u8,
     context: T,
     message: T,
-    key_value_map: &[(String, String)],
+    key_value_map: &[(T, T)],
 ) {
     match threads.log_channel.as_mut().map(move |x| {
         x.try_send(LogMessage {
             loglevel: level,
             context: context.into(),
             message: message.into(),
-            kvpairs: key_value_map.iter().cloned().collect(),
+            kvpairs: key_value_map.iter().map(|(k, v)| (k.clone().into(), v.clone().into())).collect(),
         })
     }) {
         Some(Ok(())) => {}

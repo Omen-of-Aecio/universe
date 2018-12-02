@@ -2,7 +2,6 @@ use glium::glutin;
 use glium::glutin::{ElementState, MouseButton, VirtualKeyCode as KeyCode};
 // use glium::glutin::KeyCode;
 use glium::glutin::Event::KeyboardInput;
-use glocals::component::PlayerInput;
 use libs::geometry::vec::Vec2;
 
 // TODO
@@ -120,23 +119,5 @@ impl Input {
             self.key_toggled.0[keycode] = true;
         }
         self.key_down.0[keycode] = false;
-    }
-
-    pub fn create_player_input(&self) -> PlayerInput {
-        PlayerInput {
-            up: self.key_down(KeyCode::Up)
-                || self.key_down(KeyCode::W)
-                || self.key_down(KeyCode::F),
-            down: self.key_down(KeyCode::Down)
-                || self.key_down(KeyCode::S)
-                || self.key_down(KeyCode::S),
-            left: self.key_down(KeyCode::Left)
-                || self.key_down(KeyCode::A)
-                || self.key_down(KeyCode::R),
-            right: self.key_down(KeyCode::Right)
-                || self.key_down(KeyCode::D)
-                || self.key_down(KeyCode::T),
-            g: self.key_down(KeyCode::G),
-        }
     }
 }

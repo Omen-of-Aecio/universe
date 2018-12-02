@@ -1,17 +1,15 @@
-pub mod component;
-pub mod conf;
 pub mod game;
 pub mod system;
 
-use self::game::Game;
-use addons::graphics::Graphics;
 use clap;
 use glium;
-use libs::input;
+use libs::geometry::cam::Camera;
 use libs::geometry::vec::Vec2;
-use libs::net::Socket;
-use specs::{self, World};
+use libs::input;
+use std::cmp::min;
 use std::{collections::HashMap, net::SocketAddr, time::Duration, vec::Vec};
+use tilenet::TileNet;
+use toml;
 
 pub type Tile = u8;
 pub use failure::Error;
@@ -19,7 +17,7 @@ pub use failure::Error;
 #[derive(Default)]
 pub struct Main<'a> {
     pub _logger_guard: Option<slog_scope::GlobalLoggerGuard>,
-    pub config: Option<conf::Config>,
+    pub config: Config,
     pub options: clap::ArgMatches<'a>,
 }
 
@@ -28,10 +26,8 @@ pub struct Client<'a> {
     pub game: Game,
     pub input: input::Input,
     pub display: glium::Display,
-    pub graphics: Option<Graphics>,
 
     // Networking
-    pub socket: Socket,
     pub server: SocketAddr,
 }
 
@@ -39,7 +35,6 @@ pub struct Server<'a> {
     pub main: Main<'a>,
     pub game: ServerGame,
     pub connections: HashMap<SocketAddr, Connection>,
-    pub socket: Socket,
 
     /// Frame duration in seconds (used only for how long to sleep. FPS is in GameConfig)
     pub tick_duration: Duration,
@@ -58,7 +53,7 @@ pub struct ServerGame {
     pub game_conf: GameConfig,
 
     /// Mapping from unique ID to specs Entity
-    pub entities: HashMap<u32, specs::Entity>,
+    // pub entities: HashMap<u32, specs::Entity>,
     pub entity_id_seq: u32,
 
     /// Width of the generated world
@@ -84,4 +79,58 @@ pub struct GameConfig {
     pub srv_tick_duration: Duration,
     pub air_fri: Vec2,
     pub ground_fri: f32,
+}
+
+#[derive(Default, Deserialize, Clone)]
+pub struct Config {
+    pub player: PlayerConfig,
+    pub world: WorldConfig,
+    pub srv: ServerConfig,
+}
+
+#[derive(Default, Deserialize, Clone)]
+pub struct PlayerConfig {
+    pub hori_acc: f32,
+    pub jump_duration: f32,
+    pub jump_delay: f32,
+    pub jump_acc: f32,
+    // Client config
+    // pub snapshot_rate: f32,
+}
+#[derive(Default, Deserialize, Clone)]
+pub struct WorldConfig {
+    pub width: u32,
+    pub height: u32,
+    pub gravity: f32,
+    pub air_fri: (f32, f32),
+    pub ground_fri: f32,
+}
+
+#[derive(Default, Deserialize, Clone)]
+pub struct ServerConfig {
+    /// Ticks per second
+    pub tps: u32,
+}
+
+pub struct Game {
+    // pub world: World,
+    pub cam: Camera,
+
+    pub you: u32,
+
+    pub white_base: Vec2,
+    pub black_base: Vec2,
+
+    // Extra graphics data (for debugging/visualization)
+    pub vectors: Vec<(Vec2, Vec2)>,
+
+    pub cam_mode: CameraMode,
+}
+
+/* Should go, together with some logic, to some camera module (?) */
+#[derive(Copy, Clone)]
+#[allow(unused)]
+pub enum CameraMode {
+    Interactive,
+    FollowPlayer,
 }

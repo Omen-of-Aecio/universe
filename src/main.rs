@@ -22,7 +22,6 @@ extern crate slog_json;
 extern crate slog_scope;
 extern crate slog_stream;
 extern crate slog_term;
-extern crate specs;
 extern crate tilenet;
 extern crate tilenet_ren;
 extern crate time;
@@ -35,7 +34,6 @@ mod glocals;
 mod libs;
 
 use clap::{App, Arg};
-use glocals::conf::{self, Config};
 use slog::{Drain, Level};
 
 // ---
@@ -51,8 +49,8 @@ fn create_logger(s: &mut Option<slog_scope::GlobalLoggerGuard>) {
     )));
 }
 
-fn load_configuration_file(s: &mut Option<conf::Config>) {
-    *s = Config::from_file("config.toml").ok();
+fn load_configuration_file(s: &mut glocals::Config) {
+    // *s = Config::from_file("config.toml").ok();
 }
 
 fn parse_command_line_arguments<'a>(s: &mut clap::ArgMatches<'a>) {
@@ -72,19 +70,15 @@ fn parse_command_line_arguments<'a>(s: &mut clap::ArgMatches<'a>) {
 
 fn run_client_or_server(s: glocals::Main) {
     let options = s.options.clone();
-    let err = if let Some(connect) = options.value_of("connect") {
+    if let Some(connect) = options.value_of("connect") {
         info!("Running client");
-        let mut client = addons::cli::create_client(s, connect).unwrap();
-        addons::cli::run(&mut client)
+    // let mut client = addons::cli::create_client(s, connect).unwrap();
+    // addons::cli::run(&mut client)
     } else {
         info!("Running server");
-        let mut server = addons::srv::create_server(s);
-        addons::srv::run(&mut server)
+        // let mut server = addons::srv::create_server(s);
+        // addons::srv::run(&mut server)
     };
-    if let Err(err) = err {
-        println!("Error: {}", err);
-        println!("Backtrace: {}", err.backtrace());
-    }
 }
 
 // ---

@@ -23,7 +23,6 @@ slog-json = "*"
 slog-scope = "*"
 slog-stream = "*"
 slog-term = "*"
-specs = "0.12"
 tilenet = { git = "https://github.com/Ploppz/TileNet", branch = "flagged-storage" }
 # tilenet = { path = "/home/ploppz/code/rust/tilenet" }
 tilenet_ren = { git = "https://github.com/Ploppz/tilenet-render", branch = "flagged-storage"}

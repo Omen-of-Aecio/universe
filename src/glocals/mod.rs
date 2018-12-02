@@ -1,18 +1,11 @@
 use clap;
-use glium;
-use libs::geometry::cam::Camera;
-use libs::geometry::vec::Vec2;
-use libs::input;
+use libs::{input, geometry::{cam::Camera, vec::Vec2}};
 use std::{collections::HashMap, net::SocketAddr, time::Duration, vec::Vec};
-use tilenet::TileNet;
-use toml;
 
 pub type Tile = u8;
-pub use failure::Error;
 
 #[derive(Default)]
 pub struct Main<'a> {
-    pub _logger_guard: Option<slog_scope::GlobalLoggerGuard>,
     pub config: Config,
     pub options: clap::ArgMatches<'a>,
 }

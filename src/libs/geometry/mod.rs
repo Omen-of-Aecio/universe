@@ -1,4 +1,5 @@
 pub mod cam;
+pub mod grid2d;
 pub mod vec;
 
 pub use self::vec::Vec2;

@@ -6,7 +6,6 @@ use glium;
 use libs::geometry::cam::Camera;
 use libs::geometry::vec::Vec2;
 use libs::input;
-use std::cmp::min;
 use std::{collections::HashMap, net::SocketAddr, time::Duration, vec::Vec};
 use tilenet::TileNet;
 use toml;
@@ -21,16 +20,18 @@ pub struct Main<'a> {
     pub options: clap::ArgMatches<'a>,
 }
 
+#[derive(Default)]
 pub struct Client<'a> {
     pub main: Main<'a>,
     pub game: Game,
     pub input: input::Input,
-    pub display: glium::Display,
+    // pub display: glium::Display,
 
     // Networking
-    pub server: SocketAddr,
+    // pub server: SocketAddr,
 }
 
+#[derive(Default)]
 pub struct Server<'a> {
     pub main: Main<'a>,
     pub game: ServerGame,
@@ -48,6 +49,7 @@ pub struct Connection {
     pub snapshot_rate: f32,
 }
 
+#[derive(Default)]
 pub struct ServerGame {
     pub frame: u32,
     pub game_conf: GameConfig,
@@ -112,6 +114,7 @@ pub struct ServerConfig {
     pub tps: u32,
 }
 
+#[derive(Default)]
 pub struct Game {
     // pub world: World,
     pub cam: Camera,
@@ -129,8 +132,13 @@ pub struct Game {
 
 /* Should go, together with some logic, to some camera module (?) */
 #[derive(Copy, Clone)]
-#[allow(unused)]
 pub enum CameraMode {
     Interactive,
     FollowPlayer,
+}
+
+impl Default for CameraMode {
+    fn default() -> CameraMode {
+        CameraMode::Interactive
+    }
 }

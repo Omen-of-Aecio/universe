@@ -1,6 +1,15 @@
 use clap;
-use libs::{input, geometry::{cam::Camera, vec::Vec2}};
-use std::{collections::HashMap, net::SocketAddr, time::Duration, vec::Vec};
+use libs::{
+    geometry::{cam::Camera, vec::Vec2},
+    input,
+};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::{Arc, Mutex},
+    time::Duration,
+    vec::Vec,
+};
 
 pub type Tile = u8;
 
@@ -8,6 +17,27 @@ pub type Tile = u8;
 pub struct Main<'a> {
     pub config: Config,
     pub options: clap::ArgMatches<'a>,
+    pub threads: Threads,
+}
+
+pub struct EntryPointLogger {
+    pub receiver: std::sync::mpsc::Receiver<LogMessage>,
+    pub log_channel_full_count: Arc<Mutex<usize>>,
+}
+
+#[derive(Default)]
+pub struct Threads {
+    pub logger: Option<std::thread::JoinHandle<()>>,
+    pub log_channel: Option<std::sync::mpsc::SyncSender<LogMessage>>,
+    pub log_channel_full_count: Arc<Mutex<usize>>,
+}
+
+#[derive(Default)]
+pub struct LogMessage {
+    pub loglevel: u8,
+    pub context: String,
+    pub message: String,
+    pub kvpairs: HashMap<String, String>,
 }
 
 #[derive(Default)]

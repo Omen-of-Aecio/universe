@@ -35,7 +35,7 @@ fn create_logger(s: &mut Threads) {
     s.log_channel = Some(tx);
     s.log_channel_full_count = buffer_full_count.clone();
     s.logger = Some(std::thread::spawn(move || {
-        mediators::entry_point_logger(EntryPointLogger {
+        mediators::logger::entry_point_logger(EntryPointLogger {
             log_channel_full_count: buffer_full_count,
             receiver: rx,
         });
@@ -58,11 +58,19 @@ fn parse_command_line_arguments<'a>(s: &mut clap::ArgMatches<'a>) {
     };
 }
 
-fn run_client_or_server(s: &mut glocals::Main) {
+fn run_client_or_server(s: glocals::Main) -> glocals::Main {
     let commandline = s.commandline.clone();
     if let Some(_connect) = commandline.value_of("connect") {
+        {
+            let mut client = Client {
+                main: s,
+            };
+            mediators::client::entry_point_client(&mut client);
+            client.main
+        }
     } else {
-    };
+        s
+    }
 }
 
 fn wait_for_threads_to_exit(mut s: glocals::Main) {
@@ -76,6 +84,6 @@ fn main() {
     let mut s = glocals::Main::default();
     create_logger(&mut s.threads);
     parse_command_line_arguments(&mut s.commandline);
-    run_client_or_server(&mut s);
+    s = run_client_or_server(s);
     wait_for_threads_to_exit(s);
 }

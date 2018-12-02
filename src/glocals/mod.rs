@@ -41,8 +41,8 @@ pub struct LogMessage {
 #[derive(Default)]
 pub struct Client<'a> {
     pub main: Main<'a>,
-    pub game: Game,
-    pub input: input::Input,
+    // pub game: Game,
+    // pub input: input::Input,
     // pub display: glium::Display,
 
     // Networking

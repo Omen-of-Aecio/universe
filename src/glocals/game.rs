@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::vec::Vec;
 
 pub struct Game {
-    pub world: World,
+    // pub world: World,
     pub cam: Camera,
 
     pub you: u32,

@@ -27,37 +27,37 @@ use tilenet::TileNet;
 /// this only needs to be done when it otherwise poses a problem that the hashmap is not
 /// immediately updated.
 pub fn register_entity(s: &mut Game, id: u32, ent: specs::Entity) {
-    s.world
-        .write_resource::<HashMap<u32, specs::Entity>>()
-        .insert(id, ent);
+    // s.world
+    //     .write_resource::<HashMap<u32, specs::Entity>>()
+    //     .insert(id, ent);
 }
 pub fn apply_snapshot(s: &mut Game, snapshot: Snapshot) {
     let mut added_entities: Vec<(u32, specs::Entity)> = Vec::new();
     {
-        let updater = s.world.read_resource::<LazyUpdate>();
-        for (id, entity) in snapshot.entities.into_iter() {
-            match entity {
-                Some(Entity { components }) => {
-                    match get_entity(s, id) {
-                        Some(this_ent) => {
-                            components.modify_existing(&*updater, this_ent);
-                        }
-                        None => {
-                            // TODO: maybe need to care about type (Player/Bullet)
-                            let ent = components.insert(&*updater, &*s.world.entities(), id);
-                            added_entities.push((id, ent));
-                        }
-                    }
-                }
-                // This means the entity was deleted
-                None => match get_entity(s, id) {
-                    Some(this_ent) => {
-                        s.world.entities().delete(this_ent).unwrap();
-                    }
-                    None => error!("Server removed entity not owned by me"),
-                },
-            }
-        }
+        // let updater = s.world.read_resource::<LazyUpdate>();
+        // for (id, entity) in snapshot.entities.into_iter() {
+        //     match entity {
+        //         Some(Entity { components }) => {
+        //             match get_entity(s, id) {
+        //                 Some(this_ent) => {
+        //                     components.modify_existing(&*updater, this_ent);
+        //                 }
+        //                 None => {
+        //                     // TODO: maybe need to care about type (Player/Bullet)
+        //                     let ent = components.insert(&*updater, &*s.world.entities(), id);
+        //                     added_entities.push((id, ent));
+        //                 }
+        //             }
+        //         }
+        //         // This means the entity was deleted
+        //         None => match get_entity(s, id) {
+        //             Some(this_ent) => {
+        //                 s.world.entities().delete(this_ent).unwrap();
+        //             }
+        //             None => error!("Server removed entity not owned by me"),
+        //         },
+        //     }
+        // }
     }
     for (id, ent) in added_entities {
         register_entity(s, id, ent);
@@ -68,53 +68,57 @@ pub fn print(s: &Game) {
     // info!("TileNet"; "content" => format!["{:?}", self.get_tilenet()]);
 }
 pub fn get_player_transl(s: &Game) -> Option<Vec2> {
-    let pos = s.world.read_storage::<Pos>();
-    get_you(s).and_then(|you| pos.get(you).map(|pos| pos.transl))
+    // let pos = s.world.read_storage::<Pos>();
+    // get_you(s).and_then(|you| pos.get(you).map(|pos| pos.transl))
+    None
 }
 pub fn get_you(s: &Game) -> Option<specs::Entity> {
     get_entity(s, s.you)
 }
 pub fn get_entity(s: &Game, id: u32) -> Option<specs::Entity> {
-    s.world
-        .read_resource::<HashMap<u32, specs::Entity>>()
-        .get(&id)
-        .cloned()
+    // s.world
+    //     .read_resource::<HashMap<u32, specs::Entity>>()
+    //     .get(&id)
+    //     .cloned()
+    None
 }
 // Access //
 pub fn get_tilenet_serial_rect(s: &Game, x: usize, y: usize, w: usize, h: usize) -> Vec<Tile> {
-    let tilenet = &*s.world.read_resource::<TileNet<Tile>>();
-    let w = min(x + w, tilenet.get_size().0) as isize - x as isize;
-    let h = min(y + h, tilenet.get_size().1) as isize - y as isize;
-    if w == 0 || h == 0 {
-        return Vec::new();
-    }
-    let w = w as usize;
-    let h = h as usize;
+    // let tilenet = &*s.world.read_resource::<TileNet<Tile>>();
+    // let w = min(x + w, tilenet.get_size().0) as isize - x as isize;
+    // let h = min(y + h, tilenet.get_size().1) as isize - y as isize;
+    // if w == 0 || h == 0 {
+    //     return Vec::new();
+    // }
+    // let w = w as usize;
+    // let h = h as usize;
 
-    let pixels: Vec<u8> = tilenet
-        .view_box((x, x + w, y, y + h))
-        .map(|x| *x.0)
-        .collect();
-    assert!(pixels.len() == w * h);
-    pixels
+    // let pixels: Vec<u8> = tilenet
+    //     .view_box((x, x + w, y, y + h))
+    //     .map(|x| *x.0)
+    //     .collect();
+    // assert!(pixels.len() == w * h);
+    // pixels
+    Vec::new()
 }
 
 /// Returns (white count, black count)
 pub fn count_player_colors(s: &Game) -> (u32, u32) {
-    let mut count = (0, 0);
-    let (player, color) = {
-        (
-            s.world.read_storage::<Player>(),
-            s.world.read_storage::<Color>(),
-        )
-    };
-    for (_, color) in (&player, &color).join() {
-        match *color {
-            Color::Black => count.0 += 1,
-            Color::White => count.1 += 1,
-        }
-    }
-    count
+    // let mut count = (0, 0);
+    // let (player, color) = {
+    //     (
+    //         s.world.read_storage::<Player>(),
+    //         s.world.read_storage::<Color>(),
+    //     )
+    // };
+    // for (_, color) in (&player, &color).join() {
+    //     match *color {
+    //         Color::Black => count.0 += 1,
+    //         Color::White => count.1 += 1,
+    //     }
+    // }
+    // count
+    (1, 0)
 }
 
 /// Returns (messages to send, messages to send reliably)
@@ -170,16 +174,17 @@ pub fn update(
     dispatcher: &mut Dispatcher,
     input: &Input,
 ) -> (Vec<Message>, Vec<Message>) {
-    s.world.maintain();
-    // ^^ XXX maintain before rest, because previously in this frame we handled input & network pacakets
-    s.vectors.clear(); // clear debug geometry
-    let ret = handle_game_input(s, input);
-    if let (CameraMode::FollowPlayer, Some(transl)) = (s.cam_mode, get_player_transl(s)) {
-        s.cam.center = transl;
-    }
-    *s.world.write_resource() = s.cam;
-    dispatcher.dispatch(&s.world.res);
-    ret
+    // s.world.maintain();
+    // // ^^ XXX maintain before rest, because previously in this frame we handled input & network pacakets
+    // s.vectors.clear(); // clear debug geometry
+    // let ret = handle_game_input(s, input);
+    // if let (CameraMode::FollowPlayer, Some(transl)) = (s.cam_mode, get_player_transl(s)) {
+    //     s.cam.center = transl;
+    // }
+    // *s.world.write_resource() = s.cam;
+    // dispatcher.dispatch(&s.world.res);
+    // ret
+    (Vec::new(), Vec::new())
 }
 
 pub fn create_client<'a>(s: Main<'a>, server_addr: &str) -> Result<Client<'a>, Error> {
@@ -208,13 +213,13 @@ pub fn create_client<'a>(s: Main<'a>, server_addr: &str) -> Result<Client<'a>, E
             let mut game = create_game(width, height, you, white_base, black_base, &display);
             info!("Client received Welcome message");
 
-            let graphics = Graphics::new(&display, &*game.world.read_resource());
+            // let graphics = Graphics::new(&display, &*game.world.read_resource());
             Ok(Client {
                 main: s,
                 input: Input::new(),
                 game,
                 display,
-                graphics,
+                graphics: None,
 
                 socket,
                 server,
@@ -270,7 +275,7 @@ pub fn create_game(
     };
 
     Game {
-        world,
+        // world,
         cam,
         you,
         white_base,
@@ -313,7 +318,7 @@ pub fn receive_and_handle_messages(client: &mut Client) -> Result<(), Error> {
         messages.push(msg);
     }
     for msg in messages {
-        handle_message(client, msg.0, msg.1)?;
+        handle_message(client, msg.0, msg.1)?; // Calls into world
     }
     Ok(())
 }
@@ -333,10 +338,10 @@ pub fn update_and_send_messages(client: &mut Client, dispatcher: &mut Dispatcher
 }
 
 pub fn render_game_scene(client: &mut Client) {
-    prof![
-        "Render",
-        client.graphics.render(client.game.cam, &client.game.world)
-    ];
+    // prof![
+    //     "Render",
+    //     client.graphics.render(client.game.cam, &client.game.world)
+    // ];
 }
 
 pub fn run(client: &mut Client) -> Result<(), Error> {
@@ -349,7 +354,7 @@ pub fn run(client: &mut Client) -> Result<(), Error> {
     loop {
         collect_input(client)?;
         handle_input(client);
-        receive_and_handle_messages(client)?;
+        receive_and_handle_messages(client)?; // Calls into World
         update_and_send_messages(client, &mut dispatcher)?;
         render_game_scene(client);
         // Render
@@ -361,7 +366,7 @@ pub fn run(client: &mut Client) -> Result<(), Error> {
 fn handle_input(s: &mut Client) {
     // Some interactivity for debugging
     if s.input.key_down(KeyCode::Comma) && s.input.key_toggled(KeyCode::Comma) {
-        s.graphics.tilenet_renderer.toggle_smooth();
+        s.graphics.as_mut().map(|x| x.tilenet_renderer.toggle_smooth());
     }
 }
 
@@ -390,17 +395,17 @@ fn handle_message(s: &mut Client, src: SocketAddr, msg: Message) -> Result<(), E
 }
 
 fn update_tilenet_rect(s: &mut Client, x: usize, y: usize, w: usize, h: usize, pixels: &[u8]) {
-    let tilenet = &mut *s.game.world.write_resource::<TileNet<Tile>>();
-    let mut count = 0;
-    for y in y..y + h {
-        for x in x..x + w {
-            tilenet.set(&pixels[count], (x, y));
-            count += 1;
-        }
-    }
-    s.graphics
-        .tilenet_renderer
-        .upload_texture(tilenet, x as u32, y as u32, w as u32, h as u32);
+    // let tilenet = &mut *s.game.world.write_resource::<TileNet<Tile>>();
+    // let mut count = 0;
+    // for y in y..y + h {
+    //     for x in x..x + w {
+    //         tilenet.set(&pixels[count], (x, y));
+    //         count += 1;
+    //     }
+    // }
+    // s.graphics
+    //     .tilenet_renderer
+    //     .upload_texture(tilenet, x as u32, y as u32, w as u32, h as u32);
 }
 
 fn create_socket() -> Socket {

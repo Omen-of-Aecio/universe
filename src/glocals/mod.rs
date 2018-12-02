@@ -28,7 +28,7 @@ pub struct Client<'a> {
     pub game: Game,
     pub input: input::Input,
     pub display: glium::Display,
-    pub graphics: Graphics,
+    pub graphics: Option<Graphics>,
 
     // Networking
     pub socket: Socket,

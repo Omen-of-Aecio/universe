@@ -49,6 +49,15 @@ fn move_camera_according_to_input(s: &mut Client) {
     if s.input.is_key_down(Key::S) {
         s.game.cam.center.y -= 5.0;
     }
+    match s.input.get_mouse_wheel() {
+        x if x > 0.0 => {
+            s.game.cam.zoom *= 1.1 / 1.0;
+        }
+        x if x < 0.0 => {
+            s.game.cam.zoom *= 1.0 / 1.1;
+        }
+        _ => {}
+    }
 }
 
 fn render_the_grid(grid: &mut Option<GridU8RenderData>, frame: &mut glium::Frame, cam: &Camera) {

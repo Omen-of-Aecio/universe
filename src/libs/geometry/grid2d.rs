@@ -63,6 +63,19 @@ mod tests {
         assert![None == grid.get(0, 0)];
     }
 
+    #[test]
+    fn resize_nonsensical() {
+        let mut grid: Grid<bool> = Grid::new();
+        grid.resize(10, 0);
+        assert![None == grid.get(0, 0)];
+    }
+
+    #[test]
+    fn resize_nonsensical_2() {
+        let mut grid: Grid<bool> = Grid::new();
+        grid.resize(0, 3);
+        assert![None == grid.get(0, 0)];
+    }
 
     #[test]
     fn resize_boundaries() {

@@ -55,7 +55,7 @@ pub fn does_line_collide_with_grid<T: Clone + Default>(
         if ix >= 0 && iy >= 0 {
             if let Some(entry) = grid.get(ix as usize, iy as usize) {
                 if predicate(entry) {
-                    return Some((ix as usize, iy as usize))
+                    return Some((ix as usize, iy as usize));
                 }
             }
         }
@@ -232,6 +232,37 @@ mod tests {
                     Vec2 { x: 0.0, y: 3.0 },
                     |x| *x
                 )
+        ];
+    }
+
+    #[test]
+    fn test_already_colliding() {
+        let mut grid: Grid<bool> = Grid::new();
+        grid.resize(3, 3);
+        *grid.get_mut(0, 0).unwrap() = true;
+        assert![
+            Some((0, 0))
+                == does_line_collide_with_grid(
+                    &grid,
+                    Vec2 { x: 0.0, y: 0.0 },
+                    Vec2 { x: 0.0, y: 0.0 },
+                    |x| *x,
+                )
+        ];
+    }
+
+    #[test]
+    fn test_already_colliding_but_inverted_predicate() {
+        let mut grid: Grid<bool> = Grid::new();
+        grid.resize(3, 3);
+        *grid.get_mut(0, 0).unwrap() = true;
+        assert![
+            None == does_line_collide_with_grid(
+                &grid,
+                Vec2 { x: 0.0, y: 0.0 },
+                Vec2 { x: 0.0, y: 0.0 },
+                |x| !*x,
+            )
         ];
     }
 }

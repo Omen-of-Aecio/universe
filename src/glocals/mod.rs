@@ -1,5 +1,8 @@
 use clap;
-use libs::geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
+use libs::{
+    geometry::{cam::Camera, grid2d::Grid, vec::Vec2},
+    input,
+};
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -35,13 +38,11 @@ pub struct LogMessage {
     pub kvpairs: HashMap<String, String>,
 }
 
-#[derive(Default)]
 pub struct Client<'a> {
     pub main: Main<'a>,
     pub game: Game,
-    // pub input: input::Input,
-    // pub display: glium::Display,
-
+    pub input: input::Input,
+    pub display: glium::Display,
     // Networking
     // pub server: SocketAddr,
 }

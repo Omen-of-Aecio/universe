@@ -24,6 +24,7 @@ mod libs;
 mod mediators;
 
 use clap::{App, Arg};
+use glium::{glutin, Display, DisplayBuild};
 use glocals::*;
 use mediators::log;
 use std::sync::{Arc, Mutex};
@@ -66,6 +67,12 @@ fn run_client_or_server(s: glocals::Main) -> glocals::Main {
             let mut client = Client {
                 main: s,
                 game: Game::default(),
+                display: glutin::WindowBuilder::new()
+                    .with_dimensions(1024, 768)
+                    .with_title("Universe")
+                    .build_glium()
+                    .unwrap(),
+                input: libs::input::Input::default(),
             };
             mediators::client::entry_point_client(&mut client);
             client.main

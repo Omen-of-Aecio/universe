@@ -52,6 +52,14 @@ mod tests {
     }
 
     #[test]
+    fn resize_zero() {
+        let mut grid: Grid<bool> = Grid::new();
+        grid.resize(0, 0);
+        assert![None == grid.get(0, 0)];
+    }
+
+
+    #[test]
     fn resize_boundaries() {
         let mut grid: Grid<bool> = Grid::new();
         grid.resize(10, 10);

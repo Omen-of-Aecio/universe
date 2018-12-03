@@ -4,9 +4,6 @@ use glium::glutin::{ElementState, MouseButton, VirtualKeyCode as KeyCode};
 use glium::glutin::Event::KeyboardInput;
 use libs::geometry::vec::Vec2;
 
-// TODO
-// Input isn't really made for ease of client-server
-
 const NUM_KEYS: usize = 150;
 struct Keys([bool; NUM_KEYS]);
 
@@ -15,11 +12,9 @@ pub struct Input {
     key_down: Keys,
     key_toggled: Keys,
 
-    /// Only left mouse button at the moment
-    mouse: (i32, i32, bool),
-    /// How much the mouse has moved since the last frame
-    past_mouse: (i32, i32),
-    /// How much wheel since last frame
+    left_mouse_button: bool,
+    mouse: (i32, i32),
+    mouse_in_previous_frame: (i32, i32),
     mouse_wheel: f32,
 }
 
@@ -30,17 +25,16 @@ impl Default for Keys {
 }
 
 impl Input {
-    // Mainly resets key_toggled.0
-    pub fn update(&mut self) {
+
+    pub fn prepare_for_next_frame(&mut self) {
         for i in 0..NUM_KEYS {
             self.key_toggled.0[i] = false;
         }
         self.mouse_wheel = 0.0;
-        self.past_mouse.0 = self.mouse.0;
-        self.past_mouse.1 = self.mouse.1;
+        self.mouse_in_previous_frame.0 = self.mouse.0;
+        self.mouse_in_previous_frame.1 = self.mouse.1;
     }
 
-    /* Interface to register input */
     pub fn register_key(&mut self, input: &glutin::Event) {
         match *input {
             KeyboardInput(ElementState::Pressed, _, Some(keycode)) => {
@@ -52,66 +46,71 @@ impl Input {
             _ => (), // Do nothing. Should probably log the error.
         }
     }
+
     pub fn position_mouse(&mut self, x: i32, y: i32) {
         self.mouse.0 = x;
         self.mouse.1 = y;
     }
+
     pub fn register_mouse_wheel(&mut self, y: f32) {
         self.mouse_wheel = y;
     }
+
     pub fn register_mouse_input(&mut self, state: ElementState, button: MouseButton) {
         if let MouseButton::Left = button {
-            self.mouse.2 = match state {
+            self.left_mouse_button = match state {
                 ElementState::Pressed => true,
                 ElementState::Released => false,
             };
         }
     }
 
-    /* Interface to GET state */
+    // ---
 
-    pub fn key_down(&self, keycode: KeyCode) -> bool {
+    pub fn is_key_down(&self, keycode: KeyCode) -> bool {
         self.key_down.0[keycode as usize]
     }
 
-    pub fn key_toggled(&self, keycode: KeyCode) -> bool {
+    pub fn is_key_toggled(&self, keycode: KeyCode) -> bool {
         self.key_toggled.0[keycode as usize]
     }
 
-    /// True if key was just pressed down this frame.
-    pub fn key_toggled_down(&self, keycode: KeyCode) -> bool {
-        self.key_down(keycode) && self.key_toggled(keycode)
+    pub fn is_key_toggled_down(&self, keycode: KeyCode) -> bool {
+        self.is_key_down(keycode) && self.is_key_toggled(keycode)
     }
 
-    pub fn mouse_pos(&self) -> Vec2 {
+    pub fn get_mouse_pos(&self) -> Vec2 {
         Vec2::new(self.mouse.0 as f32, self.mouse.1 as f32)
     }
-    pub fn mouse(&self) -> bool {
-        self.mouse.2
+
+    pub fn is_left_mouse_button_down(&self) -> bool {
+        self.left_mouse_button
     }
-    pub fn mouse_moved(&self) -> Vec2 {
+
+    pub fn get_mouse_moved(&self) -> Vec2 {
         Vec2::new(
-            (self.mouse.0 - self.past_mouse.0) as f32,
-            (self.mouse.1 - self.past_mouse.1) as f32,
+            (self.mouse.0 - self.mouse_in_previous_frame.0) as f32,
+            (self.mouse.1 - self.mouse_in_previous_frame.1) as f32,
         )
     }
-    pub fn mouse_wheel(&self) -> f32 {
+
+    pub fn get_mouse_wheel(&self) -> f32 {
         self.mouse_wheel
     }
 
+    // ---
+
     pub fn register_key_down(&mut self, keycode: KeyCode) {
-        // debug!("Key down"; "code" => keycode as i32);
         let keycode = keycode as usize;
         if !self.key_down.0[keycode] {
-            // If this toggles the key...
             self.key_toggled.0[keycode] = true;
         }
         self.key_down.0[keycode] = true;
     }
+
     pub fn register_key_up(&mut self, keycode: KeyCode) {
         let keycode = keycode as usize;
         if self.key_down.0[keycode] {
-            // If this toggles the key...
             self.key_toggled.0[keycode] = true;
         }
         self.key_down.0[keycode] = false;

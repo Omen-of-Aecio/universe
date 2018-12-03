@@ -30,10 +30,6 @@ impl Default for Keys {
 }
 
 impl Input {
-    pub fn new() -> Input {
-        Input::default()
-    }
-
     // Mainly resets key_toggled.0
     pub fn update(&mut self) {
         for i in 0..NUM_KEYS {

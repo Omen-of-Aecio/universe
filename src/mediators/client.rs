@@ -3,8 +3,8 @@ use glium::{
     glutin::{self, MouseScrollDelta},
     Display, DisplayBuild, Surface,
 };
-use glocals::Client;
-use libs::geometry::grid2d::Grid;
+use glocals::{Client, GridU8RenderData};
+use libs::geometry::{cam::Camera, grid2d::Grid};
 use mediators::{logger::log, random_map_generator, render_grid};
 
 fn initialize_grid(s: &mut Grid<u8>) {
@@ -38,31 +38,46 @@ pub fn collect_input(client: &mut Client) {
 fn move_camera_according_to_input(s: &mut Client) {
     use glium::glutin::VirtualKeyCode as Key;
     if s.input.is_key_down(Key::D) {
-        s.game.cam.center.x += 1.0;
+        s.game.cam.center.x += 5.0;
     }
     if s.input.is_key_down(Key::A) {
-        s.game.cam.center.x -= 1.0;
+        s.game.cam.center.x -= 5.0;
     }
     if s.input.is_key_down(Key::W) {
-        s.game.cam.center.y += 1.0;
+        s.game.cam.center.y += 5.0;
     }
     if s.input.is_key_down(Key::S) {
-        s.game.cam.center.y -= 1.0;
+        s.game.cam.center.y -= 5.0;
     }
+}
+
+fn render_the_grid(grid: &mut Option<GridU8RenderData>, frame: &mut glium::Frame, cam: &Camera) {
+    grid.as_mut().map(|s| {
+        render_grid::render(
+            s,
+            frame,
+            (cam.center.x, cam.center.y),
+            cam.zoom,
+            cam.width,
+            cam.height,
+        )
+    });
 }
 
 pub fn entry_point_client(s: &mut Client) {
     log(&mut s.main.threads, 128, "MAIN", "Creating grid", &[]);
     initialize_grid(&mut s.game.grid);
     random_map_generator::proc1(&mut s.game.grid);
-    s.game.grid_render = Some(render_grid::create_grid_u8_render_data(&s.display, &s.game.grid));
+    s.game.grid_render = Some(render_grid::create_grid_u8_render_data(
+        &s.display,
+        &s.game.grid,
+    ));
     loop {
         collect_input(s);
         move_camera_according_to_input(s);
         let mut frame = s.display.draw();
         frame.clear_color(0.0, 0.0, 0.0, 1.0);
-        let (x, y) = (s.game.cam.center.x, s.game.cam.center.y);
-        s.game.grid_render.as_mut().map(|s| render_grid::render(s, &mut frame, (x, y), 1.0, 1000, 1000));
+        render_the_grid(&mut s.game.grid_render, &mut frame, &s.game.cam);
         frame.finish();
     }
 }

@@ -5,8 +5,14 @@ pub struct Grid<T> {
     width: usize,
 }
 
-impl<T> Grid<T> where T: Clone + Default {
-    pub fn new() -> Grid<T> where T: Default {
+impl<T> Grid<T>
+where
+    T: Clone + Default,
+{
+    pub fn new() -> Grid<T>
+    where
+        T: Default,
+    {
         Grid::default()
     }
 
@@ -31,7 +37,6 @@ impl<T> Grid<T> where T: Clone + Default {
         self.height = y;
         self.width = x;
     }
-
 }
 
 #[cfg(test)]

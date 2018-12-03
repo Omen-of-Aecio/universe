@@ -1,5 +1,5 @@
 use clap;
-use libs::{geometry::{cam::Camera, vec::Vec2}};
+use libs::geometry::{cam::Camera, vec::Vec2};
 use std::{
     collections::HashMap,
     net::SocketAddr,

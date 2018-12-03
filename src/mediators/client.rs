@@ -39,7 +39,7 @@ pub fn entry_point_client(s: &mut Client) {
     log(&mut s.main.threads, 128, "MAIN", "Creating grid", &[]);
     initialize_grid(&mut s.game.grid);
     random_map_generator::proc1(&mut s.game.grid);
-    let mut renderer = render_grid::Renderer::new(&s.display, &s.game.grid);
+    let mut renderer = render_grid::create_grid_u8_render_data(&s.display, &s.game.grid);
     let size = s.game.grid.get_size();
     for j in 0..size.1 {
         for i in 0..size.0 {
@@ -58,7 +58,7 @@ pub fn entry_point_client(s: &mut Client) {
         collect_input(s);
         let mut frame = s.display.draw();
         frame.clear_color(0.0, 0.0, 0.0, 1.0);
-        renderer.render(&mut frame, (500.0, 300.0), 1.0, 1000, 1000);
+        render_grid::render(&mut renderer, &mut frame, (500.0, 300.0), 1.0, 1000, 1000);
         frame.finish();
     }
 }

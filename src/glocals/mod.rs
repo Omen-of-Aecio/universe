@@ -1,4 +1,7 @@
 use clap;
+use glium::texture::{ClientFormat, RawImage2d, Texture2d};
+pub use glium::uniforms::MagnifySamplerFilter;
+pub use glium::uniforms::MinifySamplerFilter;
 use libs::{
     geometry::{cam::Camera, grid2d::Grid, vec::Vec2},
     input,
@@ -151,6 +154,20 @@ pub enum CameraMode {
     FollowPlayer,
 }
 
+pub struct GridU8RenderData {
+    pub net_width: usize,
+    pub net_height: usize,
+
+    pub shader_prg: glium::Program,
+    pub quad_vbo: glium::VertexBuffer<Vertex>,
+    pub texture: Texture2d,
+
+    pub bg_col: [f32; 3],
+    pub minify_filter: MinifySamplerFilter,
+    pub magnify_filter: MagnifySamplerFilter,
+    pub smooth: bool,
+}
+
 // ---
 
 impl Default for CameraMode {
@@ -158,3 +175,10 @@ impl Default for CameraMode {
         CameraMode::Interactive
     }
 }
+
+#[derive(Copy, Clone)]
+pub struct Vertex {
+    pub pos: [f32; 2],
+}
+
+implement_vertex!(Vertex, pos);

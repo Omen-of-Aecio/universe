@@ -3,6 +3,7 @@ extern crate byteorder;
 #[macro_use]
 extern crate clap;
 extern crate derive_more;
+#[macro_use]
 extern crate glium;
 extern crate hibitset;
 extern crate isatty;
@@ -62,7 +63,10 @@ fn run_client_or_server(s: glocals::Main) -> glocals::Main {
     let commandline = s.commandline.clone();
     if let Some(_connect) = commandline.value_of("connect") {
         {
-            let mut client = Client { main: s };
+            let mut client = Client {
+                main: s,
+                game: Game::default(),
+            };
             mediators::client::entry_point_client(&mut client);
             client.main
         }

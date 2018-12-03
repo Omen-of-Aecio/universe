@@ -37,6 +37,10 @@ where
         self.height = y;
         self.width = x;
     }
+
+    pub fn get_size(&self) -> (usize, usize) {
+        return (self.width, self.height);
+    }
 }
 
 #[cfg(test)]

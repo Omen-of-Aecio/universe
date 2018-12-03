@@ -1,7 +1,6 @@
 use glium::glutin;
-use glium::glutin::{ElementState, MouseButton, VirtualKeyCode as KeyCode};
-// use glium::glutin::KeyCode;
 use glium::glutin::Event::KeyboardInput;
+use glium::glutin::{ElementState, MouseButton, VirtualKeyCode as KeyCode};
 use libs::geometry::vec::Vec2;
 
 const NUM_KEYS: usize = 150;
@@ -25,7 +24,6 @@ impl Default for Keys {
 }
 
 impl Input {
-
     pub fn prepare_for_next_frame(&mut self) {
         for i in 0..NUM_KEYS {
             self.key_toggled.0[i] = false;

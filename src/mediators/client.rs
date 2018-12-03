@@ -35,30 +35,34 @@ pub fn collect_input(client: &mut Client) {
     }
 }
 
+fn move_camera_according_to_input(s: &mut Client) {
+    use glium::glutin::VirtualKeyCode as Key;
+    if s.input.is_key_down(Key::D) {
+        s.game.cam.center.x += 1.0;
+    }
+    if s.input.is_key_down(Key::A) {
+        s.game.cam.center.x -= 1.0;
+    }
+    if s.input.is_key_down(Key::W) {
+        s.game.cam.center.y += 1.0;
+    }
+    if s.input.is_key_down(Key::S) {
+        s.game.cam.center.y -= 1.0;
+    }
+}
+
 pub fn entry_point_client(s: &mut Client) {
     log(&mut s.main.threads, 128, "MAIN", "Creating grid", &[]);
     initialize_grid(&mut s.game.grid);
     random_map_generator::proc1(&mut s.game.grid);
-    let mut renderer = render_grid::create_grid_u8_render_data(&s.display, &s.game.grid);
-    let size = s.game.grid.get_size();
-    for j in 0..size.1 {
-        for i in 0..size.0 {
-            print![
-                "{}",
-                if *s.game.grid.get(i, j).unwrap() > 0 {
-                    0
-                } else {
-                    1
-                }
-            ];
-        }
-        println![""];
-    }
+    s.game.grid_render = Some(render_grid::create_grid_u8_render_data(&s.display, &s.game.grid));
     loop {
         collect_input(s);
+        move_camera_according_to_input(s);
         let mut frame = s.display.draw();
         frame.clear_color(0.0, 0.0, 0.0, 1.0);
-        render_grid::render(&mut renderer, &mut frame, (500.0, 300.0), 1.0, 1000, 1000);
+        let (x, y) = (s.game.cam.center.x, s.game.cam.center.y);
+        s.game.grid_render.as_mut().map(|s| render_grid::render(s, &mut frame, (x, y), 1.0, 1000, 1000));
         frame.finish();
     }
 }

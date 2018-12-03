@@ -135,7 +135,7 @@ pub struct ServerConfig {
 pub struct Game {
     pub grid: Grid<u8>,
     pub cam: Camera,
-
+    pub grid_render: Option<GridU8RenderData>,
     pub you: u32,
 
     pub white_base: Vec2,

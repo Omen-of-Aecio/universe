@@ -1,7 +1,13 @@
 use glocals::Client;
 use libs::geometry::{grid2d::Grid, vec::Vec2};
 
-/// Check if a float-based line collides with a predicate on an integer grid
+/// Check if a float-based line collides with a predicate on a grid
+///
+/// This algorithm uses a modified version of bresenham's line algorithm.
+/// It traces a line from start to finish and sees which indices it hits on
+/// the grid. This version is the "supercover" algorithm, which means that
+/// that going through diagonals will "touch" at least one of the grid points
+/// on the side.
 pub fn does_line_collide_with_grid<T: Clone + Default>(
     grid: &Grid<T>,
     from: Vec2,
@@ -64,7 +70,7 @@ pub fn does_line_collide_with_grid<T: Clone + Default>(
     if ix >= 0 && iy >= 0 {
         if let Some(entry) = grid.get(ix as usize, iy as usize) {
             if predicate(entry) {
-                return Some((ix as usize, iy as usize));
+                return Some((dest_x as usize, dest_y as usize));
             }
         }
     }
@@ -206,6 +212,24 @@ mod tests {
                     &grid,
                     Vec2 { x: 1.5, y: 1.5 },
                     Vec2 { x: 0.0, y: 0.0 },
+                    |x| *x
+                )
+        ];
+    }
+
+    #[test]
+    fn test_collision_from_center_in_9x9_square_to_0_3() {
+        let mut grid: Grid<bool> = Grid::new();
+        grid.resize(3, 3);
+        *grid.get_mut(0, 2).unwrap() = true;
+        *grid.get_mut(1, 2).unwrap() = true;
+        *grid.get_mut(0, 1).unwrap() = true;
+        assert![
+            Some((1, 2))
+                == does_line_collide_with_grid(
+                    &grid,
+                    Vec2 { x: 1.5, y: 1.5 },
+                    Vec2 { x: 0.0, y: 3.0 },
                     |x| *x
                 )
         ];

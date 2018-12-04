@@ -242,7 +242,7 @@ impl PartialParse {
             self.lparen_stack -= 1;
         }
         if self.has_encountered_rparen {
-            PartialParseOp::Unready
+            PartialParseOp::Discard
         } else {
             PartialParseOp::Unready
         }
@@ -673,10 +673,24 @@ mod tests {
         }
         assert_eq![PartialParseOp::Discard, part.parse_increment(b')')];
         for ch in "opener (\na b c d\ne f".bytes() {
+            assert_eq![PartialParseOp::Discard, part.parse_increment(ch)];
+        }
+        assert_eq![PartialParseOp::Discard, part.parse_increment(b')')];
+        assert_eq![PartialParseOp::Ready, part.parse_increment(b'\n')];
+    }
+
+    #[test]
+    fn premature_right_parentheses_discards_entire_line() {
+        let mut part = PartialParse::default();
+        for ch in "hello world (\na b c) d ".bytes() {
             assert_eq![PartialParseOp::Unready, part.parse_increment(ch)];
         }
-        assert_eq![PartialParseOp::Unready, part.parse_increment(b')')];
-        assert_eq![PartialParseOp::Ready, part.parse_increment(b'\n')];
+        assert_eq![PartialParseOp::Discard, part.parse_increment(b')')];
+        for ch in "opener (\na b c d\ne f".bytes() {
+            assert_eq![PartialParseOp::Discard, part.parse_increment(ch)];
+        }
+        assert_eq![PartialParseOp::Discard, part.parse_increment(b'\n')];
+        assert_eq![PartialParseOp::Discard, part.parse_increment(b'a')];
     }
 
     // ---

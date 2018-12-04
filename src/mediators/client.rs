@@ -3,9 +3,9 @@ use glium::{
     glutin::{self, MouseScrollDelta},
     Display, DisplayBuild, Surface,
 };
-use glocals::{Client, GridU8RenderData};
-use libs::geometry::{cam::Camera, grid2d::Grid};
-use mediators::{logger::log, random_map_generator, render_grid};
+use crate::glocals::{Client, GridU8RenderData};
+use crate::libs::geometry::{cam::Camera, grid2d::Grid};
+use crate::mediators::{logger::log, random_map_generator, render_grid};
 
 fn initialize_grid(s: &mut Grid<u8>) {
     s.resize(1000, 1000);

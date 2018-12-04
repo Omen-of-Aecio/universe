@@ -1,4 +1,4 @@
-use libs::geometry::{grid2d::Grid, vec::Vec2};
+use crate::libs::geometry::{grid2d::Grid, vec::Vec2};
 
 /// Check if multiple lines collide with some part of the grid given a predicate
 ///

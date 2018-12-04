@@ -2,7 +2,7 @@ use clap;
 use glium::texture::{ClientFormat, RawImage2d, Texture2d};
 pub use glium::uniforms::MagnifySamplerFilter;
 pub use glium::uniforms::MinifySamplerFilter;
-use libs::{
+use crate::libs::{
     geometry::{cam::Camera, grid2d::Grid, vec::Vec2},
     input,
 };

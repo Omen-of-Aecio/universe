@@ -1,15 +1,9 @@
-extern crate bincode;
-#[macro_use]
-extern crate clap;
-extern crate derive_more;
 #[macro_use]
 extern crate glium;
-extern crate rand;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate time;
-extern crate toml;
+
+use clap::crate_authors;
 
 mod macros;
 // ---
@@ -18,9 +12,9 @@ mod libs;
 mod mediators;
 
 use clap::{App, Arg};
+use crate::glocals::*;
+use crate::mediators::log;
 use glium::{glutin, Display, DisplayBuild};
-use glocals::*;
-use mediators::log;
 use std::sync::{Arc, Mutex};
 
 // ---

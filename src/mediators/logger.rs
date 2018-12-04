@@ -1,4 +1,4 @@
-use glocals::{EntryPointLogger, LogMessage, Threads};
+use crate::glocals::{EntryPointLogger, LogMessage, Threads};
 use std::{
     collections::HashMap,
     sync::mpsc::{RecvError, TrySendError},

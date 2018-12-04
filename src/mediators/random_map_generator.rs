@@ -6,7 +6,7 @@ use std::f32::consts::PI;
 use rand;
 use rand::Rng;
 
-use libs::geometry::grid2d::Grid;
+use crate::libs::geometry::grid2d::Grid;
 
 pub fn proc1(tiles: &mut Grid<u8>) {
     let mut rng = rand::thread_rng();

@@ -1,7 +1,7 @@
 use glium::glutin;
 use glium::glutin::Event::KeyboardInput;
 use glium::glutin::{ElementState, MouseButton, VirtualKeyCode as KeyCode};
-use libs::geometry::vec::Vec2;
+use crate::libs::geometry::vec::Vec2;
 
 const NUM_KEYS: usize = 150;
 struct Keys([bool; NUM_KEYS]);

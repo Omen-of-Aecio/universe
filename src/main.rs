@@ -1,19 +1,13 @@
 extern crate bincode;
-extern crate byteorder;
 #[macro_use]
 extern crate clap;
 extern crate derive_more;
 #[macro_use]
 extern crate glium;
-extern crate hibitset;
-extern crate isatty;
-extern crate num_traits;
 extern crate rand;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate tilenet;
-extern crate tilenet_ren;
 extern crate time;
 extern crate toml;
 

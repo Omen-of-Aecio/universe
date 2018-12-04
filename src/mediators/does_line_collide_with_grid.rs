@@ -1,5 +1,24 @@
 use libs::geometry::{grid2d::Grid, vec::Vec2};
 
+/// Check if multiple lines collide with some part of the grid given a predicate
+///
+/// Returns the first found collision with the grid. This collision does not convey
+/// information about the distance travelled to cause the collision, so don't
+/// think "this is the closest collision".
+pub fn do_lines_collide_with_grid<T: Clone + Default>(
+    grid: &Grid<T>,
+    lines: &[(Vec2, Vec2)],
+    predicate: fn(&T) -> bool,
+) -> Option<(usize, usize)> {
+    for line in lines {
+        let result = does_line_collide_with_grid(grid, line.0, line.1, predicate);
+        if result.is_some() {
+            return result;
+        }
+    }
+    None
+}
+
 /// Check if a float-based line collides with a predicate on a grid
 ///
 /// This algorithm uses a modified version of bresenham's line algorithm.
@@ -263,6 +282,42 @@ mod tests {
                 Vec2 { x: 0.0, y: 0.0 },
                 Vec2 { x: 0.0, y: 0.0 },
                 |x| !*x,
+            )
+        ];
+    }
+
+    #[test]
+    fn test_lines() {
+        let mut grid: Grid<bool> = Grid::new();
+        grid.resize(3, 3);
+        *grid.get_mut(2, 1).unwrap() = true;
+        assert![
+            Some((2, 1))
+                == do_lines_collide_with_grid(
+                    &grid,
+                    &[
+                        (Vec2 { x: 0.0, y: 0.5 }, Vec2 { x: 3.0, y: 0.5 }),
+                        (Vec2 { x: 0.0, y: 1.5 }, Vec2 { x: 3.0, y: 1.5 }),
+                        (Vec2 { x: 0.0, y: 2.5 }, Vec2 { x: 3.0, y: 2.5 }),
+                    ],
+                    |x| *x,
+                )
+        ];
+    }
+
+    #[test]
+    fn test_lines_no_hit() {
+        let mut grid: Grid<bool> = Grid::new();
+        grid.resize(3, 3);
+        assert![
+            None == do_lines_collide_with_grid(
+                &grid,
+                &[
+                    (Vec2 { x: 0.0, y: 0.5 }, Vec2 { x: 3.0, y: 0.5 }),
+                    (Vec2 { x: 0.0, y: 1.5 }, Vec2 { x: 3.0, y: 1.5 }),
+                    (Vec2 { x: 0.0, y: 2.5 }, Vec2 { x: 3.0, y: 2.5 }),
+                ],
+                |x| *x,
             )
         ];
     }

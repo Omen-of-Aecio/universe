@@ -1,6 +1,9 @@
 use crate::glocals::{Client, GridU8RenderData, PolygonRenderData};
-use crate::libs::geometry::{cam::Camera, grid2d::Grid};
-use crate::mediators::{logger::log, random_map_generator, render_grid, render_polygon};
+use crate::libs::geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
+use crate::libs::input::Input;
+use crate::mediators::{
+    does_line_collide_with_grid::*, logger::log, random_map_generator, render_grid, render_polygon,
+};
 use glium::{
     self,
     glutin::{self, MouseScrollDelta, VirtualKeyCode as Key},
@@ -59,25 +62,25 @@ fn move_camera_according_to_input(s: &mut Client) {
     }
 }
 
-fn move_player_according_to_input(s: &mut Client) {
+fn move_player_according_to_input(s: &Input) -> Vec2 {
     let (dx, dy);
-    if s.input.is_key_down(Key::Up) {
+    if s.is_key_down(Key::Up) {
         dy = 1;
-    } else if s.input.is_key_down(Key::Down) {
+    } else if s.is_key_down(Key::Down) {
         dy = -1;
     } else {
         dy = 0;
     }
-    if s.input.is_key_down(Key::Left) {
+    if s.is_key_down(Key::Left) {
         dx = -1;
-    } else if s.input.is_key_down(Key::Right) {
+    } else if s.is_key_down(Key::Right) {
         dx = 1;
     } else {
         dx = 0;
     }
-    for player in s.game.players.iter_mut() {
-        player.position.x += dx as f32;
-        player.position.y += dy as f32;
+    Vec2 {
+        x: dx as f32,
+        y: dy as f32,
     }
 }
 
@@ -105,6 +108,45 @@ fn render_players(
     }
 }
 
+fn check_for_collision_and_move_players_according_to_movement_vector(
+    grid: &Grid<u8>,
+    players: &mut [PolygonRenderData],
+    movement: Vec2,
+) {
+    for player in players {
+        let tl = Vec2 {
+            x: player.position.x,
+            y: player.position.y,
+        };
+        let tr = Vec2 {
+            x: player.position.x + 9.0,
+            y: player.position.y,
+        };
+        let bl = Vec2 {
+            x: player.position.x,
+            y: player.position.y + 9.0,
+        };
+        let br = Vec2 {
+            x: player.position.x + 9.0,
+            y: player.position.y + 9.0,
+        };
+        let collision_point = do_lines_collide_with_grid(
+            grid,
+            &[
+                (tl, tl + movement),
+                (tr, tr + movement),
+                (bl, bl + movement),
+                (br, br + movement),
+            ],
+            |x| *x > 0,
+        );
+        if collision_point.is_none() {
+            player.position.x += movement.x as f32;
+            player.position.y += movement.y as f32;
+        }
+    }
+}
+
 pub fn entry_point_client(s: &mut Client) {
     log(&mut s.main.threads, 128, "MAIN", "Creating grid", &[]);
     initialize_grid(&mut s.game.grid);
@@ -119,7 +161,12 @@ pub fn entry_point_client(s: &mut Client) {
     loop {
         collect_input(s);
         move_camera_according_to_input(s);
-        move_player_according_to_input(s);
+        let movement = move_player_according_to_input(&s.input);
+        check_for_collision_and_move_players_according_to_movement_vector(
+            &s.game.grid,
+            &mut s.game.players,
+            movement,
+        );
         let mut frame = s.display.draw();
         frame.clear_color(0.0, 0.0, 1.0, 1.0);
         render_the_grid(&mut s.game.grid_render, &mut frame, &s.game.cam);

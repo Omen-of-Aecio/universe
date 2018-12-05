@@ -28,7 +28,10 @@ pub fn create_render_polygon(display: &Display) -> PolygonRenderData {
     let vert_src = include_str!("../../shaders/xy_tr.vert");
     let frag_src = include_str!("../../shaders/xy_tr.frag");
     let prg = glium::Program::from_source(display, vert_src, frag_src, None).unwrap();
-    PolygonRenderData { prg, position: Vec2 { x: 500.0, y: 300.0 } }
+    PolygonRenderData {
+        prg,
+        position: Vec2 { x: 500.0, y: 300.0 },
+    }
 }
 
 pub fn render(s: &PolygonRenderData, display: &Display, target: &mut glium::Frame, cam: &Camera) {

@@ -3,7 +3,7 @@ use crate::libs::geometry::{cam::Camera, grid2d::Grid};
 use crate::mediators::{logger::log, random_map_generator, render_grid, render_polygon};
 use glium::{
     self,
-    glutin::{self, MouseScrollDelta},
+    glutin::{self, MouseScrollDelta, VirtualKeyCode as Key},
     Display, DisplayBuild, Surface,
 };
 
@@ -36,7 +36,6 @@ pub fn collect_input(client: &mut Client) {
 }
 
 fn move_camera_according_to_input(s: &mut Client) {
-    use glium::glutin::VirtualKeyCode as Key;
     if s.input.is_key_down(Key::D) {
         s.game.cam.center.x += 5.0;
     }
@@ -60,6 +59,28 @@ fn move_camera_according_to_input(s: &mut Client) {
     }
 }
 
+fn move_player_according_to_input(s: &mut Client) {
+    let (dx, dy);
+    if s.input.is_key_down(Key::Up) {
+        dy = 1;
+    } else if s.input.is_key_down(Key::Down) {
+        dy = -1;
+    } else {
+        dy = 0;
+    }
+    if s.input.is_key_down(Key::Left) {
+        dx = -1;
+    } else if s.input.is_key_down(Key::Right) {
+        dx = 1;
+    } else {
+        dx = 0;
+    }
+    for player in s.game.players.iter_mut() {
+        player.position.x += dx as f32;
+        player.position.y += dy as f32;
+    }
+}
+
 fn render_the_grid(grid: &mut Option<GridU8RenderData>, frame: &mut glium::Frame, cam: &Camera) {
     grid.as_mut().map(|s| {
         render_grid::render(
@@ -74,7 +95,7 @@ fn render_the_grid(grid: &mut Option<GridU8RenderData>, frame: &mut glium::Frame
 }
 
 fn render_players(
-    players: &mut Vec<PolygonRenderData>,
+    players: &mut [PolygonRenderData],
     display: &Display,
     frame: &mut glium::Frame,
     cam: &Camera,
@@ -98,6 +119,7 @@ pub fn entry_point_client(s: &mut Client) {
     loop {
         collect_input(s);
         move_camera_according_to_input(s);
+        move_player_according_to_input(s);
         let mut frame = s.display.draw();
         frame.clear_color(0.0, 0.0, 1.0, 1.0);
         render_the_grid(&mut s.game.grid_render, &mut frame, &s.game.cam);

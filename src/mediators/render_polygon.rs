@@ -1,5 +1,5 @@
 use crate::glocals::{PolygonRenderData, Vertex};
-use crate::libs::geometry::cam::Camera;
+use crate::libs::geometry::{cam::Camera, vec::Vec2};
 use glium::{self, Display, Surface};
 use std::vec::Vec;
 
@@ -28,7 +28,7 @@ pub fn create_render_polygon(display: &Display) -> PolygonRenderData {
     let vert_src = include_str!("../../shaders/xy_tr.vert");
     let frag_src = include_str!("../../shaders/xy_tr.frag");
     let prg = glium::Program::from_source(display, vert_src, frag_src, None).unwrap();
-    PolygonRenderData { prg }
+    PolygonRenderData { prg, position: Vec2 { x: 500.0, y: 300.0 } }
 }
 
 pub fn render(s: &PolygonRenderData, display: &Display, target: &mut glium::Frame, cam: &Camera) {
@@ -42,7 +42,7 @@ pub fn render(s: &PolygonRenderData, display: &Display, target: &mut glium::Fram
 
     let vertex_buffer = glium::VertexBuffer::new(display, &vertices).unwrap();
     let uniforms = uniform! {
-        center: [500.0, 350.0] as [f32; 2],
+        center: [s.position.x, s.position.y] as [f32; 2],
         orientation: 0.0 as f32,
         color: [0.0, 1.0, 0.5] as [f32; 3],
         // center: [pos.transl.x, pos.transl.y],

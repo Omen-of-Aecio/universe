@@ -8,7 +8,7 @@ use crate::libs::geometry::grid2d::Grid;
 
 static vert_src: &str = include_str!("../../shaders/proc1.vert");
 static frag_src: &str = include_str!("../../shaders/proc1.frag");
-pub fn proc1(tiles: &mut Grid<u8>, mut display: &glium::Display) {
+pub fn proc1(tiles: &mut Grid<u8>, display: &glium::Display) {
     let mut rng = rand::thread_rng();
 
     let shader_prg = glium::Program::from_source(display, vert_src, frag_src, None).unwrap();

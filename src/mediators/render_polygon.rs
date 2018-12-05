@@ -31,6 +31,7 @@ pub fn create_render_polygon(display: &Display) -> PolygonRenderData {
     PolygonRenderData {
         prg,
         position: Vec2 { x: 500.0, y: 300.0 },
+        velocity: Vec2::null_vec(),
     }
 }
 

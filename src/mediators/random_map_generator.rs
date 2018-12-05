@@ -1,24 +1,17 @@
 use glium;
 use glium::glutin;
 use glium::{DisplayBuild, Surface};
-use std::f32::consts::PI;
-
-use rand;
 use rand::Rng;
+use std::f32::consts::PI;
 
 use crate::libs::geometry::grid2d::Grid;
 
-pub fn proc1(tiles: &mut Grid<u8>) {
+static vert_src: &str = include_str!("../../shaders/proc1.vert");
+static frag_src: &str = include_str!("../../shaders/proc1.frag");
+pub fn proc1(tiles: &mut Grid<u8>, mut display: &glium::Display) {
     let mut rng = rand::thread_rng();
 
-    let display = glutin::WindowBuilder::new()
-        .with_visibility(false)
-        .build_glium()
-        .unwrap();
-
-    let vert_src = include_str!("../../shaders/proc1.vert");
-    let frag_src = include_str!("../../shaders/proc1.frag");
-    let shader_prg = glium::Program::from_source(&display, vert_src, frag_src, None).unwrap();
+    let shader_prg = glium::Program::from_source(display, vert_src, frag_src, None).unwrap();
     let fullscreen_quad = vec![
         Vertex { pos: [-1.0, -1.0] },
         Vertex { pos: [1.0, -1.0] },
@@ -28,13 +21,13 @@ pub fn proc1(tiles: &mut Grid<u8>) {
         Vertex { pos: [-1.0, -1.0] },
     ];
 
-    let quad_vbo = ::glium::VertexBuffer::new(&display, &fullscreen_quad).unwrap();
+    let quad_vbo = ::glium::VertexBuffer::new(display, &fullscreen_quad).unwrap();
     let texture_data: Vec<Vec<u8>> = vec![vec![0; tiles.get_size().0]; tiles.get_size().1];
-    let texture = glium::texture::Texture2d::new(&display, texture_data).unwrap();
+    let texture = glium::texture::Texture2d::new(display, texture_data).unwrap();
 
     let ebo = glium::index::NoIndices(glium::index::PrimitiveType::TriangleFan);
 
-    let mut fbo = glium::framebuffer::SimpleFrameBuffer::new(&display, &texture).unwrap();
+    let mut fbo = glium::framebuffer::SimpleFrameBuffer::new(display, &texture).unwrap();
 
     let uniforms = uniform! {
         width: tiles.get_size().0 as f32,

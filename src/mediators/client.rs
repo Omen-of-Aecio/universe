@@ -150,7 +150,7 @@ fn check_for_collision_and_move_players_according_to_movement_vector(
 pub fn entry_point_client(s: &mut Client) {
     log(&mut s.main.threads, 128, "MAIN", "Creating grid", &[]);
     initialize_grid(&mut s.game.grid);
-    random_map_generator::proc1(&mut s.game.grid);
+    random_map_generator::proc1(&mut s.game.grid, &s.display);
     s.game.grid_render = Some(render_grid::create_grid_u8_render_data(
         &s.display,
         &s.game.grid,

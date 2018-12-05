@@ -135,6 +135,7 @@ pub struct ServerConfig {
 #[derive(Default)]
 pub struct Game {
     pub grid: Grid<u8>,
+    pub game_config: GameConfig,
     pub players: Vec<PolygonRenderData>,
     pub cam: Camera,
     pub grid_render: Option<GridU8RenderData>,

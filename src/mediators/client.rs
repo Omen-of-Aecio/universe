@@ -147,9 +147,18 @@ fn check_for_collision_and_move_players_according_to_movement_vector(
     }
 }
 
+fn apply_gravity_to_players(s: &mut Client) {
+    check_for_collision_and_move_players_according_to_movement_vector(
+        &s.game.grid,
+        &mut s.game.players,
+        s.game.game_config.gravity,
+    );
+}
+
 pub fn entry_point_client(s: &mut Client) {
     log(&mut s.main.threads, 128, "MAIN", "Creating grid", &[]);
     initialize_grid(&mut s.game.grid);
+    s.game.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
     random_map_generator::proc1(&mut s.game.grid, &s.display);
     s.game.grid_render = Some(render_grid::create_grid_u8_render_data(
         &s.display,
@@ -170,6 +179,7 @@ pub fn entry_point_client(s: &mut Client) {
             &mut s.game.players,
             movement,
         );
+        apply_gravity_to_players(s);
         let mut frame = s.display.draw();
         frame.clear_color(0.0, 0.0, 1.0, 1.0);
         render_the_grid(&mut s.game.grid_render, &mut frame, &s.game.cam);

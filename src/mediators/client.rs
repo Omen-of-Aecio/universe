@@ -188,19 +188,28 @@ fn set_gravity(s: &mut Client) {
     }
 }
 
+fn create_black_square_around_player(s: &mut Grid<u8>) {
+    for j in 200..400 {
+        for i in 400..600 {
+            *s.get_mut(i, j).unwrap() = 0;
+        }
+    }
+}
+
 pub fn entry_point_client(s: &mut Client) {
     log(&mut s.main.threads, 128, "MAIN", "Creating grid", &[]);
     initialize_grid(&mut s.game.grid);
     s.game.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
-    // random_map_generator::proc1(&mut s.game.grid, &s.display);
-    let size = s.game.grid.get_size();
-    for i in 0 .. size.0 {
-        *s.game.grid.get_mut(i, 800).unwrap() = 255;
-        *s.game.grid.get_mut(i, 0).unwrap() = 255;
-        *s.game.grid.get_mut(40, i).unwrap() = 255;
-        *s.game.grid.get_mut(600, i).unwrap() = 255;
-    }
-    *s.game.grid.get_mut(100, 1).unwrap() = 255;
+    random_map_generator::proc1(&mut s.game.grid, &s.display);
+    create_black_square_around_player(&mut s.game.grid);
+    // let size = s.game.grid.get_size();
+    // for i in 0 .. size.0 {
+    //     *s.game.grid.get_mut(i, 800).unwrap() = 255;
+    //     *s.game.grid.get_mut(i, 0).unwrap() = 255;
+    //     *s.game.grid.get_mut(40, i).unwrap() = 255;
+    //     *s.game.grid.get_mut(600, i).unwrap() = 255;
+    // }
+    // *s.game.grid.get_mut(100, 1).unwrap() = 255;
     s.game.grid_render = Some(render_grid::create_grid_u8_render_data(
         &s.display,
         &s.game.grid,

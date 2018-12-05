@@ -1,11 +1,11 @@
-use clap;
-use glium::texture::{ClientFormat, RawImage2d, Texture2d};
-pub use glium::uniforms::MagnifySamplerFilter;
-pub use glium::uniforms::MinifySamplerFilter;
 use crate::libs::{
     geometry::{cam::Camera, grid2d::Grid, vec::Vec2},
     input,
 };
+use clap;
+use glium::texture::{ClientFormat, RawImage2d, Texture2d};
+pub use glium::uniforms::MagnifySamplerFilter;
+pub use glium::uniforms::MinifySamplerFilter;
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -134,6 +134,7 @@ pub struct ServerConfig {
 #[derive(Default)]
 pub struct Game {
     pub grid: Grid<u8>,
+    pub players: Vec<PolygonRenderData>,
     pub cam: Camera,
     pub grid_render: Option<GridU8RenderData>,
     pub you: u32,
@@ -166,6 +167,10 @@ pub struct GridU8RenderData {
     pub minify_filter: MinifySamplerFilter,
     pub magnify_filter: MagnifySamplerFilter,
     pub smooth: bool,
+}
+
+pub struct PolygonRenderData {
+    pub prg: glium::Program,
 }
 
 // ---

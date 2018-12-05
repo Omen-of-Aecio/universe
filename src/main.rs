@@ -11,9 +11,9 @@ mod glocals;
 mod libs;
 mod mediators;
 
-use clap::{App, Arg};
 use crate::glocals::*;
 use crate::mediators::log;
+use clap::{App, Arg};
 use glium::{glutin, Display, DisplayBuild};
 use std::sync::{Arc, Mutex};
 

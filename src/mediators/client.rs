@@ -1,11 +1,11 @@
+use crate::glocals::{Client, GridU8RenderData, PolygonRenderData};
+use crate::libs::geometry::{cam::Camera, grid2d::Grid};
+use crate::mediators::{logger::log, random_map_generator, render_grid, render_polygon};
 use glium::{
     self,
     glutin::{self, MouseScrollDelta},
     Display, DisplayBuild, Surface,
 };
-use crate::glocals::{Client, GridU8RenderData};
-use crate::libs::geometry::{cam::Camera, grid2d::Grid};
-use crate::mediators::{logger::log, random_map_generator, render_grid};
 
 fn initialize_grid(s: &mut Grid<u8>) {
     s.resize(1000, 1000);
@@ -73,6 +73,17 @@ fn render_the_grid(grid: &mut Option<GridU8RenderData>, frame: &mut glium::Frame
     });
 }
 
+fn render_players(
+    players: &mut Vec<PolygonRenderData>,
+    display: &Display,
+    frame: &mut glium::Frame,
+    cam: &Camera,
+) {
+    for player in players {
+        render_polygon::render(player, display, frame, cam);
+    }
+}
+
 pub fn entry_point_client(s: &mut Client) {
     log(&mut s.main.threads, 128, "MAIN", "Creating grid", &[]);
     initialize_grid(&mut s.game.grid);
@@ -81,12 +92,16 @@ pub fn entry_point_client(s: &mut Client) {
         &s.display,
         &s.game.grid,
     ));
+    s.game
+        .players
+        .push(render_polygon::create_render_polygon(&s.display));
     loop {
         collect_input(s);
         move_camera_according_to_input(s);
         let mut frame = s.display.draw();
-        frame.clear_color(0.0, 0.0, 0.0, 1.0);
+        frame.clear_color(0.0, 0.0, 1.0, 1.0);
         render_the_grid(&mut s.game.grid_render, &mut frame, &s.game.cam);
+        render_players(&mut s.game.players, &s.display, &mut frame, &s.game.cam);
         frame.finish();
     }
 }

@@ -1,6 +1,6 @@
 use super::Vec2;
 
-#[derive(Copy, Clone)]
+#[derive(Clone, Copy, Debug)]
 pub struct Camera {
     pub zoom: f32,
     pub center: Vec2,

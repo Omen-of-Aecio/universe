@@ -1,8 +1,8 @@
+use crate::glocals::{GridU8RenderData, Vertex};
+use crate::libs::geometry::grid2d::Grid;
 use glium;
 use glium::texture::{ClientFormat, RawImage2d};
 use glium::{Display, Surface};
-use crate::glocals::{GridU8RenderData, Vertex};
-use crate::libs::geometry::grid2d::Grid;
 use std::borrow::Cow;
 
 // Re-export for configuration

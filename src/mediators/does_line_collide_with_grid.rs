@@ -91,11 +91,9 @@ pub fn does_line_collide_with_grid<T: Clone + Default>(
             iy += sy;
         }
     }
-    if ix >= 0 && iy >= 0 {
-        if let Some(entry) = grid.get(ix as usize, iy as usize) {
-            if predicate(entry) {
-                return Some((dest_x as usize, dest_y as usize));
-            }
+    if let Some(entry) = grid.get(dest_x as usize, dest_y as usize) {
+        if predicate(entry) {
+            return Some((dest_x as usize, dest_y as usize));
         }
     }
     None

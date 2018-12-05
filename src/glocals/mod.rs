@@ -42,6 +42,7 @@ pub struct LogMessage {
 }
 
 pub struct Client<'a> {
+    pub should_exit: bool,
     pub main: Main<'a>,
     pub game: Game,
     pub input: input::Input,

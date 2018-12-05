@@ -53,6 +53,7 @@ fn run_client_or_server(s: glocals::Main) -> glocals::Main {
     if let Some(_connect) = commandline.value_of("connect") {
         {
             let mut client = Client {
+                should_exit: false,
                 main: s,
                 game: Game::default(),
                 display: glutin::WindowBuilder::new()

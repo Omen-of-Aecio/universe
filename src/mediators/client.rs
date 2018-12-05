@@ -19,7 +19,7 @@ pub fn collect_input(client: &mut Client) {
     for ev in client.display.poll_events() {
         match ev {
             glutin::Event::Closed => {
-                return;
+                client.should_exit = true;
             }
             glutin::Event::MouseMoved(x, y) => client.input.position_mouse(x, y),
             glutin::Event::MouseWheel(MouseScrollDelta::LineDelta(_, y), _) => {
@@ -160,6 +160,9 @@ pub fn entry_point_client(s: &mut Client) {
         .push(render_polygon::create_render_polygon(&s.display));
     loop {
         collect_input(s);
+        if s.should_exit {
+            break;
+        }
         move_camera_according_to_input(s);
         let movement = move_player_according_to_input(&s.input);
         check_for_collision_and_move_players_according_to_movement_vector(

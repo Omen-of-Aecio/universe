@@ -1,17 +1,16 @@
 use glium;
-use glium::glutin;
-use glium::{implement_vertex, uniform, DisplayBuild, Surface};
+use glium::{implement_vertex, uniform, Surface};
 use rand::Rng;
 use std::f32::consts::PI;
 
 use crate::libs::geometry::grid2d::Grid;
 
-static vert_src: &str = include_str!("../../shaders/proc1.vert");
-static frag_src: &str = include_str!("../../shaders/proc1.frag");
+static VERT_SRC: &str = include_str!("../../shaders/proc1.vert");
+static FRAG_SRC: &str = include_str!("../../shaders/proc1.frag");
 pub fn proc1(tiles: &mut Grid<u8>, display: &glium::Display) {
     let mut rng = rand::thread_rng();
 
-    let shader_prg = glium::Program::from_source(display, vert_src, frag_src, None).unwrap();
+    let shader_prg = glium::Program::from_source(display, VERT_SRC, FRAG_SRC, None).unwrap();
     let fullscreen_quad = vec![
         Vertex { pos: [-1.0, -1.0] },
         Vertex { pos: [1.0, -1.0] },

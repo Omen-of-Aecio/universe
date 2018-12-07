@@ -7,7 +7,7 @@ use crate::mediators::{
 use glium::{
     self,
     glutin::{self, MouseScrollDelta, VirtualKeyCode as Key},
-    Display, DisplayBuild, Surface,
+    Display, Surface,
 };
 
 fn initialize_grid(s: &mut Grid<u8>) {
@@ -154,7 +154,7 @@ fn check_for_collision_and_move_players_according_to_movement_vector(
 ) {
     for player in players {
         let mut movement_current = movement;
-        for i in 1..50 {
+        for _ in 1..50 {
             let collided = check_for_collision_and_move_player_according_to_movement_vector(
                 grid,
                 player,
@@ -237,6 +237,26 @@ pub fn entry_point_client(s: &mut Client) {
         frame.clear_color(0.0, 0.0, 1.0, 1.0);
         render_the_grid(&mut s.game.grid_render, &mut frame, &s.game.cam);
         render_players(&mut s.game.players, &s.display, &mut frame, &s.game.cam);
-        frame.finish();
+        match frame.finish() {
+            Ok(()) => {}
+            Err(glium::SwapBuffersError::ContextLost) => {
+                log(
+                    &mut s.main.threads,
+                    64,
+                    "CLNT",
+                    "Context was lost while trying to swap buffers",
+                    &[],
+                );
+            }
+            Err(glium::SwapBuffersError::AlreadySwapped) => {
+                log(
+                    &mut s.main.threads,
+                    64,
+                    "CLNT",
+                    "OpenGL context has already been swapped",
+                    &[],
+                );
+            }
+        }
     }
 }

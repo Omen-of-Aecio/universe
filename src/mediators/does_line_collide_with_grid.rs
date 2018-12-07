@@ -34,18 +34,17 @@ pub fn do_lines_collide_with_grid<T: Clone + Default>(
 /// values.
 pub fn does_line_collide_with_grid<T: Clone + Default>(
     grid: &Grid<T>,
-    from: Vec2,
-    to: Vec2,
+    start: Vec2,
+    stop: Vec2,
     predicate: fn(&T) -> bool,
 ) -> Option<(usize, usize)> {
-    let (start, stop) = (from, to);
     let new = stop - start;
     let (vx, vy) = (new.x, new.y);
     let slope_x = 1.0 + vy * vy / vx / vx;
     let slope_y = 1.0 + vx * vx / vy / vy;
     let (dx, dy) = (slope_x.sqrt(), slope_y.sqrt());
 
-    let (mut ix, mut iy) = (start.x.floor() as i32, start.y.floor() as i32);
+    let (mut ix, mut iy) = (start.x.floor() as i16 as i32, start.y.floor() as i16 as i32);
 
     let (sx, sy);
     let (mut ex, mut ey);
@@ -66,10 +65,11 @@ pub fn does_line_collide_with_grid<T: Clone + Default>(
         ey = (1.0 - start.y.fract()) * dy;
     }
 
-    let len = (stop.x.floor() as i64 - start.x.floor() as i64).abs() as usize
-        + (stop.y.floor() as i64 - start.y.floor() as i64).abs() as usize;
+    let len = ((stop.x.floor() as i16 as i32 - start.x.floor() as i16 as i32).abs()
+        + (stop.y.floor() as i16 as i32 - start.y.floor() as i16 as i32).abs())
+        as u16;
 
-    let mut it: usize = 0;
+    let mut it: u16 = 0;
 
     let dest_x = stop.x.floor() as i32;
     let dest_y = stop.y.floor() as i32;
@@ -315,6 +315,136 @@ mod tests {
                     (Vec2 { x: 0.0, y: 1.5 }, Vec2 { x: 3.0, y: 1.5 }),
                     (Vec2 { x: 0.0, y: 2.5 }, Vec2 { x: 3.0, y: 2.5 }),
                 ],
+                |x| *x,
+            )
+        ];
+    }
+
+    #[test]
+    fn test_extremely_long_vector() {
+        let mut grid: Grid<bool> = Grid::new();
+        grid.resize(1, 1);
+        assert![
+            None == does_line_collide_with_grid(
+                &grid,
+                Vec2 { x: 0.0, y: 0.0 },
+                Vec2 { x: 1e10, y: 0.0 },
+                |x| *x,
+            )
+        ];
+    }
+
+    #[test]
+    fn test_infinity_vector() {
+        let mut grid: Grid<bool> = Grid::new();
+        grid.resize(1, 1);
+        assert![
+            None == does_line_collide_with_grid(
+                &grid,
+                Vec2 { x: 0.0, y: 0.0 },
+                Vec2 {
+                    x: std::f32::INFINITY,
+                    y: 0.0
+                },
+                |x| *x,
+            )
+        ];
+    }
+
+    #[test]
+    fn test_negative_infinity_vector() {
+        let mut grid: Grid<bool> = Grid::new();
+        grid.resize(1, 1);
+        assert![
+            None == does_line_collide_with_grid(
+                &grid,
+                Vec2 { x: 0.0, y: 0.0 },
+                Vec2 {
+                    x: std::f32::NEG_INFINITY,
+                    y: 0.0
+                },
+                |x| *x,
+            )
+        ];
+    }
+
+    #[test]
+    fn test_negative_infinity_vector_from_1_1() {
+        let mut grid: Grid<bool> = Grid::new();
+        grid.resize(1, 1);
+        assert![
+            None == does_line_collide_with_grid(
+                &grid,
+                Vec2 { x: 1.0, y: 1.0 },
+                Vec2 {
+                    x: std::f32::NEG_INFINITY,
+                    y: 0.0
+                },
+                |x| *x,
+            )
+        ];
+    }
+
+    #[test]
+    fn test_multiple_infinities() {
+        let mut grid: Grid<bool> = Grid::new();
+        grid.resize(1, 1);
+        assert![
+            None == does_line_collide_with_grid(
+                &grid,
+                Vec2 {
+                    x: std::f32::NEG_INFINITY,
+                    y: 1.0
+                },
+                Vec2 {
+                    x: std::f32::NEG_INFINITY,
+                    y: 0.0
+                },
+                |x| *x,
+            )
+        ];
+    }
+
+    #[test]
+    fn test_semi_infinite_distance() {
+        let mut grid: Grid<bool> = Grid::new();
+        grid.resize(1, 1);
+        assert![
+            None == does_line_collide_with_grid(
+                &grid,
+                Vec2 { x: 1e18, y: 1.0 },
+                Vec2 { x: -1e18, y: 0.0 },
+                |x| *x,
+            )
+        ];
+    }
+
+    #[test]
+    fn as_i32_as_expected() {
+        let mut grid: Grid<bool> = Grid::new();
+        grid.resize(1, 1);
+        assert_eq![0i32, 0.99999 as i32];
+        assert_eq![0i32, 0.09999 as i32];
+        assert_eq![0i32, -0.09999 as i32];
+        assert_eq![0i32, -0.99999 as i32];
+        assert_eq![2147483647i32, 1e30 as i32];
+    }
+
+    #[test]
+    fn test_i32_overflow() {
+        let mut grid: Grid<bool> = Grid::new();
+        grid.resize(1, 1);
+        assert![
+            None == does_line_collide_with_grid(
+                &grid,
+                Vec2 {
+                    x: 2_147_483_647.0,
+                    y: 1.0
+                },
+                Vec2 {
+                    x: 3_000_000_000.0,
+                    y: 0.0
+                },
                 |x| *x,
             )
         ];

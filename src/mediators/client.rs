@@ -155,7 +155,11 @@ fn check_for_collision_and_move_players_according_to_movement_vector(
     for player in players {
         let mut movement_current = movement;
         for i in 1..50 {
-            let collided = check_for_collision_and_move_player_according_to_movement_vector(grid, player, movement_current);
+            let collided = check_for_collision_and_move_player_according_to_movement_vector(
+                grid,
+                player,
+                movement_current,
+            );
             if !collided {
                 break;
             }
@@ -164,22 +168,18 @@ fn check_for_collision_and_move_players_according_to_movement_vector(
     }
 }
 
-fn apply_gravity_to_players_2(
-    grid: &Grid<u8>,
-    players: &mut [PolygonRenderData],
-    velocity: Vec2,
-) {
+fn apply_gravity_to_players_2(grid: &Grid<u8>, players: &mut [PolygonRenderData], velocity: Vec2) {
     for player in players {
-        check_for_collision_and_move_player_according_to_movement_vector(
-            grid,
-            player,
-            velocity,
-        );
+        check_for_collision_and_move_player_according_to_movement_vector(grid, player, velocity);
     }
 }
 
 fn apply_gravity_to_players(s: &mut Client) {
-    apply_gravity_to_players_2(&s.game.grid, &mut s.game.players, s.game.game_config.gravity);
+    apply_gravity_to_players_2(
+        &s.game.grid,
+        &mut s.game.players,
+        s.game.game_config.gravity,
+    );
 }
 
 fn set_gravity(s: &mut Client) {

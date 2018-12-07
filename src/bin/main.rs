@@ -1,21 +1,8 @@
-#[macro_use]
-extern crate glium;
-#[macro_use]
-extern crate serde_derive;
-
 use clap::crate_authors;
-
-mod macros;
-// ---
-mod glocals;
-mod libs;
-mod mediators;
-
-use crate::glocals::*;
-use crate::mediators::log;
 use clap::{App, Arg};
-use glium::{glutin, Display, DisplayBuild};
+use glium::{glutin, DisplayBuild};
 use std::sync::{Arc, Mutex};
+use universe::{glocals::*, mediators::*, *};
 
 // ---
 

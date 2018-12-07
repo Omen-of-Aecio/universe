@@ -7,6 +7,7 @@ use glium::implement_vertex;
 use glium::texture::{ClientFormat, RawImage2d, Texture2d};
 pub use glium::uniforms::MagnifySamplerFilter;
 pub use glium::uniforms::MinifySamplerFilter;
+use serde_derive::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     net::SocketAddr,

@@ -1,6 +1,6 @@
 use glium;
 use glium::glutin;
-use glium::{DisplayBuild, Surface};
+use glium::{implement_vertex, uniform, DisplayBuild, Surface};
 use rand::Rng;
 use std::f32::consts::PI;
 

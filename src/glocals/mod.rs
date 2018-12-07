@@ -3,6 +3,7 @@ use crate::libs::{
     input,
 };
 use clap;
+use glium::implement_vertex;
 use glium::texture::{ClientFormat, RawImage2d, Texture2d};
 pub use glium::uniforms::MagnifySamplerFilter;
 pub use glium::uniforms::MinifySamplerFilter;

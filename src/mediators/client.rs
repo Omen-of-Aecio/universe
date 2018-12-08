@@ -97,11 +97,7 @@ fn render_the_grid(grid: &mut Option<GridU8RenderData>, frame: &mut glium::Frame
     });
 }
 
-fn render_players(
-    players: &mut [PolygonRenderData],
-    frame: &mut glium::Frame,
-    cam: &Camera,
-) {
+fn render_players(players: &mut [PolygonRenderData], frame: &mut glium::Frame, cam: &Camera) {
     for player in players {
         render_polygon::render(player, frame, cam);
     }

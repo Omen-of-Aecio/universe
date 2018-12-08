@@ -7,7 +7,7 @@ use crate::mediators::{
 use glium::{
     self,
     glutin::{self, MouseScrollDelta, VirtualKeyCode as Key},
-    Display, Surface,
+    Surface,
 };
 
 fn initialize_grid(s: &mut Grid<u8>) {
@@ -99,12 +99,11 @@ fn render_the_grid(grid: &mut Option<GridU8RenderData>, frame: &mut glium::Frame
 
 fn render_players(
     players: &mut [PolygonRenderData],
-    display: &Display,
     frame: &mut glium::Frame,
     cam: &Camera,
 ) {
     for player in players {
-        render_polygon::render(player, display, frame, cam);
+        render_polygon::render(player, frame, cam);
     }
 }
 
@@ -257,7 +256,7 @@ pub fn entry_point_client(s: &mut Client) {
         let mut frame = s.display.draw();
         frame.clear_color(0.0, 0.0, 1.0, 1.0);
         render_the_grid(&mut s.game.grid_render, &mut frame, &s.game.cam);
-        render_players(&mut s.game.players, &s.display, &mut frame, &s.game.cam);
+        render_players(&mut s.game.players, &mut frame, &s.game.cam);
         match frame.finish() {
             Ok(()) => {}
             Err(glium::SwapBuffersError::ContextLost) => {

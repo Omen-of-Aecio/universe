@@ -175,6 +175,7 @@ pub struct GridU8RenderData {
 
 pub struct PolygonRenderData {
     pub prg: glium::Program,
+    pub vertex_buffer: glium::VertexBuffer<Vertex>,
     pub position: Vec2,
     pub velocity: Vec2,
 }

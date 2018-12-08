@@ -183,7 +183,7 @@ fn apply_gravity_to_players(s: &mut Client) {
 }
 
 fn set_gravity(s: &mut Client) {
-    if s.input.is_key_toggled(Key::G) && s.input.is_key_down(Key::G) {
+    if s.input.is_key_toggled_down(Key::G) {
         s.game.game_config.gravity_on = !s.game.game_config.gravity_on;
     }
 }

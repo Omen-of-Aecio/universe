@@ -1,5 +1,7 @@
-use super::{msg::Message, pkt::Packet};
+use super::pkt::Packet;
 use crate::glocals::Error;
+use std::marker::PhantomData;
+use serde::{Deserialize, Serialize};
 use std::{
     self,
     collections::VecDeque,
@@ -8,32 +10,32 @@ use std::{
 };
 use time::precise_time_ns;
 
-pub struct SentPacket {
+pub struct SentPacket<T: Clone + Debug> {
     pub time: u64,
     pub seq: u32,
-    pub packet: Packet,
+    pub packet: Packet<T>,
     ack_handler: Option<Box<Fn() + 'static>>,
 }
 
-impl Debug for SentPacket {
+impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Debug for SentPacket<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "SentPacket; time = {}, seq = {}", self.time, self.seq)
     }
 }
 
-pub struct Connection {
+pub struct Connection<T: Clone + Debug> {
     /// The sequence number of the next sent packet
     pub seq: u32,
     /// The first entry should always be Some.
     /// Some means that it's not yet acknowledged
-    pub send_window: VecDeque<Option<SentPacket>>,
+    pub send_window: VecDeque<Option<SentPacket<T>>>,
 
     dest: SocketAddr,
 }
 const RESEND_INTERVAL_MS: u64 = 1000;
 
-impl<'a> Connection {
-    pub fn new(dest: SocketAddr) -> Connection {
+impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Connection<T> {
+    pub fn new(dest: SocketAddr) -> Connection<T> {
         Connection {
             seq: 0,
             send_window: VecDeque::new(),
@@ -107,7 +109,7 @@ impl<'a> Connection {
     /// enqueued.
     pub fn send_message<'b>(
         &'b mut self,
-        msg: Message,
+        msg: T,
         socket: &UdpSocket,
         ack_handler: Option<Box<Fn() + 'static>>,
     ) -> Result<u32, Error> {
@@ -131,9 +133,10 @@ impl<'a> Connection {
     // have to send a slice of its own buffer.
     pub fn unwrap_message(
         &mut self,
-        packet: Packet,
+        msg: T,
+        packet: Packet<T>,
         socket: &UdpSocket,
-    ) -> Result<Option<Message>, Error> {
+    ) -> Result<Option<T>, Error> {
         let mut received_msg = None;
         match packet {
             Packet::Unreliable { msg } => {

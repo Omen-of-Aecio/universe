@@ -38,11 +38,12 @@ pub fn create_render_polygon(display: &Display) -> PolygonRenderData {
 pub fn render(s: &PolygonRenderData, display: &Display, target: &mut glium::Frame, cam: &Camera) {
     let no_indices = glium::index::NoIndices(glium::index::PrimitiveType::TriangleFan);
 
-    let mut vertices = Vec::new();
-    vertices.push(Vertex { pos: [0.0, 0.0] });
-    vertices.push(Vertex { pos: [0.0, 10.0] });
-    vertices.push(Vertex { pos: [10.0, 10.0] });
-    vertices.push(Vertex { pos: [10.0, 0.0] });
+    let vertices = [
+        Vertex { pos: [0.0, 0.0] },
+        Vertex { pos: [0.0, 10.0] },
+        Vertex { pos: [10.0, 10.0] },
+        Vertex { pos: [10.0, 0.0] },
+    ];
 
     let vertex_buffer = glium::VertexBuffer::new(display, &vertices).unwrap();
     let uniforms = uniform! {

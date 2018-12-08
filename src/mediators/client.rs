@@ -252,16 +252,16 @@ pub fn entry_point_client(s: &mut Client) {
             break;
         }
         toggle_camera_mode(s);
-        move_camera_according_to_input(s);
-        set_camera(s);
-        set_gravity(s);
-        set_smooth(s);
         let movement = move_player_according_to_input(&s.input);
         check_for_collision_and_move_players_according_to_movement_vector(
             &s.game.grid,
             &mut s.game.players,
             movement,
         );
+        move_camera_according_to_input(s);
+        set_camera(s);
+        set_gravity(s);
+        set_smooth(s);
         if s.game.game_config.gravity_on {
             apply_gravity_to_players(s);
         }

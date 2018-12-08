@@ -1,4 +1,4 @@
-use crate::glocals::{Client, GridU8RenderData, PolygonRenderData};
+use crate::glocals::{CameraMode, Client, GridU8RenderData, PolygonRenderData};
 use crate::libs::geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
 use crate::libs::input::Input;
 use crate::mediators::{
@@ -196,6 +196,30 @@ fn create_black_square_around_player(s: &mut Grid<u8>) {
     }
 }
 
+fn set_camera(s: &mut Client) {
+    match s.game.cam_mode {
+        CameraMode::Interactive => {}
+        CameraMode::FollowPlayer=> {
+            let center = s.game.players[0].position;
+            s.game.cam.center = center;
+        }
+    }
+}
+
+fn toggle_camera_mode(s: &mut Client) {
+    if s.input.is_key_toggled_down(Key::F) {
+        s.game.cam_mode = 
+            match s.game.cam_mode {
+                CameraMode::FollowPlayer => {
+                    CameraMode::Interactive
+                }
+                CameraMode::Interactive => {
+                    CameraMode::FollowPlayer
+                }
+            };
+    }
+}
+
 pub fn entry_point_client(s: &mut Client) {
     log(&mut s.main.threads, 128, "MAIN", "Creating grid", &[]);
     initialize_grid(&mut s.game.grid);
@@ -222,7 +246,9 @@ pub fn entry_point_client(s: &mut Client) {
         if s.should_exit {
             break;
         }
+        toggle_camera_mode(s);
         move_camera_according_to_input(s);
+        set_camera(s);
         set_gravity(s);
         let movement = move_player_according_to_input(&s.input);
         check_for_collision_and_move_players_according_to_movement_vector(

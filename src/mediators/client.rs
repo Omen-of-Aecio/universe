@@ -199,7 +199,7 @@ fn create_black_square_around_player(s: &mut Grid<u8>) {
 fn set_camera(s: &mut Client) {
     match s.game.cam_mode {
         CameraMode::Interactive => {}
-        CameraMode::FollowPlayer=> {
+        CameraMode::FollowPlayer => {
             let center = s.game.players[0].position;
             s.game.cam.center = center;
         }
@@ -208,15 +208,10 @@ fn set_camera(s: &mut Client) {
 
 fn toggle_camera_mode(s: &mut Client) {
     if s.input.is_key_toggled_down(Key::F) {
-        s.game.cam_mode = 
-            match s.game.cam_mode {
-                CameraMode::FollowPlayer => {
-                    CameraMode::Interactive
-                }
-                CameraMode::Interactive => {
-                    CameraMode::FollowPlayer
-                }
-            };
+        s.game.cam_mode = match s.game.cam_mode {
+            CameraMode::FollowPlayer => CameraMode::Interactive,
+            CameraMode::Interactive => CameraMode::FollowPlayer,
+        };
     }
 }
 

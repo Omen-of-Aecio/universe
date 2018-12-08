@@ -81,7 +81,7 @@ fn move_player_according_to_input(s: &Input) -> Vec2 {
     Vec2 {
         x: dx as f32,
         y: dy as f32,
-    }
+    } / if s.is_key_down(Key::LShift) { 3.0 } else { 1.0 }
 }
 
 fn render_the_grid(grid: &mut Option<GridU8RenderData>, frame: &mut glium::Frame, cam: &Camera) {
@@ -113,20 +113,20 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
     movement: Vec2,
 ) -> bool {
     let tl = Vec2 {
-        x: player.position.x - 1.0,
-        y: player.position.y - 1.0,
+        x: player.position.x + 0.01,
+        y: player.position.y + 0.01,
     };
     let tr = Vec2 {
-        x: player.position.x + 10.0 - 1.0,
-        y: player.position.y - 1.0,
+        x: player.position.x + 9.99,
+        y: player.position.y + 0.01,
     };
     let bl = Vec2 {
-        x: player.position.x - 1.0,
-        y: player.position.y + 10.0 - 1.0,
+        x: player.position.x + 0.01,
+        y: player.position.y + 9.99,
     };
     let br = Vec2 {
-        x: player.position.x + 10.0 - 1.0,
-        y: player.position.y + 10.0 - 1.0,
+        x: player.position.x + 9.99,
+        y: player.position.y + 9.99,
     };
     let collision_point = do_lines_collide_with_grid(
         grid,

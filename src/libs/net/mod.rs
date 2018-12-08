@@ -1,17 +1,18 @@
 mod conn;
-pub mod msg;
 mod pkt;
 
+use std::marker::PhantomData;
 use self::conn::Connection;
 use self::pkt::Packet;
 use crate::glocals::Error;
-use crate::libs::net::msg::Message;
 
 use std;
 use std::collections::hash_map::HashMap;
+use std::fmt::Debug;
 use std::iter::Iterator;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use std::time::Duration;
+use serde::{Deserialize, Serialize};
 
 /// Provides an interface to encode and [reliably] send, decode and receive messages to/from any destination.
 
@@ -21,13 +22,15 @@ use std::time::Duration;
 // Socket //
 ////////////
 
-pub struct Socket {
+pub struct Socket<'a, T: Clone + Debug + Deserialize<'a> + Serialize> {
+    phantom: PhantomData<&'a T>,
     socket: UdpSocket,
-    connections: HashMap<SocketAddr, Connection>,
+    connections: HashMap<SocketAddr, Connection<'a, T>>,
     buffer: Vec<u8>,
 }
-impl Socket {
-    pub fn new(port: u16) -> Result<Socket, Error> {
+
+impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Socket<'a, T> {
+    pub fn new(port: u16) -> Result<Socket<'a, T>, Error> {
         Ok(Socket {
             socket: UdpSocket::bind(("0.0.0.0:".to_string() + port.to_string().as_str()).as_str())?,
             connections: HashMap::new(),
@@ -51,7 +54,7 @@ impl Socket {
     }
 
     /// Attempt to clone the socket to create consumable iterator
-    pub fn messages(&mut self) -> SocketIter {
+    pub fn messages(&mut self) -> SocketIter<'a, T> {
         SocketIter { socket: self }
     }
     pub fn max_payload_size() -> u32 {
@@ -59,7 +62,7 @@ impl Socket {
     }
 
     /// Send unreliable message
-    pub fn send_to(&mut self, msg: Message, dest: SocketAddr) -> Result<(), Error> {
+    pub fn send_to(&mut self, msg: T, dest: SocketAddr) -> Result<(), Error> {
         let buffer = Packet::Unreliable { msg }.encode()?;
         self.socket.send_to(&buffer, dest)?;
 
@@ -67,9 +70,9 @@ impl Socket {
     }
 
     /// Send reliable message
-    pub fn send_reliably_to<'a>(
+    pub fn send_reliably_to(
         &'a mut self,
-        msg: Message,
+        msg: T,
         dest: SocketAddr,
         ack_handler: Option<Box<Fn() + 'static>>,
     ) -> Result<(), Error> {
@@ -83,7 +86,7 @@ impl Socket {
         Ok(())
     }
 
-    fn get_connection_or_create(&mut self, dest: SocketAddr) -> &mut Connection {
+    fn get_connection_or_create(&mut self, dest: SocketAddr) -> &mut Connection<'a, T> {
         if self.connections.get(&dest).is_none() {
             let conn = Connection::new(dest);
             self.connections.insert(dest, conn);
@@ -95,13 +98,13 @@ impl Socket {
     // pub fn send_reliable_to_and_wait(&self, msg: Message, dest: SocketAddr) -> Result<()>
 
     /// Blocking, with timeout (3 sec)
-    pub fn recv(&mut self) -> Result<(SocketAddr, Message), Error> {
+    pub fn recv(&mut self) -> Result<(SocketAddr, T), Error> {
         self.socket.set_nonblocking(false)?;
         self.socket.set_read_timeout(Some(Duration::new(3, 0)))?;
         self._recv()
     }
 
-    fn _recv(&mut self) -> Result<(SocketAddr, Message), Error> {
+    fn _recv(&mut self) -> Result<(SocketAddr, T), Error> {
         // Since we may just receive an Ack, we loop until we receive an actual message
         Ok(loop {
             let socket = self.socket.try_clone()?;
@@ -116,14 +119,14 @@ impl Socket {
     }
 }
 
-pub struct SocketIter<'a> {
-    socket: &'a mut Socket,
+pub struct SocketIter<'a, T: Clone + Debug + Deserialize<'a> + Serialize> {
+    socket: &'a mut Socket<'a, T>,
 }
 
-impl<'a> Iterator for SocketIter<'a> {
-    type Item = Result<(SocketAddr, Message), Error>;
+impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Iterator for SocketIter<'a, T> {
+    type Item = Result<(SocketAddr, T), Error>;
 
-    fn next(&mut self) -> Option<Result<(SocketAddr, Message), Error>> {
+    fn next(&mut self) -> Option<Result<(SocketAddr, T), Error>> {
         if let Err(e) = self.socket.socket.set_nonblocking(true) {
             return Some(Err(e.into()));
         }

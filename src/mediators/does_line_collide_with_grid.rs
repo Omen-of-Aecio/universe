@@ -76,7 +76,6 @@ pub fn does_line_collide_with_grid<T: Clone + Default>(
 
     while it < len {
         it += 1;
-        println!["=({}, {})", ix, iy];
         if ix >= 0 && iy >= 0 {
             if let Some(entry) = grid.get(ix as usize, iy as usize) {
                 if predicate(entry) {

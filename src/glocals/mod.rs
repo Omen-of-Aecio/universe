@@ -16,6 +16,8 @@ use std::{
     vec::Vec,
 };
 
+pub type Error = failure::Error;
+
 #[derive(Default)]
 pub struct Main<'a> {
     pub config: Config,

@@ -187,6 +187,21 @@ fn set_gravity(s: &mut Client) {
     }
 }
 
+fn set_smooth(s: &mut Client) {
+    if s.input.is_key_toggled_down(Key::R) {
+        if let Some(ref mut gridrenderdata) = s.game.grid_render {
+            render_grid::toggle_smooth(gridrenderdata);
+            log(
+                &mut s.main.threads,
+                128,
+                "CLNT",
+                "Toggling grid smoothing",
+                &[("smooth", &format!["{}", gridrenderdata.smooth])],
+            );
+        }
+    }
+}
+
 fn create_black_square_around_player(s: &mut Grid<u8>) {
     for j in 200..400 {
         for i in 400..600 {
@@ -244,6 +259,7 @@ pub fn entry_point_client(s: &mut Client) {
         move_camera_according_to_input(s);
         set_camera(s);
         set_gravity(s);
+        set_smooth(s);
         let movement = move_player_according_to_input(&s.input);
         check_for_collision_and_move_players_according_to_movement_vector(
             &s.game.grid,

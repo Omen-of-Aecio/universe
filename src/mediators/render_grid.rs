@@ -37,7 +37,7 @@ pub fn create_grid_u8_render_data(display: &Display, net: &Grid<u8>) -> GridU8Re
         bg_col: [0.5, 0.5, 0.5],
         minify_filter: MinifySamplerFilter::Nearest,
         magnify_filter: MagnifySamplerFilter::Nearest,
-        smooth: true,
+        smooth: false,
     };
     upload_entire_texture(&mut new, net);
     new

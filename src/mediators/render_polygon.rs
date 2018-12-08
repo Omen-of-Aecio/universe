@@ -28,10 +28,10 @@ pub fn create_render_polygon(display: &Display) -> PolygonRenderData {
     let frag_src = include_str!("../../shaders/xy_tr.frag");
     let prg = glium::Program::from_source(display, vert_src, frag_src, None).unwrap();
     let vertices = [
-        Vertex { pos: [1.0, 1.0] }, // bottom left
-        Vertex { pos: [1.0, 11.0] }, // top left
-        Vertex { pos: [11.0, 11.0] }, // top right
-        Vertex { pos: [11.0, 1.0] }, // bottom right
+        Vertex { pos: [0.0, 0.0] },   // bottom left
+        Vertex { pos: [0.0, 10.0] },  // top left
+        Vertex { pos: [10.0, 10.0] }, // top right
+        Vertex { pos: [10.0, 0.0] },  // bottom right
     ];
 
     let vertex_buffer = glium::VertexBuffer::new(display, &vertices).unwrap();

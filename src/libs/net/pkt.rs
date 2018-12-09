@@ -1,8 +1,8 @@
 use crate::glocals::Error;
-use std::fmt::Debug;
+use failure::format_err;
 use serde::{Deserialize, Serialize};
 use serde_derive::{Deserialize, Serialize};
-use failure::format_err;
+use std::fmt::Debug;
 
 use bincode;
 
@@ -13,7 +13,7 @@ use bincode;
 /// `Packet` struct wraps a message in protocol-specific data.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum Packet<T: Clone + Debug> {
-    Ack { ack: u32, },
+    Ack { ack: u32 },
     Reliable { seq: u32, msg: T },
     Unreliable { msg: T },
 }

@@ -1,7 +1,7 @@
 use super::pkt::Packet;
 use crate::glocals::Error;
-use std::marker::PhantomData;
 use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
 use std::{
     self,
     collections::VecDeque,
@@ -145,7 +145,8 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Connection<T> {
             Packet::Reliable { seq, msg } => {
                 received_msg = Some(msg);
                 // ack_reply = Some(Packet::Ack {ack: seq});
-                socket.send_to(&Packet::Ack { ack: seq }.encode()?, self.dest)?;
+                let packet: Packet<T> = Packet::Ack { ack: seq };
+                socket.send_to(&packet.encode()?, self.dest)?;
             }
             Packet::Ack { ack } => {
                 self.acknowledge(ack)?;

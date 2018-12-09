@@ -301,33 +301,35 @@ pub fn entry_point_client(s: &mut Client) {
             apply_gravity_to_players(s);
         }
 
+        let mut frame = s.display.draw();
+        frame.clear_color(0.0, 0.0, 1.0, 1.0);
+        render_the_grid(&mut s.game.grid_render, &mut frame, &s.game.cam);
+        render_players(&mut s.game.players, &mut frame, &s.game.cam);
+
         // ---
 
-        let end = PreciseTime::now();
-        let elapsed = begin.to(end);
-        time_spent = time_spent + elapsed;
-        frame_counter += 1;
         if frame_counter > 100 {
             log(
                 &mut s.main.threads,
                 128 + 64,
                 "CLNT",
-                "Time spent doing logic",
+                "Time spent, 100-frame average",
                 &[(
-                    "µs / 100 frames",
-                    &format!["{:?}", time_spent.num_microseconds()],
+                    "µs",
+                    &format!["{:?}", time_spent.num_microseconds().map(|x| x / 100)],
                 )],
             );
             frame_counter = 0;
             time_spent = time::Duration::zero();
+        } else {
+            let end = PreciseTime::now();
+            let elapsed = begin.to(end);
+            time_spent = time_spent + elapsed;
+            frame_counter += 1;
         }
 
         // ---
 
-        let mut frame = s.display.draw();
-        frame.clear_color(0.0, 0.0, 1.0, 1.0);
-        render_the_grid(&mut s.game.grid_render, &mut frame, &s.game.cam);
-        render_players(&mut s.game.players, &mut frame, &s.game.cam);
         match frame.finish() {
             Ok(()) => {}
             Err(glium::SwapBuffersError::ContextLost) => {

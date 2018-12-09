@@ -9,6 +9,7 @@ use glium::{
     glutin::{self, MouseScrollDelta, VirtualKeyCode as Key},
     Surface,
 };
+use time::PreciseTime;
 
 fn initialize_grid(s: &mut Grid<u8>) {
     s.resize(1000, 1000);
@@ -246,7 +247,13 @@ pub fn entry_point_client(s: &mut Client) {
     s.game
         .players
         .push(render_polygon::create_render_polygon(&s.display));
+    let mut frame_counter = 0u8;
+    let mut time_spent = time::Duration::zero();
     loop {
+        let begin = PreciseTime::now();
+
+        // ---
+
         collect_input(s);
         if s.should_exit {
             break;
@@ -265,6 +272,30 @@ pub fn entry_point_client(s: &mut Client) {
         if s.game.game_config.gravity_on {
             apply_gravity_to_players(s);
         }
+
+        // ---
+
+        let end = PreciseTime::now();
+        let elapsed = begin.to(end);
+        time_spent = time_spent + elapsed;
+        frame_counter += 1;
+        if frame_counter > 100 {
+            log(
+                &mut s.main.threads,
+                128 + 64,
+                "CLNT",
+                "Time spent doing logic",
+                &[(
+                    "µs / 100 frames",
+                    &format!["{:?}", time_spent.num_microseconds()],
+                )],
+            );
+            frame_counter = 0;
+            time_spent = time::Duration::zero();
+        }
+
+        // ---
+
         let mut frame = s.display.draw();
         frame.clear_color(0.0, 0.0, 1.0, 1.0);
         render_the_grid(&mut s.game.grid_render, &mut frame, &s.game.cam);

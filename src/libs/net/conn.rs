@@ -1,7 +1,6 @@
 use super::pkt::Packet;
 use crate::glocals::Error;
 use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
 use std::{
     self,
     collections::VecDeque,
@@ -133,7 +132,6 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Connection<T> {
     // have to send a slice of its own buffer.
     pub fn unwrap_message(
         &mut self,
-        msg: T,
         packet: Packet<T>,
         socket: &UdpSocket,
     ) -> Result<Option<T>, Error> {

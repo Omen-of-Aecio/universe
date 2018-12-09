@@ -33,7 +33,7 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Packet<T> {
     }
 
     pub fn decode(data: &'a [u8]) -> Result<Packet<T>, Error> {
-        bincode::deserialize(&data).map_err(|_| format_err!("failed to deserialize"))
+        bincode::deserialize(&data[..]).map_err(|_| format_err!("failed to deserialize"))
     }
 
     pub fn max_payload_size() -> u32 {

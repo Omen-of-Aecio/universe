@@ -1,8 +1,6 @@
 mod conn;
 mod pkt;
 
-/*
-use std::marker::PhantomData;
 use self::conn::Connection;
 use self::pkt::Packet;
 use crate::glocals::Error;
@@ -23,19 +21,18 @@ use serde::{Deserialize, Serialize};
 // Socket //
 ////////////
 
-pub struct Socket<'a, T: Clone + Debug + Deserialize<'a> + Serialize> {
-    phantom: PhantomData<&'a T>,
+pub struct Socket<T: Clone + Debug> {
     socket: UdpSocket,
-    connections: HashMap<SocketAddr, Connection<'a, T>>,
+    connections: HashMap<SocketAddr, Connection<T>>,
     buffer: Vec<u8>,
 }
 
-impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Socket<'a, T> {
-    pub fn new(port: u16) -> Result<Socket<'a, T>, Error> {
+impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Socket<T> {
+    pub fn new(port: u16) -> Result<Socket<T>, Error> {
         Ok(Socket {
             socket: UdpSocket::bind(("0.0.0.0:".to_string() + port.to_string().as_str()).as_str())?,
             connections: HashMap::new(),
-            buffer: default_vec(Packet::max_payload_size() as usize + 100),
+            buffer: default_vec(Packet::<T>::max_payload_size() as usize + 100),
             // XXX 100 as a safe bet (headers and such)
         })
     }
@@ -55,11 +52,11 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Socket<'a, T> {
     }
 
     /// Attempt to clone the socket to create consumable iterator
-    pub fn messages(&mut self) -> SocketIter<'a, T> {
+    pub fn messages(&'a mut self) -> SocketIter<'a, T> {
         SocketIter { socket: self }
     }
     pub fn max_payload_size() -> u32 {
-        Packet::max_payload_size() // because Packet should probably be private to the net module
+        Packet::<T>::max_payload_size() // because Packet should probably be private to the net module
     }
 
     /// Send unreliable message
@@ -72,7 +69,7 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Socket<'a, T> {
 
     /// Send reliable message
     pub fn send_reliably_to(
-        &'a mut self,
+        &mut self,
         msg: T,
         dest: SocketAddr,
         ack_handler: Option<Box<Fn() + 'static>>,
@@ -87,7 +84,7 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Socket<'a, T> {
         Ok(())
     }
 
-    fn get_connection_or_create(&mut self, dest: SocketAddr) -> &mut Connection<'a, T> {
+    fn get_connection_or_create(&mut self, dest: SocketAddr) -> &mut Connection<T> {
         if self.connections.get(&dest).is_none() {
             let conn = Connection::new(dest);
             self.connections.insert(dest, conn);
@@ -110,18 +107,18 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Socket<'a, T> {
         Ok(loop {
             let socket = self.socket.try_clone()?;
             let (amt, src) = self.socket.recv_from(&mut self.buffer)?;
-            let packet = Packet::decode(&self.buffer[0..amt])?;
-            let conn = self.get_connection_or_create(src);
-            let msg = conn.unwrap_message(packet, &socket)?;
-            if let Some(msg) = msg {
-                break (src, msg);
-            }
+            // let packet = Packet::decode(&self.buffer[0..amt])?.clone();
+            // let conn = self.get_connection_or_create(src);
+            // let msg = conn.unwrap_message(packet, &socket)?;
+            // if let Some(msg) = msg {
+            //     break (src, msg);
+            // }
         })
     }
 }
 
 pub struct SocketIter<'a, T: Clone + Debug + Deserialize<'a> + Serialize> {
-    socket: &'a mut Socket<'a, T>,
+    socket: &'a mut Socket<T>,
 }
 
 impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Iterator for SocketIter<'a, T> {
@@ -191,4 +188,3 @@ mod tests {
         assert![false];
     }
 }
-*/

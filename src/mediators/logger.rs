@@ -142,6 +142,24 @@ pub fn create_logger(s: &mut Threads) {
     log(s, 128, "MAIN", "Logger thread created", &[]);
 }
 
+pub fn create_logger_with_writer<T: 'static + std::io::Write + Send>(
+    s: &mut Threads,
+    mut writer: T,
+) {
+    let (tx, rx) = std::sync::mpsc::sync_channel(1000);
+    let buffer_full_count = Arc::new(Mutex::new(0));
+    s.log_channel = Some(tx);
+    s.log_channel_full_count = buffer_full_count.clone();
+    s.logger = Some(std::thread::spawn(move || {
+        entry_point_logger(EntryPointLogger {
+            log_channel_full_count: buffer_full_count,
+            receiver: rx,
+            writer: &mut writer,
+        });
+    }));
+    log(s, 128, "MAIN", "Logger thread created", &[]);
+}
+
 // ---
 
 #[cfg(test)]
@@ -185,6 +203,70 @@ mod tests {
             }
             Err(error @ std::sync::PoisonError { .. }) => {
                 assert![false, "The lock should not be poisoned"];
+            }
+        };
+    }
+
+    // ---
+
+    struct Veclog {
+        pub data: Arc<Mutex<Vec<u8>>>,
+    }
+
+    impl Veclog {
+        fn new() -> Veclog {
+            Veclog {
+                data: Arc::new(Mutex::new(Vec::new())),
+            }
+        }
+    }
+
+    impl std::io::Write for Veclog {
+        fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
+            match self.data.lock() {
+                Ok(ref mut g) => {
+                    g.append(&mut Vec::from(data));
+                    Ok(data.len())
+                }
+                Err(_) => {
+                    panic!["Unable to lock writer"];
+                }
+            }
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    // ---
+
+    #[test]
+    fn single_message_arrives_confirm() {
+        let mut threads = Threads::default();
+        let mut veclog = Veclog::new();
+        let mut arc = veclog.data.clone();
+        create_logger_with_writer(&mut threads, veclog);
+        assert_eq![
+            true,
+            log(&mut threads, 127, "TEST", "This message will arrive", &[])
+        ];
+        match threads.log_channel_full_count.lock() {
+            Ok(ref guard) => {
+                assert_eq![0usize, **guard];
+            }
+            Err(error @ std::sync::PoisonError { .. }) => {
+                assert![false, "The lock should not be poisoned"];
+            }
+        };
+        threads.log_channel = None;
+        threads.logger.map(|x| x.join());
+        match arc.lock() {
+            Ok(ref guard) => {
+                assert_eq![String::from("128: \"MAIN\": \"Logger thread created\", {}\n127: \"TEST\": \"This message will arrive\", {}\n128: \"LGGR\": \"Logger exiting\", {}\n"),
+                String::from_utf8((**guard).clone()).unwrap()];
+            }
+            Err(_) => {
+                assert![false, "Unable to acquire lock"];
             }
         };
     }

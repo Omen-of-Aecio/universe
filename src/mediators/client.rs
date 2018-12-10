@@ -308,7 +308,7 @@ pub fn entry_point_client(s: &mut Client) {
 
         // ---
 
-        if frame_counter > 100 {
+        if frame_counter >= 100 {
             log(
                 &mut s.main.threads,
                 128 + 64,

@@ -25,9 +25,10 @@ pub struct Main<'a> {
     pub threads: Threads,
 }
 
-pub struct EntryPointLogger {
+pub struct EntryPointLogger<'a> {
     pub receiver: std::sync::mpsc::Receiver<LogMessage>,
     pub log_channel_full_count: Arc<Mutex<usize>>,
+    pub writer: &'a mut dyn std::io::Write,
 }
 
 #[derive(Default)]

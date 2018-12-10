@@ -1,24 +1,9 @@
 use clap::crate_authors;
 use clap::{App, Arg};
 use glium::{glutin, DisplayBuild};
-use std::sync::{Arc, Mutex};
-use universe::{glocals::*, mediators::*, *};
+use universe::{glocals::*, mediators::logger::*, mediators::*, *};
 
 // ---
-
-fn create_logger(s: &mut Threads) {
-    let (tx, rx) = std::sync::mpsc::sync_channel(1000);
-    let buffer_full_count = Arc::new(Mutex::new(0));
-    s.log_channel = Some(tx);
-    s.log_channel_full_count = buffer_full_count.clone();
-    s.logger = Some(std::thread::spawn(move || {
-        mediators::logger::entry_point_logger(EntryPointLogger {
-            log_channel_full_count: buffer_full_count,
-            receiver: rx,
-        });
-    }));
-    log(s, 128, "MAIN", "Logger thread created", &[]);
-}
 
 fn parse_command_line_arguments<'a>(s: &mut clap::ArgMatches<'a>) {
     *s = {

@@ -86,7 +86,9 @@ pub fn log<T: Clone + Into<String>>(
     }) {
         Some(Ok(())) => true,
         Some(Err(TrySendError::Full(LogMessage { .. }))) => {
-            threads.log_channel_full_count.fetch_add(1, Ordering::Relaxed);
+            threads
+                .log_channel_full_count
+                .fetch_add(1, Ordering::Relaxed);
             false
         }
         Some(Err(TrySendError::Disconnected(LogMessage { .. }))) => {
@@ -221,7 +223,10 @@ mod tests {
                 &[]
             )
         ];
-        assert_eq![0usize, threads.log_channel_full_count.load(Ordering::Relaxed)];
+        assert_eq![
+            0usize,
+            threads.log_channel_full_count.load(Ordering::Relaxed)
+        ];
     }
 
     #[test]
@@ -232,7 +237,10 @@ mod tests {
             true,
             log(&mut threads, 128, "TEST", "This message will arrive", &[])
         ];
-        assert_eq![0usize, threads.log_channel_full_count.load(Ordering::Relaxed)];
+        assert_eq![
+            0usize,
+            threads.log_channel_full_count.load(Ordering::Relaxed)
+        ];
     }
 
     // ---
@@ -278,7 +286,10 @@ mod tests {
             true,
             log(&mut threads, 128, "TEST", "This message will arrive", &[])
         ];
-        assert_eq![0usize, threads.log_channel_full_count.load(Ordering::Relaxed)];
+        assert_eq![
+            0usize,
+            threads.log_channel_full_count.load(Ordering::Relaxed)
+        ];
         threads.log_channel = None;
         threads.logger.map(|x| x.join());
         assert_eq![
@@ -304,7 +315,10 @@ mod tests {
             "This message will arrive",
             &[("key", "value")]
         )];
-        assert_eq![0usize, threads.log_channel_full_count.load(Ordering::Relaxed)];
+        assert_eq![
+            0usize,
+            threads.log_channel_full_count.load(Ordering::Relaxed)
+        ];
         threads.log_channel = None;
         threads.logger.map(|x| x.join());
         assert_eq![
@@ -332,7 +346,10 @@ mod tests {
             "This message will arrive",
             &[("key", "value"), ("key", "value"), ("key", "value")]
         )];
-        assert_eq![0usize, threads.log_channel_full_count.load(Ordering::Relaxed)];
+        assert_eq![
+            0usize,
+            threads.log_channel_full_count.load(Ordering::Relaxed)
+        ];
         threads.log_channel = None;
         threads.logger.map(|x| x.join());
         assert_eq![

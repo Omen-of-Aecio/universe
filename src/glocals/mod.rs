@@ -3,8 +3,8 @@ use crate::libs::{
     input,
 };
 use clap;
-use glium::{implement_vertex, texture::Texture2d};
 pub use glium::uniforms::{MagnifySamplerFilter, MinifySamplerFilter};
+use glium::{implement_vertex, texture::Texture2d};
 use serde_derive::Deserialize;
 use std::{
     collections::HashMap,

@@ -1,7 +1,7 @@
 use clap::crate_authors;
 use clap::{App, Arg};
 use glium::{glutin, DisplayBuild};
-use universe::{glocals::*, mediators::logger::*, mediators::*, *};
+use universe::{glocals::*, mediators::logger::*, *};
 
 // ---
 

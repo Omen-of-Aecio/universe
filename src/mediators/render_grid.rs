@@ -30,9 +30,9 @@ pub fn create_grid_u8_render_data(display: &Display, net: &Grid<u8>) -> GridU8Re
         net_width: net.get_size().0,
         net_height: net.get_size().1,
 
-        shader_prg: shader_prg,
-        quad_vbo: quad_vbo,
-        texture: texture,
+        shader_prg,
+        quad_vbo,
+        texture,
 
         bg_col: [0.5, 0.5, 0.5],
         minify_filter: MinifySamplerFilter::Nearest,

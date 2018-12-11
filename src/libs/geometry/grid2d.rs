@@ -39,7 +39,7 @@ where
     }
 
     pub fn get_size(&self) -> (usize, usize) {
-        return (self.width, self.height);
+        (self.width, self.height)
     }
 }
 

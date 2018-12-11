@@ -104,10 +104,7 @@ fn render_players(players: &mut [PolygonRenderData], frame: &mut glium::Frame, c
     }
 }
 
-fn check_player_collides_here(
-    grid: &Grid<u8>,
-    position: Vec2,
-) -> bool {
+fn check_player_collides_here(grid: &Grid<u8>, position: Vec2) -> bool {
     let tl = Vec2 {
         x: position.x + 0.01,
         y: position.y + 0.01,
@@ -124,10 +121,17 @@ fn check_player_collides_here(
         x: position.x + 9.99,
         y: position.y + 9.99,
     };
-    grid.get(tl.x as usize, tl.y as usize).map_or(false, |x| *x > 0)
-    || grid.get(tr.x as usize, tr.y as usize).map_or(false, |x| *x > 0)
-    || grid.get(br.x as usize, br.y as usize).map_or(false, |x| *x > 0)
-    || grid.get(bl.x as usize, bl.y as usize).map_or(false, |x| *x > 0)
+    grid.get(tl.x as usize, tl.y as usize)
+        .map_or(false, |x| *x > 0)
+        || grid
+            .get(tr.x as usize, tr.y as usize)
+            .map_or(false, |x| *x > 0)
+        || grid
+            .get(br.x as usize, br.y as usize)
+            .map_or(false, |x| *x > 0)
+        || grid
+            .get(bl.x as usize, bl.y as usize)
+            .map_or(false, |x| *x > 0)
 }
 
 fn check_for_collision_and_move_player_according_to_movement_vector(
@@ -184,7 +188,10 @@ fn check_for_collision_and_move_players_according_to_movement_vector(
         if !collided {
             break;
         }
-        movement_current = Vec2 { x: movement.x, y : movement.y + 1.1f32 };
+        movement_current = Vec2 {
+            x: movement.x,
+            y: movement.y + 1.1f32,
+        };
         let new_position = player.position + movement_current;
         if !check_player_collides_here(grid, new_position) {
             player.position += movement_current;

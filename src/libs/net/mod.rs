@@ -5,13 +5,13 @@ use self::conn::Connection;
 use self::pkt::Packet;
 use crate::glocals::Error;
 
+use serde::{Deserialize, Serialize};
 use std;
 use std::collections::hash_map::HashMap;
 use std::fmt::Debug;
 use std::iter::Iterator;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
 
 /// Provides an interface to encode and [reliably] send, decode and receive messages to/from any destination.
 

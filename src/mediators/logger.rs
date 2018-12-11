@@ -1,3 +1,60 @@
+//! A threaded logger
+//!
+//! The logger described in this file uses no global state, it all goes through
+//! the glocal `universe::glocals::Threads`.
+//!
+//! When we create a logger, a thread is spawned and a bounded buffer is allocated
+//! for messages to be sent to the logger. This is also accompanied by a counter for
+//! failed messages - when the buffer is full, the message is discarded and the counter
+//! incremented. Such a counter is useful so the logger can report how many messages
+//! were dropped.
+//!
+//! For using the logger, all you need to use is the `log` function.
+//! It takes a logging level and log context, which are used to limit messages
+//! if needed. The log levels range from 0 to 255, where 0 will _always_ be logged
+//! (unless the queue is full). The context ought to be a short descriptor
+//! of where this log message came from the semantic sense.
+//!
+//! ```
+//! use universe::{glocals::Threads, mediators::logger::{create_logger, log}};
+//! fn main() {
+//!     // Allocate the structure for storing threads from `universe`
+//!     let mut threads = Threads::default();
+//!
+//!     // Start the logger thread, storing the context and queue inside the `threads` structure
+//!     create_logger(&mut threads);
+//!
+//!     // Log a message by pushing it to the logger's queue
+//!     // Returning true if there was an active queue with sufficient space
+//!     // and false if the message could not be sent.
+//!     assert![
+//!         log(
+//!             // Threads variable so we can communicate to the logger thread
+//!             &mut threads,
+//!
+//!             // The logging level
+//!             128,
+//!
+//!             // The logging context
+//!             "TEST",
+//!
+//!             // An arbitrary message describing the event
+//!             "This message does not arrive, and the failed count will _not_ be incremented",
+//!
+//!             // A key-value map of items, also printed by the logger
+//!             // Mainly useful when reporting state
+//!             &[("key", "value")]
+//!         )
+//!     ];
+//!
+//!     // Close the logging channel, thus signalling to the logger thread that
+//!     // we are finished
+//!     threads.log_channel = None;
+//!
+//!     // Join the logger thread with this one
+//!     threads.logger.unwrap().join();
+//! }
+//! ```
 use crate::glocals::{EntryPointLogger, LogMessage, Threads};
 use std::{
     collections::HashMap,
@@ -7,6 +64,7 @@ use std::{
     },
 };
 
+/// Log a message
 pub fn log<T: Clone + Into<String>>(
     threads: &mut Threads,
     level: u8,
@@ -55,7 +113,7 @@ fn write_message_out(out: &mut dyn std::io::Write, msg: LogMessage) {
         message,
         kvpairs,
     } = msg;
-    writeln![
+    let _ = writeln![
         out,
         "{:03}: {:?}: {:?}, {:#?}",
         loglevel, context, message, kvpairs
@@ -104,13 +162,22 @@ fn check_if_messages_were_lost(s: &mut EntryPointLogger) {
 
 // ---
 
-pub fn entry_point_logger(mut s: EntryPointLogger) {
+fn entry_point_logger(mut s: EntryPointLogger) {
+    write_message_out(
+        s.writer,
+        LogMessage {
+            loglevel: 128,
+            context: "LGGR".into(),
+            message: "Logger thread spawned".into(),
+            kvpairs: HashMap::new(),
+        },
+    );
     loop {
         match s.receiver.recv() {
             Ok(msg @ LogMessage { .. }) => {
                 write_message_out(s.writer, msg);
             }
-            Err(RecvError {}) => {
+            Err(RecvError) => {
                 break;
             }
         }
@@ -121,12 +188,13 @@ pub fn entry_point_logger(mut s: EntryPointLogger) {
         LogMessage {
             loglevel: 128,
             context: "LGGR".into(),
-            message: "Logger exiting".into(),
+            message: "Logger thread exited".into(),
             kvpairs: HashMap::new(),
         },
     );
 }
 
+/// Spawn a logger thread with a writer to stdout
 pub fn create_logger(s: &mut Threads) {
     let (tx, rx) = std::sync::mpsc::sync_channel(1000);
     let buffer_full_count = Arc::new(Mutex::new(0));
@@ -139,9 +207,9 @@ pub fn create_logger(s: &mut Threads) {
             writer: &mut std::io::stdout(),
         });
     }));
-    log(s, 128, "MAIN", "Logger thread created", &[]);
 }
 
+/// Spawn a logger thread with a custom writer
 pub fn create_logger_with_writer<T: 'static + std::io::Write + Send>(
     s: &mut Threads,
     mut writer: T,
@@ -157,7 +225,6 @@ pub fn create_logger_with_writer<T: 'static + std::io::Write + Send>(
             writer: &mut writer,
         });
     }));
-    log(s, 128, "MAIN", "Logger thread created", &[]);
 }
 
 // ---
@@ -173,7 +240,7 @@ mod tests {
             false,
             log(
                 &mut threads,
-                127,
+                128,
                 "TEST",
                 "This message does not arrive, and the failed count will _not_ be incremented",
                 &[]
@@ -195,7 +262,7 @@ mod tests {
         create_logger(&mut threads);
         assert_eq![
             true,
-            log(&mut threads, 127, "TEST", "This message will arrive", &[])
+            log(&mut threads, 128, "TEST", "This message will arrive", &[])
         ];
         match threads.log_channel_full_count.lock() {
             Ok(ref guard) => {
@@ -248,7 +315,7 @@ mod tests {
         create_logger_with_writer(&mut threads, veclog);
         assert_eq![
             true,
-            log(&mut threads, 127, "TEST", "This message will arrive", &[])
+            log(&mut threads, 128, "TEST", "This message will arrive", &[])
         ];
         match threads.log_channel_full_count.lock() {
             Ok(ref guard) => {
@@ -262,7 +329,7 @@ mod tests {
         threads.logger.map(|x| x.join());
         match arc.lock() {
             Ok(ref guard) => {
-                assert_eq![String::from("128: \"MAIN\": \"Logger thread created\", {}\n127: \"TEST\": \"This message will arrive\", {}\n128: \"LGGR\": \"Logger exiting\", {}\n"),
+                assert_eq![String::from("128: \"LGGR\": \"Logger thread spawned\", {}\n128: \"TEST\": \"This message will arrive\", {}\n128: \"LGGR\": \"Logger thread exited\", {}\n"),
                 String::from_utf8((**guard).clone()).unwrap()];
             }
             Err(_) => {

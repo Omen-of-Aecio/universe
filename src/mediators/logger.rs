@@ -250,7 +250,7 @@ mod tests {
             Ok(ref guard) => {
                 assert_eq![0usize, **guard];
             }
-            Err(error @ std::sync::PoisonError { .. }) => {
+            Err(std::sync::PoisonError { .. }) => {
                 assert![false, "The lock should not be poisoned"];
             }
         };
@@ -268,7 +268,7 @@ mod tests {
             Ok(ref guard) => {
                 assert_eq![0usize, **guard];
             }
-            Err(error @ std::sync::PoisonError { .. }) => {
+            Err(std::sync::PoisonError { .. }) => {
                 assert![false, "The lock should not be poisoned"];
             }
         };
@@ -310,31 +310,51 @@ mod tests {
     #[test]
     fn single_message_arrives_confirm() {
         let mut threads = Threads::default();
-        let mut veclog = Veclog::new();
-        let mut arc = veclog.data.clone();
+        let veclog = Veclog::new();
+        let arc = veclog.data.clone();
         create_logger_with_writer(&mut threads, veclog);
         assert_eq![
             true,
             log(&mut threads, 128, "TEST", "This message will arrive", &[])
         ];
-        match threads.log_channel_full_count.lock() {
-            Ok(ref guard) => {
-                assert_eq![0usize, **guard];
-            }
-            Err(error @ std::sync::PoisonError { .. }) => {
-                assert![false, "The lock should not be poisoned"];
-            }
-        };
+        assert_eq![0usize, *threads.log_channel_full_count.lock().unwrap()];
         threads.log_channel = None;
         threads.logger.map(|x| x.join());
-        match arc.lock() {
-            Ok(ref guard) => {
-                assert_eq![String::from("128: \"LGGR\": \"Logger thread spawned\", {}\n128: \"TEST\": \"This message will arrive\", {}\n128: \"LGGR\": \"Logger thread exited\", {}\n"),
-                String::from_utf8((**guard).clone()).unwrap()];
-            }
-            Err(_) => {
-                assert![false, "Unable to acquire lock"];
-            }
-        };
+        assert_eq![
+            r#"128: "LGGR": "Logger thread spawned", {}
+128: "TEST": "This message will arrive", {}
+128: "LGGR": "Logger thread exited", {}
+"#
+            .as_bytes(),
+            arc.lock().unwrap().as_slice()
+        ];
+    }
+
+    #[test]
+    fn single_message_arrives_confirm_with_key_values() {
+        let mut threads = Threads::default();
+        let veclog = Veclog::new();
+        let arc = veclog.data.clone();
+        create_logger_with_writer(&mut threads, veclog);
+        assert![log(
+            &mut threads,
+            128,
+            "TEST",
+            "This message will arrive",
+            &[("key", "value")]
+        )];
+        assert_eq![0usize, *threads.log_channel_full_count.lock().unwrap()];
+        threads.log_channel = None;
+        threads.logger.map(|x| x.join());
+        assert_eq![
+            r#"128: "LGGR": "Logger thread spawned", {}
+128: "TEST": "This message will arrive", {
+    "key": "value"
+}
+128: "LGGR": "Logger thread exited", {}
+"#
+            .as_bytes(),
+            arc.lock().unwrap().as_slice()
+        ];
     }
 }

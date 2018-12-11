@@ -59,6 +59,7 @@ use crate::glocals::{EntryPointLogger, LogMessage, Threads};
 use std::{
     collections::HashMap,
     sync::{
+        atomic::{AtomicUsize, Ordering},
         mpsc::{RecvError, TrySendError},
         Arc, Mutex,
     },
@@ -85,14 +86,7 @@ pub fn log<T: Clone + Into<String>>(
     }) {
         Some(Ok(())) => true,
         Some(Err(TrySendError::Full(LogMessage { .. }))) => {
-            match threads.log_channel_full_count.lock() {
-                Ok(mut guard) => {
-                    *guard += 1;
-                }
-                Err(error @ std::sync::PoisonError { .. }) => {
-                    println!["Logger lock is poisoned: {:#?}", error];
-                }
-            }
+            threads.log_channel_full_count.fetch_add(1, Ordering::Relaxed);
             false
         }
         Some(Err(TrySendError::Disconnected(LogMessage { .. }))) => {
@@ -123,40 +117,21 @@ fn write_message_out(out: &mut dyn std::io::Write, msg: LogMessage) {
 // ---
 
 fn check_if_messages_were_lost(s: &mut EntryPointLogger) {
-    match s.log_channel_full_count.lock() {
-        Ok(mut overfilled_buffer_count) => {
-            if *overfilled_buffer_count > 0 {
-                write_message_out(
-                    s.writer,
-                    LogMessage {
-                        loglevel: 0,
-                        context: "LGGR".into(),
-                        message: "Messages lost due to filled buffer".into(),
-                        kvpairs: {
-                            let mut map = HashMap::new();
-                            map.insert("messages_lost".into(), overfilled_buffer_count.to_string());
-                            map
-                        },
-                    },
-                );
-                *overfilled_buffer_count = 0;
-            }
-        }
-        Err(error @ std::sync::PoisonError { .. }) => {
-            write_message_out(
-                s.writer,
-                LogMessage {
-                    loglevel: 0,
-                    context: "LGGR".into(),
-                    message: "Logger unable to acquire failed counter".into(),
-                    kvpairs: {
-                        let mut map = HashMap::new();
-                        map.insert("reason".into(), error.to_string());
-                        map
-                    },
+    let overfilled_buffer_count = s.log_channel_full_count.swap(0, Ordering::Relaxed);
+    if overfilled_buffer_count > 0 {
+        write_message_out(
+            s.writer,
+            LogMessage {
+                loglevel: 0,
+                context: "LGGR".into(),
+                message: "Messages lost due to filled buffer".into(),
+                kvpairs: {
+                    let mut map = HashMap::new();
+                    map.insert("messages_lost".into(), overfilled_buffer_count.to_string());
+                    map
                 },
-            );
-        }
+            },
+        );
     }
 }
 
@@ -197,12 +172,12 @@ fn entry_point_logger(mut s: EntryPointLogger) {
 /// Spawn a logger thread with a writer to stdout
 pub fn create_logger(s: &mut Threads) {
     let (tx, rx) = std::sync::mpsc::sync_channel(1000);
-    let buffer_full_count = Arc::new(Mutex::new(0));
+    let buffer_full_count = Arc::new(AtomicUsize::new(0));
     s.log_channel = Some(tx);
     s.log_channel_full_count = buffer_full_count.clone();
     s.logger = Some(std::thread::spawn(move || {
         entry_point_logger(EntryPointLogger {
-            log_channel_full_count: buffer_full_count,
+            log_channel_full_count: buffer_full_count.clone(),
             receiver: rx,
             writer: &mut std::io::stdout(),
         });
@@ -215,12 +190,12 @@ pub fn create_logger_with_writer<T: 'static + std::io::Write + Send>(
     mut writer: T,
 ) {
     let (tx, rx) = std::sync::mpsc::sync_channel(1000);
-    let buffer_full_count = Arc::new(Mutex::new(0));
+    let buffer_full_count = Arc::new(AtomicUsize::new(0));
     s.log_channel = Some(tx);
     s.log_channel_full_count = buffer_full_count.clone();
     s.logger = Some(std::thread::spawn(move || {
         entry_point_logger(EntryPointLogger {
-            log_channel_full_count: buffer_full_count,
+            log_channel_full_count: buffer_full_count.clone(),
             receiver: rx,
             writer: &mut writer,
         });
@@ -246,14 +221,7 @@ mod tests {
                 &[]
             )
         ];
-        match threads.log_channel_full_count.lock() {
-            Ok(ref guard) => {
-                assert_eq![0usize, **guard];
-            }
-            Err(std::sync::PoisonError { .. }) => {
-                assert![false, "The lock should not be poisoned"];
-            }
-        };
+        assert_eq![0usize, threads.log_channel_full_count.load(Ordering::Relaxed)];
     }
 
     #[test]
@@ -264,14 +232,7 @@ mod tests {
             true,
             log(&mut threads, 128, "TEST", "This message will arrive", &[])
         ];
-        match threads.log_channel_full_count.lock() {
-            Ok(ref guard) => {
-                assert_eq![0usize, **guard];
-            }
-            Err(std::sync::PoisonError { .. }) => {
-                assert![false, "The lock should not be poisoned"];
-            }
-        };
+        assert_eq![0usize, threads.log_channel_full_count.load(Ordering::Relaxed)];
     }
 
     // ---
@@ -317,7 +278,7 @@ mod tests {
             true,
             log(&mut threads, 128, "TEST", "This message will arrive", &[])
         ];
-        assert_eq![0usize, *threads.log_channel_full_count.lock().unwrap()];
+        assert_eq![0usize, threads.log_channel_full_count.load(Ordering::Relaxed)];
         threads.log_channel = None;
         threads.logger.map(|x| x.join());
         assert_eq![
@@ -343,7 +304,35 @@ mod tests {
             "This message will arrive",
             &[("key", "value")]
         )];
-        assert_eq![0usize, *threads.log_channel_full_count.lock().unwrap()];
+        assert_eq![0usize, threads.log_channel_full_count.load(Ordering::Relaxed)];
+        threads.log_channel = None;
+        threads.logger.map(|x| x.join());
+        assert_eq![
+            r#"128: "LGGR": "Logger thread spawned", {}
+128: "TEST": "This message will arrive", {
+    "key": "value"
+}
+128: "LGGR": "Logger thread exited", {}
+"#
+            .as_bytes(),
+            arc.lock().unwrap().as_slice()
+        ];
+    }
+
+    #[test]
+    fn single_message_arrives_confirm_with_duplicate_key_values() {
+        let mut threads = Threads::default();
+        let veclog = Veclog::new();
+        let arc = veclog.data.clone();
+        create_logger_with_writer(&mut threads, veclog);
+        assert![log(
+            &mut threads,
+            128,
+            "TEST",
+            "This message will arrive",
+            &[("key", "value"), ("key", "value"), ("key", "value")]
+        )];
+        assert_eq![0usize, threads.log_channel_full_count.load(Ordering::Relaxed)];
         threads.log_channel = None;
         threads.logger.map(|x| x.join());
         assert_eq![

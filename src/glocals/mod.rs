@@ -3,15 +3,13 @@ use crate::libs::{
     input,
 };
 use clap;
-use glium::implement_vertex;
-use glium::texture::Texture2d;
-pub use glium::uniforms::MagnifySamplerFilter;
-pub use glium::uniforms::MinifySamplerFilter;
-use serde_derive::{Deserialize, Serialize};
+use glium::{implement_vertex, texture::Texture2d};
+pub use glium::uniforms::{MagnifySamplerFilter, MinifySamplerFilter};
+use serde_derive::Deserialize;
 use std::{
     collections::HashMap,
     net::SocketAddr,
-    sync::{Arc, Mutex},
+    sync::{atomic::AtomicUsize, Arc, Mutex},
     time::Duration,
     vec::Vec,
 };
@@ -27,7 +25,7 @@ pub struct Main<'a> {
 
 pub struct EntryPointLogger<'a> {
     pub receiver: std::sync::mpsc::Receiver<LogMessage>,
-    pub log_channel_full_count: Arc<Mutex<usize>>,
+    pub log_channel_full_count: Arc<AtomicUsize>,
     pub writer: &'a mut dyn std::io::Write,
 }
 
@@ -35,7 +33,7 @@ pub struct EntryPointLogger<'a> {
 pub struct Threads {
     pub logger: Option<std::thread::JoinHandle<()>>,
     pub log_channel: Option<std::sync::mpsc::SyncSender<LogMessage>>,
-    pub log_channel_full_count: Arc<Mutex<usize>>,
+    pub log_channel_full_count: Arc<AtomicUsize>,
 }
 
 #[derive(Default)]

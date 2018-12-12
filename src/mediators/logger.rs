@@ -65,6 +65,8 @@ use std::{
     },
 };
 
+static CHANNEL_SIZE: usize = 1000;
+
 /// Log a message
 pub fn log<T: Clone + Into<String>>(
     threads: &mut Threads,
@@ -173,7 +175,7 @@ fn entry_point_logger(mut s: EntryPointLogger) {
 
 /// Spawn a logger thread with a writer to stdout
 pub fn create_logger(s: &mut Threads) {
-    let (tx, rx) = std::sync::mpsc::sync_channel(1000);
+    let (tx, rx) = std::sync::mpsc::sync_channel(CHANNEL_SIZE);
     let buffer_full_count = Arc::new(AtomicUsize::new(0));
     s.log_channel = Some(tx);
     s.log_channel_full_count = buffer_full_count.clone();
@@ -191,7 +193,7 @@ pub fn create_logger_with_writer<T: 'static + std::io::Write + Send>(
     s: &mut Threads,
     mut writer: T,
 ) {
-    let (tx, rx) = std::sync::mpsc::sync_channel(1000);
+    let (tx, rx) = std::sync::mpsc::sync_channel(CHANNEL_SIZE);
     let buffer_full_count = Arc::new(AtomicUsize::new(0));
     s.log_channel = Some(tx);
     s.log_channel_full_count = buffer_full_count.clone();
@@ -372,7 +374,7 @@ mod tests {
         create_logger_with_writer(&mut threads, veclog);
         {
             let _guard = arc.lock();
-            for i in 0..1000 {
+            for _ in 0..CHANNEL_SIZE {
                 assert![log(
                     &mut threads,
                     128,
@@ -385,12 +387,24 @@ mod tests {
                 0usize,
                 threads.log_channel_full_count.load(Ordering::Relaxed)
             ];
-            log(&mut threads, 128, "TEST", "This message will not arrive", &[]);
+            log(
+                &mut threads,
+                128,
+                "TEST",
+                "This message will not arrive",
+                &[],
+            );
             assert_eq![
                 1usize,
                 threads.log_channel_full_count.load(Ordering::Relaxed)
             ];
-            log(&mut threads, 128, "TEST", "This message will not arrive", &[]);
+            log(
+                &mut threads,
+                128,
+                "TEST",
+                "This message will not arrive",
+                &[],
+            );
             assert_eq![
                 2usize,
                 threads.log_channel_full_count.load(Ordering::Relaxed)

@@ -25,6 +25,7 @@ impl Camera {
         self.width = size.0;
         self.height = size.1;
     }
+
     pub fn screen_to_world(&self, screen_pos: Vec2) -> Vec2 {
         let screen_size = Vec2::new(self.width as f32, self.height as f32);
         let center = Vec2::new(self.center.x, -self.center.y);

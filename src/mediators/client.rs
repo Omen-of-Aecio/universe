@@ -280,14 +280,21 @@ fn maybe_fire_bullets(s: &mut Client) {
         let origin = s.game.players[0].position + Vec2 { x: 5.0, y: 5.0 };
         let length = (target - origin).length_squared();
         if length > 0.1 {
-            let mut bullet = Bullet {
+            let bullet = Bullet {
                 render: render_polygon::create_render_polygon(&s.display),
                 direction: (target - origin).normalize(),
                 cam: s.game.cam,
             };
             s.game.bullets.push(bullet);
         }
-        println!["{:?}", s.game.bullets.iter().map(|x| x.direction).collect::<Vec<Vec2>>()];
+        println![
+            "{:?}",
+            s.game
+                .bullets
+                .iter()
+                .map(|x| x.direction)
+                .collect::<Vec<Vec2>>()
+        ];
     }
 }
 
@@ -304,8 +311,8 @@ fn update_bullets(bullets: &mut Vec<Bullet>) {
 }
 
 fn play_song(s: &mut Client) {
-    use std::{io::BufReader, fs::File};
     use rodio::Source;
+    use std::{fs::File, io::BufReader};
     let file = File::open("04 Video Games.mp3").unwrap();
     let source = rodio::Decoder::new(BufReader::new(file)).unwrap();
     s.audio.append(source);
@@ -334,6 +341,7 @@ pub fn entry_point_client(s: &mut Client) {
         .push(render_polygon::create_render_polygon(&s.display));
     let mut frame_counter = 0u8;
     let mut time_spent = time::Duration::zero();
+
     loop {
         let begin = PreciseTime::now();
 

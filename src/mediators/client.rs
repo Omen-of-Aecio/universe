@@ -303,6 +303,14 @@ fn update_bullets(bullets: &mut Vec<Bullet>) {
     }
 }
 
+fn play_song(s: &mut Client) {
+    use std::{io::BufReader, fs::File};
+    use rodio::Source;
+    let file = File::open("04 Video Games.mp3").unwrap();
+    let source = rodio::Decoder::new(BufReader::new(file)).unwrap();
+    s.audio.append(source);
+}
+
 pub fn entry_point_client(s: &mut Client) {
     log(&mut s.main.threads, 128, "MAIN", "Creating grid", &[]);
     initialize_grid(&mut s.game.grid);

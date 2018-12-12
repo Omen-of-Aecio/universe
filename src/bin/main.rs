@@ -1,6 +1,7 @@
 use clap::crate_authors;
 use clap::{App, Arg};
 use glium::{glutin, DisplayBuild};
+use rodio;
 use universe::{glocals::*, mediators::logger::*, *};
 
 // ---
@@ -34,6 +35,7 @@ fn run_client_or_server(s: glocals::Main) -> glocals::Main {
                     .build_glium()
                     .unwrap(),
                 input: libs::input::Input::default(),
+                audio: rodio::Sink::new(&rodio::default_output_device().unwrap()),
             };
             mediators::client::entry_point_client(&mut client);
             client.main

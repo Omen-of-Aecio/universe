@@ -50,6 +50,7 @@ pub struct Client<'a> {
     pub game: Game,
     pub input: input::Input,
     pub display: glium::Display,
+    pub audio: rodio::Sink,
     // Networking
     // pub server: SocketAddr,
 }

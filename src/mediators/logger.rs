@@ -363,4 +363,44 @@ mod tests {
             arc.lock().unwrap().as_slice()
         ];
     }
+
+    #[test]
+    fn dropped_messages() {
+        let mut threads = Threads::default();
+        let veclog = Veclog::new();
+        let arc = veclog.data.clone();
+        create_logger_with_writer(&mut threads, veclog);
+        {
+            let _guard = arc.lock();
+            for i in 0..1000 {
+                assert![log(
+                    &mut threads,
+                    128,
+                    "TEST",
+                    "This message will arrive",
+                    &[]
+                )];
+            }
+            assert_eq![
+                0usize,
+                threads.log_channel_full_count.load(Ordering::Relaxed)
+            ];
+            log(&mut threads, 128, "TEST", "This message will not arrive", &[]);
+            assert_eq![
+                1usize,
+                threads.log_channel_full_count.load(Ordering::Relaxed)
+            ];
+            log(&mut threads, 128, "TEST", "This message will not arrive", &[]);
+            assert_eq![
+                2usize,
+                threads.log_channel_full_count.load(Ordering::Relaxed)
+            ];
+        }
+        threads.log_channel = None;
+        threads.logger.map(|x| x.join());
+        assert_eq![
+            0usize,
+            threads.log_channel_full_count.load(Ordering::Relaxed)
+        ];
+    }
 }

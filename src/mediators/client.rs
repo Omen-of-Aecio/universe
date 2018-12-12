@@ -1,4 +1,4 @@
-use crate::glocals::{CameraMode, Client, GridU8RenderData, PolygonRenderData};
+use crate::glocals::*;
 use crate::libs::geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
 use crate::libs::input::Input;
 use crate::mediators::{
@@ -261,6 +261,48 @@ fn toggle_camera_mode(s: &mut Client) {
     }
 }
 
+fn maybe_fire_bullets(s: &mut Client) {
+    if s.input.is_left_mouse_button_down() {
+        log(
+            &mut s.main.threads,
+            128,
+            "CLNT",
+            "Mouse on screen",
+            &[
+                (
+                    "world",
+                    &format!["{:?}", s.game.cam.screen_to_world(s.input.get_mouse_pos())],
+                ),
+                ("mouse", &format!["{:?}", s.input.get_mouse_pos()]),
+            ],
+        );
+        let target = s.game.cam.screen_to_world(s.input.get_mouse_pos());
+        let origin = s.game.players[0].position + Vec2 { x: 5.0, y: 5.0 };
+        let length = (target - origin).length_squared();
+        if length > 0.1 {
+            let mut bullet = Bullet {
+                render: render_polygon::create_render_polygon(&s.display),
+                direction: (target - origin).normalize(),
+                cam: s.game.cam,
+            };
+            s.game.bullets.push(bullet);
+        }
+        println!["{:?}", s.game.bullets.iter().map(|x| x.direction).collect::<Vec<Vec2>>()];
+    }
+}
+
+fn render_bullets(bullets: &Vec<Bullet>, frame: &mut glium::Frame) {
+    for bullet in bullets {
+        render_polygon::render(&bullet.render, frame, &bullet.cam);
+    }
+}
+
+fn update_bullets(bullets: &mut Vec<Bullet>) {
+    for bullet in bullets {
+        bullet.cam.center += bullet.direction * 3.0;
+    }
+}
+
 pub fn entry_point_client(s: &mut Client) {
     log(&mut s.main.threads, 128, "MAIN", "Creating grid", &[]);
     initialize_grid(&mut s.game.grid);
@@ -307,11 +349,13 @@ pub fn entry_point_client(s: &mut Client) {
         if s.game.game_config.gravity_on {
             apply_gravity_to_players(s);
         }
-
+        maybe_fire_bullets(s);
+        update_bullets(&mut s.game.bullets);
         let mut frame = s.display.draw();
         frame.clear_color(0.0, 0.0, 1.0, 1.0);
         render_the_grid(&mut s.game.grid_render, &mut frame, &s.game.cam);
         render_players(&mut s.game.players, &mut frame, &s.game.cam);
+        render_bullets(&mut s.game.bullets, &mut frame);
 
         // ---
 

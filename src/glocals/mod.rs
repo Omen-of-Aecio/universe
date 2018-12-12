@@ -135,11 +135,18 @@ pub struct ServerConfig {
     pub ticks_per_second: u32,
 }
 
+pub struct Bullet {
+    pub render: PolygonRenderData,
+    pub direction: Vec2,
+    pub cam: Camera,
+}
+
 #[derive(Default)]
 pub struct Game {
     pub grid: Grid<u8>,
     pub game_config: GameConfig,
     pub players: Vec<PolygonRenderData>,
+    pub bullets: Vec<Bullet>,
     pub cam: Camera,
     pub grid_render: Option<GridU8RenderData>,
     pub you: u32,

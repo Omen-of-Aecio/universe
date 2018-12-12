@@ -7,7 +7,7 @@ pub use glium::uniforms::{MagnifySamplerFilter, MinifySamplerFilter};
 use glium::{implement_vertex, texture::Texture2d};
 use serde_derive::Deserialize;
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     net::SocketAddr,
     sync::{atomic::AtomicUsize, Arc, Mutex},
     time::Duration,
@@ -41,7 +41,7 @@ pub struct LogMessage {
     pub loglevel: u8,
     pub context: String,
     pub message: String,
-    pub kvpairs: HashMap<String, String>,
+    pub kvpairs: BTreeMap<String, String>,
 }
 
 pub struct Client<'a> {

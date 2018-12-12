@@ -57,7 +57,7 @@
 //! ```
 use crate::glocals::{EntryPointLogger, LogMessage, Threads};
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     sync::{
         atomic::{AtomicUsize, Ordering},
         mpsc::{RecvError, TrySendError},
@@ -130,7 +130,7 @@ fn check_if_messages_were_lost(s: &mut EntryPointLogger) {
                 context: "LGGR".into(),
                 message: "Messages lost due to filled buffer".into(),
                 kvpairs: {
-                    let mut map = HashMap::new();
+                    let mut map = BTreeMap::new();
                     map.insert("messages_lost".into(), overfilled_buffer_count.to_string());
                     map
                 },
@@ -148,7 +148,7 @@ fn entry_point_logger(mut s: EntryPointLogger) {
             loglevel: 128,
             context: "LGGR".into(),
             message: "Logger thread spawned".into(),
-            kvpairs: HashMap::new(),
+            kvpairs: BTreeMap::new(),
         },
     );
     loop {
@@ -156,7 +156,7 @@ fn entry_point_logger(mut s: EntryPointLogger) {
             Ok(msg @ LogMessage { .. }) => {
                 write_message_out(s.writer, msg);
             }
-            Err(RecvError) => {
+            Err(RecvError { .. }) => {
                 break;
             }
         }
@@ -168,7 +168,7 @@ fn entry_point_logger(mut s: EntryPointLogger) {
             loglevel: 128,
             context: "LGGR".into(),
             message: "Logger thread exited".into(),
-            kvpairs: HashMap::new(),
+            kvpairs: BTreeMap::new(),
         },
     );
 }
@@ -382,6 +382,10 @@ mod tests {
                     "This message will arrive",
                     &[]
                 )];
+                assert_eq![
+                    0usize,
+                    threads.log_channel_full_count.load(Ordering::Relaxed)
+                ];
             }
             assert_eq![
                 0usize,
@@ -417,4 +421,38 @@ mod tests {
             threads.log_channel_full_count.load(Ordering::Relaxed)
         ];
     }
+
+    #[test]
+    fn ensure_kv_pairs_are_ordered() {
+        let mut threads = Threads::default();
+        let veclog = Veclog::new();
+        let arc = veclog.data.clone();
+        create_logger_with_writer(&mut threads, veclog);
+        assert![log(
+            &mut threads,
+            128,
+            "TEST",
+            "This message will arrive",
+            &[("key", "value"), ("abc123", "def456"), ("foo", "bar")]
+        )];
+        assert_eq![
+            0usize,
+            threads.log_channel_full_count.load(Ordering::Relaxed)
+        ];
+        threads.log_channel = None;
+        threads.logger.map(|x| x.join());
+        assert_eq![
+            r#"128: "LGGR": "Logger thread spawned", {}
+128: "TEST": "This message will arrive", {
+    "abc123": "def456",
+    "foo": "bar",
+    "key": "value"
+}
+128: "LGGR": "Logger thread exited", {}
+"#
+            .as_bytes(),
+            arc.lock().unwrap().as_slice()
+        ];
+    }
+
 }

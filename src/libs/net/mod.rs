@@ -22,15 +22,15 @@ use std::time::Duration;
 ////////////
 
 pub struct Socket<T: Clone + Debug> {
-    socket: UdpSocket,
+    pub socket: UdpSocket,
     connections: HashMap<SocketAddr, Connection<T>>,
     buffer: Vec<u8>,
 }
 
-impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Socket<T> {
+impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Serialize> Socket<T> {
     pub fn new(port: u16) -> Result<Socket<T>, Error> {
         Ok(Socket {
-            socket: UdpSocket::bind(("0.0.0.0:".to_string() + port.to_string().as_str()).as_str())?,
+            socket: UdpSocket::bind(("127.0.0.1:".to_string() + port.to_string().as_str()).as_str())?,
             connections: HashMap::new(),
             buffer: default_vec(Packet::<T>::max_payload_size() as usize + 100),
             // XXX 100 as a safe bet (headers and such)
@@ -104,16 +104,16 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Socket<T> {
 
     fn _recv(&mut self) -> Result<(SocketAddr, T), Error> {
         // Since we may just receive an Ack, we loop until we receive an actual message
-        Ok(loop {
-            let socket = self.socket.try_clone()?;
-            let (amt, src) = self.socket.recv_from(&mut self.buffer)?;
-            // let packet = Packet::decode(&self.buffer[0..amt])?.clone();
+        let socket = self.socket.try_clone()?;
+        let (amt, src) = socket.recv_from(&mut self.buffer)?;
+        let conn = self.get_connection_or_create(src);
+        // let packet: Packet<T> = Packet::decode(&self.buffer[0..amt])?.clone();
+        Ok((src, T::default()))
             // let conn = self.get_connection_or_create(src);
             // let msg = conn.unwrap_message(packet, &socket)?;
             // if let Some(msg) = msg {
             //     break (src, msg);
             // }
-        })
     }
 }
 
@@ -121,7 +121,7 @@ pub struct SocketIter<'a, T: Clone + Debug + Deserialize<'a> + Serialize> {
     socket: &'a mut Socket<T>,
 }
 
-impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Iterator for SocketIter<'a, T> {
+impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Serialize> Iterator for SocketIter<'a, T> {
     type Item = Result<(SocketAddr, T), Error>;
 
     fn next(&mut self) -> Option<Result<(SocketAddr, T), Error>> {
@@ -181,8 +181,19 @@ fn default_vec<T: Default>(size: usize) -> Vec<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use super::*;
 
+    static CLIENT_PORT: u16 = 12347;
+    static SERVER_PORT: u16 = 34254;
+
     #[test]
-    fn new() {}
+    fn confirm_message_arrives() {
+        let mut client: Socket<bool> = Socket::new(CLIENT_PORT).unwrap();
+        let mut server: Socket<bool> = Socket::new(SERVER_PORT).unwrap();
+
+        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), SERVER_PORT);
+        client.send_to(false, destination).unwrap();
+        server.recv().unwrap();
+    }
 }

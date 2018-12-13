@@ -21,13 +21,13 @@ use std::time::Duration;
 // Socket //
 ////////////
 
-pub struct Socket<T: Clone + Debug> {
+pub struct Socket<T: Clone + Debug + Eq + PartialEq> {
     pub socket: UdpSocket,
     connections: HashMap<SocketAddr, Connection<T>>,
     buffer: Vec<u8>,
 }
 
-impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Serialize> Socket<T> {
+impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + PartialEq> Socket<T> {
     pub fn new(port: u16) -> Result<Socket<T>, Error> {
         Ok(Socket {
             socket: UdpSocket::bind(("127.0.0.1:".to_string() + port.to_string().as_str()).as_str())?,
@@ -107,7 +107,10 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Serialize> Socket<T> {
         let socket = self.socket.try_clone()?;
         let (amt, src) = socket.recv_from(&mut self.buffer)?;
         let conn = self.get_connection_or_create(src);
-        // let packet: Packet<T> = Packet::decode(&self.buffer[0..amt])?.clone();
+        {
+            // let buf = self.buffer.clone();
+            // let packet: Packet<T> = Packet::decode(&'_ buf[..])?.clone();
+        }
         Ok((src, T::default()))
             // let conn = self.get_connection_or_create(src);
             // let msg = conn.unwrap_message(packet, &socket)?;
@@ -117,11 +120,11 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Serialize> Socket<T> {
     }
 }
 
-pub struct SocketIter<'a, T: Clone + Debug + Deserialize<'a> + Serialize> {
+pub struct SocketIter<'a, T: Clone + Debug + Deserialize<'a> + Eq + Serialize + PartialEq> {
     socket: &'a mut Socket<T>,
 }
 
-impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Serialize> Iterator for SocketIter<'a, T> {
+impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + PartialEq> Iterator for SocketIter<'a, T> {
     type Item = Result<(SocketAddr, T), Error>;
 
     fn next(&mut self) -> Option<Result<(SocketAddr, T), Error>> {
@@ -189,6 +192,7 @@ mod tests {
 
     #[test]
     fn confirm_message_arrives() {
+        println!["{:?}", Packet::<bool>::decode(&[0])];
         let mut client: Socket<bool> = Socket::new(CLIENT_PORT).unwrap();
         let mut server: Socket<bool> = Socket::new(SERVER_PORT).unwrap();
 

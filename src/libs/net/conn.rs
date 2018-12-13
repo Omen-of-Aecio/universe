@@ -9,20 +9,20 @@ use std::{
 };
 use time::precise_time_ns;
 
-pub struct SentPacket<T: Clone + Debug> {
+pub struct SentPacket<T: Clone + Debug + Eq + PartialEq> {
     pub time: u64,
     pub seq: u32,
     pub packet: Packet<T>,
     ack_handler: Option<Box<Fn() + 'static>>,
 }
 
-impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Debug for SentPacket<T> {
+impl<'a, T: Clone + Debug + Deserialize<'a> + Eq + Serialize + PartialEq> Debug for SentPacket<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "SentPacket; time = {}, seq = {}", self.time, self.seq)
     }
 }
 
-pub struct Connection<T: Clone + Debug> {
+pub struct Connection<T: Clone + Debug + Eq + PartialEq> {
     /// The sequence number of the next sent packet
     pub seq: u32,
     /// The first entry should always be Some.
@@ -33,7 +33,7 @@ pub struct Connection<T: Clone + Debug> {
 }
 const RESEND_INTERVAL_MS: u64 = 1000;
 
-impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize> Connection<T> {
+impl<'a, T: Clone + Debug + Deserialize<'a> + Eq + Serialize + PartialEq> Connection<T> {
     pub fn new(dest: SocketAddr) -> Connection<T> {
         Connection {
             seq: 0,

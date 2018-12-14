@@ -13,7 +13,6 @@ pub struct SentPacket<T: Clone + Debug + Eq + PartialEq> {
     pub time: u64,
     pub seq: u32,
     pub packet: Packet<T>,
-    ack_handler: Option<Box<Fn() + 'static>>,
 }
 
 impl<'a, T: Clone + Debug + Deserialize<'a> + Eq + Serialize + PartialEq> Debug for SentPacket<T> {
@@ -77,9 +76,6 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Eq + Serialize + PartialEq> Connec
         match self.send_window.get_mut(index) {
             Some(sent_packet) => {
                 if let Some(ref sent_packet) = sent_packet {
-                    if let Some(ref handler) = sent_packet.ack_handler {
-                        handler()
-                    }
                 }
                 *sent_packet = None;
             }
@@ -110,7 +106,6 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Eq + Serialize + PartialEq> Connec
         &'b mut self,
         msg: T,
         socket: &UdpSocket,
-        ack_handler: Option<Box<Fn() + 'static>>,
     ) -> Result<u32, Error> {
         let packet = Packet::Reliable { seq: self.seq, msg };
         // debug!("Send"; "seq" => self.seq, "ack" => self.received+1);
@@ -118,7 +113,6 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Eq + Serialize + PartialEq> Connec
             time: precise_time_ns(),
             seq: self.seq,
             packet: packet.clone(),
-            ack_handler,
         }));
 
         self.seq += 1;

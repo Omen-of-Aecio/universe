@@ -5,6 +5,7 @@ use self::conn::Connection;
 use self::pkt::Packet;
 use crate::glocals::Error;
 
+use failure::err_msg;
 use serde::{Deserialize, Serialize};
 use std;
 use std::collections::hash_map::HashMap;
@@ -22,9 +23,8 @@ use std::time::Duration;
 ////////////
 
 pub struct Socket<T: Clone + Debug + Eq + PartialEq> {
-    pub socket: UdpSocket,
+    socket: UdpSocket,
     connections: HashMap<SocketAddr, Connection<T>>,
-    buffer: Vec<u8>,
 }
 
 impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + PartialEq> Socket<T> {
@@ -32,8 +32,6 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
         Ok(Socket {
             socket: UdpSocket::bind(("127.0.0.1:".to_string() + port.to_string().as_str()).as_str())?,
             connections: HashMap::new(),
-            buffer: default_vec(Packet::<T>::max_payload_size() as usize + 100),
-            // XXX 100 as a safe bet (headers and such)
         })
     }
 
@@ -51,10 +49,6 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
         Ok(())
     }
 
-    /// Attempt to clone the socket to create consumable iterator
-    pub fn messages(&'a mut self) -> SocketIter<'a, T> {
-        SocketIter { socket: self }
-    }
     pub fn max_payload_size() -> u32 {
         Packet::<T>::max_payload_size() // because Packet should probably be private to the net module
     }
@@ -72,7 +66,6 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
         &mut self,
         msg: T,
         dest: SocketAddr,
-        ack_handler: Option<Box<Fn() + 'static>>,
     ) -> Result<(), Error> {
         // Need to clone it here because of aliasing :/
         // IDEA: Could also let Connection::wrap_message take a clone of the UdpSocket and send the
@@ -80,7 +73,7 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
         let socket = self.socket.try_clone()?;
 
         let conn = self.get_connection_or_create(dest);
-        conn.send_message(msg, &socket, ack_handler)?;
+        conn.send_message(msg, &socket)?;
         Ok(())
     }
 
@@ -96,58 +89,30 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
     // pub fn send_reliable_to_and_wait(&self, msg: Message, dest: SocketAddr) -> Result<()>
 
     /// Blocking, with timeout (3 sec)
-    pub fn recv(&mut self) -> Result<(SocketAddr, T), Error> {
+    pub fn recv(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> {
         self.socket.set_nonblocking(false)?;
         self.socket.set_read_timeout(Some(Duration::new(3, 0)))?;
-        self._recv()
+        self._recv(buffer)
     }
 
-    fn _recv(&mut self) -> Result<(SocketAddr, T), Error> {
+    fn _recv(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> {
         // Since we may just receive an Ack, we loop until we receive an actual message
         let socket = self.socket.try_clone()?;
-        let (amt, src) = socket.recv_from(&mut self.buffer)?;
+        let (amt, src) = socket.recv_from(buffer)?;
         let conn = self.get_connection_or_create(src);
-        {
-            // let buf = self.buffer.clone();
-            // let packet: Packet<T> = Packet::decode(&'_ buf[..])?.clone();
+        let packet: Packet<T> = Packet::decode(buffer)?;
+        // let value = self.get_connection_or_create(src);
+        let msg = conn.unwrap_message(packet, &socket)?;
+        if let Some(msg) = msg {
+            Ok((src, msg))
+        } else {
+            Err(err_msg("did not recv a message"))
         }
-        Ok((src, T::default()))
             // let conn = self.get_connection_or_create(src);
             // let msg = conn.unwrap_message(packet, &socket)?;
             // if let Some(msg) = msg {
             //     break (src, msg);
             // }
-    }
-}
-
-pub struct SocketIter<'a, T: Clone + Debug + Deserialize<'a> + Eq + Serialize + PartialEq> {
-    socket: &'a mut Socket<T>,
-}
-
-impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + PartialEq> Iterator for SocketIter<'a, T> {
-    type Item = Result<(SocketAddr, T), Error>;
-
-    fn next(&mut self) -> Option<Result<(SocketAddr, T), Error>> {
-        if let Err(e) = self.socket.socket.set_nonblocking(true) {
-            return Some(Err(e.into()));
-        }
-
-        let msg = self.socket._recv();
-
-        match msg {
-            Ok(msg) => Some(Ok(msg)),
-            Err(e) => {
-                let end_messages = match e.downcast_ref::<std::io::Error>().map(|e| e.kind()) {
-                    Some(std::io::ErrorKind::WouldBlock) => true,
-                    _ => false,
-                };
-                if end_messages {
-                    None
-                } else {
-                    Some(Err(e))
-                }
-            }
-        }
     }
 }
 
@@ -198,6 +163,23 @@ mod tests {
 
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), SERVER_PORT);
         client.send_to(false, destination).unwrap();
-        server.recv().unwrap();
+        let mut buffer = [0u8; 1000];
+        server.recv(&mut buffer).unwrap();
+    }
+
+    #[test]
+    fn confirm_reliable_message_arrives() {
+        let mut client: Socket<bool> = Socket::new(CLIENT_PORT).unwrap();
+        let mut server: Socket<bool> = Socket::new(SERVER_PORT).unwrap();
+
+        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), SERVER_PORT);
+        let client_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), CLIENT_PORT);
+
+        client.send_reliably_to(true, destination).unwrap();
+        let mut buffer = [0u8; 3000];
+        assert_eq![true, server.recv(&mut buffer).unwrap().1];
+        assert![client.get_connection_or_create(destination).send_window[0].is_some()];
+        assert![client.recv(&mut buffer).is_err()];
+        assert![client.get_connection_or_create(destination).send_window[0].is_none()];
     }
 }

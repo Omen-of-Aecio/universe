@@ -458,19 +458,19 @@ mod tests {
         grid.resize(100, 10);
         let mut rng = rand::thread_rng();
         for i in 0..100 {
-            *grid.get_mut(i, 0).unwrap() = rng.gen();
+            *grid.get_mut(i, 0).unwrap() = black_box(rng.gen());
         }
         let end_x: u8 = rng.gen();
         let end_y: bool = rng.gen();
         b.iter(|| {
             let result = does_line_collide_with_grid(
-                &grid,
-                Vec2 { x: 0.0, y: 0.0 },
-                Vec2 {
+                black_box(&grid),
+                black_box(Vec2 { x: 0.0, y: 0.0 }),
+                black_box(Vec2 {
                     x: end_x as f32,
                     y: if end_y { 8.0 } else { 0.0 },
-                },
-                |x| black_box(*x),
+                }),
+                black_box(|x| *x),
             );
             black_box(result);
         });

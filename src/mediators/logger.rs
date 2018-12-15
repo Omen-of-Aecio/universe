@@ -455,56 +455,54 @@ mod tests {
         ];
     }
 
-    // use rand::prelude::*;
-    // use test::{black_box, Bencher};
-    // #[bench]
-    // fn sending_a_message(b: &mut Bencher) {
-    //     let (tx, rx) = std::sync::mpsc::channel();
-    //     let thread = std::thread::spawn(move || {
-    //         loop {
-    //             let x = rx.recv().ok();
-    //             if let Some(x) = x {
-    //                 black_box(x);
-    //             } else {
-    //                 break;
-    //             }
-    //         }
-    //     });
-    //     b.iter(|| {
-    //         black_box(tx.send(123));
-    //     });
-    //     std::mem::drop(tx);
-    //     thread.join();
-    // }
+    use rand::prelude::*;
+    use test::{black_box, Bencher};
+    #[bench]
+    fn sending_a_message(b: &mut Bencher) {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let thread = std::thread::spawn(move || loop {
+            let x = rx.recv().ok();
+            if let Some(x) = x {
+                black_box(x);
+            } else {
+                break;
+            }
+        });
+        b.iter(|| {
+            black_box(tx.send(123));
+        });
+        std::mem::drop(tx);
+        thread.join();
+    }
 
-    // #[bench]
-    // fn sending_a_message_to_non_existing_logger(b: &mut Bencher) {
-    //     let mut threads = Threads::default();
-    //     b.iter(|| {
-    //         let result = log(
-    //             &mut threads,
-    //             128,
-    //             "TEST",
-    //             "This message does not arrive, and the failed count will _not_ be incremented",
-    //             &[]
-    //         );
-    //         black_box(result);
-    //     });
-    // }
+    #[bench]
+    fn sending_a_message_to_non_existing_logger(b: &mut Bencher) {
+        let mut threads = Threads::default();
+        b.iter(|| {
+            let result = log(
+                &mut threads,
+                128,
+                "TEST",
+                "This message does not arrive, and the failed count will _not_ be incremented",
+                &[],
+            );
+            black_box(result);
+        });
+    }
 
-    // #[bench]
-    // fn sending_a_message_to_logger(b: &mut Bencher) {
-    //     let mut threads = Threads::default();
-    //     create_logger(&mut threads);
-    //     b.iter(|| {
-    //         let result = log(
-    //             &mut threads,
-    //             128,
-    //             "TEST",
-    //             "This message should probably arrive",
-    //             &[]
-    //         );
-    //         black_box(result);
-    //     });
-    // }
+    #[bench]
+    fn sending_a_message_to_logger(b: &mut Bencher) {
+        let mut threads = Threads::default();
+        create_logger(&mut threads);
+        b.iter(|| {
+            let result = log(
+                &mut threads,
+                128,
+                "TEST",
+                "This message should probably arrive",
+                &[],
+            );
+            black_box(result);
+        });
+    }
 }

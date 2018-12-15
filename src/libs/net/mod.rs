@@ -137,14 +137,6 @@ pub fn to_socket_addr(addr: &str) -> Result<SocketAddr, Error> {
     )))
 }
 
-fn default_vec<T: Default>(size: usize) -> Vec<T> {
-    let mut zero_vec: Vec<T> = Vec::with_capacity(size);
-    for _ in 0..size {
-        zero_vec.push(T::default());
-    }
-    zero_vec
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

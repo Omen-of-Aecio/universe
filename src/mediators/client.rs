@@ -287,14 +287,6 @@ fn maybe_fire_bullets(s: &mut Client) {
             };
             s.game.bullets.push(bullet);
         }
-        println![
-            "{:?}",
-            s.game
-                .bullets
-                .iter()
-                .map(|x| x.direction)
-                .collect::<Vec<Vec2>>()
-        ];
     }
 }
 

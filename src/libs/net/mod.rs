@@ -30,7 +30,9 @@ pub struct Socket<T: Clone + Debug + Eq + PartialEq> {
 impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + PartialEq> Socket<T> {
     pub fn new(port: u16) -> Result<Socket<T>, Error> {
         Ok(Socket {
-            socket: UdpSocket::bind(("127.0.0.1:".to_string() + port.to_string().as_str()).as_str())?,
+            socket: UdpSocket::bind(
+                ("127.0.0.1:".to_string() + port.to_string().as_str()).as_str(),
+            )?,
             connections: HashMap::new(),
         })
     }
@@ -62,11 +64,7 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
     }
 
     /// Send reliable message
-    pub fn send_reliably_to(
-        &mut self,
-        msg: T,
-        dest: SocketAddr,
-    ) -> Result<(), Error> {
+    pub fn send_reliably_to(&mut self, msg: T, dest: SocketAddr) -> Result<(), Error> {
         // Need to clone it here because of aliasing :/
         // IDEA: Could also let Connection::wrap_message take a clone of the UdpSocket and send the
         // message itself. Connection could even know the UdpSocket and SocketAddr
@@ -108,11 +106,11 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
         } else {
             Err(err_msg("did not recv a message"))
         }
-            // let conn = self.get_connection_or_create(src);
-            // let msg = conn.unwrap_message(packet, &socket)?;
-            // if let Some(msg) = msg {
-            //     break (src, msg);
-            // }
+        // let conn = self.get_connection_or_create(src);
+        // let msg = conn.unwrap_message(packet, &socket)?;
+        // if let Some(msg) = msg {
+        //     break (src, msg);
+        // }
     }
 }
 
@@ -149,8 +147,8 @@ fn default_vec<T: Default>(size: usize) -> Vec<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use super::*;
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     static CLIENT_PORT: u16 = 12347;
     static SERVER_PORT: u16 = 34254;

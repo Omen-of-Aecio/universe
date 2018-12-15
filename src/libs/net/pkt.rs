@@ -48,7 +48,10 @@ mod tests {
     #[test]
     fn encode_decode_test() {
         let message = Packet::Reliable { seq: 0, msg: false }.encode().unwrap();
-        assert_eq![Packet::Reliable { seq: 0, msg: false }, Packet::<bool>::decode(&message).unwrap()];
+        assert_eq![
+            Packet::Reliable { seq: 0, msg: false },
+            Packet::<bool>::decode(&message).unwrap()
+        ];
     }
 
     #[test]

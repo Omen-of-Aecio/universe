@@ -75,8 +75,7 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Eq + Serialize + PartialEq> Connec
 
         match self.send_window.get_mut(index) {
             Some(sent_packet) => {
-                if let Some(ref sent_packet) = sent_packet {
-                }
+                if let Some(ref sent_packet) = sent_packet {}
                 *sent_packet = None;
             }
             None => panic!("Index out of bounds: {}", index),
@@ -102,11 +101,7 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Eq + Serialize + PartialEq> Connec
 
     /// Wraps in a packet, encodes, and adds the packet to the send window queue. Returns the data
     /// enqueued.
-    pub fn send_message<'b>(
-        &'b mut self,
-        msg: T,
-        socket: &UdpSocket,
-    ) -> Result<u32, Error> {
+    pub fn send_message<'b>(&'b mut self, msg: T, socket: &UdpSocket) -> Result<u32, Error> {
         let packet = Packet::Reliable { seq: self.seq, msg };
         // debug!("Send"; "seq" => self.seq, "ack" => self.received+1);
         self.send_window.push_back(Some(SentPacket {

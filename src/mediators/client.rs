@@ -1,5 +1,5 @@
 use crate::glocals::*;
-use crate::libs::geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
+use crate::libs::geometry::{boxit::Boxit, cam::Camera, grid2d::Grid, vec::Vec2};
 use crate::libs::input::Input;
 use crate::libs::logger::Logger;
 use crate::mediators::{
@@ -234,10 +234,8 @@ fn set_smooth(s: &mut Client) {
 }
 
 fn create_black_square_around_player(s: &mut Grid<u8>) {
-    for j in 200..400 {
-        for i in 400..600 {
-            *s.get_mut(i, j).unwrap() = 0;
-        }
+    for (i, j) in Boxit::with_center((100, 100), (500, 300)) {
+        *s.get_mut(i, j).unwrap() = 0;
     }
 }
 

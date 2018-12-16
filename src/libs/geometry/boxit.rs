@@ -125,6 +125,7 @@ mod tests {
         let result: Vec<(usize, usize)> = bx.collect();
         assert_eq![
             vec![
+                (0,  123),
                 (1,  123),
                 (2,  123),
                 (3,  123),

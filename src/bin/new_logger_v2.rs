@@ -31,11 +31,11 @@ struct LoggerV2Async<C: Display + Send> {
     level: Arc<AtomicUsize>,
 }
 
-fn logger_thread<C: Display + Send>(rx: mpsc::Receiver<(u8, C)>, dropped: Arc<AtomicUsize>) {
+fn logger_thread<C: Display + Send, W: std::io::Write>(rx: mpsc::Receiver<(u8, C)>, dropped: Arc<AtomicUsize>, mut writer: W) {
     loop {
         match rx.recv() {
             Ok(msg) => {
-                // println!["{}: {:03}: {}", Local::now(), msg.0, msg.1];
+                writeln![writer, "{}: {:03}: {}", Local::now(), msg.0, msg.1];
             }
             Err(RecvError { .. }) => {
                 break;
@@ -63,16 +63,17 @@ impl<C: 'static + Display + Send> LoggerV2Async<C> {
     /// waiting for messages to print out. Once all logger objects
     /// are dropped, the thread will die.
     pub fn spawn() -> (Logger<C>, thread::JoinHandle<()>) {
-        let (tx, rx) = mpsc::sync_channel(30_000_000);
+        let (tx, rx) = mpsc::sync_channel(30_000);
         let full_count = Arc::new(AtomicUsize::new(0));
         let level = Arc::new(AtomicUsize::new(128));
+        let ex = std::io::stdout();
         (
             Logger {
                 log_channel: tx,
                 log_channel_full_count: full_count.clone(),
                 level,
             },
-            thread::spawn(move || logger_thread(rx, full_count)),
+            thread::spawn(move || logger_thread(rx, full_count, ex)),
         )
     }
 

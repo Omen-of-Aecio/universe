@@ -2,7 +2,7 @@ use clap::crate_authors;
 use clap::{App, Arg};
 use glium::{glutin, DisplayBuild};
 use rodio;
-use universe::{glocals::*, mediators::logger::*, *};
+use universe::{glocals::*, *};
 
 // ---
 
@@ -25,7 +25,10 @@ fn run_client_or_server(s: glocals::Main) -> glocals::Main {
     let commandline = s.commandline.clone();
     if let Some(_connect) = commandline.value_of("connect") {
         {
+            let (logger, thread) = crate::libs::logger::Logger::spawn();
             let mut client = Client {
+                logger,
+                handle: thread,
                 should_exit: false,
                 main: s,
                 game: Game::default(),
@@ -54,7 +57,6 @@ fn wait_for_threads_to_exit(mut s: glocals::Main) {
 
 fn main() {
     let mut s = glocals::Main::default();
-    create_logger(&mut s.threads);
     parse_command_line_arguments(&mut s.commandline);
     s = run_client_or_server(s);
     wait_for_threads_to_exit(s);

@@ -31,7 +31,11 @@ struct LoggerV2Async<C: Display + Send> {
     level: Arc<AtomicUsize>,
 }
 
-fn logger_thread<C: Display + Send, W: std::io::Write>(rx: mpsc::Receiver<(u8, C)>, dropped: Arc<AtomicUsize>, mut writer: W) {
+fn logger_thread<C: Display + Send, W: std::io::Write>(
+    rx: mpsc::Receiver<(u8, C)>,
+    dropped: Arc<AtomicUsize>,
+    mut writer: W,
+) {
     loop {
         match rx.recv() {
             Ok(msg) => {
@@ -274,7 +278,11 @@ mod tests {
     #[bench]
     fn message_urself(b: &mut Bencher) {
         b.iter(|| {
-            black_box(println!["{} {}", black_box("Something may be done"), black_box(1230.123)]);
+            black_box(println![
+                "{} {}",
+                black_box("Something may be done"),
+                black_box(1230.123)
+            ]);
         });
     }
 

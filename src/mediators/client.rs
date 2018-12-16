@@ -2,7 +2,7 @@ use crate::glocals::*;
 use crate::libs::geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
 use crate::libs::input::Input;
 use crate::mediators::{
-    does_line_collide_with_grid::*, logger::log, random_map_generator, render_grid, render_polygon,
+    does_line_collide_with_grid::*, random_map_generator, render_grid, render_polygon,
 };
 use glium::{
     self,
@@ -223,13 +223,7 @@ fn set_smooth(s: &mut Client) {
     if s.input.is_key_toggled_down(Key::R) {
         if let Some(ref mut gridrenderdata) = s.game.grid_render {
             render_grid::toggle_smooth(gridrenderdata);
-            log(
-                &mut s.main.threads,
-                128,
-                "CLNT",
-                "Toggling grid smoothing",
-                &[("smooth", &format!["{}", gridrenderdata.smooth])],
-            );
+            s.logger.info(Log::Bool("Toggling grid smoothing", "smooth", gridrenderdata.smooth));
         }
     }
 }
@@ -263,19 +257,9 @@ fn toggle_camera_mode(s: &mut Client) {
 
 fn maybe_fire_bullets(s: &mut Client) {
     if s.input.is_left_mouse_button_down() {
-        log(
-            &mut s.main.threads,
-            128,
-            "CLNT",
-            "Mouse on screen",
-            &[
-                (
-                    "world",
-                    &format!["{:?}", s.game.cam.screen_to_world(s.input.get_mouse_pos())],
-                ),
-                ("mouse", &format!["{:?}", s.input.get_mouse_pos()]),
-            ],
-        );
+        let mouse = s.input.get_mouse_pos();
+        let world = s.game.cam.screen_to_world(mouse);
+        s.logger.info(Log::Coordinates(world, mouse));
         let target = s.game.cam.screen_to_world(s.input.get_mouse_pos());
         let origin = s.game.players[0].position + Vec2 { x: 5.0, y: 5.0 };
         let length = (target - origin).length_squared();
@@ -311,7 +295,7 @@ fn play_song(s: &mut Client) {
 }
 
 pub fn entry_point_client(s: &mut Client) {
-    log(&mut s.main.threads, 128, "MAIN", "Creating grid", &[]);
+    s.logger.info(Log::Static("Creating grid"));
     initialize_grid(&mut s.game.grid);
     s.game.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
     random_map_generator::proc1(&mut s.game.grid, &s.display);
@@ -368,16 +352,12 @@ pub fn entry_point_client(s: &mut Client) {
         // ---
 
         if frame_counter >= 100 {
-            log(
-                &mut s.main.threads,
-                128 + 64,
-                "CLNT",
+            s.logger.set_log_level(196);
+            s.logger.debug(Log::I64(
                 "Time spent, 100-frame average",
-                &[(
-                    "µs",
-                    &format!["{:?}", time_spent.num_microseconds().map(|x| x / 100)],
-                )],
-            );
+                "µs",
+                time_spent.num_microseconds().map(|x| x / 100).unwrap_or(0),
+            ));
             frame_counter = 0;
             time_spent = time::Duration::zero();
         } else {
@@ -392,22 +372,10 @@ pub fn entry_point_client(s: &mut Client) {
         match frame.finish() {
             Ok(()) => {}
             Err(glium::SwapBuffersError::ContextLost) => {
-                log(
-                    &mut s.main.threads,
-                    64,
-                    "CLNT",
-                    "Context was lost while trying to swap buffers",
-                    &[],
-                );
+                s.logger.error(Log::Static("Context was lost while trying to swap buffers"));
             }
             Err(glium::SwapBuffersError::AlreadySwapped) => {
-                log(
-                    &mut s.main.threads,
-                    64,
-                    "CLNT",
-                    "OpenGL context has already been swapped",
-                    &[],
-                );
+                s.logger.error(Log::Static("OpenGL context has already been swapped"));
             }
         }
     }

@@ -1,6 +1,7 @@
 use crate::libs::{
     geometry::{cam::Camera, grid2d::Grid, vec::Vec2},
     input,
+    logger::Logger,
 };
 use clap;
 pub use glium::uniforms::{MagnifySamplerFilter, MinifySamplerFilter};
@@ -45,8 +46,31 @@ pub struct LogMessage {
     pub kvpairs: BTreeMap<String, String>,
 }
 
+#[derive(Debug)]
+pub enum Log {
+    Static(&'static str),
+    Bool(&'static str, &'static str, bool),
+    U64(&'static str, &'static str, u64),
+    I64(&'static str, &'static str, i64),
+    Coordinates(Vec2, Vec2),
+}
+
+impl std::fmt::Display for Log {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Log::Static(str) => write![f, "{}", str],
+            Log::Bool(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
+            Log::U64(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
+            Log::I64(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
+            Log::Coordinates(world, mouse) => write![f, "Mouse on screen, world={:?}, mouse={:?}", world, mouse],
+        }
+    }
+}
+
 pub struct Client<'a> {
+    pub logger: Logger<Log>,
     pub should_exit: bool,
+    pub handle: std::thread::JoinHandle<()>,
     pub main: Main<'a>,
     pub game: Game,
     pub input: input::Input,

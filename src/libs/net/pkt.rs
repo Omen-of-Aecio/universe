@@ -37,7 +37,8 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize + Eq + PartialEq> Packet
     }
 
     pub fn max_payload_size() -> u32 {
-        4 * 1024 // 4 KB
+        // 4 * 1024 // 4 KB
+        4 * 1000 * 1000
     }
 }
 

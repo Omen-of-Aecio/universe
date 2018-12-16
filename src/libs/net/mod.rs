@@ -96,7 +96,7 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
     fn _recv(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> {
         // Since we may just receive an Ack, we loop until we receive an actual message
         let socket = self.socket.try_clone()?;
-        let (amt, src) = socket.recv_from(buffer)?;
+        let (_, src) = socket.recv_from(buffer)?;
         let conn = self.get_connection_or_create(src);
         let packet: Packet<T> = Packet::decode(buffer)?;
         // let value = self.get_connection_or_create(src);
@@ -139,15 +139,15 @@ pub fn to_socket_addr(addr: &str) -> Result<SocketAddr, Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use super::*;
+    use test::{black_box, Bencher};
 
     static CLIENT_PORT: u16 = 12347;
     static SERVER_PORT: u16 = 34254;
 
     #[test]
     fn confirm_message_arrives() {
-        println!["{:?}", Packet::<bool>::decode(&[0])];
         let mut client: Socket<bool> = Socket::new(CLIENT_PORT).unwrap();
         let mut server: Socket<bool> = Socket::new(SERVER_PORT).unwrap();
 
@@ -163,7 +163,6 @@ mod tests {
         let mut server: Socket<bool> = Socket::new(SERVER_PORT).unwrap();
 
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), SERVER_PORT);
-        let client_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), CLIENT_PORT);
 
         client.send_reliably_to(true, destination).unwrap();
         let mut buffer = [0u8; 3000];
@@ -171,5 +170,58 @@ mod tests {
         assert![client.get_connection_or_create(destination).send_window[0].is_some()];
         assert![client.recv(&mut buffer).is_err()];
         assert![client.get_connection_or_create(destination).send_window[0].is_none()];
+    }
+
+    #[test]
+    fn confirm_u8_size_of_packet() {
+        assert_eq![8, Packet::Unreliable { msg: 128 }.encode().unwrap().len()];
+    }
+
+    // ---
+
+    #[bench]
+    fn time_per_byte(b: &mut Bencher) {
+        let mut client: Socket<u8> = Socket::new(CLIENT_PORT).unwrap();
+        let mut server: Socket<u8> = Socket::new(SERVER_PORT).unwrap();
+
+        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), SERVER_PORT);
+        b.iter(|| {
+            client.send_to(black_box(128u8), black_box(destination)).unwrap();
+            let mut buffer = [0u8; 8];
+            server.recv(black_box(&mut buffer)).unwrap();
+        });
+    }
+
+    #[bench]
+    fn allocating_1000_bytes(b: &mut Bencher) {
+        b.iter(|| {
+            black_box(vec![128; 1000])
+        });
+    }
+
+    #[bench]
+    fn time_per_kilobyte(b: &mut Bencher) {
+        let mut client: Socket<Vec<u8>> = Socket::new(CLIENT_PORT).unwrap();
+        let mut server: Socket<Vec<u8>> = Socket::new(SERVER_PORT).unwrap();
+
+        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), SERVER_PORT);
+        b.iter(|| {
+            client.send_to(black_box(vec![128; 1000]), black_box(destination)).unwrap();
+            let mut buffer = [0u8; 2000];
+            server.recv(black_box(&mut buffer)).unwrap();
+        });
+    }
+
+    #[bench]
+    fn time_per_10_kb(b: &mut Bencher) {
+        let mut client: Socket<Vec<u8>> = Socket::new(CLIENT_PORT).unwrap();
+        let mut server: Socket<Vec<u8>> = Socket::new(SERVER_PORT).unwrap();
+
+        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), SERVER_PORT);
+        b.iter(|| {
+            client.send_to(black_box(vec![128; 10_000]), black_box(destination)).unwrap();
+            let mut buffer = [0u8; 20_000];
+            server.recv(black_box(&mut buffer)).unwrap();
+        });
     }
 }

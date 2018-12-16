@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Boxit {
     top: usize,
     bottom: usize,
@@ -58,6 +58,7 @@ impl Iterator for Boxit {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test::{black_box, Bencher};
 
     #[test]
     fn simple() {
@@ -138,5 +139,17 @@ mod tests {
             ],
             result
         ];
+    }
+
+    #[bench]
+    fn iterate_1000x1000(b: &mut Bencher) {
+        b.iter(|| {
+            let mut bx = black_box(Boxit::with_center((0, 0), (1000, 1000)));
+            let mut value = 0;
+            while black_box(bx.next()).is_some() {
+                value = black_box(value + 0);
+            }
+            black_box(value)
+        });
     }
 }

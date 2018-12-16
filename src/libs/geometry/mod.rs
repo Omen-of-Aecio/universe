@@ -1,4 +1,5 @@
 pub mod bocs;
+pub mod boxit;
 pub mod cam;
 pub mod grid2d;
 pub mod vec;

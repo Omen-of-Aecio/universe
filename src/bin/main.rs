@@ -21,14 +21,14 @@ fn parse_command_line_arguments<'a>(s: &mut clap::ArgMatches<'a>) {
     };
 }
 
-fn run_client_or_server(s: glocals::Main) -> glocals::Main {
+fn run_client_or_server(mut s: glocals::Main) -> glocals::Main {
     let commandline = s.commandline.clone();
     if let Some(_connect) = commandline.value_of("connect") {
         {
             let (logger, thread) = crate::libs::logger::Logger::spawn();
+            s.threads.logger = Some(thread);
             let mut client = Client {
                 logger,
-                handle: thread,
                 should_exit: false,
                 main: s,
                 game: Game::default(),
@@ -49,7 +49,6 @@ fn run_client_or_server(s: glocals::Main) -> glocals::Main {
 }
 
 fn wait_for_threads_to_exit(mut s: glocals::Main) {
-    std::mem::replace(&mut s.threads.log_channel, None);
     s.threads.logger.map(|x| x.join());
 }
 

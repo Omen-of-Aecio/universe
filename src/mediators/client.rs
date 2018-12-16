@@ -354,9 +354,9 @@ pub fn entry_point_client(s: &mut Client) {
         if frame_counter >= 100 {
             s.logger.set_log_level(196);
             s.logger.debug(Log::I64(
-                "Time spent, 100-frame average",
+                "Time spent (100-frame average)",
                 "µs",
-                time_spent.num_microseconds().map(|x| x / 100).unwrap_or(0),
+                time_spent.num_microseconds().map(|x| x / 100).unwrap_or(-1),
             ));
             frame_counter = 0;
             time_spent = time::Duration::zero();

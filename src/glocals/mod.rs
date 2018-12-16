@@ -25,25 +25,9 @@ pub struct Main<'a> {
     pub threads: Threads,
 }
 
-pub struct EntryPointLogger<'a> {
-    pub receiver: std::sync::mpsc::Receiver<LogMessage>,
-    pub log_channel_full_count: Arc<AtomicUsize>,
-    pub writer: &'a mut dyn std::io::Write,
-}
-
 #[derive(Default)]
 pub struct Threads {
     pub logger: Option<std::thread::JoinHandle<()>>,
-    pub log_channel: Option<std::sync::mpsc::SyncSender<LogMessage>>,
-    pub log_channel_full_count: Arc<AtomicUsize>,
-}
-
-#[derive(Default)]
-pub struct LogMessage {
-    pub loglevel: u8,
-    pub context: String,
-    pub message: String,
-    pub kvpairs: BTreeMap<String, String>,
 }
 
 #[derive(Debug)]
@@ -70,7 +54,6 @@ impl std::fmt::Display for Log {
 pub struct Client<'a> {
     pub logger: Logger<Log>,
     pub should_exit: bool,
-    pub handle: std::thread::JoinHandle<()>,
     pub main: Main<'a>,
     pub game: Game,
     pub input: input::Input,

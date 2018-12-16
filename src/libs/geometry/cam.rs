@@ -1,4 +1,4 @@
-use super::Vec2;
+use super::{Bocs, Vec2};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Camera {
@@ -35,5 +35,12 @@ impl Camera {
         // Translate by center
         ((screen_pos - screen_size.scale_uni(0.5)).scale_uni(1.0 / self.zoom) + center)
             .scale(1.0, -1.0)
+    }
+
+    pub fn get_view_bocs(&self) -> Bocs {
+        Bocs {
+            start: self.center - Vec2 { x: self.width as f32, y: self.height as f32 } / 2.0f32,
+            difference: Vec2 { x: self.width as f32, y: self.height as f32 },
+        }
     }
 }

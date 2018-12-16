@@ -246,7 +246,8 @@ fn set_camera(s: &mut Client) {
         CameraMode::Interactive => {}
         CameraMode::FollowPlayer => {
             let center = s.game.players[0].position;
-            s.game.cam.center = center;
+            let cam_center = s.game.cam.center;
+            s.game.cam.center += (center - cam_center) / 10.0;
         }
     }
 }

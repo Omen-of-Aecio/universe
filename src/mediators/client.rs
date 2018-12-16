@@ -223,7 +223,11 @@ fn set_smooth(s: &mut Client) {
     if s.input.is_key_toggled_down(Key::R) {
         if let Some(ref mut gridrenderdata) = s.game.grid_render {
             render_grid::toggle_smooth(gridrenderdata);
-            s.logger.info(Log::Bool("Toggling grid smoothing", "smooth", gridrenderdata.smooth));
+            s.logger.info(Log::Bool(
+                "Toggling grid smoothing",
+                "smooth",
+                gridrenderdata.smooth,
+            ));
         }
     }
 }
@@ -372,10 +376,12 @@ pub fn entry_point_client(s: &mut Client) {
         match frame.finish() {
             Ok(()) => {}
             Err(glium::SwapBuffersError::ContextLost) => {
-                s.logger.error(Log::Static("Context was lost while trying to swap buffers"));
+                s.logger
+                    .error(Log::Static("Context was lost while trying to swap buffers"));
             }
             Err(glium::SwapBuffersError::AlreadySwapped) => {
-                s.logger.error(Log::Static("OpenGL context has already been swapped"));
+                s.logger
+                    .error(Log::Static("OpenGL context has already been swapped"));
             }
         }
     }

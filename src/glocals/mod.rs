@@ -46,7 +46,9 @@ impl std::fmt::Display for Log {
             Log::Bool(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
             Log::U64(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
             Log::I64(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
-            Log::Coordinates(world, mouse) => write![f, "Mouse on screen, world={:?}, mouse={:?}", world, mouse],
+            Log::Coordinates(world, mouse) => {
+                write![f, "Mouse on screen, world={:?}, mouse={:?}", world, mouse]
+            }
         }
     }
 }

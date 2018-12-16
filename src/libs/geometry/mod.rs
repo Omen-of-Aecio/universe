@@ -1,3 +1,4 @@
+pub mod bocs;
 pub mod cam;
 pub mod grid2d;
 pub mod vec;

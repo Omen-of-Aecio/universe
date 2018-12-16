@@ -48,7 +48,7 @@ fn run_client_or_server(mut s: glocals::Main) -> glocals::Main {
     }
 }
 
-fn wait_for_threads_to_exit(mut s: glocals::Main) {
+fn wait_for_threads_to_exit(s: glocals::Main) {
     s.threads.logger.map(|x| x.join());
 }
 

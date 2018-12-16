@@ -13,17 +13,33 @@ pub struct Boxit {
 
 impl Boxit {
     pub fn with_center(radii: (usize, usize), center: (usize, usize)) -> Boxit {
-        let left = if radii.0 >= center.0 { 0 } else { center.0 - radii.0 };
+        let left = if radii.0 >= center.0 {
+            0
+        } else {
+            center.0 - radii.0
+        };
         let (right, right_overflow) = center.0.overflowing_add(radii.0);
 
-        let top = if radii.1 >= center.1 { 0 } else { center.1 - radii.1 };
+        let top = if radii.1 >= center.1 {
+            0
+        } else {
+            center.1 - radii.1
+        };
         let (bottom, bottom_overflow) = center.1.overflowing_add(radii.1);
 
         Boxit {
             top,
             left,
-            bottom: if bottom_overflow { usize::max_value() } else { bottom },
-            right: if right_overflow { usize::max_value() } else { right },
+            bottom: if bottom_overflow {
+                usize::max_value()
+            } else {
+                bottom
+            },
+            right: if right_overflow {
+                usize::max_value()
+            } else {
+                right
+            },
 
             current_x: left,
             current_y: top,
@@ -64,15 +80,7 @@ mod tests {
     fn simple() {
         let bx = Boxit::with_center((1, 1), (0, 0));
         let result: Vec<(usize, usize)> = bx.collect();
-        assert_eq![
-            vec![
-                (0, 0),
-                (1, 0),
-                (0, 1),
-                (1, 1),
-            ],
-            result
-        ];
+        assert_eq![vec![(0, 0), (1, 0), (0, 1), (1, 1),], result];
     }
 
     #[test]
@@ -81,16 +89,16 @@ mod tests {
         let result: Vec<(usize, usize)> = bx.collect();
         assert_eq![
             vec![
-                (0,  0),
-                (1,  0),
-                (2,  0),
-                (3,  0),
-                (4,  0),
-                (5,  0),
-                (6,  0),
-                (7,  0),
-                (8,  0),
-                (9,  0),
+                (0, 0),
+                (1, 0),
+                (2, 0),
+                (3, 0),
+                (4, 0),
+                (5, 0),
+                (6, 0),
+                (7, 0),
+                (8, 0),
+                (9, 0),
                 (10, 0),
             ],
             result
@@ -103,17 +111,17 @@ mod tests {
         let result: Vec<(usize, usize)> = bx.collect();
         assert_eq![
             vec![
-                (0,  0 ),
-                (0,  1 ),
-                (0,  2 ),
-                (0,  3 ),
-                (0,  4 ),
-                (0,  5 ),
-                (0,  6 ),
-                (0,  7 ),
-                (0,  8 ),
-                (0,  9 ),
-                (0,  10),
+                (0, 0),
+                (0, 1),
+                (0, 2),
+                (0, 3),
+                (0, 4),
+                (0, 5),
+                (0, 6),
+                (0, 7),
+                (0, 8),
+                (0, 9),
+                (0, 10),
             ],
             result
         ];
@@ -125,16 +133,16 @@ mod tests {
         let result: Vec<(usize, usize)> = bx.collect();
         assert_eq![
             vec![
-                (0,  123),
-                (1,  123),
-                (2,  123),
-                (3,  123),
-                (4,  123),
-                (5,  123),
-                (6,  123),
-                (7,  123),
-                (8,  123),
-                (9,  123),
+                (0, 123),
+                (1, 123),
+                (2, 123),
+                (3, 123),
+                (4, 123),
+                (5, 123),
+                (6, 123),
+                (7, 123),
+                (8, 123),
+                (9, 123),
                 (10, 123),
                 (11, 123),
             ],

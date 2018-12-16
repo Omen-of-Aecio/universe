@@ -39,8 +39,15 @@ impl Camera {
 
     pub fn get_view_bocs(&self) -> Bocs {
         Bocs {
-            start: self.center - Vec2 { x: self.width as f32, y: self.height as f32 } / 2.0f32,
-            difference: Vec2 { x: self.width as f32, y: self.height as f32 },
+            start: self.center
+                - Vec2 {
+                    x: self.width as f32,
+                    y: self.height as f32,
+                } / 2.0f32,
+            difference: Vec2 {
+                x: self.width as f32,
+                y: self.height as f32,
+            },
         }
     }
 }

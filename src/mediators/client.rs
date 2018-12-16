@@ -1,6 +1,7 @@
 use crate::glocals::*;
 use crate::libs::geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
 use crate::libs::input::Input;
+use crate::libs::logger::Logger;
 use crate::mediators::{
     does_line_collide_with_grid::*, random_map_generator, render_grid, render_polygon,
 };
@@ -263,7 +264,7 @@ fn maybe_fire_bullets(s: &mut Client) {
     if s.input.is_left_mouse_button_down() {
         let mouse = s.input.get_mouse_pos();
         let world = s.game.cam.screen_to_world(mouse);
-        s.logger.info(Log::Coordinates(world, mouse));
+        s.logger.trace(Log::Coordinates(world, mouse));
         let target = s.game.cam.screen_to_world(s.input.get_mouse_pos());
         let origin = s.game.players[0].position + Vec2 { x: 5.0, y: 5.0 };
         let length = (target - origin).length_squared();
@@ -296,6 +297,18 @@ fn play_song(s: &mut Client) {
     let file = File::open("04 Video Games.mp3").unwrap();
     let source = rodio::Decoder::new(BufReader::new(file)).unwrap();
     s.audio.append(source);
+}
+fn remove_bullets_outside_camera(log: &mut Logger<Log>, bullets: &mut Vec<Bullet>, cam: &Camera) {
+    let bocs = cam.get_view_bocs();
+    let mut x = vec![];
+    for (i, bullet) in bullets.iter().enumerate() {
+        if !bocs.is_point_inside(bullet.cam.center) {
+            x.push(i);
+        }
+    }
+    for i in x.iter().rev() {
+        bullets.remove(*i);
+    }
 }
 
 pub fn entry_point_client(s: &mut Client) {
@@ -347,6 +360,7 @@ pub fn entry_point_client(s: &mut Client) {
         }
         maybe_fire_bullets(s);
         update_bullets(&mut s.game.bullets);
+        remove_bullets_outside_camera(&mut s.logger, &mut s.game.bullets, &s.game.cam);
         let mut frame = s.display.draw();
         frame.clear_color(0.0, 0.0, 1.0, 1.0);
         render_the_grid(&mut s.game.grid_render, &mut frame, &s.game.cam);

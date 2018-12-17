@@ -3,7 +3,7 @@ use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
 // ---
 
-#[derive(Copy, Clone, Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Vec2 {
     pub x: f32,
     pub y: f32,
@@ -147,8 +147,106 @@ impl Div<f32> for Vec2 {
 
 // ---
 
-impl PartialEq for Vec2 {
-    fn eq(&self, other: &Vec2) -> bool {
-        self.x == other.x && self.y == other.y
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test::{black_box, Bencher};
+
+    #[test]
+    fn null() {
+        assert_eq![Vec2 { x: 0.0, y: 0.0 }, Vec2::null_vec(),];
+    }
+
+    #[test]
+    fn dot() {
+        assert_eq![
+            3.6000001,
+            Vec2::dot(Vec2 { x: 3.0, y: 0.0 }, Vec2 { x: 1.2, y: 3.8 })
+        ];
+    }
+
+    #[test]
+    fn cross() {
+        assert_eq![
+            6.0,
+            Vec2::cross(Vec2 { x: 2.0, y: 0.0 }, Vec2 { x: 0.0, y: 3.0 })
+        ];
+        assert_eq![
+            5.8,
+            Vec2::cross(Vec2 { x: 2.0, y: 1.0 }, Vec2 { x: 0.2, y: 3.0 })
+        ];
+    }
+
+    #[test]
+    fn length() {
+        assert_eq![10.0, Vec2 { x: 10.0, y: 0.0 }.length(),];
+        assert_eq![10.0, Vec2 { x: 0.0, y: 10.0 }.length(),];
+        assert_eq![10.0, Vec2 { x: -10.0, y: 0.0 }.length(),];
+        assert_eq![10.0, Vec2 { x: 0.0, y: -10.0 }.length(),];
+    }
+
+    #[test]
+    fn eq() {
+        assert![Vec2 { x: 1.2, y: 3.4 } == Vec2 { x: 1.2, y: 3.4 }]
+    }
+
+    #[test]
+    fn add() {
+        assert_eq![
+            Vec2 { x: 1.2, y: 3.4 },
+            Vec2 { x: 0.1, y: 3.2 } + Vec2 { x: 1.1, y: 0.2 }
+        ];
+    }
+
+    #[test]
+    fn add_assign() {
+        let mut vec = Vec2 { x: 1.2, y: 3.4 };
+        vec += Vec2 { x: 0.1, y: 3.2 };
+        assert_eq![
+            vec,
+            Vec2 {
+                x: 1.3000001,
+                y: 6.6000004
+            },
+        ];
+    }
+
+    #[test]
+    fn sub() {
+        assert_eq![
+            Vec2 { x: -1.0, y: 3.0 },
+            Vec2 { x: 0.1, y: 3.2 } - Vec2 { x: 1.1, y: 0.2 }
+        ];
+    }
+
+    #[test]
+    fn sub_assign() {
+        let mut vec = Vec2 { x: 1.2, y: 3.4 };
+        vec -= Vec2 { x: 0.1, y: 3.2 };
+        assert_eq![
+            vec,
+            Vec2 {
+                x: 1.1,
+                y: 0.20000005
+            },
+        ];
+    }
+
+    #[bench]
+    fn dot_product_speed(b: &mut Bencher) {
+        b.iter(|| {
+            for _ in 0..100_000 {
+                black_box(Vec2::dot(black_box(Vec2::new(0.1, 0.2)), black_box(Vec2::new(4.3, -1.8))));
+            }
+        });
+    }
+
+    #[bench]
+    fn cross_product_speed(b: &mut Bencher) {
+        b.iter(|| {
+            for _ in 0..100_000 {
+                black_box(Vec2::cross(black_box(Vec2::new(0.1, 0.2)), black_box(Vec2::new(4.3, -1.8))));
+            }
+        });
     }
 }

@@ -102,6 +102,8 @@ pub fn does_line_collide_with_grid<T: Clone + Default>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::prelude::*;
+    use test::{black_box, Bencher};
 
     #[test]
     fn test_no_collision() {
@@ -450,8 +452,6 @@ mod tests {
         ];
     }
 
-    use rand::prelude::*;
-    use test::{black_box, Bencher};
     #[bench]
     fn long_distance_to_collision(b: &mut Bencher) {
         let mut grid: Grid<bool> = Grid::new();

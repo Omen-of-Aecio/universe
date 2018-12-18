@@ -139,8 +139,8 @@ pub fn to_socket_addr(addr: &str) -> Result<SocketAddr, Error> {
 
 #[cfg(test)]
 mod tests {
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use super::*;
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use test::{black_box, Bencher};
 
     static CLIENT_PORT: u16 = 12347;
@@ -186,7 +186,9 @@ mod tests {
 
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), SERVER_PORT);
         b.iter(|| {
-            client.send_to(black_box(128u8), black_box(destination)).unwrap();
+            client
+                .send_to(black_box(128u8), black_box(destination))
+                .unwrap();
             let mut buffer = [0u8; 8];
             server.recv(black_box(&mut buffer)).unwrap();
         });
@@ -194,9 +196,7 @@ mod tests {
 
     #[bench]
     fn allocating_1000_bytes(b: &mut Bencher) {
-        b.iter(|| {
-            black_box(vec![128; 1000])
-        });
+        b.iter(|| black_box(vec![128; 1000]));
     }
 
     #[bench]
@@ -206,7 +206,9 @@ mod tests {
 
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), SERVER_PORT);
         b.iter(|| {
-            client.send_to(black_box(vec![128; 1000]), black_box(destination)).unwrap();
+            client
+                .send_to(black_box(vec![128; 1000]), black_box(destination))
+                .unwrap();
             let mut buffer = [0u8; 2000];
             server.recv(black_box(&mut buffer)).unwrap();
         });
@@ -219,7 +221,9 @@ mod tests {
 
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), SERVER_PORT);
         b.iter(|| {
-            client.send_to(black_box(vec![128; 10_000]), black_box(destination)).unwrap();
+            client
+                .send_to(black_box(vec![128; 10_000]), black_box(destination))
+                .unwrap();
             let mut buffer = [0u8; 20_000];
             server.recv(black_box(&mut buffer)).unwrap();
         });

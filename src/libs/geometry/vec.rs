@@ -235,8 +235,11 @@ mod tests {
     #[bench]
     fn dot_product_speed(b: &mut Bencher) {
         b.iter(|| {
-            for _ in 0..100_000 {
-                black_box(Vec2::dot(black_box(Vec2::new(0.1, 0.2)), black_box(Vec2::new(4.3, -1.8))));
+            for _ in 0..1000 {
+                black_box(Vec2::dot(
+                    black_box(Vec2::new(0.1, 0.2)),
+                    black_box(Vec2::new(4.3, -1.8)),
+                ));
             }
         });
     }
@@ -244,8 +247,11 @@ mod tests {
     #[bench]
     fn cross_product_speed(b: &mut Bencher) {
         b.iter(|| {
-            for _ in 0..100_000 {
-                black_box(Vec2::cross(black_box(Vec2::new(0.1, 0.2)), black_box(Vec2::new(4.3, -1.8))));
+            for _ in 0..1000 {
+                black_box(Vec2::cross(
+                    black_box(Vec2::new(0.1, 0.2)),
+                    black_box(Vec2::new(4.3, -1.8)),
+                ));
             }
         });
     }

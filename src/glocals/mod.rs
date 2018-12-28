@@ -1,4 +1,5 @@
 use crate::libs::{
+    benchmarker::Benchmarker,
     geometry::{cam::Camera, grid2d::Grid, vec::Vec2},
     input,
     logger::Logger,
@@ -61,6 +62,8 @@ pub struct Client<'a> {
     pub input: input::Input,
     pub display: glium::Display,
     pub audio: rodio::Sink,
+    pub logic_benchmarker: Benchmarker,
+    pub drawing_benchmarker: Benchmarker,
     // Networking
     // pub server: SocketAddr,
 }

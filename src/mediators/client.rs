@@ -1,4 +1,5 @@
 use crate::glocals::*;
+use crate::libs::benchmarker::Benchmarker;
 use crate::libs::geometry::{boxit::Boxit, cam::Camera, grid2d::Grid, vec::Vec2};
 use crate::libs::input::Input;
 use crate::libs::logger::Logger;
@@ -297,6 +298,7 @@ fn play_song(s: &mut Client) {
     let source = rodio::Decoder::new(BufReader::new(file)).unwrap();
     s.audio.append(source);
 }
+
 fn remove_bullets_outside_camera(log: &mut Logger<Log>, bullets: &mut Vec<Bullet>, cam: &Camera) {
     let bocs = cam.get_view_bocs();
     let mut x = vec![];
@@ -307,6 +309,16 @@ fn remove_bullets_outside_camera(log: &mut Logger<Log>, bullets: &mut Vec<Bullet
     }
     for i in x.iter().rev() {
         bullets.remove(*i);
+    }
+}
+
+fn stop_benchmark(benchmarker: &mut Benchmarker, logger: &mut Logger<Log>, msg: &'static str) {
+    if let Some(duration) = benchmarker.stop() {
+        logger.debug(Log::I64(
+            msg,
+            "µs",
+            duration.num_microseconds().map(|x| x / 100).unwrap_or(-1),
+        ));
     }
 }
 
@@ -331,12 +343,12 @@ pub fn entry_point_client(s: &mut Client) {
     s.game
         .players
         .push(render_polygon::create_render_polygon(&s.display));
-    let mut frame_counter = 0u8;
-    let mut time_spent = time::Duration::zero();
+
+    s.logger.set_log_level(196);
 
     loop {
-        let begin = PreciseTime::now();
-
+        // ---
+        s.logic_benchmarker.start();
         // ---
 
         collect_input(s);
@@ -360,30 +372,24 @@ pub fn entry_point_client(s: &mut Client) {
         maybe_fire_bullets(s);
         update_bullets(&mut s.game.bullets);
         remove_bullets_outside_camera(&mut s.logger, &mut s.game.bullets, &s.game.cam);
+
+        // ---
+        stop_benchmark(&mut s.logic_benchmarker, &mut s.logger, "Logic time spent (100-frame average)");
+        // ---
+
         let mut frame = s.display.draw();
         frame.clear_color(0.0, 0.0, 1.0, 1.0);
+
+        // ---
+        s.drawing_benchmarker.start();
+        // ---
+
         render_the_grid(&mut s.game.grid_render, &mut frame, &s.game.cam);
         render_players(&mut s.game.players, &mut frame, &s.game.cam);
         render_bullets(&mut s.game.bullets, &mut frame);
 
         // ---
-
-        if frame_counter >= 100 {
-            s.logger.set_log_level(196);
-            s.logger.debug(Log::I64(
-                "Time spent (100-frame average)",
-                "µs",
-                time_spent.num_microseconds().map(|x| x / 100).unwrap_or(-1),
-            ));
-            frame_counter = 0;
-            time_spent = time::Duration::zero();
-        } else {
-            let end = PreciseTime::now();
-            let elapsed = begin.to(end);
-            time_spent = time_spent + elapsed;
-            frame_counter += 1;
-        }
-
+        stop_benchmark(&mut s.drawing_benchmarker, &mut s.logger, "Drawing time spent (100-frame average)");
         // ---
 
         match frame.finish() {

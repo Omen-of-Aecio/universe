@@ -1,3 +1,4 @@
+pub mod benchmarker;
 pub mod geometry;
 pub mod input;
 pub mod logger;

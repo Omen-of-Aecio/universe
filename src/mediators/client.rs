@@ -274,22 +274,23 @@ fn maybe_fire_bullets(s: &mut Client) {
             let bullet = Bullet {
                 render: render_polygon::create_render_polygon(&s.display),
                 direction: (target - origin).normalize(),
-                cam: s.game.cam,
+                position: origin,
             };
             s.game.bullets.push(bullet);
         }
     }
 }
 
-fn render_bullets(bullets: &Vec<Bullet>, frame: &mut glium::Frame) {
+fn render_bullets(bullets: &Vec<Bullet>, frame: &mut glium::Frame, cam: &Camera) {
     for bullet in bullets {
-        render_polygon::render(&bullet.render, frame, &bullet.cam);
+        render_polygon::render(&bullet.render, frame, &cam);
     }
 }
 
 fn update_bullets(bullets: &mut Vec<Bullet>) {
     for bullet in bullets {
-        bullet.cam.center += bullet.direction * 3.0;
+        bullet.position += bullet.direction * 3.0;
+        bullet.render.position = bullet.position;
     }
 }
 
@@ -305,7 +306,7 @@ fn remove_bullets_outside_camera(log: &mut Logger<Log>, bullets: &mut Vec<Bullet
     let bocs = cam.get_view_bocs();
     let mut x = vec![];
     for (i, bullet) in bullets.iter().enumerate() {
-        if !bocs.is_point_inside(bullet.cam.center) {
+        if !bocs.is_point_inside(bullet.position) {
             x.push(i);
         }
     }
@@ -390,7 +391,7 @@ pub fn entry_point_client(s: &mut Client) {
 
         render_the_grid(&mut s.game.grid_render, &mut frame, &s.game.cam);
         render_players(&mut s.game.players, &mut frame, &s.game.cam);
-        render_bullets(&mut s.game.bullets, &mut frame);
+        render_bullets(&mut s.game.bullets, &mut frame, &s.game.cam);
 
         // ---
         stop_benchmark(

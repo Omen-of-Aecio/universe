@@ -152,7 +152,7 @@ pub struct ServerConfig {
 pub struct Bullet {
     pub render: PolygonRenderData,
     pub direction: Vec2,
-    pub cam: Camera,
+    pub position: Vec2,
 }
 
 #[derive(Default)]

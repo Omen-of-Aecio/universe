@@ -208,11 +208,13 @@ fn apply_gravity_to_players_2(grid: &Grid<u8>, players: &mut [PolygonRenderData]
 }
 
 fn apply_gravity_to_players(s: &mut Client) {
-    apply_gravity_to_players_2(
-        &s.game.grid,
-        &mut s.game.players,
-        s.game.game_config.gravity,
-    );
+    if s.game.game_config.gravity_on {
+        apply_gravity_to_players_2(
+            &s.game.grid,
+            &mut s.game.players,
+            s.game.game_config.gravity,
+        );
+    }
 }
 
 fn set_gravity(s: &mut Client) {
@@ -366,9 +368,7 @@ pub fn entry_point_client(s: &mut Client) {
         set_camera(s);
         set_gravity(s);
         set_smooth(s);
-        if s.game.game_config.gravity_on {
-            apply_gravity_to_players(s);
-        }
+        apply_gravity_to_players(s);
         maybe_fire_bullets(s);
         update_bullets(&mut s.game.bullets);
         remove_bullets_outside_camera(&mut s.logger, &mut s.game.bullets, &s.game.cam);

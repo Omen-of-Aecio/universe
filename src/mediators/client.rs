@@ -374,7 +374,11 @@ pub fn entry_point_client(s: &mut Client) {
         remove_bullets_outside_camera(&mut s.logger, &mut s.game.bullets, &s.game.cam);
 
         // ---
-        stop_benchmark(&mut s.logic_benchmarker, &mut s.logger, "Logic time spent (100-frame average)");
+        stop_benchmark(
+            &mut s.logic_benchmarker,
+            &mut s.logger,
+            "Logic time spent (100-frame average)",
+        );
         // ---
 
         let mut frame = s.display.draw();
@@ -389,7 +393,11 @@ pub fn entry_point_client(s: &mut Client) {
         render_bullets(&mut s.game.bullets, &mut frame);
 
         // ---
-        stop_benchmark(&mut s.drawing_benchmarker, &mut s.logger, "Drawing time spent (100-frame average)");
+        stop_benchmark(
+            &mut s.drawing_benchmarker,
+            &mut s.logger,
+            "Drawing time spent (100-frame average)",
+        );
         // ---
 
         match frame.finish() {

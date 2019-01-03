@@ -5,7 +5,7 @@ use self::conn::Connection;
 use self::pkt::Packet;
 use crate::glocals::Error;
 
-use failure::err_msg;
+use failure::{bail, err_msg};
 use serde::{Deserialize, Serialize};
 use std;
 use std::collections::hash_map::HashMap;
@@ -35,6 +35,21 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
             )?,
             connections: HashMap::new(),
         })
+    }
+
+    pub fn new_with_random_port() -> Result<(Socket<T>, u16), Error> {
+        for port in 10000..65535 { // TODO Needs to be inclusive
+            let socket = UdpSocket::bind(
+                ("127.0.0.1:".to_string() + port.to_string().as_str()).as_str(),
+            );
+            if socket.is_ok() {
+                return Ok((Socket {
+                    socket: socket.unwrap(),
+                    connections: HashMap::new(),
+                }, port));
+            }
+        }
+        bail!("Unable to find a port")
     }
 
     /// A temporary (TODO) simple (but brute force) solution to the need of occasionally resending
@@ -143,15 +158,12 @@ mod tests {
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use test::{black_box, Bencher};
 
-    static CLIENT_PORT: u16 = 12347;
-    static SERVER_PORT: u16 = 34254;
-
     #[test]
     fn confirm_message_arrives() {
-        let mut client: Socket<bool> = Socket::new(CLIENT_PORT).unwrap();
-        let mut server: Socket<bool> = Socket::new(SERVER_PORT).unwrap();
+        let (mut client, client_port): (Socket<bool>, _) = Socket::new_with_random_port().unwrap();
+        let (mut server, server_port): (Socket<bool>, _) = Socket::new_with_random_port().unwrap();
 
-        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), SERVER_PORT);
+        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
         client.send_to(false, destination).unwrap();
         let mut buffer = [0u8; 1000];
         server.recv(&mut buffer).unwrap();
@@ -159,10 +171,10 @@ mod tests {
 
     #[test]
     fn confirm_reliable_message_arrives() {
-        let mut client: Socket<bool> = Socket::new(CLIENT_PORT).unwrap();
-        let mut server: Socket<bool> = Socket::new(SERVER_PORT).unwrap();
+        let (mut client, client_port): (Socket<bool>, _) = Socket::new_with_random_port().unwrap();
+        let (mut server, server_port): (Socket<bool>, _) = Socket::new_with_random_port().unwrap();
 
-        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), SERVER_PORT);
+        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
 
         client.send_reliably_to(true, destination).unwrap();
         let mut buffer = [0u8; 3000];
@@ -181,10 +193,10 @@ mod tests {
 
     #[bench]
     fn time_per_byte(b: &mut Bencher) {
-        let mut client: Socket<u8> = Socket::new(CLIENT_PORT).unwrap();
-        let mut server: Socket<u8> = Socket::new(SERVER_PORT).unwrap();
+        let (mut client, client_port): (Socket<u8>, _) = Socket::new_with_random_port().unwrap();
+        let (mut server, server_port): (Socket<u8>, _) = Socket::new_with_random_port().unwrap();
 
-        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), SERVER_PORT);
+        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
         b.iter(|| {
             client
                 .send_to(black_box(128u8), black_box(destination))
@@ -201,10 +213,10 @@ mod tests {
 
     #[bench]
     fn time_per_kilobyte(b: &mut Bencher) {
-        let mut client: Socket<Vec<u8>> = Socket::new(CLIENT_PORT).unwrap();
-        let mut server: Socket<Vec<u8>> = Socket::new(SERVER_PORT).unwrap();
+        let (mut client, client_port): (Socket<Vec<u8>>, _) = Socket::new_with_random_port().unwrap();
+        let (mut server, server_port): (Socket<Vec<u8>>, _) = Socket::new_with_random_port().unwrap();
 
-        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), SERVER_PORT);
+        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
         b.iter(|| {
             client
                 .send_to(black_box(vec![128; 1000]), black_box(destination))
@@ -216,10 +228,10 @@ mod tests {
 
     #[bench]
     fn time_per_10_kb(b: &mut Bencher) {
-        let mut client: Socket<Vec<u8>> = Socket::new(CLIENT_PORT).unwrap();
-        let mut server: Socket<Vec<u8>> = Socket::new(SERVER_PORT).unwrap();
+        let (mut client, client_port): (Socket<Vec<u8>>, _) = Socket::new_with_random_port().unwrap();
+        let (mut server, server_port): (Socket<Vec<u8>>, _) = Socket::new_with_random_port().unwrap();
 
-        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), SERVER_PORT);
+        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
         b.iter(|| {
             client
                 .send_to(black_box(vec![128; 10_000]), black_box(destination))

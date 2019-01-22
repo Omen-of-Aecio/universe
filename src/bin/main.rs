@@ -27,6 +27,7 @@ fn run_client_or_server(mut s: glocals::Main) -> glocals::Main {
     if let Some(_connect) = commandline.value_of("connect") {
         let (logger, thread) = crate::libs::logger::Logger::spawn();
         s.threads.logger = Some(thread);
+        s.threads.game_shell = Some(crate::mediators::game_shell::spawn(logger.clone()));
         let mut client = Client {
             logger,
             should_exit: false,

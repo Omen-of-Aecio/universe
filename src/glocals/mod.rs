@@ -3,6 +3,7 @@ use crate::libs::{
     geometry::{cam::Camera, grid2d::Grid, vec::Vec2},
     input,
     logger::Logger,
+    metac::{Data, Evaluate},
 };
 use clap;
 pub use glium::uniforms::{MagnifySamplerFilter, MinifySamplerFilter};
@@ -29,9 +30,15 @@ pub struct Main<'a> {
 #[derive(Default)]
 pub struct Threads {
     pub logger: Option<std::thread::JoinHandle<()>>,
+    pub game_shell: Option<std::thread::JoinHandle<()>>,
 }
 
-#[derive(Debug)]
+pub struct GameShell<T: Evaluate<String>> {
+    pub logger: Logger<Log>,
+    pub evaluator: T,
+}
+
+#[derive(Clone, Debug)]
 pub enum Log {
     Static(&'static str),
     Bool(&'static str, &'static str, bool),

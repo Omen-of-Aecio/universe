@@ -33,30 +33,33 @@ pub struct Threads {
     pub game_shell: Option<std::thread::JoinHandle<()>>,
 }
 
-pub struct GameShell<T: Evaluate<String>> {
+pub struct GameShell {
     pub logger: Logger<Log>,
-    pub evaluator: T,
 }
 
 #[derive(Clone, Debug)]
 pub enum Log {
-    Static(&'static str),
     Bool(&'static str, &'static str, bool),
-    U64(&'static str, &'static str, u64),
-    I64(&'static str, &'static str, i64),
     Coordinates(Vec2, Vec2),
+    Dynamic(String),
+    I64(&'static str, &'static str, i64),
+    Static(&'static str),
+    U64(&'static str, &'static str, u64),
+    Usize(&'static str, &'static str, usize),
 }
 
 impl std::fmt::Display for Log {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Log::Static(str) => write![f, "{}", str],
             Log::Bool(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
-            Log::U64(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
-            Log::I64(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
             Log::Coordinates(world, mouse) => {
                 write![f, "Mouse on screen, world={:?}, mouse={:?}", world, mouse]
             }
+            Log::Dynamic(str) => write![f, "{}", str],
+            Log::I64(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
+            Log::Static(str) => write![f, "{}", str],
+            Log::U64(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
+            Log::Usize(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
         }
     }
 }

@@ -16,16 +16,18 @@ fn game_shell_thread(mut s: GameShell) {
         for stream in listener.incoming() {
             let mut stream = stream.unwrap();
             let mut buffer = [0; 128];
-            stream.read(&mut buffer);
-            let string = from_utf8(&buffer[..]);
-            if let Ok(string) = string {
-                s.logger.info(Log::Dynamic(string.into()));
-                let result = s.interpret(string);
-                if let Ok(result) = result {
-                    stream.write(result.as_bytes());
+            let read_count = stream.read(&mut buffer);
+            if let Ok(count) = read_count {
+                let string = from_utf8(&buffer[0..count]);
+                if let Ok(string) = string {
+                    s.logger.info(Log::Dynamic(string.into()));
+                    let result = s.interpret(string);
+                    if let Ok(result) = result {
+                        stream.write(result.as_bytes());
+                    }
+                } else {
+                    s.logger.warn(Log::Static("Malformed data from client"));
                 }
-            } else {
-                s.logger.warn(Log::Static("Malformed data from client"));
             }
         }
     }

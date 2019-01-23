@@ -15,18 +15,37 @@ fn game_shell_thread(mut s: GameShell) {
     loop {
         for stream in listener.incoming() {
             let mut stream = stream.unwrap();
+            s.logger.info(Log::Static("new stream"));
             let mut buffer = [0; 128];
-            let read_count = stream.read(&mut buffer);
-            if let Ok(count) = read_count {
-                let string = from_utf8(&buffer[0..count]);
-                if let Ok(string) = string {
-                    s.logger.info(Log::Dynamic(string.into()));
-                    let result = s.interpret(string);
-                    if let Ok(result) = result {
-                        stream.write(result.as_bytes());
+            loop {
+                s.logger.info(Log::Static("READING ST"));
+                let read_count = stream.read(&mut buffer);
+                s.logger.info(Log::Dynamic(format!["Attr{:?}", read_count]));
+                if let Ok(count) = read_count {
+                    if count == 0 {
+                        break;
+                    }
+                    let string = from_utf8(&buffer[0..count]);
+                    if let Ok(string) = string {
+                        s.logger.info(Log::Static("BOUTA INTERPRET"));
+                        s.logger.info(Log::Dynamic(string.into()));
+                        let result = s.interpret(string);
+                        s.logger.info(Log::Static("interpret done"));
+                        if let Ok(result) = result {
+                            s.logger.info(Log::Static("After OK RES"));
+                            stream.write(result.as_bytes());
+                            s.logger.info(Log::Static("After OK RES w"));
+                            stream.flush();
+                        } else {
+                            stream.write(b"Unable to complete query");
+                            stream.flush();
+                        }
+                    } else {
+                        s.logger.warn(Log::Static("Malformed data from client"));
                     }
                 } else {
-                    s.logger.warn(Log::Static("Malformed data from client"));
+                    s.logger.info(Log::Static("Going into break"));
+                    break;
                 }
             }
         }

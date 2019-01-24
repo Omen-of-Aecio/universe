@@ -9,19 +9,24 @@ fn main() -> io::Result<()> {
     let mut handle = stdin.lock();
     let mut output = stdout.lock();
 
-    writeln![output, "gsh: GameShell v1.0.0"];
+    writeln![output, "gsh: GameShell v0.1.0 at your service (? for help)"];
+    write![output, "> "];
+    output.flush()?;
     for line in handle.lines() {
         let line = line?;
-        writeln![output, "writing line to remote"];
         listener.write(line.as_bytes())?;
-        writeln![output, "flushing to remote"];
         listener.flush()?;
-        writeln![output, "reading from remote"];
         buffer = String::new();
-        listener.read_to_string(&mut buffer)?;
+        let mut buffer = [0; 128];
+        listener.read(&mut buffer)?;
         // output.write(buffer.as_bytes())?;
-        writeln![output, "{}\n> ", buffer];
+        if let Ok(buffer) = std::str::from_utf8(&buffer) {
+            writeln![output, "{} ", buffer];
+            output.flush()?;
+        }
+        write![output, "> "];
         output.flush()?;
     }
+    writeln![output];
     Ok(())
 }

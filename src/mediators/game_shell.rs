@@ -10,41 +10,45 @@ pub fn spawn(logger: Logger<Log>) -> JoinHandle<()> {
 }
 
 fn game_shell_thread(mut s: GameShell) {
-    s.logger.info(Log::Static("Started GameShell"));
     let listener = TcpListener::bind("127.0.0.1:32931").unwrap();
+    s.logger.info(Log::Static("Started GameShell server"));
     loop {
         for stream in listener.incoming() {
             let mut stream = stream.unwrap();
-            s.logger.info(Log::Static("new stream"));
-            let mut buffer = [0; 128];
-            loop {
-                s.logger.info(Log::Static("READING ST"));
+            s.logger.debug(Log::Static("gsh: Acquired new stream"));
+            const BUFFER_SIZE: usize = 129;
+            let mut buffer = [0; BUFFER_SIZE];
+            'receiver: loop {
                 let read_count = stream.read(&mut buffer);
-                s.logger.info(Log::Dynamic(format!["Attr{:?}", read_count]));
+                s.logger.debug(Log::Static("gsh: Received message from farend"));
                 if let Ok(count) = read_count {
+                    if count == BUFFER_SIZE {
+                        s.logger.debug(Log::Usize("gsh: Message exceeds maximum length, disconnecting to prevent further messages", "max", BUFFER_SIZE-1));
+                        write![stream, "Response: Message exceeds maximum length, disconnecting to prevent further messages, max={}", BUFFER_SIZE-1];
+                        break 'receiver;
+                    }
+                    s.logger.debug(Log::Usize("gsh: Message from farend", "length", count));
                     if count == 0 {
                         break;
                     }
                     let string = from_utf8(&buffer[0..count]);
                     if let Ok(string) = string {
-                        s.logger.info(Log::Static("BOUTA INTERPRET"));
-                        s.logger.info(Log::Dynamic(string.into()));
+                        s.logger.debug(Log::Static("gsh: Converted farend message to UTF-8, calling interpret"));
                         let result = s.interpret(string);
-                        s.logger.info(Log::Static("interpret done"));
                         if let Ok(result) = result {
-                            s.logger.info(Log::Static("After OK RES"));
-                            stream.write(result.as_bytes());
-                            s.logger.info(Log::Static("After OK RES w"));
+                            s.logger.debug(Log::Static("gsh: Message parsing succeeded and evaluated, sending response to client"));
+                            stream.write((String::from("Response: ") + &result).as_bytes());
                             stream.flush();
                         } else {
+                            s.logger.debug(Log::Static("gsh: Message parsing failed"));
                             stream.write(b"Unable to complete query");
                             stream.flush();
                         }
                     } else {
-                        s.logger.warn(Log::Static("Malformed data from client"));
+                        s.logger.debug(Log::Static("Malformed data from client"));
                     }
                 } else {
-                    s.logger.info(Log::Static("Going into break"));
+                    s.logger.debug(Log::Static("gsh: Message from farend empty"));
                     break;
                 }
             }
@@ -57,11 +61,14 @@ fn game_shell_thread(mut s: GameShell) {
 impl Evaluate<String> for GameShell {
     fn evaluate<'a>(&mut self, commands: &[Data<'a>]) -> String {
         match commands[0] {
+            Data::Atom("kill") => {
+                "Killing application".into()
+            }
             Data::Atom("log") => {
                 self.log(&commands[1..])
             }
             _ => {
-                "".into()
+                "Unknown input, ignoring".into()
             }
         }
     }

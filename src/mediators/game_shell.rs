@@ -55,7 +55,6 @@ fn connection_loop(s: &mut GameShell, mut stream: TcpStream) -> io::Result<()> {
 
 fn game_shell_thread(mut s: GameShell) {
     let listener = TcpListener::bind("127.0.0.1:32931");
-    // let mut threads = vec![];
     match listener {
         Ok(listener) => {
             s.logger.info(Log::Static("Started GameShell server"));
@@ -65,7 +64,7 @@ fn game_shell_thread(mut s: GameShell) {
                         Ok(stream) => {
                             let mut shell_clone = s.clone();
                             thread::spawn(move || {
-                                connection_loop(&mut shell_clone, stream);
+                                let _ = connection_loop(&mut shell_clone, stream);
                             });
                         }
                         Err(error) => {
@@ -83,19 +82,77 @@ fn game_shell_thread(mut s: GameShell) {
 
 // ---
 
+enum X {
+    Atom(&'static str),
+    Predicate(&'static str, fn(&str) -> bool),
+}
+
+fn any_u8_function(input: &str) -> bool {
+    input.parse::<u8>().is_ok()
+}
+
+const any_u8: X = X::Predicate("<u8>", any_u8_function);
+
 impl Evaluate<String> for GameShell {
     fn evaluate<'a>(&mut self, commands: &[Data<'a>]) -> String {
-        match commands[0] {
-            Data::Atom("kill") => {
-                "Killing application".into()
+        let spec = [
+            ([X::Atom("log"), X::Atom("level"), any_u8], GameShell::log)
+        ];
+
+        fn samplify(xs: &[X]) -> String {
+            let mut string = String::new();
+            for x in xs {
+                match x {
+                    X::Atom(sample) => string += sample,
+                    X::Predicate(name, _) => string += name,
+                }
             }
-            Data::Atom("log") => {
-                self.log(&commands[1..])
-            }
-            _ => {
-                "Unknown input, ignoring".into()
+            string
+        }
+
+        let mut args = vec![];
+
+        'outer: for command in spec.iter() {
+            args.clear();
+            if command.0.len() == commands.len() {
+                for (idx, part) in command.0.iter().enumerate() {
+                    match part {
+                        X::Atom(string) => {
+                            match commands[idx] {
+                                Data::Atom(other) => {
+                                    if string == &other {
+                                        // OK
+                                    } else {
+                                        continue 'outer;
+                                    }
+                                }
+                                _ => {
+                                    continue 'outer;
+                                }
+                            }
+                        }
+                        X::Predicate(desc, predf) => {
+                            match commands[idx] {
+                                Data::Atom(other) => {
+                                    if predf(&other) {
+                                        // OK
+                                        args.push(Data::Atom(other));
+                                    } else {
+                                        return format!["Expected {}", desc];
+                                    }
+                                }
+                                _ => {
+                                    continue 'outer;
+                                }
+                            }
+                        }
+                    }
+                }
+                // We have gotten here, so the command matches.
+                return command.1(self, &args);
             }
         }
+        return format!["Unknown command"];
     }
 }
 
@@ -104,33 +161,18 @@ impl Evaluate<String> for GameShell {
 impl GameShell {
     fn log<'a>(&mut self, commands: &[Data<'a>]) -> String {
         match commands[0] {
-            Data::Atom("level") => {
-                if commands.len() == 2 {
-                    match commands[1] {
-                        Data::Atom(number) => {
-                            let value = number.parse::<u8>();
-                            if let Ok(value) = value {
-                                self.logger.set_log_level(value);
-                                "OK: Changed log level".into()
-                            } else {
-                                self.logger.info(Log::Dynamic(String::from("|") + number.into() + "|"));
-                                "Err: Unable to parse number".into()
-                            }
-                        }
-                        _ => {
-                            "Usage: log level <u8>".into()
-                        }
-                    }
+            Data::Atom(number) => {
+                let value = number.parse::<u8>();
+                if let Ok(value) = value {
+                    self.logger.set_log_level(value);
+                    "OK: Changed log level".into()
                 } else {
-                    "Usage: log level <u8>".into()
+                    self.logger.info(Log::Dynamic(String::from("|") + number.into() + "|"));
+                    "Err: Unable to parse number".into()
                 }
             }
-            Data::Atom(string) => {
-                self.logger.info(Log::Dynamic(string.into()));
-                "Unknown atom".into()
-            }
             _ => {
-                "Unknown command".into()
+                "Usage: log level <u8>".into()
             }
         }
     }

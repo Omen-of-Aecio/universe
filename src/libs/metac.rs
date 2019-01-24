@@ -69,6 +69,42 @@
 //! ```
 //! From here we can set up a more complex environment, callbacks, etc. It's all up to the
 //! implementer.
+//!
+//! # Multiline Support #
+//! Because this is a sh-like language, it's quite line oriented by nature. Feeding "a b c\nd e f" into
+//! the interpreter will separately interpret each line.
+//!
+//! However, it is sometimes very desirable to write code on multiple lines. The only way to do
+//! this in metac is by using parentheses:
+//! ```
+//! use universe::libs::metac::{parse, Data};
+//! fn main() {
+//!     let line = "Set Log Level (\n\tGet Logger Levels\n)";
+//!     let mut data = [Data::Atom(&line[0..]); 32];
+//!     let count = parse(line, &mut data).unwrap();
+//!
+//!     assert_eq![4, count];
+//!     assert_eq![Data::Atom("Set"), data[0]];
+//!     assert_eq![Data::Atom("Log"), data[1]];
+//!     assert_eq![Data::Atom("Level"), data[2]];
+//!     assert_eq![Data::Command("\n\tGet Logger Levels\n"), data[3]];
+//!
+//!     let count = parse(data[3].content(), &mut data).unwrap();
+//!     assert_eq![3, count];
+//!     assert_eq![Data::Atom("Get"), data[0]];
+//!     assert_eq![Data::Atom("Logger"), data[1]];
+//!     assert_eq![Data::Atom("Levels"), data[2]];
+//! }
+//! ```
+//!
+//! Which will look like
+//!
+//! ```text
+//! Set Log Level (
+//!     Get Logger Levels
+//! )
+//! ```
+//!
 #![feature(test)]
 #![no_std]
 extern crate test;
@@ -83,6 +119,15 @@ pub enum Data<'a> {
     Command(&'a str),
 }
 
+impl<'a> Data<'a> {
+    pub fn content(&self) -> &'a str {
+        match *self {
+            Data::Atom(string) => string,
+            Data::Command(string) => string,
+        }
+    }
+}
+
 /// Parsing error struct
 ///
 /// The errors represented here are single-line oriented. For instance, a
@@ -90,7 +135,7 @@ pub enum Data<'a> {
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
     DanglingLeftParenthesis,
-    InputLineTooLong,
+    InputHasTooManyElements,
     PrematureRightParenthesis,
 }
 
@@ -103,15 +148,43 @@ pub trait Evaluate<T: Default> {
     /// Commands are line-separated pieces of code turned into fixed data
     /// segments.
     fn evaluate<'a>(&mut self, commands: &[Data<'a>]) -> T;
-    /// Repeatedly calls evaluate for each line in the input
+    /// Set up the parser and call evaluate on the result
     ///
-    /// Also performs some setup to be able to call evaluate.
-    fn interpret(&mut self, input: &str) -> Result<T, ParseError> {
-        let mut data = [Data::Atom(&input[0..]); BUFFER_SIZE]; // TODO Use MaybeUninit here to prevent default initialization, currently only on nightly
+    /// This method expects "complete" statements, that is, it doesn't take in a bunch of
+    /// commands, but rather one single whole command. This single whole command can be on
+    /// multiple lines.
+    fn interpret(&mut self, statement: &str) -> Result<T, ParseError> {
+        let mut data = [Data::Atom(&statement[0..]); BUFFER_SIZE]; // TODO Use MaybeUninit here to prevent default initialization, currently only on nightly
+        let size = parse(statement, &mut data)?;
+        Ok(self.evaluate(&data[0..size]))
+    }
+    /// Interprets several statements one-by-one
+    ///
+    /// When calling this function, it will `interpret` a statement as quickly as possible,
+    /// normally, this happens when a newline is found. If however that same line contains
+    /// an unclosed opening parenthesis, we will need to include all lines coming after this one
+    /// in order to complete the statement.
+    fn interpret_multiple(&mut self, code: &str) -> Result<T, ParseError> {
+        let mut old_idx = 0;
+        let mut lparen_stack = 0;
         let mut result = T::default();
-        for line in input.lines() {
-            let size = parse(line, &mut data)?;
-            result = self.evaluate(&data[0..size]);
+        let mut idx = 0;
+        for ch in code.chars() {
+            if ch == '\n' && lparen_stack == 0 {
+                result = self.interpret(&code[old_idx..idx])?;
+                old_idx = idx + 1;
+            } else if ch == '(' {
+                lparen_stack += 1;
+            } else if ch == ')' {
+                if lparen_stack == 0 {
+                    return Err(ParseError::PrematureRightParenthesis);
+                }
+                lparen_stack -= 1;
+            }
+            idx += 1;
+        }
+        if idx != old_idx {
+            result = self.interpret(&code[old_idx..idx])?;
         }
         Ok(result)
     }
@@ -132,8 +205,8 @@ pub fn parse<'a>(line: &'a str, output: &mut [Data<'a>; BUFFER_SIZE]) -> Result<
                 if lparen_stack == 0 {
                     output[buff_idx] = Data::Command(&line[start..stop]);
                     buff_idx += 1;
-                    if buff_idx >= BUFFER_SIZE {
-                        return Err(ParseError::InputLineTooLong);
+                    if buff_idx >= output.len() {
+                        return Err(ParseError::InputHasTooManyElements);
                     }
                     stop += 1;
                     start = stop;
@@ -148,8 +221,8 @@ pub fn parse<'a>(line: &'a str, output: &mut [Data<'a>; BUFFER_SIZE]) -> Result<
                 if start != stop {
                     output[buff_idx] = Data::Atom(&line[start..stop]);
                     buff_idx += 1;
-                    if buff_idx >= BUFFER_SIZE {
-                        return Err(ParseError::InputLineTooLong);
+                    if buff_idx >= output.len() {
+                        return Err(ParseError::InputHasTooManyElements);
                     }
                 }
                 stop += 1;
@@ -215,6 +288,25 @@ mod tests {
         assert_eq![Data::Command("Get Log Level"), data[3]];
     }
 
+    #[test]
+    fn subcommand_parse_multiline() {
+        let line = "Set Log Level (\n\tGet Logger Levels\n)";
+        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let count = parse(line, &mut data).unwrap();
+
+        assert_eq![4, count];
+        assert_eq![Data::Atom("Set"), data[0]];
+        assert_eq![Data::Atom("Log"), data[1]];
+        assert_eq![Data::Atom("Level"), data[2]];
+        assert_eq![Data::Command("\n\tGet Logger Levels\n"), data[3]];
+
+        let count = parse(data[3].content(), &mut data).unwrap();
+        assert_eq![3, count];
+        assert_eq![Data::Atom("Get"), data[0]];
+        assert_eq![Data::Atom("Logger"), data[1]];
+        assert_eq![Data::Atom("Levels"), data[2]];
+    }
+
     // ---
 
     #[test]
@@ -222,7 +314,7 @@ mod tests {
         let line = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse viverra porta lacus, quis pretium nibh lacinia at. Mauris convallis sed lectus nec dapibus. Interdum et malesuada fames ac ante ipsum primis in faucibus. Nulla vulputate sapien dui. Aliquam finibus ante ut purus facilisis, in sagittis tortor varius. Nunc interdum fermentum libero, et egestas arcu convallis sed. Maecenas nec diam a libero vulputate suscipit. Phasellus ac dolor ut nunc ultricies fringilla. Maecenas sed feugiat nunc. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae. Quisque tincidunt metus ut ante dapibus, et molestie massa varius. Sed ultrices sapien sed mauris congue pretium. Pellentesque bibendum hendrerit sagittis. Vestibulum dignissim egestas feugiat. Ut porttitor et massa a posuere. Ut euismod metus a sem facilisis ullamcorper. Proin pharetra placerat enim";
         let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
         assert_eq![
-            ParseError::InputLineTooLong,
+            ParseError::InputHasTooManyElements,
             parse(line, &mut data).unwrap_err()
         ];
     }
@@ -248,6 +340,58 @@ mod tests {
     }
 
     // ---
+
+    #[test]
+    fn interpret_multiple_simple() {
+        struct Eval {
+            pub invoked: usize,
+        }
+        impl Evaluate<()> for Eval {
+            fn evaluate<'a>(&mut self, commands: &[Data<'a>]) {
+                self.invoked += 1;
+            }
+        }
+        let mut eval = Eval { invoked: 0 };
+
+        eval.interpret_multiple("X\nY\nZ\nW (\n\t1 2 3\n) W-1\nQ").unwrap();
+        assert_eq![5, eval.invoked];
+    }
+
+    #[test]
+    fn interpret_multiple() {
+        struct Eval {
+            pub invoked: usize,
+        }
+        impl Evaluate<()> for Eval {
+            fn evaluate<'a>(&mut self, commands: &[Data<'a>]) {
+                self.invoked += 1;
+                match self.invoked {
+                    1 => {
+                        assert_eq![&[Data::Atom("Lorem"), Data::Atom("ipsum"), Data::Command("\n\tdolor sit amet\n\tX\n")], commands];
+                    }
+                    2 => {
+                        assert_eq![&[Data::Atom("dolor"), Data::Atom("sit"), Data::Atom("amet"), Data::Atom("X")], commands];
+                    }
+                    3 => {
+                        assert_eq![&[Data::Atom("Singular")], commands];
+                    }
+                    _ => assert![false],
+                }
+                for command in commands {
+                    match command {
+                        Data::Atom(_) => {}
+                        Data::Command(string) => {
+                            self.interpret(string).unwrap();
+                        }
+                    }
+                }
+            }
+        }
+        let mut eval = Eval { invoked: 0 };
+
+        eval.interpret_multiple("Lorem ipsum (\n\tdolor sit amet\n\tX\n)\nSingular").unwrap();
+        assert_eq![3, eval.invoked];
+    }
 
     #[test]
     fn evaluator() {
@@ -298,6 +442,9 @@ mod tests {
         eval.interpret("We can also nest substitutions: (my (recursive (command) here))")
             .unwrap();
         assert_eq![10, eval.invoked];
+        eval.interpret("a (\n\tb c\n)")
+            .unwrap();
+        assert_eq![12, eval.invoked];
     }
 
     // ---

@@ -103,9 +103,9 @@ const any_atom: X = X::Predicate("<atom>", any_atom_function);
 
 impl Evaluate<String> for GameShell {
     fn evaluate<'a>(&mut self, commands: &[Data<'a>]) -> String {
-        let spec = [
-            (vec![X::Atom("log"), X::Atom("global"), X::Atom("level"), any_u8], Box::new(log)),
-            // (vec![X::Atom("log"), X::Atom("context"), any_atom, X::Atom("level"), any_u8], Box::new(log_context)),
+        let spec: &[(Vec<_>, &Fn(&mut GameShell, &[Data]) -> String)] = &[
+            (vec![X::Atom("log"), X::Atom("global"), X::Atom("level"), any_u8], &log),
+            (vec![X::Atom("log"), X::Atom("context"), any_atom, X::Atom("level"), any_u8], &log_context),
         ];
 
         fn samplify(xs: &[X]) -> String {
@@ -167,7 +167,7 @@ impl Evaluate<String> for GameShell {
 
 // ---
 
-fn log<'a>(s: &mut GameShell, commands: &[Data<'a>]) -> String {
+fn log(s: &mut GameShell, commands: &[Data]) -> String {
     match commands[0] {
         Data::Atom(number) => {
             let value = number.parse::<u8>();
@@ -184,12 +184,27 @@ fn log<'a>(s: &mut GameShell, commands: &[Data<'a>]) -> String {
         }
     }
 }
+
 fn log_context<'a>(s: &mut GameShell, commands: &[Data<'a>]) -> String {
+    let mut ctx;
     match commands[0] {
+        Data::Atom(context) => {
+            ctx = match context {
+                "cli" => "cli",
+                "gsh" => "gsh",
+                "lgr" => "lgr",
+                _ => return "Invalid logging context".into(),
+            };
+        }
+        _ => {
+            return "Usage: log context <atom> level <u8>".into()
+        }
+    }
+    match commands[1] {
         Data::Atom(number) => {
             let value = number.parse::<u8>();
             if let Ok(value) = value {
-                s.logger.set_log_level(value);
+                s.logger.set_context_specific_log_level(ctx, value);
                 "OK: Changed log level".into()
             } else {
                 s.logger.info("gsh", Log::Dynamic(String::from("|") + number.into() + "|"));
@@ -197,7 +212,7 @@ fn log_context<'a>(s: &mut GameShell, commands: &[Data<'a>]) -> String {
             }
         }
         _ => {
-            "Usage: log level <u8>".into()
+            "Usage: log context <atom> level <u8>".into()
         }
     }
 }

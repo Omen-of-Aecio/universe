@@ -33,9 +33,14 @@ pub struct Threads {
     pub game_shell: Option<std::thread::JoinHandle<()>>,
 }
 
+// ---
+
+#[derive(Clone)]
 pub struct GameShell {
     pub logger: Logger<Log>,
 }
+
+// ---
 
 #[derive(Clone, Debug)]
 pub enum Log {
@@ -44,6 +49,7 @@ pub enum Log {
     Dynamic(String),
     I64(&'static str, &'static str, i64),
     Static(&'static str),
+    StaticDynamic(&'static str, &'static str, String),
     U64(&'static str, &'static str, u64),
     Usize(&'static str, &'static str, usize),
 }
@@ -58,6 +64,7 @@ impl std::fmt::Display for Log {
             Log::Dynamic(str) => write![f, "{}", str],
             Log::I64(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
             Log::Static(str) => write![f, "{}", str],
+            Log::StaticDynamic(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
             Log::U64(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
             Log::Usize(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
         }

@@ -31,7 +31,7 @@ fn connection_loop(s: &mut GameShell, mut stream: TcpStream) -> io::Result<()> {
             let string = from_utf8(&buffer[0..count]);
             if let Ok(string) = string {
                 s.logger.debug("gsh", Log::Static("Converted farend message to UTF-8, calling interpret"));
-                let result = s.interpret(string);
+                let result = s.interpret_single(string);
                 if let Ok(result) = result {
                     s.logger.debug("gsh", Log::Static("Message parsing succeeded and evaluated, sending response to client"));
                     stream.write((String::from("Response: ") + &result).as_bytes())?;

@@ -18,7 +18,7 @@
 //!     }
 //!
 //!     let mut eval = Eval { };
-//!     eval.interpret("Hello (World 1 2) 3").unwrap();
+//!     eval.interpret_single("Hello (World 1 2) 3").unwrap();
 //! }
 //! ```
 //!
@@ -64,7 +64,7 @@
 //!
 //!     let mut eval = Eval { hashmap: HashMap::new() };
 //!     eval.register("my-variable", "my-value");
-//!     assert_eq!["my-value", eval.interpret("Get my-variable").unwrap()];
+//!     assert_eq!["my-value", eval.interpret_single("Get my-variable").unwrap()];
 //! }
 //! ```
 //! From here we can set up a more complex environment, callbacks, etc. It's all up to the
@@ -77,34 +77,26 @@
 //! However, it is sometimes very desirable to write code on multiple lines. The only way to do
 //! this in metac is by using parentheses:
 //! ```
-//! use universe::libs::metac::{parse, Data};
+//! use universe::libs::metac::{Data, Evaluate};
 //! fn main() {
-//!     let line = "Set Log Level (\n\tGet Logger Levels\n)";
-//!     let mut data = [Data::Atom(&line[0..]); 32];
-//!     let count = parse(line, &mut data).unwrap();
+//!     struct Eval {
+//!         invoked: usize,
+//!     }
+//!     impl Evaluate<usize> for Eval {
+//!         fn evaluate(&mut self, commands: &[Data]) -> usize{
+//!             commands.len()
+//!         }
+//!     }
 //!
-//!     assert_eq![4, count];
-//!     assert_eq![Data::Atom("Set"), data[0]];
-//!     assert_eq![Data::Atom("Log"), data[1]];
-//!     assert_eq![Data::Atom("Level"), data[2]];
-//!     assert_eq![Data::Command("\n\tGet Logger Levels\n"), data[3]];
+//!     let mut eval = Eval { invoked: 0 };
 //!
-//!     let count = parse(data[3].content(), &mut data).unwrap();
-//!     assert_eq![3, count];
-//!     assert_eq![Data::Atom("Get"), data[0]];
-//!     assert_eq![Data::Atom("Logger"), data[1]];
-//!     assert_eq![Data::Atom("Levels"), data[2]];
+//!     assert_eq![5, eval.interpret_single("This is\na single statement").unwrap()];
+//!
+//!     // Note: The return value is the result of interpreting the last statement, which is why
+//!     // it returns 3 instead of 2 (the first statement) or 5 (the sum).
+//!     assert_eq![3, eval.interpret_multiple("Here are\ntwo unrelated statements").unwrap()];
 //! }
 //! ```
-//!
-//! Which will look like
-//!
-//! ```text
-//! Set Log Level (
-//!     Get Logger Levels
-//! )
-//! ```
-//!
 #![feature(test)]
 #![no_std]
 extern crate test;
@@ -150,10 +142,10 @@ pub trait Evaluate<T: Default> {
     fn evaluate<'a>(&mut self, commands: &[Data<'a>]) -> T;
     /// Set up the parser and call evaluate on the result
     ///
-    /// This method expects "complete" statements, that is, it doesn't take in a bunch of
+    /// This method expects 1 single statement, that is, it doesn't take in a bunch of
     /// commands, but rather one single whole command. This single whole command can be on
     /// multiple lines.
-    fn interpret(&mut self, statement: &str) -> Result<T, ParseError> {
+    fn interpret_single(&mut self, statement: &str) -> Result<T, ParseError> {
         let mut data = [Data::Atom(&statement[0..]); BUFFER_SIZE]; // TODO Use MaybeUninit here to prevent default initialization, currently only on nightly
         let size = parse(statement, &mut data)?;
         Ok(self.evaluate(&data[0..size]))
@@ -171,7 +163,7 @@ pub trait Evaluate<T: Default> {
         let mut idx = 0;
         for ch in code.chars() {
             if ch == '\n' && lparen_stack == 0 {
-                result = self.interpret(&code[old_idx..idx])?;
+                result = self.interpret_single(&code[old_idx..idx])?;
                 old_idx = idx + 1;
             } else if ch == '(' {
                 lparen_stack += 1;
@@ -184,14 +176,14 @@ pub trait Evaluate<T: Default> {
             idx += 1;
         }
         if idx != old_idx {
-            result = self.interpret(&code[old_idx..idx])?;
+            result = self.interpret_single(&code[old_idx..idx])?;
         }
         Ok(result)
     }
 }
 
 /// Parse an input line into a classified output buffer
-pub fn parse<'a>(line: &'a str, output: &mut [Data<'a>; BUFFER_SIZE]) -> Result<usize, ParseError> {
+fn parse<'a>(line: &'a str, output: &mut [Data<'a>; BUFFER_SIZE]) -> Result<usize, ParseError> {
     let mut lparen_stack = 0;
     let mut buff_idx = 0;
     let (mut start, mut stop) = (0, 0);
@@ -381,7 +373,7 @@ mod tests {
                     match command {
                         Data::Atom(_) => {}
                         Data::Command(string) => {
-                            self.interpret(string).unwrap();
+                            self.interpret_single(string).unwrap();
                         }
                     }
                 }
@@ -404,9 +396,9 @@ mod tests {
             }
         }
         let mut eval = Eval { invoked: 0 };
-        eval.interpret("Hello World").unwrap();
+        eval.interpret_single("Hello World").unwrap();
         assert_eq![1, eval.invoked];
-        eval.interpret("This is an example (command)").unwrap();
+        eval.interpret_single("This is an example (command)").unwrap();
         assert_eq![2, eval.invoked];
     }
 
@@ -422,27 +414,27 @@ mod tests {
                     match command {
                         Data::Atom(_) => {}
                         Data::Command(string) => {
-                            self.interpret(string).unwrap();
+                            self.interpret_single(string).unwrap();
                         }
                     }
                 }
             }
         }
         let mut eval = Eval { invoked: 0 };
-        eval.interpret("Hello World").unwrap();
+        eval.interpret_single("Hello World").unwrap();
         assert_eq![1, eval.invoked];
-        eval.interpret("This is an example of substitution: (command)")
+        eval.interpret_single("This is an example of substitution: (command)")
             .unwrap();
         assert_eq![3, eval.invoked];
-        eval.interpret(
+        eval.interpret_single(
             "We can substitute more than once: (my command), anywhere: (another command here)",
         )
         .unwrap();
         assert_eq![6, eval.invoked];
-        eval.interpret("We can also nest substitutions: (my (recursive (command) here))")
+        eval.interpret_single("We can also nest substitutions: (my (recursive (command) here))")
             .unwrap();
         assert_eq![10, eval.invoked];
-        eval.interpret("a (\n\tb c\n)")
+        eval.interpret_single("a (\n\tb c\n)")
             .unwrap();
         assert_eq![12, eval.invoked];
     }
@@ -457,7 +449,7 @@ mod tests {
         }
         let mut eval = Eval {};
         b.iter(|| {
-            eval.interpret(black_box("unknown reasonably long command"))
+            eval.interpret_single(black_box("unknown reasonably long command"))
                 .unwrap();
         });
     }
@@ -470,7 +462,7 @@ mod tests {
         }
         let mut eval = Eval {};
         b.iter(|| {
-            eval.interpret(black_box("x")).unwrap();
+            eval.interpret_single(black_box("x")).unwrap();
         });
     }
 
@@ -482,7 +474,7 @@ mod tests {
         }
         let mut eval = Eval {};
         b.iter(|| {
-            eval.interpret(black_box("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris tristique massa magna, eget consectetur dui posuere congue. Etiam rhoncus porttitor enim, eget malesuada ante dapibus eget. Duis neque dui, tincidunt ut varius")).unwrap();
+            eval.interpret_single(black_box("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris tristique massa magna, eget consectetur dui posuere congue. Etiam rhoncus porttitor enim, eget malesuada ante dapibus eget. Duis neque dui, tincidunt ut varius")).unwrap();
         });
     }
 
@@ -494,7 +486,7 @@ mod tests {
         }
         let mut eval = Eval {};
         b.iter(|| {
-            eval.interpret(black_box("unknown (some) (long command 1)"))
+            eval.interpret_single(black_box("unknown (some) (long command 1)"))
                 .unwrap();
         });
     }
@@ -511,7 +503,7 @@ mod tests {
         }
         let mut eval = Eval { invoke: 0 };
         b.iter(|| {
-            eval.interpret(black_box("unknown reasonably long command"))
+            eval.interpret_single(black_box("unknown reasonably long command"))
                 .unwrap();
         });
     }

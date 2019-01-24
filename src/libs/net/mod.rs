@@ -38,15 +38,18 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
     }
 
     pub fn new_with_random_port() -> Result<(Socket<T>, u16), Error> {
-        for port in 10000..65535 { // TODO Needs to be inclusive
-            let socket = UdpSocket::bind(
-                ("127.0.0.1:".to_string() + port.to_string().as_str()).as_str(),
-            );
+        for port in 10000..65535 {
+            // TODO Needs to be inclusive
+            let socket =
+                UdpSocket::bind(("127.0.0.1:".to_string() + port.to_string().as_str()).as_str());
             if socket.is_ok() {
-                return Ok((Socket {
-                    socket: socket.unwrap(),
-                    connections: HashMap::new(),
-                }, port));
+                return Ok((
+                    Socket {
+                        socket: socket.unwrap(),
+                        connections: HashMap::new(),
+                    },
+                    port,
+                ));
             }
         }
         bail!("Unable to find a port")
@@ -213,8 +216,10 @@ mod tests {
 
     #[bench]
     fn time_per_kilobyte(b: &mut Bencher) {
-        let (mut client, client_port): (Socket<Vec<u8>>, _) = Socket::new_with_random_port().unwrap();
-        let (mut server, server_port): (Socket<Vec<u8>>, _) = Socket::new_with_random_port().unwrap();
+        let (mut client, client_port): (Socket<Vec<u8>>, _) =
+            Socket::new_with_random_port().unwrap();
+        let (mut server, server_port): (Socket<Vec<u8>>, _) =
+            Socket::new_with_random_port().unwrap();
 
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
         b.iter(|| {
@@ -228,8 +233,10 @@ mod tests {
 
     #[bench]
     fn time_per_10_kb(b: &mut Bencher) {
-        let (mut client, client_port): (Socket<Vec<u8>>, _) = Socket::new_with_random_port().unwrap();
-        let (mut server, server_port): (Socket<Vec<u8>>, _) = Socket::new_with_random_port().unwrap();
+        let (mut client, client_port): (Socket<Vec<u8>>, _) =
+            Socket::new_with_random_port().unwrap();
+        let (mut server, server_port): (Socket<Vec<u8>>, _) =
+            Socket::new_with_random_port().unwrap();
 
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
         b.iter(|| {

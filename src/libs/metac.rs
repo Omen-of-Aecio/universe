@@ -339,13 +339,14 @@ mod tests {
             pub invoked: usize,
         }
         impl Evaluate<()> for Eval {
-            fn evaluate<'a>(&mut self, commands: &[Data<'a>]) {
+            fn evaluate<'a>(&mut self, _: &[Data<'a>]) {
                 self.invoked += 1;
             }
         }
         let mut eval = Eval { invoked: 0 };
 
-        eval.interpret_multiple("X\nY\nZ\nW (\n\t1 2 3\n) W-1\nQ").unwrap();
+        eval.interpret_multiple("X\nY\nZ\nW (\n\t1 2 3\n) W-1\nQ")
+            .unwrap();
         assert_eq![5, eval.invoked];
     }
 
@@ -359,10 +360,25 @@ mod tests {
                 self.invoked += 1;
                 match self.invoked {
                     1 => {
-                        assert_eq![&[Data::Atom("Lorem"), Data::Atom("ipsum"), Data::Command("\n\tdolor sit amet\n\tX\n")], commands];
+                        assert_eq![
+                            &[
+                                Data::Atom("Lorem"),
+                                Data::Atom("ipsum"),
+                                Data::Command("\n\tdolor sit amet\n\tX\n")
+                            ],
+                            commands
+                        ];
                     }
                     2 => {
-                        assert_eq![&[Data::Atom("dolor"), Data::Atom("sit"), Data::Atom("amet"), Data::Atom("X")], commands];
+                        assert_eq![
+                            &[
+                                Data::Atom("dolor"),
+                                Data::Atom("sit"),
+                                Data::Atom("amet"),
+                                Data::Atom("X")
+                            ],
+                            commands
+                        ];
                     }
                     3 => {
                         assert_eq![&[Data::Atom("Singular")], commands];
@@ -381,7 +397,8 @@ mod tests {
         }
         let mut eval = Eval { invoked: 0 };
 
-        eval.interpret_multiple("Lorem ipsum (\n\tdolor sit amet\n\tX\n)\nSingular").unwrap();
+        eval.interpret_multiple("Lorem ipsum (\n\tdolor sit amet\n\tX\n)\nSingular")
+            .unwrap();
         assert_eq![3, eval.invoked];
     }
 
@@ -398,7 +415,8 @@ mod tests {
         let mut eval = Eval { invoked: 0 };
         eval.interpret_single("Hello World").unwrap();
         assert_eq![1, eval.invoked];
-        eval.interpret_single("This is an example (command)").unwrap();
+        eval.interpret_single("This is an example (command)")
+            .unwrap();
         assert_eq![2, eval.invoked];
     }
 
@@ -434,8 +452,7 @@ mod tests {
         eval.interpret_single("We can also nest substitutions: (my (recursive (command) here))")
             .unwrap();
         assert_eq![10, eval.invoked];
-        eval.interpret_single("a (\n\tb c\n)")
-            .unwrap();
+        eval.interpret_single("a (\n\tb c\n)").unwrap();
         assert_eq![12, eval.invoked];
     }
 

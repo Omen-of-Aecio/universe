@@ -227,7 +227,7 @@ fn set_smooth(s: &mut Client) {
     if s.input.is_key_toggled_down(Key::R) {
         if let Some(ref mut gridrenderdata) = s.game.grid_render {
             render_grid::toggle_smooth(gridrenderdata);
-            s.logger.info(Log::Bool(
+            s.logger.info("cli", Log::Bool(
                 "Toggling grid smoothing",
                 "smooth",
                 gridrenderdata.smooth,
@@ -266,7 +266,7 @@ fn maybe_fire_bullets(s: &mut Client) {
     if s.input.is_left_mouse_button_down() {
         let mouse = s.input.get_mouse_pos();
         let world = s.game.cam.screen_to_world(mouse);
-        s.logger.trace(Log::Coordinates(world, mouse));
+        s.logger.trace("cli", Log::Coordinates(world, mouse));
         let target = s.game.cam.screen_to_world(s.input.get_mouse_pos());
         let origin = s.game.players[0].position + Vec2 { x: 5.0, y: 5.0 };
         let length = (target - origin).length_squared();
@@ -317,7 +317,7 @@ fn remove_bullets_outside_camera(log: &mut Logger<Log>, bullets: &mut Vec<Bullet
 
 fn stop_benchmark(benchmarker: &mut Benchmarker, logger: &mut Logger<Log>, msg: &'static str) {
     if let Some(duration) = benchmarker.stop() {
-        logger.debug(Log::I64(
+        logger.debug("cli", Log::I64(
             msg,
             "µs",
             duration.num_microseconds().map(|x| x / 100).unwrap_or(-1),
@@ -326,7 +326,7 @@ fn stop_benchmark(benchmarker: &mut Benchmarker, logger: &mut Logger<Log>, msg: 
 }
 
 pub fn entry_point_client(s: &mut Client) {
-    s.logger.info(Log::Static("Creating grid"));
+    s.logger.info("cli", Log::Static("Creating grid"));
     initialize_grid(&mut s.game.grid);
     s.game.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
     random_map_generator::proc1(&mut s.game.grid, &s.display);
@@ -405,11 +405,11 @@ pub fn entry_point_client(s: &mut Client) {
             Ok(()) => {}
             Err(glium::SwapBuffersError::ContextLost) => {
                 s.logger
-                    .error(Log::Static("Context was lost while trying to swap buffers"));
+                    .error("cli", Log::Static("Context was lost while trying to swap buffers"));
             }
             Err(glium::SwapBuffersError::AlreadySwapped) => {
                 s.logger
-                    .error(Log::Static("OpenGL context has already been swapped"));
+                    .error("cli", Log::Static("OpenGL context has already been swapped"));
             }
         }
     }

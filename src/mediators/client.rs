@@ -317,7 +317,7 @@ fn remove_bullets_outside_camera(log: &mut Logger<Log>, bullets: &mut Vec<Bullet
 fn stop_benchmark(benchmarker: &mut Benchmarker, logger: &mut Logger<Log>, msg: &'static str) {
     if let Some(duration) = benchmarker.stop() {
         logger.debug(
-            "cli",
+            "benchmark",
             Log::I64(
                 msg,
                 "µs",

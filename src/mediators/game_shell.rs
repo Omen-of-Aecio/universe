@@ -240,6 +240,7 @@ fn log_context<'a>(s: &mut GameShell, commands: &[Data<'a>]) -> String {
             ctx = match context {
                 "cli" => "cli",
                 "gsh" => "gsh",
+                "benchmark" => "benchmark",
                 "lgr" => "lgr",
                 _ => return "Invalid logging context".into(),
             };

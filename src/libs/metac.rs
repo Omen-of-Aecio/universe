@@ -1,4 +1,4 @@
-//! A zero-allocation, no_std command language parser for custom interpreters.
+//! A zero-allocation, no_std, lisp-inspired command language parser for custom interpreters.
 //!
 //! Here's an example:
 //! ```
@@ -6,13 +6,13 @@
 //! fn main() {
 //!     struct Eval { }
 //!     impl Evaluate<()> for Eval {
-//!         fn evaluate<'a>(&mut self, commands: &[Data<'a>]) -> () {
-//!             for command in commands {
-//!                 match command {
+//!         fn evaluate(&mut self, statement: &[Data]) -> () {
+//!             for part in statement {
+//!                 match part {
 //!                     Data::Atom(string) => {}
 //!                     Data::Command(command_string) => {}
 //!                 }
-//!                 println!["{:?}", command];
+//!                 println!["{:?}", part];
 //!             }
 //!         }
 //!     }
@@ -31,8 +31,8 @@
 //! 1. Atoms - Basically strings
 //! 2. Commands - `()`-enclosed text.
 //!
-//! Note that commands are not expanded by metac, you have to do this yourself.
-//! A nested command like `something (alpha (beta gamma))` will be parsed as `[Atom("something"),
+//! Note that nested expressions are not expanded by metac, you have to do this yourself.
+//! A statement with nesting like `something (alpha (beta gamma))` will be parsed as `[Atom("something"),
 //! Command("alpha (beta gamma)")]`.
 //! Your evaluator decides whether it will parse the contents or use it for something different.
 //!
@@ -50,10 +50,10 @@
 //!         }
 //!     }
 //!     impl Evaluate<String> for Eval {
-//!         fn evaluate<'a>(&mut self, commands: &[Data<'a>]) -> String {
-//!             if commands.len() == 2 {
-//!                 if let Data::Atom("Get") = commands[0] {
-//!                     if let Data::Atom(key) = commands[1] {
+//!         fn evaluate(&mut self, statement: &[Data]) -> String {
+//!             if statement.len() == 2 {
+//!                 if let Data::Atom("Get") = statement[0] {
+//!                     if let Data::Atom(key) = statement[1] {
 //!                         return self.hashmap.get(key).unwrap().clone();
 //!                     }
 //!                 }
@@ -83,8 +83,8 @@
 //!         invoked: usize,
 //!     }
 //!     impl Evaluate<usize> for Eval {
-//!         fn evaluate(&mut self, commands: &[Data]) -> usize{
-//!             commands.len()
+//!         fn evaluate(&mut self, statement: &[Data]) -> usize {
+//!             statement.len()
 //!         }
 //!     }
 //!
@@ -95,6 +95,11 @@
 //!     // Note: The return value is the result of interpreting the last statement, which is why
 //!     // it returns 3 instead of 2 (the first statement) or 5 (the sum).
 //!     assert_eq![3, eval.interpret_multiple("Here are\ntwo unrelated statements").unwrap()];
+//!     assert_eq![5, eval.interpret_single("Here are\ntwo unrelated statements").unwrap()];
+//!
+//!     // Because the "\n" was present during an opening parenthesis, both lines are considered
+//!     // part of the same statement, hence 5 elements in this statement.
+//!     assert_eq![5, eval.interpret_multiple("This is (\na) single statement").unwrap()];
 //! }
 //! ```
 #![feature(test)]
@@ -107,11 +112,15 @@ const BUFFER_SIZE: usize = 32;
 /// Distinguishes atoms from commands
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Data<'a> {
+    /// An atom is a single, non-whitespace non-(), connected string of characters
     Atom(&'a str),
+    /// A command represents the contents (including whitespace) inside (), excluding the outer
+    /// parentheses. It may contain inner ()-characters.
     Command(&'a str),
 }
 
 impl<'a> Data<'a> {
+    /// Get the raw string data
     pub fn content(&self) -> &'a str {
         match *self {
             Data::Atom(string) => string,
@@ -126,8 +135,14 @@ impl<'a> Data<'a> {
 /// `DanglingLeftParenthesis` refers to an unclosed `(` in the line.
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
+    /// A left parenthesis has been left open
     DanglingLeftParenthesis,
+    /// There are too many elements for the parser to handle
+    ///
+    /// To avoid this, either shorten the code or edit the `BUFFER_SIZE`
+    /// inside metac.
     InputHasTooManyElements,
+    /// A right parenthesis has been found without having read a corresponding left parenthesis
     PrematureRightParenthesis,
 }
 
@@ -135,26 +150,27 @@ pub enum ParseError {
 ///
 /// Central trait to add the interpreter to your custom evaluator
 pub trait Evaluate<T: Default> {
-    /// Evaluate a single command
+    /// Evaluate a single statement 
     ///
-    /// Commands are line-separated pieces of code turned into fixed data
-    /// segments.
-    fn evaluate<'a>(&mut self, commands: &[Data<'a>]) -> T;
+    /// Statements are line-separated pieces of code turned into fixed data
+    /// segments. See `interpret_single` and `interpret_multiple` on how to
+    /// parse statements.
+    fn evaluate<'a>(&mut self, statement: &[Data<'a>]) -> T;
     /// Set up the parser and call evaluate on the result
     ///
     /// This method expects 1 single statement, that is, it doesn't take in a bunch of
-    /// commands, but rather one single whole command. This single whole command can be on
-    /// multiple lines.
+    /// separate statements, but rather one single whole statement, even if it contains
+    /// newlines, which are considered whitespace and skipped.
     fn interpret_single(&mut self, statement: &str) -> Result<T, ParseError> {
         let mut data = [Data::Atom(&statement[0..]); BUFFER_SIZE]; // TODO Use MaybeUninit here to prevent default initialization, currently only on nightly
         let size = parse(statement, &mut data)?;
         Ok(self.evaluate(&data[0..size]))
     }
-    /// Interprets several statements one-by-one
+    /// Interpret several statements one-by-one
     ///
-    /// When calling this function, it will `interpret` a statement as quickly as possible,
-    /// normally, this happens when a newline is found. If however that same line contains
-    /// an unclosed opening parenthesis, we will need to include all lines coming after this one
+    /// When calling this function, it will `interpret` each individual statement,
+    /// Normally, this happens when a newline is found. If however that same line contains
+    /// an unclosed opening parenthesis, we will need to include some lines coming after this one
     /// in order to complete the statement.
     fn interpret_multiple(&mut self, code: &str) -> Result<T, ParseError> {
         let mut old_idx = 0;
@@ -181,6 +197,8 @@ pub trait Evaluate<T: Default> {
         Ok(result)
     }
 }
+
+// ---
 
 /// Parse an input line into a classified output buffer
 fn parse<'a>(line: &'a str, output: &mut [Data<'a>; BUFFER_SIZE]) -> Result<usize, ParseError> {
@@ -265,6 +283,50 @@ mod tests {
         assert_eq![Data::Atom("Log"), data[1]];
         assert_eq![Data::Atom("Level"), data[2]];
         assert_eq![Data::Atom("0"), data[3]];
+    }
+
+    #[test]
+    fn parse_weird_whitespace() {
+        let line = "Set Log\n\n\n Level  ( 0)";
+        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let count = parse(line, &mut data).unwrap();
+
+        assert_eq![4, count];
+        assert_eq![Data::Atom("Set"), data[0]];
+        assert_eq![Data::Atom("Log"), data[1]];
+        assert_eq![Data::Atom("Level"), data[2]];
+        assert_eq![Data::Command(" 0"), data[3]];
+    }
+
+    #[test]
+    fn empty_subcommand_parse() {
+        let line = "()";
+        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let count = parse(line, &mut data).unwrap();
+
+        assert_eq![1, count];
+        assert_eq![Data::Command(""), data[0]];
+    }
+
+    #[test]
+    fn empty_nested_subcommand_parse() {
+        let line = "(())";
+        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let count = parse(line, &mut data).unwrap();
+
+        assert_eq![1, count];
+        assert_eq![Data::Command("()"), data[0]];
+    }
+
+    #[test]
+    fn empty_nested_subcommand_with_more_empty_parse() {
+        let line = "(())()";
+        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let count = parse(line, &mut data).unwrap();
+
+        assert_eq![2, count];
+        assert_eq![Data::Command("()"), data[0]];
+        assert_eq![Data::Command(""), data[1]];
     }
 
     #[test]

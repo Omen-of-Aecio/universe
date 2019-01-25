@@ -2,7 +2,7 @@ use std::io::{self, BufRead, Read, Write};
 use std::net::TcpStream;
 
 fn main() -> io::Result<()> {
-    let mut listener = TcpStream::connect("127.0.0.1:32931").unwrap();
+    let mut listener = TcpStream::connect("127.0.0.1:32931")?;
     let mut buffer = String::new();
     let stdin = io::stdin();
     let stdout = io::stdout();

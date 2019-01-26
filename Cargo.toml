@@ -24,6 +24,12 @@ serde_derive = "1.0"
 time = "0.1.40"
 toml = "0.4.9"
 
+gfx = "0.17"
+gfx_window_sdl = "0.8"
+sdl2 = "0.31"
+
+[dev-dependencies]
+regex = "1.1.0"
 slog-async = "2.3"
 slog-json = "2.3"
 slog-scope = "4"
@@ -31,13 +37,6 @@ slog-stream = "1.2"
 slog-term = "2.3"
 # slog = { version = "2.3", features = ["max_level_trace", "release_max_level_trace"] }
 slog = "2.3"
-
-gfx = "0.17"
-gfx_window_sdl = "0.8"
-sdl2 = "0.31"
-
-[dev-dependencies]
-regex = "1.1.0"
 
 [features]
 default = []

@@ -29,7 +29,8 @@ slog-json = "2.3"
 slog-scope = "4"
 slog-stream = "1.2"
 slog-term = "2.3"
-slog = { version = "2.3", features = ["max_level_trace", "release_max_level_trace"] }
+# slog = { version = "2.3", features = ["max_level_trace", "release_max_level_trace"] }
+slog = "2.3"
 
 gfx = "0.17"
 gfx_window_sdl = "0.8"

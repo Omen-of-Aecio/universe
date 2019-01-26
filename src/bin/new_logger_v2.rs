@@ -285,16 +285,4 @@ mod tests {
             ]);
         });
     }
-
-    use slog::{Drain, Level};
-    #[bench]
-    fn message_slog(b: &mut Bencher) {
-        let decorator = slog_term::PlainDecorator::new(std::io::stdout());
-        let drain = slog_term::CompactFormat::new(decorator).build().fuse();
-        let drain = slog_async::Async::new(drain).build().fuse();
-        let log = slog::Logger::root(drain, o!("version" => "0.5"));
-        b.iter(|| {
-            black_box(trace![log, "{}", "Something may be done"]);
-        });
-    }
 }

@@ -176,7 +176,7 @@ const any_atom: X = X::Predicate("<atom>", any_atom_function);
 
 impl Evaluate<String> for GameShell {
     fn evaluate<'a>(&mut self, commands: &[Data<'a>]) -> String {
-        let spec: &[(Vec<_>, &Fn(&mut GameShell, &[Data]) -> String)] = &[
+        let spec: &[(Vec<_>, &dyn Fn(&mut GameShell, &[Data]) -> String)] = &[
             (
                 vec![X::Atom("log"), X::Atom("global"), X::Atom("level"), any_u8],
                 &log,
@@ -269,8 +269,8 @@ fn log(s: &mut GameShell, commands: &[Data]) -> String {
     }
 }
 
-fn log_context<'a>(s: &mut GameShell, commands: &[Data<'a>]) -> String {
-    let mut ctx;
+fn log_context(s: &mut GameShell, commands: &[Data]) -> String {
+    let ctx;
     match commands[0] {
         Data::Atom(context) => {
             ctx = match context {

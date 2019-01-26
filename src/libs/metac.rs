@@ -150,7 +150,7 @@ pub enum ParseError {
 ///
 /// Central trait to add the interpreter to your custom evaluator
 pub trait Evaluate<T: Default> {
-    /// Evaluate a single statement 
+    /// Evaluate a single statement
     ///
     /// Statements are line-separated pieces of code turned into fixed data
     /// segments. See `interpret_single` and `interpret_multiple` on how to

@@ -3,13 +3,29 @@ use crate::libs::{
     logger::Logger,
     metac::{Data, Evaluate},
 };
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::str::from_utf8;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::thread::{self, JoinHandle};
 
-pub fn spawn(logger: Logger<Log>) -> JoinHandle<()> {
-    thread::spawn(move || game_shell_thread(GameShell { logger }))
+pub fn spawn(logger: Logger<Log>) -> (JoinHandle<()>, Arc<AtomicBool>) {
+    let keep_running = Arc::new(AtomicBool::new(true));
+    let keep_running_clone = keep_running.clone();
+    (
+        thread::spawn(move || {
+            game_shell_thread(GameShell {
+                logger,
+                keep_running,
+            })
+        }),
+        keep_running_clone,
+    )
 }
 
 fn connection_loop(s: &mut GameShell, mut stream: TcpStream) -> io::Result<()> {
@@ -80,8 +96,11 @@ fn game_shell_thread(mut s: GameShell) {
         Ok(listener) => {
             s.logger
                 .info("gsh", Log::Static("Started GameShell server"));
-            loop {
+            'outer_loop: loop {
                 for stream in listener.incoming() {
+                    if !s.keep_running.load(Ordering::Relaxed) {
+                        break 'outer_loop;
+                    }
                     match stream {
                         Ok(stream) => {
                             let mut shell_clone = s.clone();

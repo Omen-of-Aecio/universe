@@ -13,7 +13,10 @@ use serde_derive::Deserialize;
 use std::{
     collections::{BTreeMap, HashMap},
     net::SocketAddr,
-    sync::{atomic::AtomicUsize, Arc},
+    sync::{
+        atomic::{AtomicBool, AtomicUsize},
+        Arc,
+    },
     time::Duration,
     vec::Vec,
 };
@@ -31,6 +34,7 @@ pub struct Main<'a> {
 pub struct Threads {
     pub logger: Option<std::thread::JoinHandle<()>>,
     pub game_shell: Option<std::thread::JoinHandle<()>>,
+    pub game_shell_keep_running: Option<Arc<AtomicBool>>,
 }
 
 // ---
@@ -38,6 +42,7 @@ pub struct Threads {
 #[derive(Clone)]
 pub struct GameShell {
     pub logger: Logger<Log>,
+    pub keep_running: Arc<AtomicBool>,
 }
 
 // ---

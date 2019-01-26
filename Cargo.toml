@@ -35,6 +35,9 @@ gfx = "0.17"
 gfx_window_sdl = "0.8"
 sdl2 = "0.31"
 
+[dev-dependencies]
+regex = "1.1.0"
+
 [features]
 default = []
 dev = []

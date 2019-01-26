@@ -19,16 +19,58 @@ pub fn spawn(logger: Logger<Log>) -> (JoinHandle<()>, Arc<AtomicBool>) {
     let keep_running_clone = keep_running.clone();
     (
         thread::spawn(move || {
+            let mut nest = Nest::new();
+            for spell in SPEC {
+                build_nest(&mut nest, spell.0, spell.1);
+            }
             game_shell_thread(GameShell {
                 logger,
                 keep_running,
+                commands: nest,
             })
         }),
         keep_running_clone,
     )
 }
 
-fn connection_loop(s: &mut GameShell, mut stream: TcpStream) -> io::Result<()> {
+// ---
+
+fn clone_and_spawn_connection_handler(s: &GameShell<Nest>, stream: TcpStream) -> JoinHandle<()> {
+    let mut logger = s.logger.clone();
+    let keep_running = s.keep_running.clone();
+    thread::spawn(move || {
+        let mut nest = Nest::new();
+        for spell in SPEC {
+            logger.info("gsh", Log::Static("Building nest..."));
+            build_nest(&mut nest, spell.0, spell.1);
+        }
+        let mut shell_clone = GameShell {
+            logger,
+            keep_running,
+            commands: nest,
+        };
+        let result = connection_loop(&mut shell_clone, stream);
+        match result {
+            Ok(()) => {
+                shell_clone
+                    .logger
+                    .debug("gsh", Log::Static("Connection ended ok"));
+            }
+            Err(error) => {
+                shell_clone.logger.debug(
+                    "gsh",
+                    Log::StaticDynamic(
+                        "Connection errored out",
+                        "reason",
+                        format!["{:?}", error],
+                    ),
+                );
+            }
+        }
+    })
+}
+
+fn connection_loop<'a>(s: &mut GameShell<Nest<'a>>, mut stream: TcpStream) -> io::Result<()> {
     s.logger.debug("gsh", Log::Static("Acquired new stream"));
     const BUFFER_SIZE: usize = 129;
     let mut buffer = [0; BUFFER_SIZE];
@@ -90,7 +132,7 @@ fn connection_loop(s: &mut GameShell, mut stream: TcpStream) -> io::Result<()> {
     Ok(())
 }
 
-fn game_shell_thread(mut s: GameShell) {
+fn game_shell_thread<'a>(mut s: GameShell<Nest<'a>>) {
     let listener = TcpListener::bind("127.0.0.1:32931");
     match listener {
         Ok(listener) => {
@@ -103,27 +145,7 @@ fn game_shell_thread(mut s: GameShell) {
                     }
                     match stream {
                         Ok(stream) => {
-                            let mut shell_clone = s.clone();
-                            thread::spawn(move || {
-                                let result = connection_loop(&mut shell_clone, stream);
-                                match result {
-                                    Ok(()) => {
-                                        shell_clone
-                                            .logger
-                                            .debug("gsh", Log::Static("Connection ended ok"));
-                                    }
-                                    Err(error) => {
-                                        shell_clone.logger.debug(
-                                            "gsh",
-                                            Log::StaticDynamic(
-                                                "Connection errored out",
-                                                "reason",
-                                                format!["{:?}", error],
-                                            ),
-                                        );
-                                    }
-                                }
-                            });
+                            clone_and_spawn_connection_handler(&s, stream);
                         }
                         Err(error) => {
                             s.logger.error(
@@ -154,10 +176,55 @@ fn game_shell_thread(mut s: GameShell) {
 
 // ---
 
-enum X {
-    Atom(&'static str),
-    Predicate(&'static str, fn(&str) -> bool),
+type Pred<'a> = (&'a str, fn(&str) -> bool);
+#[derive(Clone, Copy)]
+enum X<'a> {
+    Atom(&'a str),
+    Predicate(&'a str, (&'a str, fn(&str) -> bool)),
 }
+
+impl<'a> std::fmt::Debug for X<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            X::Atom(atom) => {
+                write![f, "X::Atom({})", atom]
+            }
+            X::Predicate(descriptor, _) => {
+                write![f, "X::Predicate({}, <function>)", descriptor]
+            }
+        }
+    }
+}
+
+impl<'a> Hash for X<'a> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            X::Atom(string) => {
+                string.hash(state);
+            }
+            X::Predicate(string, _) => {
+                string.hash(state);
+            }
+        }
+    }
+}
+
+impl<'a> PartialEq for X<'a> {
+    fn eq(&self, other: &X) -> bool {
+        match self {
+            X::Atom(left) => match other {
+                X::Atom(right) => left == right,
+                X::Predicate(right, _) => left == right,
+            },
+            X::Predicate(left, _) => match other {
+                X::Atom(right) => left == right,
+                X::Predicate(right, _) => left == right,
+            },
+        }
+    }
+}
+
+impl<'a> Eq for X<'a> {}
 
 fn any_u8_function(input: &str) -> bool {
     input.parse::<u8>().is_ok()
@@ -171,88 +238,156 @@ fn any_atom_function(input: &str) -> bool {
     }
     true
 }
-const any_u8: X = X::Predicate("<u8>", any_u8_function);
-const any_atom: X = X::Predicate("<atom>", any_atom_function);
+const any_u8: Pred = ("<u8>", any_u8_function);
+const any_atom: Pred = ("<atom>", any_atom_function);
 
-impl Evaluate<String> for GameShell {
-    fn evaluate<'a>(&mut self, commands: &[Data<'a>]) -> String {
-        let spec: &[(Vec<_>, &dyn Fn(&mut GameShell, &[Data]) -> String)] = &[
-            (
-                vec![X::Atom("log"), X::Atom("global"), X::Atom("level"), any_u8],
-                &log,
-            ),
-            (
-                vec![
-                    X::Atom("log"),
-                    X::Atom("context"),
-                    any_atom,
-                    X::Atom("level"),
-                    any_u8,
-                ],
-                &log_context,
-            ),
-        ];
+type Fun<'a> = fn(&mut GameShell<Nest<'a>>, &[Data]) -> String;
+type Ether<'a> = Either<Nest<'a>, Fun<'a>>;
 
-        fn samplify(xs: &[X]) -> String {
-            let mut string = String::new();
-            for x in xs {
-                match x {
-                    X::Atom(sample) => string += sample,
-                    X::Predicate(name, _) => string += name,
+impl<'a> std::fmt::Debug for Ether<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Either::Left(atom) => {
+                write![f, "Nest {:?}", atom]
+            }
+            Either::Right(atom) => {
+                write![f, "Right <function>"]
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
+enum Either<L: Clone, R: Clone> {
+    Left(L),
+    Right(R),
+}
+#[derive(Clone, Debug)]
+struct Nest<'a> {
+    pub head: HashMap<X<'a>, Ether<'a>>,
+}
+impl<'a> Nest<'a> {
+    fn new() -> Self {
+        Self {
+            head: HashMap::new(),
+        }
+    }
+}
+const SPEC: &[(&[X], Fun)] = &[
+    (
+        &[X::Atom("log"), X::Atom("global"), X::Predicate("level", any_u8)],
+        log,
+    ),
+    (
+       &[ 
+            X::Atom("log"),
+            X::Predicate("context", any_atom),
+            X::Predicate("level", any_u8),
+        ],
+        log_context,
+    ),
+];
+
+fn build_nest<'a>(nest: &mut Nest<'a>, commands: &'a [X], handler: Fun<'a>) -> Option<Ether<'a>> {
+    if commands.len() != 0 {
+        // Does the nest already contain this command?
+        if nest.head.get_mut(&commands[0]).is_some() {
+            match nest.head.get_mut(&commands[0]) {
+                Some(Either::Left(subnest)) => {
+                    let ether = build_nest(subnest , &commands[1..], handler);
+                    if let Some(ether) = ether {
+                        subnest.head.insert(commands[0], ether);
+                    }
+                    None
+                }
+                Some(Either::Right(handler)) => {
+                    unreachable![];
+                }
+                None => {
+                    unreachable![];
                 }
             }
-            string
+        } else {
+            let mut ether = Nest::new();
+            let result = build_nest(&mut ether, &commands[1..], handler);
+            if result.is_some() {
+                nest.head.insert(commands[0], result.unwrap());
+            } else {
+                nest.head.insert(commands[0], Either::Left(ether));
+            }
+            None
         }
+    } else {
+        Some(Either::Right(handler))
+    }
+}
+
+impl<'a> Evaluate<String> for GameShell<Nest<'a>> {
+    fn evaluate<'b>(&mut self, commands: &[Data<'b>]) -> String {
 
         let mut args = vec![];
 
-        'outer: for command in spec.iter() {
-            args.clear();
-            if command.0.len() == commands.len() {
-                for (idx, part) in command.0.iter().enumerate() {
-                    match part {
-                        X::Atom(string) => {
-                            match commands[idx] {
-                                Data::Atom(other) => {
-                                    if string == &other {
-                                        // OK
-                                    } else {
-                                        continue 'outer;
+        let mut nest = &self.commands.head;
+        let mut to_handle: Fun = invalid;
+        let mut to_predicate: Option<fn(&str) -> bool> = None;
+        let mut last_predicate_name = "";
+
+        for c in commands {
+            match c {
+                Data::Atom(atom) => {
+                    if let Some(pred) = to_predicate {
+                        let result = pred(atom);
+                        self.logger.debug("gsh", Log::Bool("Predicate evaluated", "result", result));
+                        if result {
+                            to_predicate = None;
+                            args.push(c.clone());
+                        } else {
+                            return format!["Expected: {}, but got: {:?}", last_predicate_name, atom];
+                        }
+                    } else {
+                        match nest.get_key_value(&X::Atom(atom)) {
+                            Some((x, up_next)) => {
+                                match x {
+                                    X::Atom(_) => {
+                                        self.logger.debug("gsh", Log::StaticDynamic("Found command", "entry", (*atom).into()));
+                                    }
+                                    X::Predicate(_, (desc, pred)) => {
+                                        self.logger.debug("gsh", Log::StaticDynamic("Found predicate", "entry", (*atom).into()));
+                                        to_predicate = Some(*pred);
+                                        last_predicate_name = desc;
                                     }
                                 }
-                                _ => {
-                                    continue 'outer;
+                                match up_next {
+                                    Either::Left(next) => {
+                                        nest = &next.head;
+                                    }
+                                    Either::Right(handler) => {
+                                        to_handle = *handler;
+                                    }
                                 }
                             }
-                        }
-                        X::Predicate(desc, predf) => {
-                            match commands[idx] {
-                                Data::Atom(other) => {
-                                    if predf(&other) {
-                                        // OK
-                                        args.push(Data::Atom(other));
-                                    } else {
-                                        return format!["Expected {}", desc];
-                                    }
-                                }
-                                _ => {
-                                    continue 'outer;
-                                }
+                            None => {
                             }
                         }
                     }
                 }
-                // We have gotten here, so the command matches.
-                return command.1(self, &args);
+                Data::Command(cmd) => {
+                    unimplemented![];
+                }
             }
         }
-        return format!["Unknown command"];
+
+        to_handle(self, &args[..])
     }
 }
 
 // ---
 
-fn log(s: &mut GameShell, commands: &[Data]) -> String {
+fn invalid<'a>(s: &mut GameShell<Nest<'a>>, commands: &[Data]) -> String {
+    "Command not found".into()
+}
+
+fn log<'a>(s: &mut GameShell<Nest<'a>>, commands: &[Data]) -> String {
     match commands[0] {
         Data::Atom(number) => {
             let value = number.parse::<u8>();
@@ -269,7 +404,7 @@ fn log(s: &mut GameShell, commands: &[Data]) -> String {
     }
 }
 
-fn log_context(s: &mut GameShell, commands: &[Data]) -> String {
+fn log_context<'a>(s: &mut GameShell<Nest<'a>>, commands: &[Data]) -> String {
     let ctx;
     match commands[0] {
         Data::Atom(context) => {

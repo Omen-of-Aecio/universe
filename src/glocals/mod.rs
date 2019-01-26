@@ -40,9 +40,10 @@ pub struct Threads {
 // ---
 
 #[derive(Clone)]
-pub struct GameShell {
+pub struct GameShell<T: Send + Sync> {
     pub logger: Logger<Log>,
     pub keep_running: Arc<AtomicBool>,
+    pub commands: T,
 }
 
 // ---

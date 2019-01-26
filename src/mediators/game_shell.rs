@@ -277,7 +277,7 @@ fn log_context(s: &mut GameShell, commands: &[Data]) -> String {
                 "cli" => "cli",
                 "gsh" => "gsh",
                 "benchmark" => "benchmark",
-                "lgr" => "lgr",
+                "logger" => "logger",
                 _ => return "Invalid logging context".into(),
             };
         }

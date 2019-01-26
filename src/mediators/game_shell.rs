@@ -86,7 +86,24 @@ fn game_shell_thread(mut s: GameShell) {
                         Ok(stream) => {
                             let mut shell_clone = s.clone();
                             thread::spawn(move || {
-                                let _ = connection_loop(&mut shell_clone, stream);
+                                let result = connection_loop(&mut shell_clone, stream);
+                                match result {
+                                    Ok(()) => {
+                                        shell_clone
+                                            .logger
+                                            .debug("gsh", Log::Static("Connection ended ok"));
+                                    }
+                                    Err(error) => {
+                                        shell_clone.logger.debug(
+                                            "gsh",
+                                            Log::StaticDynamic(
+                                                "Connection errored out",
+                                                "reason",
+                                                format!["{:?}", error],
+                                            ),
+                                        );
+                                    }
+                                }
                             });
                         }
                         Err(error) => {

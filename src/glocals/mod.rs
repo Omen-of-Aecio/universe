@@ -56,6 +56,7 @@ pub enum Log {
     I64(&'static str, &'static str, i64),
     Static(&'static str),
     StaticDynamic(&'static str, &'static str, String),
+    StaticDynamics(&'static str, Vec<(&'static str, String)>),
     U64(&'static str, &'static str, u64),
     Usize(&'static str, &'static str, usize),
 }
@@ -71,6 +72,18 @@ impl std::fmt::Display for Log {
             Log::I64(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
             Log::Static(str) => write![f, "{}", str],
             Log::StaticDynamic(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
+            Log::StaticDynamics(msg, kvs) => {
+                write![f, "{}", msg]?;
+                if kvs.len() >= 1 {
+                    write![f, ", "];
+                    for kv in kvs.iter().take(kvs.len() - 1) {
+                        write![f, "{}={}, ", kv.0, kv.1]?;
+                    }
+                    let kv = kvs.last().unwrap();
+                    write![f, "{}={}", kv.0, kv.1]?;
+                }
+                Ok(())
+            }
             Log::U64(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
             Log::Usize(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
         }

@@ -217,8 +217,13 @@ fn any_atom_function(input: &str) -> Option<Input> {
     }
     Some(Input::Atom(input.into()))
 }
+
+fn any_string_function(input: &str) -> Option<Input> {
+    Some(Input::String(input.into()))
+}
 const any_u8: Pred = ("<u8>", any_u8_function);
 const any_atom: Pred = ("<atom>", any_atom_function);
+const any_string: Pred = ("<string>", any_string_function);
 
 type Fun<'a> = fn(&mut Gsh<'a>, &[Input]) -> String;
 type Ether<'a> = Either<Nest<'a>, Fun<'a>>;
@@ -260,6 +265,10 @@ const SPEC: &[(&[X], Fun)] = &[
     ),
     (
         &[X::Atom("ex")], number
+    ),
+    (
+        &[X::Atom("log"), X::Predicate("trace", any_string)],
+        log_trace,
     ),
     (
        &[ 
@@ -309,6 +318,7 @@ fn build_nest<'a>(nest: &mut Nest<'a>, commands: &'a [X], handler: Fun<'a>) -> O
 enum Input {
     U8(u8),
     Atom(String),
+    String(String),
 }
 
 // ---
@@ -322,99 +332,65 @@ impl<'a> Evaluate<String> for Gsh<'a> {
         let mut to_handle: Fun = unrecognized_command;
         let mut to_predicate: Option<(&str, &str, fn(&str) -> Option<Input>)> = None;
 
-        // Note change format to HashMap<&'a str, (X, Ether<'a>)>
-        // So we can avoid get_key_value (and nightly)
-        // and we get a more sane result from the table, also we don't need to create Hash,
-        // PartialEq, and so on, those feel like hacks in this case.
         for c in commands {
+            let string;
+            let mut atom;
+
             match c {
-                Data::Atom(atom) => {
-                    if let Some((name, desc, pred)) = to_predicate {
-                        let result = pred(atom);
-                        // self.logger.debug("gsh", Log::Bool("Predicate evaluated", "result", result));
-                        if let Some(result) = result {
-                            to_predicate = None;
-                            args.push(result.clone());
-                        } else {
-                            return format!["Expected: {}, but got: {:?}", desc, atom];
+                Data::Atom(atom2) => atom = *atom2,
+                Data::Command(cmd) => {
+                    match self.interpret_single(cmd) {
+                        Ok(result) => {
+                            string = result;
+                            atom = &string[..];
                         }
-                    } else {
-                        match nest.get(atom) {
-                            Some((x, up_next)) => {
-                                match x {
-                                    X::Atom(_) => {
-                                        self.logger.debug("gsh", Log::StaticDynamic("Found command", "entry", (*atom).into()));
-                                    }
-                                    X::Predicate(name, (desc, pred)) => {
-                                        self.logger.debug("gsh", Log::StaticDynamic("Found predicate", "entry", (*atom).into()));
-                                        to_predicate = Some((name, desc, *pred));
-                                    }
-                                }
-                                match up_next {
-                                    Either::Left(next) => {
-                                        nest = next.head.clone();
-                                    }
-                                    Either::Right(handler) => {
-                                        to_handle = *handler;
-                                    }
-                                }
+                        Err(error) => return format!["Error parsing: {}", cmd],
+                    };
+                }
+            }
+            if let Some((name, desc, pred)) = to_predicate {
+                let result = pred(atom);
+                self.logger.debug("gsh", Log::Bool("Predicate evaluated as atom", "is_ok", result.is_some()));
+                if let Some(result) = result {
+                    to_predicate = None;
+                    args.push(result.clone());
+                } else {
+                    return format!["Expected: {}, but got: {:?}", desc, atom];
+                }
+            } else {
+                match nest.get(atom) {
+                    Some((x, up_next)) => {
+                        match x {
+                            X::Atom(_) => {
+                                self.logger.debug("gsh", Log::StaticDynamic("Found command", "entry", (*atom).into()));
                             }
-                            None => {
-                                return format!["Unrecognized command"];
+                            X::Predicate(name, (desc, pred)) => {
+                                self.logger.debug("gsh", Log::StaticDynamic("Found predicate", "entry", (*atom).into()));
+                                to_predicate = Some((name, desc, *pred));
+                            }
+                        }
+                        match up_next {
+                            Either::Left(next) => {
+                                nest = next.head.clone();
+                            }
+                            Either::Right(handler) => {
+                                to_handle = *handler;
                             }
                         }
                     }
-                }
-                Data::Command(cmd) => {
-                    self.logger.debug("gsh", Log::StaticDynamic("CMD", "input", (*cmd).into()));
-                    let result = match self.interpret_single(cmd) {
-                        Ok(result) => result,
-                        Err(error) => return format!["Error parsing: {}", cmd],
-                    };
-                    let atom: &str = &result;
-                    if let Some((name, desc, pred)) = to_predicate {
-                        let result = pred(atom);
-                        // self.logger.debug("gsh", Log::Bool("Predicate evaluated", "result", result));
-                        if let Some(result) = result {
-                            to_predicate = None;
-                            args.push(result.clone());
-                        } else {
-                            return format!["Expected: {}, but got: {:?}", desc, atom];
-                        }
-                    } else {
-                        match nest.get(atom) {
-                            Some((x, up_next)) => {
-                                match x {
-                                    X::Atom(_) => {
-                                        self.logger.debug("gsh", Log::StaticDynamic("Found command", "entry", (*atom).into()));
-                                    }
-                                    X::Predicate(name, (desc, pred)) => {
-                                        self.logger.debug("gsh", Log::StaticDynamic("Found predicate", "entry", (*atom).into()));
-                                        to_predicate = Some((name, desc, *pred));
-                                    }
-                                }
-                                match up_next {
-                                    Either::Left(next) => {
-                                        nest = next.head.clone();
-                                    }
-                                    Either::Right(handler) => {
-                                        to_handle = *handler;
-                                    }
-                                }
-                            }
-                            None => {
-                                return format!["Unrecognized command"];
-                            }
-                        }
+                    None => {
+                        return format!["Unrecognized command"];
                     }
                 }
             }
         }
 
         if let Some((name, desc, _)) = to_predicate {
-            return format!["Missing predicate value: {} of type: {}", name, desc];
+            self.logger.debug("gsh", Log::StaticDynamics("Unresolved predicate. Aborting", vec![("name", name.into()), ("type", desc.into())]));
+            return format!["Missing predicate, value={}, type={}", name, desc];
         }
 
+        self.logger.debug("gsh", Log::Static("Command resolved, calling handler"));
         to_handle(self, &args[..])
     }
 }
@@ -422,10 +398,10 @@ impl<'a> Evaluate<String> for Gsh<'a> {
 // ---
 
 fn unrecognized_command<'a>(s: &mut Gsh<'a>, commands: &[Input]) -> String {
-    "Command not found".into()
+    "Command not finished".into()
 }
 
-fn log<'a>(s: &mut Gsh<'a>, commands: &[Input]) -> String {
+fn log(s: &mut Gsh, commands: &[Input]) -> String {
     match commands[0] {
         Input::U8(level) => {
             s.logger.set_log_level(level);
@@ -439,12 +415,23 @@ fn number(s: &mut Gsh, commands: &[Input]) -> String {
     "0".into()
 }
 
-fn log_context<'a>(s: &mut Gsh<'a>, commands: &[Input]) -> String {
+fn log_trace(s: &mut Gsh, commands: &[Input]) -> String {
+    match commands[0] {
+        Input::String(ref string) => {
+            s.logger.trace("user", Log::Dynamic(string.clone()));
+            "OK".into()
+        }
+        _ => "Error".into()
+    }
+}
+
+fn log_context(s: &mut Gsh, commands: &[Input]) -> String {
     let ctx;
     match commands[0] {
         Input::Atom(ref context) => {
             ctx = match &context[..] {
                 "cli" => "cli",
+                "trace" => "trace",
                 "gsh" => "gsh",
                 "benchmark" => "benchmark",
                 "logger" => "logger",

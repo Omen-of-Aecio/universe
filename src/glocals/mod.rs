@@ -75,7 +75,7 @@ impl std::fmt::Display for Log {
             Log::StaticDynamics(msg, kvs) => {
                 write![f, "{}", msg]?;
                 if kvs.len() >= 1 {
-                    write![f, ", "];
+                    write![f, ", "]?;
                     for kv in kvs.iter().take(kvs.len() - 1) {
                         write![f, "{}={}, ", kv.0, kv.1]?;
                     }

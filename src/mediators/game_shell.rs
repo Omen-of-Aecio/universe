@@ -176,78 +176,39 @@ fn game_shell_thread<'a>(mut s: Gsh<'a>) {
 
 // ---
 
-type Gsh<'a> = GameShell<Arc<Nest<'a>>>;
-type Pred<'a> = (&'a str, fn(&str) -> Option<Input>);
-#[derive(Clone, Copy)]
-enum X<'a> {
-    Atom(&'a str),
-    Predicate(&'a str, Pred<'a>),
-}
-
-impl<'a> X<'a> {
-    fn name(&self) -> &'a str {
-        match self {
-            X::Atom(name) => name,
-            X::Predicate(name, _) => name,
-        }
-    }
-}
-impl<'a> std::fmt::Debug for X<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            X::Atom(atom) => {
-                write![f, "X::Atom({})", atom]
-            }
-            X::Predicate(descriptor, _) => {
-                write![f, "X::Predicate({}, <function>)", descriptor]
+mod predicates {
+    use super::*;
+    fn any_atom_function(input: &str) -> Option<Input> {
+        for i in input.chars() {
+            if i.is_whitespace() {
+                return None;
             }
         }
+        Some(Input::Atom(input.into()))
     }
-}
-
-fn any_u8_function(input: &str) -> Option<Input> {
-    input.parse::<u8>().ok().map(|x| Input::U8(x))
-}
-
-fn any_atom_function(input: &str) -> Option<Input> {
-    for i in input.chars() {
-        if i.is_whitespace() {
-            return None;
-        }
+    fn any_string_function(input: &str) -> Option<Input> {
+        Some(Input::String(input.into()))
     }
-    Some(Input::Atom(input.into()))
-}
-
-fn any_string_function(input: &str) -> Option<Input> {
-    Some(Input::String(input.into()))
-}
-const any_u8: Pred = ("<u8>", any_u8_function);
-const any_atom: Pred = ("<atom>", any_atom_function);
-const any_string: Pred = ("<string>", any_string_function);
-
-type Fun<'a> = fn(&mut Gsh<'a>, &[Input]) -> String;
-type Ether<'a> = Either<Nest<'a>, Fun<'a>>;
-
-impl<'a> std::fmt::Debug for Ether<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Either::Left(atom) => {
-                write![f, "Nest {:?}", atom]
-            }
-            Either::Right(atom) => {
-                write![f, "Right <function>"]
-            }
-        }
+    fn any_u8_function(input: &str) -> Option<Input> {
+        input.parse::<u8>().ok().map(|x| Input::U8(x))
     }
+    pub const ANY_ATOM: Pred = ("<atom>", any_atom_function);
+    pub const ANY_STRING: Pred = ("<string>", any_string_function);
+    pub const ANY_U8: Pred = ("<u8>", any_u8_function);
 }
+use self::predicates::*;
+use self::command_handlers::*;
 
 #[derive(Clone)]
-enum Either<L: Clone, R: Clone> {
+pub enum Either<L: Clone, R: Clone> {
     Left(L),
     Right(R),
 }
-#[derive(Clone, Debug)]
-struct Nest<'a> {
+type Ether<'a> = Either<Nest<'a>, Fun<'a>>;
+type Fun<'a> = fn(&mut Gsh<'a>, &[Input]) -> String;
+type Gsh<'a> = GameShell<Arc<Nest<'a>>>;
+#[derive(Clone)]
+pub struct Nest<'a> {
     pub head: HashMap<&'a str, (X<'a>, Ether<'a>)>,
 }
 impl<'a> Nest<'a> {
@@ -257,24 +218,43 @@ impl<'a> Nest<'a> {
         }
     }
 }
+type Pred<'a> = (&'a str, fn(&str) -> Option<Input>);
+#[derive(Clone, Copy)]
+pub enum X<'a> {
+    Atom(&'a str),
+    Predicate(&'a str, Pred<'a>),
+}
+impl<'a> X<'a> {
+    fn name(&self) -> &'a str {
+        match self {
+            X::Atom(name) => name,
+            X::Predicate(name, _) => name,
+        }
+    }
+}
+
+// ---
 
 const SPEC: &[(&[X], Fun)] = &[
     (
-        &[X::Atom("log"), X::Atom("global"), X::Predicate("level", any_u8)],
+        &[X::Atom("log"), X::Atom("global"), X::Predicate("level", ANY_U8)],
         log,
     ),
     (
         &[X::Atom("ex")], number
     ),
+    // (
+    //     &[X::Atom("ex"), X::Atom("a")], number
+    // ),
     (
-        &[X::Atom("log"), X::Predicate("trace", any_string)],
+        &[X::Atom("log"), X::Predicate("trace", ANY_STRING)],
         log_trace,
     ),
     (
        &[ 
             X::Atom("log"),
-            X::Predicate("context", any_atom),
-            X::Predicate("level", any_u8),
+            X::Predicate("context", ANY_ATOM),
+            X::Predicate("level", ANY_U8),
         ],
         log_context,
     ),
@@ -315,7 +295,7 @@ fn build_nest<'a>(nest: &mut Nest<'a>, commands: &'a [X], handler: Fun<'a>) -> O
 }
 
 #[derive(Clone)]
-enum Input {
+pub enum Input {
     U8(u8),
     Atom(String),
     String(String),
@@ -333,8 +313,7 @@ impl<'a> Evaluate<String> for Gsh<'a> {
         let mut to_predicate: Option<(&str, &str, fn(&str) -> Option<Input>)> = None;
 
         for c in commands {
-            let string;
-            let mut atom;
+            let (atom, string);
 
             match c {
                 Data::Atom(atom2) => atom = *atom2,
@@ -350,7 +329,7 @@ impl<'a> Evaluate<String> for Gsh<'a> {
             }
             if let Some((name, desc, pred)) = to_predicate {
                 let result = pred(atom);
-                self.logger.debug("gsh", Log::Bool("Predicate evaluated as atom", "is_ok", result.is_some()));
+                self.logger.debug("gsh", Log::Bool("Predicate evaluated", "is_ok", result.is_some()));
                 if let Some(result) = result {
                     to_predicate = None;
                     args.push(result.clone());
@@ -362,7 +341,7 @@ impl<'a> Evaluate<String> for Gsh<'a> {
                     Some((x, up_next)) => {
                         match x {
                             X::Atom(_) => {
-                                self.logger.debug("gsh", Log::StaticDynamic("Found command", "entry", (*atom).into()));
+                                self.logger.debug("gsh", Log::StaticDynamic("Found atom", "entry", (*atom).into()));
                             }
                             X::Predicate(name, (desc, pred)) => {
                                 self.logger.debug("gsh", Log::StaticDynamic("Found predicate", "entry", (*atom).into()));
@@ -397,64 +376,86 @@ impl<'a> Evaluate<String> for Gsh<'a> {
 
 // ---
 
-fn unrecognized_command<'a>(s: &mut Gsh<'a>, commands: &[Input]) -> String {
-    "Command not finished".into()
-}
+mod command_handlers {
+    use super::*;
 
-fn log(s: &mut Gsh, commands: &[Input]) -> String {
-    match commands[0] {
-        Input::U8(level) => {
-            s.logger.set_log_level(level);
-            "OK: Changed log level".into()
-        }
-        _ => "Usage: log level <u8>".into(),
+    pub fn unrecognized_command<'a>(s: &mut Gsh<'a>, commands: &[Input]) -> String {
+        "Command not finished".into()
     }
-}
 
-fn number(s: &mut Gsh, commands: &[Input]) -> String {
-    "0".into()
-}
-
-fn log_trace(s: &mut Gsh, commands: &[Input]) -> String {
-    match commands[0] {
-        Input::String(ref string) => {
-            s.logger.trace("user", Log::Dynamic(string.clone()));
-            "OK".into()
+    pub fn log(s: &mut Gsh, commands: &[Input]) -> String {
+        match commands[0] {
+            Input::U8(level) => {
+                s.logger.set_log_level(level);
+                "OK: Changed log level".into()
+            }
+            _ => "Usage: log level <u8>".into(),
         }
-        _ => "Error".into()
     }
-}
 
-fn log_context(s: &mut Gsh, commands: &[Input]) -> String {
-    let ctx;
-    match commands[0] {
-        Input::Atom(ref context) => {
-            ctx = match &context[..] {
-                "cli" => "cli",
-                "trace" => "trace",
-                "gsh" => "gsh",
-                "benchmark" => "benchmark",
-                "logger" => "logger",
-                _ => return "Invalid logging context".into(),
-            };
-        }
-        _ => return "Usage: log context <atom> level <u8>".into(),
+    pub fn number(s: &mut Gsh, commands: &[Input]) -> String {
+        "0".into()
     }
-    match commands[1] {
-        Input::U8(level) => {
-            s.logger.set_context_specific_log_level(ctx, level);
-            "OK: Changed log level".into()
+
+    pub fn log_trace(s: &mut Gsh, commands: &[Input]) -> String {
+        match commands[0] {
+            Input::String(ref string) => {
+                s.logger.trace("user", Log::Dynamic(string.clone()));
+                "OK".into()
+            }
+            _ => "Error".into()
         }
-        _ => "Usage: log context <atom> level <u8>".into(),
+    }
+
+    pub fn log_context(s: &mut Gsh, commands: &[Input]) -> String {
+        let ctx;
+        match commands[0] {
+            Input::Atom(ref context) => {
+                ctx = match &context[..] {
+                    "cli" => "cli",
+                    "trace" => "trace",
+                    "gsh" => "gsh",
+                    "benchmark" => "benchmark",
+                    "logger" => "logger",
+                    _ => return "Invalid logging context".into(),
+                };
+            }
+            _ => return "Usage: log context <atom> level <u8>".into(),
+        }
+        match commands[1] {
+            Input::U8(level) => {
+                s.logger.set_context_specific_log_level(ctx, level);
+                "OK: Changed log level".into()
+            }
+            _ => "Usage: log context <atom> level <u8>".into(),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::io::{self, BufRead, Read, Write};
+    use std::net::TcpStream;
+    use std::sync::atomic::Ordering;
     use super::*;
 
     #[test]
-    fn parse_u8() {
-        "10".parse::<u8>().unwrap();
+    fn nondeterministic_change_log_level() -> io::Result<()> {
+        let (mut logger, logger_handle) = crate::libs::logger::Logger::spawn();
+        assert_ne![123, logger.get_log_level()];
+        let (mut gsh, keep_running) = spawn(logger.clone());
+        std::thread::sleep(std::time::Duration::new(0, 50_000_000));
+        {
+            let mut listener = TcpStream::connect("127.0.0.1:32931")?;
+            write![listener, "log global level 123"]?;
+            listener.flush()?;
+        }
+        std::thread::sleep(std::time::Duration::new(0, 50_000_000));
+        assert_eq![123, logger.get_log_level()];
+        keep_running.store(false, Ordering::Relaxed);
+        std::mem::drop(logger);
+        let mut listener = TcpStream::connect("127.0.0.1:32931")?;
+        logger_handle.join();
+        Ok(())
     }
 }

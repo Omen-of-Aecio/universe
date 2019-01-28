@@ -70,7 +70,7 @@ fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<
     })
 }
 
-fn connection_loop<'a>(s: &mut Gsh<'a>, mut stream: TcpStream) -> io::Result<()> {
+fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
     s.logger.debug("gsh", Log::Static("Acquired new stream"));
     const BUFFER_SIZE: usize = 129;
     let mut buffer = [0; BUFFER_SIZE];
@@ -208,6 +208,13 @@ type Ether<'a> = Either<Nest<'a>, Fun<'a>>;
 type Fun<'a> = fn(&mut Gsh<'a>, &[Input]) -> String;
 type Gsh<'a> = GameShell<Arc<Nest<'a>>>;
 #[derive(Clone)]
+pub enum Input {
+    U8(u8),
+    Atom(String),
+    String(String),
+}
+
+#[derive(Clone)]
 pub struct Nest<'a> {
     pub head: HashMap<&'a str, (X<'a>, Ether<'a>)>,
 }
@@ -223,12 +230,14 @@ type Pred<'a> = (&'a str, fn(&str) -> Option<Input>);
 pub enum X<'a> {
     Atom(&'a str),
     Predicate(&'a str, Pred<'a>),
+    Recurring(&'a str, Pred<'a>),
 }
 impl<'a> X<'a> {
     fn name(&self) -> &'a str {
         match self {
             X::Atom(name) => name,
             X::Predicate(name, _) => name,
+            X::Recurring(name, _) => name,
         }
     }
 }
@@ -243,9 +252,9 @@ const SPEC: &[(&[X], Fun)] = &[
     (
         &[X::Atom("ex")], number
     ),
-    // (
-    //     &[X::Atom("ex"), X::Atom("a")], number
-    // ),
+    (
+        &[X::Recurring("autocomplete", ANY_STRING)] , autocomplete
+    ),
     (
         &[X::Atom("log"), X::Predicate("trace", ANY_STRING)],
         log_trace,
@@ -294,23 +303,16 @@ fn build_nest<'a>(nest: &mut Nest<'a>, commands: &'a [X], handler: Fun<'a>) -> O
     }
 }
 
-#[derive(Clone)]
-pub enum Input {
-    U8(u8),
-    Atom(String),
-    String(String),
-}
-
 // ---
 
 impl<'a> Evaluate<String> for Gsh<'a> {
-    fn evaluate<'b>(&mut self, commands: &[Data<'b>]) -> String {
+    fn evaluate(&mut self, commands: &[Data]) -> String {
 
         let mut args: Vec<Input> = vec![];
 
         let mut nest = self.commands.head.clone();
         let mut to_handle: Fun = unrecognized_command;
-        let mut to_predicate: Option<(&str, &str, fn(&str) -> Option<Input>)> = None;
+        let mut to_predicate: Option<(&str, &str, fn(&str) -> Option<Input>, bool)> = None;
 
         for c in commands {
             let (atom, string);
@@ -327,11 +329,13 @@ impl<'a> Evaluate<String> for Gsh<'a> {
                     };
                 }
             }
-            if let Some((name, desc, pred)) = to_predicate {
+            if let Some((name, desc, pred, recur)) = to_predicate {
                 let result = pred(atom);
                 self.logger.debug("gsh", Log::Bool("Predicate evaluated", "is_ok", result.is_some()));
                 if let Some(result) = result {
-                    to_predicate = None;
+                    if !recur {
+                        to_predicate = None;
+                    }
                     args.push(result.clone());
                 } else {
                     return format!["Expected: {}, but got: {:?}", desc, atom];
@@ -345,7 +349,11 @@ impl<'a> Evaluate<String> for Gsh<'a> {
                             }
                             X::Predicate(name, (desc, pred)) => {
                                 self.logger.debug("gsh", Log::StaticDynamic("Found predicate", "entry", (*atom).into()));
-                                to_predicate = Some((name, desc, *pred));
+                                to_predicate = Some((name, desc, *pred, false));
+                            }
+                            X::Recurring(name, (desc, pred)) => {
+                                self.logger.debug("gsh", Log::StaticDynamic("Found recurring predicate", "entry", (*atom).into()));
+                                to_predicate = Some((name, desc, *pred, true));
                             }
                         }
                         match up_next {
@@ -364,7 +372,7 @@ impl<'a> Evaluate<String> for Gsh<'a> {
             }
         }
 
-        if let Some((name, desc, _)) = to_predicate {
+        if let Some((name, desc, _, false)) = to_predicate {
             self.logger.debug("gsh", Log::StaticDynamics("Unresolved predicate. Aborting", vec![("name", name.into()), ("type", desc.into())]));
             return format!["Missing predicate, value={}, type={}", name, desc];
         }
@@ -379,8 +387,65 @@ impl<'a> Evaluate<String> for Gsh<'a> {
 mod command_handlers {
     use super::*;
 
-    pub fn unrecognized_command<'a>(s: &mut Gsh<'a>, commands: &[Input]) -> String {
+    pub fn unrecognized_command(s: &mut Gsh, commands: &[Input]) -> String {
         "Command not finished".into()
+    }
+
+    pub fn autocomplete(s: &mut Gsh, commands: &[Input]) -> String {
+        let mut nesthead = s.commands.head.clone();
+        let mut waspred = false;
+        let mut predname = "";
+        for cmd in commands {
+            if waspred {
+                waspred = false;
+                continue;
+            }
+            match cmd {
+                Input::String(string) => {
+                    match nesthead.clone().get(&string[..]) {
+                        Some((x, Either::Left(nest))) => {
+                            nesthead = nest.head.clone();
+                            match x {
+                                X::Atom(_) => {
+                                    waspred = false;
+                                }
+                                X::Predicate(_, (n, _)) => {
+                                    waspred = true;
+                                    predname = n;
+                                }
+                                X::Recurring(_, (n, _)) => {
+                                    waspred = true;
+                                    predname = n;
+                                }
+                            }
+                        }
+                        Some((x, Either::Right(_))) => {
+                            match x {
+                                X::Atom(_) => {
+                                    waspred = false;
+                                }
+                                X::Predicate(_, (n, _)) => {
+                                    waspred = true;
+                                    predname = n;
+                                }
+                                X::Recurring(_, (n, _)) => {
+                                    waspred = true;
+                                    predname = n;
+                                }
+                            }
+                        }
+                        None => {
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        if waspred {
+            format!["{:?}", predname]
+        } else {
+            format!["{:?}", nesthead.keys()]
+        }
     }
 
     pub fn log(s: &mut Gsh, commands: &[Input]) -> String {

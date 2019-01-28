@@ -59,11 +59,7 @@ fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<
             Err(error) => {
                 shell_clone.logger.debug(
                     "gsh",
-                    Log::StaticDynamic(
-                        "Connection errored out",
-                        "reason",
-                        format!["{:?}", error],
-                    ),
+                    Log::StaticDynamic("Connection errored out", "reason", format!["{:?}", error]),
                 );
             }
         }
@@ -72,13 +68,16 @@ fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<
 
 fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
     s.logger.debug("gsh", Log::Static("Acquired new stream"));
-    const BUFFER_SIZE: usize = 129;
+    const BUFFER_SIZE: usize = 513;
     let mut buffer = [0; BUFFER_SIZE];
     'receiver: loop {
         let read_count = stream.read(&mut buffer);
         s.logger
             .debug("gsh", Log::Static("Received message from farend"));
         if let Ok(count) = read_count {
+            if count == 0 {
+                break 'receiver;
+            }
             if count == BUFFER_SIZE {
                 s.logger.debug(
                     "gsh",
@@ -100,7 +99,11 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
             if let Ok(string) = string {
                 s.logger.debug(
                     "gsh",
-                    Log::Static("Converted farend message to UTF-8, calling interpret"),
+                    Log::StaticDynamic(
+                        "Converted farend message to UTF-8, calling interpret",
+                        "content",
+                        string.into(),
+                    ),
                 );
                 let result = s.interpret_single(string);
                 if let Ok(result) = result {
@@ -110,7 +113,11 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
                             "Message parsing succeeded and evaluated, sending response to client",
                         ),
                     );
-                    stream.write((String::from("Response: ") + &result).as_bytes())?;
+                    if result.len() > 0 {
+                        stream.write(format!["{}", &result].as_bytes())?;
+                    } else {
+                        stream.write(format!["OK"].as_bytes())?;
+                    }
                     stream.flush()?;
                 } else {
                     s.logger.debug("gsh", Log::Static("Message parsing failed"));
@@ -196,8 +203,8 @@ mod predicates {
     pub const ANY_STRING: Pred = ("<string>", any_string_function);
     pub const ANY_U8: Pred = ("<u8>", any_u8_function);
 }
-use self::predicates::*;
 use self::command_handlers::*;
+use self::predicates::*;
 
 #[derive(Clone)]
 pub enum Either<L: Clone, R: Clone> {
@@ -246,21 +253,21 @@ impl<'a> X<'a> {
 
 const SPEC: &[(&[X], Fun)] = &[
     (
-        &[X::Atom("log"), X::Atom("global"), X::Predicate("level", ANY_U8)],
+        &[
+            X::Atom("log"),
+            X::Atom("global"),
+            X::Predicate("level", ANY_U8),
+        ],
         log,
     ),
+    (&[X::Atom("ex")], number),
+    (&[X::Recurring("autocomplete", ANY_STRING)], autocomplete),
     (
-        &[X::Atom("ex")], number
-    ),
-    (
-        &[X::Recurring("autocomplete", ANY_STRING)] , autocomplete
-    ),
-    (
-        &[X::Atom("log"), X::Predicate("trace", ANY_STRING)],
+        &[X::Atom("log"), X::Recurring("trace", ANY_STRING)],
         log_trace,
     ),
     (
-       &[ 
+        &[
             X::Atom("log"),
             X::Predicate("context", ANY_ATOM),
             X::Predicate("level", ANY_U8),
@@ -275,9 +282,11 @@ fn build_nest<'a>(nest: &mut Nest<'a>, commands: &'a [X], handler: Fun<'a>) -> O
         if nest.head.get_mut(&commands[0].name()).is_some() {
             match nest.head.get_mut(&commands[0].name()) {
                 Some((_, Either::Left(subnest))) => {
-                    let ether = build_nest(subnest , &commands[1..], handler);
+                    let ether = build_nest(subnest, &commands[1..], handler);
                     if let Some(ether) = ether {
-                        subnest.head.insert(commands[0].name(), (commands[0], ether));
+                        subnest
+                            .head
+                            .insert(commands[0].name(), (commands[0], ether));
                     }
                     None
                 }
@@ -292,9 +301,13 @@ fn build_nest<'a>(nest: &mut Nest<'a>, commands: &'a [X], handler: Fun<'a>) -> O
             let mut ether = Nest::new();
             let result = build_nest(&mut ether, &commands[1..], handler);
             if result.is_some() {
-                nest.head.insert(commands[0].name(), (commands[0].clone(), result.unwrap()));
+                nest.head
+                    .insert(commands[0].name(), (commands[0].clone(), result.unwrap()));
             } else {
-                nest.head.insert(commands[0].name(), (commands[0].clone(), Either::Left(ether)));
+                nest.head.insert(
+                    commands[0].name(),
+                    (commands[0].clone(), Either::Left(ether)),
+                );
             }
             None
         }
@@ -307,7 +320,6 @@ fn build_nest<'a>(nest: &mut Nest<'a>, commands: &'a [X], handler: Fun<'a>) -> O
 
 impl<'a> Evaluate<String> for Gsh<'a> {
     fn evaluate(&mut self, commands: &[Data]) -> String {
-
         let mut args: Vec<Input> = vec![];
 
         let mut nest = self.commands.head.clone();
@@ -331,7 +343,10 @@ impl<'a> Evaluate<String> for Gsh<'a> {
             }
             if let Some((name, desc, pred, recur)) = to_predicate {
                 let result = pred(atom);
-                self.logger.debug("gsh", Log::Bool("Predicate evaluated", "is_ok", result.is_some()));
+                self.logger.debug(
+                    "gsh",
+                    Log::Bool("Predicate evaluated", "is_ok", result.is_some()),
+                );
                 if let Some(result) = result {
                     if !recur {
                         to_predicate = None;
@@ -345,14 +360,27 @@ impl<'a> Evaluate<String> for Gsh<'a> {
                     Some((x, up_next)) => {
                         match x {
                             X::Atom(_) => {
-                                self.logger.debug("gsh", Log::StaticDynamic("Found atom", "entry", (*atom).into()));
+                                self.logger.debug(
+                                    "gsh",
+                                    Log::StaticDynamic("Found atom", "entry", (*atom).into()),
+                                );
                             }
                             X::Predicate(name, (desc, pred)) => {
-                                self.logger.debug("gsh", Log::StaticDynamic("Found predicate", "entry", (*atom).into()));
+                                self.logger.debug(
+                                    "gsh",
+                                    Log::StaticDynamic("Found predicate", "entry", (*atom).into()),
+                                );
                                 to_predicate = Some((name, desc, *pred, false));
                             }
                             X::Recurring(name, (desc, pred)) => {
-                                self.logger.debug("gsh", Log::StaticDynamic("Found recurring predicate", "entry", (*atom).into()));
+                                self.logger.debug(
+                                    "gsh",
+                                    Log::StaticDynamic(
+                                        "Found recurring predicate",
+                                        "entry",
+                                        (*atom).into(),
+                                    ),
+                                );
                                 to_predicate = Some((name, desc, *pred, true));
                             }
                         }
@@ -373,11 +401,18 @@ impl<'a> Evaluate<String> for Gsh<'a> {
         }
 
         if let Some((name, desc, _, false)) = to_predicate {
-            self.logger.debug("gsh", Log::StaticDynamics("Unresolved predicate. Aborting", vec![("name", name.into()), ("type", desc.into())]));
+            self.logger.debug(
+                "gsh",
+                Log::StaticDynamics(
+                    "Unresolved predicate. Aborting",
+                    vec![("name", name.into()), ("type", desc.into())],
+                ),
+            );
             return format!["Missing predicate, value={}, type={}", name, desc];
         }
 
-        self.logger.debug("gsh", Log::Static("Command resolved, calling handler"));
+        self.logger
+            .debug("gsh", Log::Static("Command resolved, calling handler"));
         to_handle(self, &args[..])
     }
 }
@@ -395,50 +430,52 @@ mod command_handlers {
         let mut nesthead = s.commands.head.clone();
         let mut waspred = false;
         let mut predname = "";
+        let mut recur = false;
         for cmd in commands {
             if waspred {
-                waspred = false;
+                waspred = recur;
                 continue;
             }
             match cmd {
-                Input::String(string) => {
-                    match nesthead.clone().get(&string[..]) {
-                        Some((x, Either::Left(nest))) => {
-                            nesthead = nest.head.clone();
-                            match x {
-                                X::Atom(_) => {
-                                    waspred = false;
-                                }
-                                X::Predicate(_, (n, _)) => {
-                                    waspred = true;
-                                    predname = n;
-                                }
-                                X::Recurring(_, (n, _)) => {
-                                    waspred = true;
-                                    predname = n;
-                                }
+                Input::String(string) => match nesthead.clone().get(&string[..]) {
+                    Some((x, Either::Left(nest))) => {
+                        nesthead = nest.head.clone();
+                        match x {
+                            X::Atom(_) => {
+                                waspred = false;
                             }
-                        }
-                        Some((x, Either::Right(_))) => {
-                            match x {
-                                X::Atom(_) => {
-                                    waspred = false;
-                                }
-                                X::Predicate(_, (n, _)) => {
-                                    waspred = true;
-                                    predname = n;
-                                }
-                                X::Recurring(_, (n, _)) => {
-                                    waspred = true;
-                                    predname = n;
-                                }
+                            X::Predicate(_, (n, _)) => {
+                                waspred = true;
+                                predname = n;
                             }
-                        }
-                        None => {
+                            X::Recurring(_, (n, _)) => {
+                                waspred = true;
+                                predname = n;
+                                recur = true;
+                            }
                         }
                     }
+                    Some((x, Either::Right(_))) => match x {
+                        X::Atom(_) => {
+                            waspred = false;
+                        }
+                        X::Predicate(_, (n, _)) => {
+                            waspred = true;
+                            predname = n;
+                        }
+                        X::Recurring(_, (n, _)) => {
+                            waspred = true;
+                            predname = n;
+                            recur = true;
+                        }
+                    },
+                    None => {
+                        return "Exceeded command parameter count".into();
+                    }
+                },
+                _ => {
+                    unreachable![];
                 }
-                _ => {}
             }
         }
         if waspred {
@@ -463,13 +500,20 @@ mod command_handlers {
     }
 
     pub fn log_trace(s: &mut Gsh, commands: &[Input]) -> String {
-        match commands[0] {
-            Input::String(ref string) => {
-                s.logger.trace("user", Log::Dynamic(string.clone()));
-                "OK".into()
+        let mut sum = String::new();
+        for (idx, cmd) in commands.iter().enumerate() {
+            match cmd {
+                Input::String(ref string) => {
+                    if idx + 1 < commands.len() && idx != 0 {
+                        sum.push(' ');
+                    }
+                    sum += string;
+                }
+                _ => return "Error".into(),
             }
-            _ => "Error".into()
         }
+        s.logger.trace("user", Log::Dynamic(sum));
+        "OK".into()
     }
 
     pub fn log_context(s: &mut Gsh, commands: &[Input]) -> String {
@@ -499,10 +543,10 @@ mod command_handlers {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::io::{self, BufRead, Read, Write};
     use std::net::TcpStream;
     use std::sync::atomic::Ordering;
-    use super::*;
 
     #[test]
     fn nondeterministic_change_log_level() -> io::Result<()> {

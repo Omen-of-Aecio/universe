@@ -1,30 +1,128 @@
-use std::io::{self, BufRead, Read, Write};
+use rustyline::completion::{Completer, Pair};
+use rustyline::error::ReadlineError;
+use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
+use rustyline::hint::Hinter;
+use rustyline::{Editor, Helper};
+use std::borrow::Cow::{self, Borrowed, Owned};
+use std::cell::RefCell;
+use std::io::{self, Read, Write};
 use std::net::TcpStream;
 
+static HISTORY_FILE: &str = ".gsh-history.txt";
+
+static COLORED_PROMPT: &'static str = "\x1b[1;32m>>\x1b[0m ";
+
+static PROMPT: &'static str = ">> ";
+
+struct AutoComplete(MatchingBracketHighlighter, RefCell<TcpStream>);
+
+impl Completer for AutoComplete {
+    type Candidate = Pair;
+
+    fn complete(&self, line: &str, pos: usize) -> Result<(usize, Vec<Pair>), ReadlineError> {
+        Ok((pos, vec![]))
+    }
+}
+
+impl Hinter for AutoComplete {
+    fn hint(&self, line: &str, pos: usize) -> Option<String> {
+        if line.chars().last() == Some(' ') {
+            // ---
+            self.1
+                .borrow_mut()
+                .write(format!["autocomplete {}\n", line].as_bytes());
+            self.1.borrow_mut().flush();
+            // ---
+            let mut buffer = [0; 512];
+            self.1.borrow_mut().read(&mut buffer);
+            if let Ok(buffer) = std::str::from_utf8(&buffer) {
+                return Some(String::from(" ") + buffer.into());
+            }
+        }
+        None
+    }
+}
+
+impl Highlighter for AutoComplete {
+    fn highlight_prompt<'p>(&self, prompt: &'p str) -> Cow<'p, str> {
+        if prompt == PROMPT {
+            Borrowed(COLORED_PROMPT)
+        } else {
+            Borrowed(prompt)
+        }
+    }
+
+    fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
+        Owned("\x1b[1m".to_owned() + hint + "\x1b[m")
+    }
+
+    fn highlight<'l>(&self, line: &'l str, pos: usize) -> Cow<'l, str> {
+        self.0.highlight(line, pos)
+    }
+
+    fn highlight_char(&self, line: &str, pos: usize) -> bool {
+        self.0.highlight_char(line, pos)
+    }
+}
+
+impl Helper for AutoComplete {}
+
+// ---
+
 fn main() -> io::Result<()> {
-    let mut listener = TcpStream::connect("127.0.0.1:32931")?;
-    let stdin = io::stdin();
+    let listener = TcpStream::connect("127.0.0.1:32931")?;
     let stdout = io::stdout();
-    let handle = stdin.lock();
     let mut output = stdout.lock();
 
     writeln![output, "gsh: GameShell v0.1.0 at your service (? for help)"]?;
+    let mut rl = Editor::<AutoComplete>::new();
+    rl.set_helper(Some(AutoComplete(
+        MatchingBracketHighlighter::new(),
+        RefCell::new(listener),
+    )));
+    if rl.load_history(HISTORY_FILE).is_err() {
+        writeln![
+            output,
+            "No previous history, using `{}` in current directory",
+            HISTORY_FILE
+        ]?;
+    }
+
     write![output, "> "]?;
     output.flush()?;
-    for line in handle.lines() {
-        let line = line?;
-        listener.write(line.as_bytes())?;
-        listener.flush()?;
-        let mut buffer = [0; 128];
-        listener.read(&mut buffer)?;
-        // output.write(buffer.as_bytes())?;
-        if let Ok(buffer) = std::str::from_utf8(&buffer) {
-            writeln![output, "{} ", buffer]?;
-            output.flush()?;
+    loop {
+        let line = rl.readline("> ");
+        match line {
+            Ok(line) => {
+                rl.add_history_entry(line.as_ref());
+                // println!["Does this run???"];
+                let mut listener = rl.helper_mut().unwrap().1.borrow_mut();
+                // ---
+                listener.write(line.as_bytes())?;
+                listener.flush()?;
+                // ---
+                let mut buffer = [0; 512];
+                listener.read(&mut buffer)?;
+                if let Ok(buffer) = std::str::from_utf8(&buffer) {
+                    writeln![output, "{} ", buffer]?;
+                    output.flush()?;
+                }
+                // ---
+                write![output, "> "]?;
+                output.flush()?;
+            }
+            Err(ReadlineError::Interrupted) => {
+                writeln![output, "^C"]?;
+            }
+            Err(ReadlineError::Eof) => {
+                break;
+            }
+            Err(err) => {
+                writeln![output, "Error: {:?}", err]?;
+                break;
+            }
         }
-        write![output, "> "]?;
-        output.flush()?;
     }
-    writeln![output]?;
+    rl.save_history(HISTORY_FILE).unwrap();
     Ok(())
 }

@@ -76,6 +76,10 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
             .debug("gsh", Log::Static("Received message from farend"));
         if let Ok(count) = read_count {
             if count == 0 {
+                s.logger.debug(
+                    "gsh",
+                    Log::Static("Received empty message from farend, connection forfeit"),
+                );
                 break 'receiver;
             }
             if count == BUFFER_SIZE {
@@ -92,10 +96,7 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
             }
             s.logger
                 .debug("gsh", Log::Usize("Message from farend", "length", count));
-            if count == 0 {
-                break;
-            }
-            let string = from_utf8(&buffer[0..count]);
+            let string = from_utf8(&buffer[..count]);
             if let Ok(string) = string {
                 s.logger.debug(
                     "gsh",
@@ -147,7 +148,9 @@ fn game_shell_thread<'a>(mut s: Gsh<'a>) {
                 .info("gsh", Log::Static("Started GameShell server"));
             'outer_loop: loop {
                 for stream in listener.incoming() {
-                    if !s.keep_running.load(Ordering::Relaxed) {
+                    if !s.keep_running.load(Ordering::Acquire) {
+                        s.logger
+                            .info("gsh", Log::Static("Stopped GameShell server"));
                         break 'outer_loop;
                     }
                     match stream {
@@ -547,6 +550,7 @@ mod tests {
     use std::io::{self, BufRead, Read, Write};
     use std::net::TcpStream;
     use std::sync::atomic::Ordering;
+    use test::{black_box, Bencher};
 
     #[test]
     fn nondeterministic_change_log_level() -> io::Result<()> {
@@ -558,12 +562,34 @@ mod tests {
             let mut listener = TcpStream::connect("127.0.0.1:32931")?;
             write![listener, "log global level 123"]?;
             listener.flush()?;
+            listener.read(&mut [0u8; 256])?;
         }
-        std::thread::sleep(std::time::Duration::new(0, 50_000_000));
+        // std::thread::sleep(std::time::Duration::new(0, 50_000_000));
         assert_eq![123, logger.get_log_level()];
-        keep_running.store(false, Ordering::Relaxed);
+        keep_running.store(false, Ordering::Release);
         std::mem::drop(logger);
         let mut listener = TcpStream::connect("127.0.0.1:32931")?;
+        logger_handle.join();
+        Ok(())
+    }
+
+    #[bench]
+    fn message_bandwidth_over_tcp(b: &mut Bencher) -> io::Result<()> {
+        let (mut logger, logger_handle) = crate::libs::logger::Logger::spawn();
+        let (mut gsh, keep_running) = spawn(logger.clone());
+        std::thread::sleep(std::time::Duration::new(0, 50_000_000));
+        logger.set_log_level(0);
+        let mut listener = TcpStream::connect("127.0.0.1:32931")?;
+        b.iter(|| -> io::Result<()> {
+            write![listener, "log global level 0"]?;
+            listener.flush()?;
+            listener.read(&mut [0u8; 1024])?;
+            Ok(())
+        });
+        keep_running.store(false, Ordering::Release);
+        std::mem::drop(listener);
+        std::mem::drop(logger);
+        let listener = TcpStream::connect("127.0.0.1:32931")?;
         logger_handle.join();
         Ok(())
     }

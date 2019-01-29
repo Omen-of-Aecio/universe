@@ -587,7 +587,7 @@ mod tests {
         std::thread::sleep(std::time::Duration::new(0, 50_000_000));
         {
             let mut listener = TcpStream::connect("127.0.0.1:32931")?;
-            write![listener, "log global level 123"]?;
+            write![listener, "log global level 123\n"]?;
             listener.flush()?;
             listener.read(&mut [0u8; 256])?;
         }
@@ -608,7 +608,7 @@ mod tests {
         logger.set_log_level(0);
         let mut listener = TcpStream::connect("127.0.0.1:32931")?;
         b.iter(|| -> io::Result<()> {
-            write![listener, "log global level 0"]?;
+            write![listener, "log global level 0\n"]?;
             listener.flush()?;
             listener.read(&mut [0u8; 1024])?;
             Ok(())

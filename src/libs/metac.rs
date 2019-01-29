@@ -198,6 +198,62 @@ pub trait Evaluate<T: Default> {
     }
 }
 
+/// A partial parse is a parse where we send single bytes into the parser and get back a complete↲
+/// parsing state. This is useful when reading TCP streams or other streams that may yield at any
+/// point in time.
+///
+/// This structure does not in any way do any interpreting or evaluate, it's just used for stream
+/// parsing. This structure is quite low-level. See the tests in this file to see how it operates,
+/// based on that, you need to add surrounding facilities where you use this struct to handle the
+/// outputs it gives you.
+#[derive(Debug, PartialEq)]
+pub struct PartialParse {
+    lparen_stack: usize,
+    has_encountered_rparen: bool,
+}
+
+impl PartialParse {
+    /// Create a new parser
+    pub fn new() -> Self {
+        Self {
+            lparen_stack: 0,
+            has_encountered_rparen: false,
+        }
+    }
+
+    /// Parses. 1 byte at a time
+    ///
+    /// This function assumes that a linear stream of bytes is fed into it.
+    ///
+    /// It will return None when there has been an error. In such cases, _all_ previous bytes ought
+    /// to be discarded and not interpreted.
+    ///
+    /// When it returns Some(true), it means that the previous bytes (except for those that were
+    /// marked None) can be sent into `interpret_single` safely.
+    ///
+    /// When it returns Some(false), it means that the parser simply noticed the character and
+    /// advanced its internal state.
+    pub fn parse_increment(&mut self, input: u8) -> Option<bool> {
+        if input == b'\n' && self.lparen_stack == 0 {
+            self.has_encountered_rparen = false;
+            return Some(true);
+        } else if input == b'(' {
+            self.lparen_stack += 1;
+        } else if input == b')' {
+            if self.lparen_stack == 0 {
+                self.has_encountered_rparen = true;
+                return None;
+            }
+            self.lparen_stack -= 1;
+        }
+        if self.has_encountered_rparen {
+            None
+        } else {
+            Some(false)
+        }
+    }
+}
+
 // ---
 
 /// Parse an input line into a classified output buffer
@@ -516,6 +572,83 @@ mod tests {
         assert_eq![10, eval.invoked];
         eval.interpret_single("a (\n\tb c\n)").unwrap();
         assert_eq![12, eval.invoked];
+    }
+
+    // ---
+
+    #[test]
+    fn partial_parse_single_line() {
+        let mut part = PartialParse::new();
+        for ch in "hello world".bytes() {
+            assert_eq![Some(false), part.parse_increment(ch)];
+        }
+        assert_eq![Some(true), part.parse_increment(b'\n')];
+    }
+
+    #[test]
+    fn partial_parse_multi_line() {
+        let mut part = PartialParse::new();
+        for ch in "hello world (".bytes() {
+            assert_eq![Some(false), part.parse_increment(ch)];
+        }
+        assert_eq![Some(false), part.parse_increment(b'\n')];
+
+        for ch in "this is a message".bytes() {
+            assert_eq![Some(false), part.parse_increment(ch)];
+        }
+        assert_eq![Some(false), part.parse_increment(b'\n')];
+        assert_eq![Some(false), part.parse_increment(b')')];
+
+        for ch in "last few words".bytes() {
+            assert_eq![Some(false), part.parse_increment(ch)];
+        }
+        assert_eq![Some(true), part.parse_increment(b'\n')];
+    }
+
+    #[test]
+    fn partial_parse_multi_line_nested() {
+        let mut part = PartialParse::new();
+        for ch in "hello world (".bytes() {
+            assert_eq![Some(false), part.parse_increment(ch)];
+        }
+        assert_eq![Some(false), part.parse_increment(b'\n')];
+
+        for ch in "this) (is (a message".bytes() {
+            assert_eq![Some(false), part.parse_increment(ch)];
+        }
+        assert_eq![Some(false), part.parse_increment(b'\n')];
+        assert_eq![Some(false), part.parse_increment(b')')];
+
+        for ch in "last few words".bytes() {
+            assert_eq![Some(false), part.parse_increment(ch)];
+        }
+        assert_eq![Some(false), part.parse_increment(b'\n')];
+        assert_eq![Some(false), part.parse_increment(b')')];
+        assert_eq![Some(true), part.parse_increment(b'\n')];
+    }
+
+    #[test]
+    fn partial_parse_error() {
+        let mut part = PartialParse::new();
+        for ch in "hello world".bytes() {
+            assert_eq![Some(false), part.parse_increment(ch)];
+        }
+        assert_eq![None, part.parse_increment(b')')];
+        assert_eq![Some(true), part.parse_increment(b'\n')];
+    }
+
+    #[test]
+    fn partial_parse_error_complex() {
+        let mut part = PartialParse::new();
+        for ch in "hello world (\na b c) d ".bytes() {
+            assert_eq![Some(false), part.parse_increment(ch)];
+        }
+        assert_eq![None, part.parse_increment(b')')];
+        for ch in "opener (\na b c d\ne f".bytes() {
+            assert_eq![None, part.parse_increment(ch)];
+        }
+        assert_eq![None, part.parse_increment(b')')];
+        assert_eq![Some(true), part.parse_increment(b'\n')];
     }
 
     // ---

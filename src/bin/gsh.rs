@@ -25,7 +25,7 @@ impl Completer for AutoComplete {
 }
 
 impl Hinter for AutoComplete {
-    fn hint(&self, line: &str, pos: usize) -> Option<String> {
+    fn hint(&self, line: &str, _: usize) -> Option<String> {
         if line.chars().last() == Some(' ') {
             // ---
             self.0
@@ -73,7 +73,8 @@ fn main() -> io::Result<()> {
                 rl.add_history_entry(line.as_ref());
                 let mut listener = rl.helper_mut().unwrap().0.borrow_mut();
                 // ---
-                listener.write((line + "\n").as_bytes())?;
+                listener.write(line.as_bytes())?;
+                listener.write(b"\n")?;
                 listener.flush()?;
                 // ---
                 let mut buffer = [0; 512];

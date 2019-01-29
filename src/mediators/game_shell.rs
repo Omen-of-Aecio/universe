@@ -1,10 +1,9 @@
 use crate::glocals::{GameShell, Log};
 use crate::libs::{
     logger::Logger,
-    metac::{Data, Evaluate},
+    metac::{Data, Evaluate, PartialParse},
 };
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
 use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::str::from_utf8;
@@ -41,7 +40,6 @@ fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<
     thread::spawn(move || {
         let mut nest = Nest::new();
         for spell in SPEC {
-            logger.info("gsh", Log::Static("Building nest..."));
             build_nest(&mut nest, spell.0, spell.1);
         }
         let mut shell_clone = GameShell {
@@ -68,73 +66,102 @@ fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<
 
 fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
     s.logger.debug("gsh", Log::Static("Acquired new stream"));
-    const BUFFER_SIZE: usize = 513;
+    const BUFFER_SIZE: usize = 2048;
     let mut buffer = [0; BUFFER_SIZE];
+    let mut begin = 0;
+    let mut shift = 0;
+    let mut partial_parser = PartialParse::new();
     'receiver: loop {
-        let read_count = stream.read(&mut buffer);
+        for (base, idx) in (shift..begin).enumerate() {
+            buffer[base] = buffer[idx];
+        }
+        s.logger.trace(
+            "gsh",
+            Log::Usize2("Loop entry", "shift", shift, "begin", begin),
+        );
+        begin -= shift;
         s.logger
-            .debug("gsh", Log::Static("Received message from farend"));
-        if let Ok(count) = read_count {
-            if count == 0 {
-                s.logger.debug(
-                    "gsh",
-                    Log::Static("Received empty message from farend, connection forfeit"),
-                );
-                break 'receiver;
-            }
-            if count == BUFFER_SIZE {
-                s.logger.debug(
-                    "gsh",
-                    Log::Usize(
-                        "Message exceeds maximum length, disconnecting to prevent further messages",
-                        "max",
-                        BUFFER_SIZE - 1,
-                    ),
-                );
-                write![stream, "Response: Message exceeds maximum length, disconnecting to prevent further messages, max={}", BUFFER_SIZE-1]?;
-                break 'receiver;
-            }
-            s.logger
-                .debug("gsh", Log::Usize("Message from farend", "length", count));
-            let string = from_utf8(&buffer[0..count]);
-            if let Ok(string) = string {
-                s.logger.debug(
-                    "gsh",
-                    Log::StaticDynamic(
-                        "Converted farend message to UTF-8, calling interpret",
-                        "content",
-                        string.into(),
-                    ),
-                );
-                let result = s.interpret_single(string);
-                if let Ok(result) = result {
-                    s.logger.debug(
-                        "gsh",
-                        Log::Static(
-                            "Message parsing succeeded and evaluated, sending response to client",
-                        ),
-                    );
-                    if result.len() > 0 {
-                        stream.write(format!["{}", &result].as_bytes())?;
-                    } else {
-                        stream.write(format!["OK"].as_bytes())?;
-                    }
-                    stream.flush()?;
-                } else {
-                    s.logger.debug("gsh", Log::Static("Message parsing failed"));
-                    stream.write(b"Unable to complete query")?;
-                    stream.flush()?;
-                }
-            } else {
+            .trace("gsh", Log::Usize("Loop entry (new)", "begin", begin));
+        if begin > 0 {
+            from_utf8(&buffer[0..begin]).map(|x| {
                 s.logger
-                    .debug("gsh", Log::Static("Malformed UTF-8 received"));
-            }
-        } else {
-            s.logger.debug(
+                    .trace("gsh", Log::StaticDynamic("Buffer contents from partial parse",
+                    "buffer", x.into()));
+            });
+
+        }
+        shift = 0;
+        if begin == BUFFER_SIZE - 1 {
+            s.logger.warn(
                 "gsh",
-                Log::StaticDynamic("Unable to read", "reason", format!["{:?}", read_count]),
+                Log::Usize(
+                    "Message exceeds maximum length, disconnecting to prevent further messages",
+                    "max",
+                    BUFFER_SIZE,
+                ),
             );
-            break;
+            write![stream, "Response: Message exceeds maximum length, disconnecting to prevent further messages, max={}", BUFFER_SIZE]?;
+            break 'receiver;
+        }
+        let count = stream.read(&mut buffer[begin..])?;
+        if count == 0 {
+            s.logger.info(
+                "gsh",
+                Log::Static("Received empty message from farend, connection forfeit"),
+            );
+            break 'receiver;
+        }
+        s.logger
+            .trace("gsh", Log::Usize("Message from farend", "length", count));
+        for ch in buffer[begin..(begin + count)].iter() {
+            begin += 1;
+            match partial_parser.parse_increment(*ch) {
+                Some(true) => {
+                    shift = begin;
+                    let string = from_utf8(&buffer[(begin - shift)..begin]);
+                    if let Ok(string) = string {
+                        s.logger.debug(
+                            "gsh",
+                            Log::StaticDynamic(
+                                "Converted farend message to UTF-8, calling interpret",
+                                "content",
+                                string.into(),
+                            ),
+                        );
+                        let result = s.interpret_single(string);
+                        if let Ok(result) = result {
+                            s.logger.debug(
+                                "gsh",
+                                Log::Static(
+                                    "Message parsing succeeded and evaluated, sending response to client",
+                                ),
+                            );
+                            if result.len() > 0 {
+                                stream.write(format!["{}", &result].as_bytes())?;
+                            } else {
+                                stream.write(format!["OK"].as_bytes())?;
+                            }
+                            stream.flush()?;
+                        } else {
+                            s.logger.error("gsh", Log::Static("Message parsing failed"));
+                            stream.write(b"Unable to complete query")?;
+                            stream.flush()?;
+                            unreachable![];
+                        }
+                    } else {
+                        s.logger
+                            .warn("gsh", Log::Static("Malformed UTF-8 received"));
+                    }
+                }
+                Some(false) => {
+                    // Do nothing
+                }
+                None => {
+                    // Set the shift register = begin, this means that all bytes so far will
+                    // not be used to interpret a command. They will instead be overwritten.
+                    shift = begin;
+                }
+            }
         }
     }
     Ok(())

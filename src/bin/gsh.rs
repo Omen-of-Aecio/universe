@@ -73,8 +73,7 @@ fn main() -> io::Result<()> {
                 rl.add_history_entry(line.as_ref());
                 let mut listener = rl.helper_mut().unwrap().0.borrow_mut();
                 // ---
-                listener.write(line.as_bytes())?;
-                listener.write("\n".as_bytes())?;
+                listener.write((line + "\n").as_bytes())?;
                 listener.flush()?;
                 // ---
                 let mut buffer = [0; 512];

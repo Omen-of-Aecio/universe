@@ -96,7 +96,7 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
             }
             s.logger
                 .debug("gsh", Log::Usize("Message from farend", "length", count));
-            let string = from_utf8(&buffer[..count]);
+            let string = from_utf8(&buffer[0..count]);
             if let Ok(string) = string {
                 s.logger.debug(
                     "gsh",

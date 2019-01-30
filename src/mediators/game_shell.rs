@@ -229,9 +229,13 @@ mod predicates {
     fn any_u8_function(input: &str) -> Option<Input> {
         input.parse::<u8>().ok().map(|x| Input::U8(x))
     }
+    fn any_i32_function(input: &str) -> Option<Input> {
+        input.parse::<i32>().ok().map(|x| Input::I32(x))
+    }
     pub const ANY_ATOM: Pred = ("<atom>", any_atom_function);
     pub const ANY_STRING: Pred = ("<string>", any_string_function);
     pub const ANY_U8: Pred = ("<u8>", any_u8_function);
+    pub const ANY_I32: Pred = ("<i32>", any_i32_function);
 }
 use self::command_handlers::*;
 use self::predicates::*;
@@ -247,6 +251,7 @@ type Gsh<'a> = GameShell<Arc<Nest<'a>>>;
 #[derive(Clone)]
 pub enum Input {
     U8(u8),
+    I32(i32),
     Atom(String),
     String(String),
 }
@@ -291,6 +296,7 @@ const SPEC: &[(&[X], Fun)] = &[
         log,
     ),
     (&[X::Atom("ex")], number),
+    (&[X::Recurring("+", ANY_I32)], add),
     (&[X::Recurring("autocomplete", ANY_STRING)], autocomplete),
     (
         &[X::Atom("log"), X::Recurring("trace", ANY_STRING)],
@@ -456,6 +462,21 @@ mod command_handlers {
         "Command not finished".into()
     }
 
+    pub fn add(s: &mut Gsh, commands: &[Input]) -> String {
+        let mut sum = 0;
+        for cmd in commands {
+            match cmd {
+                Input::I32(x) => {
+                    sum += x;
+                }
+                _ => {
+                    return "Expected i32".into();
+                }
+            }
+        }
+        sum.to_string()
+    }
+
     pub fn autocomplete(s: &mut Gsh, commands: &[Input]) -> String {
         let mut nesthead = s.commands.head.clone();
         let mut waspred = false;
@@ -525,7 +546,7 @@ mod command_handlers {
         }
     }
 
-    pub fn number(s: &mut Gsh, commands: &[Input]) -> String {
+    pub fn number(s: &mut Gsh, _: &[Input]) -> String {
         "0".into()
     }
 

@@ -3,7 +3,6 @@ use crate::libs::{
     geometry::{cam::Camera, grid2d::Grid, vec::Vec2},
     input,
     logger::Logger,
-    metac::{Data, Evaluate},
 };
 use clap;
 pub use glium::uniforms::{MagnifySamplerFilter, MinifySamplerFilter};
@@ -11,12 +10,9 @@ use glium::{implement_vertex, texture::Texture2d};
 use rodio;
 use serde_derive::Deserialize;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     net::SocketAddr,
-    sync::{
-        atomic::{AtomicBool, AtomicUsize},
-        Arc,
-    },
+    sync::{atomic::AtomicBool, Arc},
     time::Duration,
     vec::Vec,
 };
@@ -78,7 +74,7 @@ impl std::fmt::Display for Log {
             Log::StaticDynamic(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
             Log::StaticDynamics(msg, kvs) => {
                 write![f, "{}", msg]?;
-                if kvs.len() >= 1 {
+                if !kvs.is_empty() {
                     write![f, ", "]?;
                     for kv in kvs.iter().take(kvs.len() - 1) {
                         write![f, "{}={}, ", kv.0, kv.1]?;

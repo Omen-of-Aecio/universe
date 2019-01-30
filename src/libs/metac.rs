@@ -102,8 +102,8 @@
 //!     assert_eq![5, eval.interpret_multiple("This is (\na) single statement").unwrap()];
 //! }
 //! ```
-#![feature(test)]
-#![no_std]
+// #![feature(test)]
+// #![no_std]
 extern crate test;
 
 /// Size of the buffer used during parsing
@@ -206,21 +206,13 @@ pub trait Evaluate<T: Default> {
 /// parsing. This structure is quite low-level. See the tests in this file to see how it operates,
 /// based on that, you need to add surrounding facilities where you use this struct to handle the
 /// outputs it gives you.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct PartialParse {
     lparen_stack: usize,
     has_encountered_rparen: bool,
 }
 
 impl PartialParse {
-    /// Create a new parser
-    pub fn new() -> Self {
-        Self {
-            lparen_stack: 0,
-            has_encountered_rparen: false,
-        }
-    }
-
     /// Parses. 1 byte at a time
     ///
     /// This function assumes that a linear stream of bytes is fed into it.
@@ -282,26 +274,24 @@ fn parse<'a>(line: &'a str, output: &mut [Data<'a>; BUFFER_SIZE]) -> Result<usiz
             } else {
                 stop += 1;
             }
-        } else {
-            if i.is_whitespace() {
-                if start != stop {
-                    output[buff_idx] = Data::Atom(&line[start..stop]);
-                    buff_idx += 1;
-                    if buff_idx >= output.len() {
-                        return Err(ParseError::InputHasTooManyElements);
-                    }
+        } else if i.is_whitespace() {
+            if start != stop {
+                output[buff_idx] = Data::Atom(&line[start..stop]);
+                buff_idx += 1;
+                if buff_idx >= output.len() {
+                    return Err(ParseError::InputHasTooManyElements);
                 }
-                stop += 1;
-                start = stop;
-            } else if i == '(' {
-                lparen_stack += 1;
-                stop += 1;
-                start = stop;
-            } else if i == ')' {
-                return Err(ParseError::PrematureRightParenthesis);
-            } else {
-                stop += 1;
             }
+            stop += 1;
+            start = stop;
+        } else if i == '(' {
+            lparen_stack += 1;
+            stop += 1;
+            start = stop;
+        } else if i == ')' {
+            return Err(ParseError::PrematureRightParenthesis);
+        } else {
+            stop += 1;
         }
     }
     if lparen_stack > 0 {
@@ -578,7 +568,7 @@ mod tests {
 
     #[test]
     fn partial_parse_single_line() {
-        let mut part = PartialParse::new();
+        let mut part = PartialParse::default();
         for ch in "hello world".bytes() {
             assert_eq![Some(false), part.parse_increment(ch)];
         }
@@ -587,7 +577,7 @@ mod tests {
 
     #[test]
     fn partial_parse_multi_line() {
-        let mut part = PartialParse::new();
+        let mut part = PartialParse::default();
         for ch in "hello world (".bytes() {
             assert_eq![Some(false), part.parse_increment(ch)];
         }
@@ -607,7 +597,7 @@ mod tests {
 
     #[test]
     fn partial_parse_multi_line_nested() {
-        let mut part = PartialParse::new();
+        let mut part = PartialParse::default();
         for ch in "hello world (".bytes() {
             assert_eq![Some(false), part.parse_increment(ch)];
         }
@@ -629,7 +619,7 @@ mod tests {
 
     #[test]
     fn partial_parse_error() {
-        let mut part = PartialParse::new();
+        let mut part = PartialParse::default();
         for ch in "hello world".bytes() {
             assert_eq![Some(false), part.parse_increment(ch)];
         }
@@ -639,7 +629,7 @@ mod tests {
 
     #[test]
     fn partial_parse_error_complex() {
-        let mut part = PartialParse::new();
+        let mut part = PartialParse::default();
         for ch in "hello world (\na b c) d ".bytes() {
             assert_eq![Some(false), part.parse_increment(ch)];
         }

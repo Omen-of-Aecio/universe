@@ -56,7 +56,7 @@ fn main() -> io::Result<()> {
     let listener = TcpStream::connect("127.0.0.1:32931")?;
     let stdout = io::stdout();
     let mut output = stdout.lock();
-    let mut parse = PartialParse::new();
+    let mut parse = PartialParse::default();
 
     writeln![output, "gsh: GameShell v0.1.0 at your service (? for help)"]?;
     let mut rl = Editor::<AutoComplete>::new();

@@ -35,7 +35,7 @@ pub fn spawn(logger: Logger<Log>) -> (JoinHandle<()>, Arc<AtomicBool>) {
 // ---
 
 fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<()> {
-    let mut logger = s.logger.clone();
+    let logger = s.logger.clone();
     let keep_running = s.keep_running.clone();
     thread::spawn(move || {
         let mut nest = Nest::new();
@@ -70,7 +70,7 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
     let mut buffer = [0; BUFFER_SIZE];
     let mut begin = 0;
     let mut shift = 0;
-    let mut partial_parser = PartialParse::new();
+    let mut partial_parser = PartialParse::default();
     'receiver: loop {
         for (base, idx) in (shift..begin).enumerate() {
             buffer[base] = buffer[idx];
@@ -83,12 +83,29 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
         s.logger
             .trace("gsh", Log::Usize("Loop entry (new)", "begin", begin));
         if begin > 0 {
-            from_utf8(&buffer[0..begin]).map(|x| {
-                s.logger
-                    .trace("gsh", Log::StaticDynamic("Buffer contents from partial parse",
-                    "buffer", x.into()));
-            });
-
+            match from_utf8(&buffer[0..begin]) {
+                Ok(x) => {
+                    s.logger.trace(
+                        "gsh",
+                        Log::StaticDynamic(
+                            "Buffer contents from partial parse",
+                            "buffer",
+                            x.into(),
+                        ),
+                    );
+                }
+                Err(error) => {
+                    s.logger.error(
+                        "gsh",
+                        Log::StaticDynamic(
+                            "Shift buffer contains invalid UTF-8",
+                            "error",
+                            format!["{}", error],
+                        ),
+                    );
+                    break 'receiver;
+                }
+            }
         }
         shift = 0;
         if begin == BUFFER_SIZE - 1 {
@@ -146,11 +163,11 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
                             s.logger.error("gsh", Log::Static("Message parsing failed"));
                             stream.write(b"Unable to complete query")?;
                             stream.flush()?;
-                            unreachable![];
                         }
                     } else {
                         s.logger
-                            .warn("gsh", Log::Static("Malformed UTF-8 received"));
+                            .warn("gsh", Log::Static("Malformed UTF-8 received, this should never happen. Ending connection"));
+                        break 'receiver;
                     }
                 }
                 Some(false) => {
@@ -327,7 +344,7 @@ fn build_nest<'a>(nest: &mut Nest<'a>, commands: &'a [X], handler: Fun<'a>) -> O
                     }
                     None
                 }
-                Some((_, Either::Right(handler))) => {
+                Some((_, Either::Right(_handler))) => {
                     unreachable![];
                 }
                 None => {
@@ -374,11 +391,11 @@ impl<'a> Evaluate<String> for Gsh<'a> {
                             string = result;
                             atom = &string[..];
                         }
-                        Err(error) => return format!["Error parsing: {}", cmd],
+                        Err(_) => return format!["Error parsing: {}", cmd],
                     };
                 }
             }
-            if let Some((name, desc, pred, recur)) = to_predicate {
+            if let Some((_name, desc, pred, recur)) = to_predicate {
                 let result = pred(atom);
                 self.logger.debug(
                     "gsh",
@@ -459,15 +476,15 @@ impl<'a> Evaluate<String> for Gsh<'a> {
 mod command_handlers {
     use super::*;
 
-    pub fn unrecognized_command(s: &mut Gsh, commands: &[Input]) -> String {
+    pub fn unrecognized_command(_: &mut Gsh, _: &[Input]) -> String {
         "Command not finished".into()
     }
 
-    pub fn void(s: &mut Gsh, _: &[Input]) -> String {
+    pub fn void(_: &mut Gsh, _: &[Input]) -> String {
         "".into()
     }
 
-    pub fn add(s: &mut Gsh, commands: &[Input]) -> String {
+    pub fn add(_: &mut Gsh, commands: &[Input]) -> String {
         let mut sum = 0;
         for cmd in commands {
             match cmd {
@@ -551,7 +568,7 @@ mod command_handlers {
         }
     }
 
-    pub fn number(s: &mut Gsh, _: &[Input]) -> String {
+    pub fn number(_: &mut Gsh, _: &[Input]) -> String {
         "0".into()
     }
 
@@ -600,34 +617,61 @@ mod command_handlers {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::{self, BufRead, Read, Write};
+    use std::io::{self, Read, Write};
     use std::net::TcpStream;
     use std::sync::atomic::Ordering;
     use test::{black_box, Bencher};
 
+    #[ignore]
     #[test]
     fn nondeterministic_change_log_level() -> io::Result<()> {
-        let (mut logger, logger_handle) = crate::libs::logger::Logger::spawn();
+        let (logger, logger_handle) = crate::libs::logger::Logger::spawn();
         assert_ne![123, logger.get_log_level()];
-        let (mut gsh, keep_running) = spawn(logger.clone());
+        let (_gsh, keep_running) = spawn(logger.clone());
         std::thread::sleep(std::time::Duration::new(0, 50_000_000));
         {
             let mut listener = TcpStream::connect("127.0.0.1:32931")?;
-            write![listener, "log global level 123\n"]?;
+            writeln![listener, "log global level 123"]?;
             listener.flush()?;
             listener.read(&mut [0u8; 256])?;
         }
-        // std::thread::sleep(std::time::Duration::new(0, 50_000_000));
         assert_eq![123, logger.get_log_level()];
         keep_running.store(false, Ordering::Release);
         std::mem::drop(logger);
-        let mut listener = TcpStream::connect("127.0.0.1:32931")?;
-        logger_handle.join();
+        let listener = TcpStream::connect("127.0.0.1:32931")?;
+        logger_handle.join().unwrap();
         Ok(())
     }
 
     #[bench]
     fn speed_of_interpreting_a_raw_command(b: &mut Bencher) -> io::Result<()> {
+        let logger_handle = {
+            // given
+            let (mut logger, logger_handle) = crate::libs::logger::Logger::spawn();
+            logger.set_log_level(0);
+            let keep_running = Arc::new(AtomicBool::new(true));
+            let mut nest = Nest::new();
+            for spell in SPEC {
+                build_nest(&mut nest, spell.0, spell.1);
+            }
+            let mut gsh = GameShell {
+                logger,
+                keep_running,
+                commands: Arc::new(nest),
+            };
+
+            // then
+            b.iter(|| black_box(gsh.interpret_single(black_box("void"))));
+            logger_handle
+        };
+        logger_handle.join();
+
+        // cleanup
+        Ok(())
+    }
+
+    #[bench]
+    fn speed_of_interpreting_a_nested_command_with_parameters(b: &mut Bencher) -> io::Result<()> {
         let logger_handle = {
             // given
             let (mut logger, logger_handle) = crate::libs::logger::Logger::spawn();
@@ -645,9 +689,7 @@ mod tests {
             };
 
             // then
-            b.iter(|| {
-                black_box(gsh.interpret_single(black_box("void")));
-            });
+            b.iter(|| black_box(gsh.interpret_single(black_box("void (void 123) abc"))));
             logger_handle
         };
         logger_handle.join();
@@ -664,7 +706,7 @@ mod tests {
         logger.set_log_level(0);
         let mut listener = TcpStream::connect("127.0.0.1:32931")?;
         b.iter(|| -> io::Result<()> {
-            write![listener, "log global level 0\n"]?;
+            writeln![listener, "log global level 0"]?;
             listener.flush()?;
             listener.read(&mut [0u8; 1024])?;
             Ok(())

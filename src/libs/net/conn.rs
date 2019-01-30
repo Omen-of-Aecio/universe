@@ -63,7 +63,6 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Eq + Serialize + PartialEq> Connec
         let first_seq = match self.send_window.front() {
             None => {
                 panic!("Send window empty, but ack received.");
-                return Ok(()); // have to tolerate some faults
             }
             Some(first) => match *first {
                 Some(ref sent_packet) => sent_packet.seq,
@@ -75,7 +74,6 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Eq + Serialize + PartialEq> Connec
 
         match self.send_window.get_mut(index) {
             Some(sent_packet) => {
-                if let Some(ref sent_packet) = sent_packet {}
                 *sent_packet = None;
             }
             None => panic!("Index out of bounds: {}", index),

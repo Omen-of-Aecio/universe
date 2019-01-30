@@ -11,7 +11,6 @@ use glium::{
     glutin::{self, MouseScrollDelta, VirtualKeyCode as Key},
     Surface,
 };
-use time::PreciseTime;
 
 fn initialize_grid(s: &mut Grid<u8>) {
     s.resize(1000, 1000);
@@ -294,14 +293,13 @@ fn update_bullets(bullets: &mut Vec<Bullet>) {
 }
 
 fn play_song(s: &mut Client) {
-    use rodio::Source;
     use std::{fs::File, io::BufReader};
     let file = File::open("04 Video Games.mp3").unwrap();
     let source = rodio::Decoder::new(BufReader::new(file)).unwrap();
     s.audio.append(source);
 }
 
-fn remove_bullets_outside_camera(log: &mut Logger<Log>, bullets: &mut Vec<Bullet>, cam: &Camera) {
+fn remove_bullets_outside_camera(_log: &mut Logger<Log>, bullets: &mut Vec<Bullet>, cam: &Camera) {
     let bocs = cam.get_view_bocs();
     let mut x = vec![];
     for (i, bullet) in bullets.iter().enumerate() {
@@ -328,6 +326,7 @@ fn stop_benchmark(benchmarker: &mut Benchmarker, logger: &mut Logger<Log>, msg: 
 }
 
 pub fn entry_point_client(s: &mut Client) {
+    play_song(s);
     s.logger.info("cli", Log::Static("Creating grid"));
     initialize_grid(&mut s.game.grid);
     s.game.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };

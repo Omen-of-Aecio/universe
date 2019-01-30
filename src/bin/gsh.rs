@@ -1,9 +1,8 @@
 use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
-use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
+use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
 use rustyline::{Editor, Helper};
-use std::borrow::Cow::{self, Borrowed, Owned};
 use std::cell::{Cell, RefCell};
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
@@ -11,16 +10,12 @@ use universe::libs::metac::PartialParse;
 
 static HISTORY_FILE: &str = ".gsh-history.txt";
 
-static COLORED_PROMPT: &'static str = "\x1b[1;32m>>\x1b[0m ";
-
-static PROMPT: &'static str = ">> ";
-
 struct AutoComplete(RefCell<TcpStream>, Cell<bool>);
 
 impl Completer for AutoComplete {
     type Candidate = Pair;
 
-    fn complete(&self, line: &str, pos: usize) -> Result<(usize, Vec<Pair>), ReadlineError> {
+    fn complete(&self, _: &str, pos: usize) -> Result<(usize, Vec<Pair>), ReadlineError> {
         Ok((pos, vec![]))
     }
 }
@@ -30,17 +25,18 @@ impl Hinter for AutoComplete {
         if !self.1.get() || line.find('(').is_some() {
             return None;
         }
-        if line.chars().last() == Some(' ') {
+        if line.ends_with(' ') {
             // ---
             self.0
                 .borrow_mut()
-                .write(format!["autocomplete {}\n", line].as_bytes());
-            self.0.borrow_mut().flush();
+                .write_all(format!["autocomplete {}\n", line].as_bytes())
+                .unwrap();
+            self.0.borrow_mut().flush().unwrap();
             // ---
             let mut buffer = [0; 512];
-            self.0.borrow_mut().read(&mut buffer);
+            let _ = self.0.borrow_mut().read(&mut buffer).unwrap();
             if let Ok(buffer) = std::str::from_utf8(&buffer) {
-                return Some(String::from(" ") + buffer.into());
+                return Some(String::from(" ") + buffer);
             }
         }
         None
@@ -98,8 +94,8 @@ fn main() -> io::Result<()> {
                 {
                     let mut listener = rl.helper_mut().unwrap().0.borrow_mut();
                     // ---
-                    listener.write(line.as_bytes())?;
-                    listener.write(b"\n")?;
+                    listener.write_all(line.as_bytes())?;
+                    listener.write_all(b"\n")?;
                     listener.flush()?;
                     // ---
                 }
@@ -109,7 +105,7 @@ fn main() -> io::Result<()> {
                 // ---
                 let mut buffer = [0; 512];
                 let mut listener = rl.helper_mut().unwrap().0.borrow_mut();
-                listener.read(&mut buffer)?;
+                let _ = listener.read(&mut buffer)?;
                 if let Ok(buffer) = std::str::from_utf8(&buffer) {
                     writeln![output, "{} ", buffer]?;
                     output.flush()?;

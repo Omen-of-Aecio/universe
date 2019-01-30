@@ -87,16 +87,16 @@ fn move_player_according_to_input(s: &Input) -> Vec2 {
 }
 
 fn render_the_grid(grid: &mut Option<GridU8RenderData>, frame: &mut glium::Frame, cam: &Camera) {
-    grid.as_mut().map(|s| {
+    if let Some(ref mut grid) = grid {
         render_grid::render(
-            s,
+            grid,
             frame,
             (cam.center.x, cam.center.y),
             cam.zoom,
             cam.width,
             cam.height,
-        )
-    });
+        );
+    }
 }
 
 fn render_players(players: &mut [PolygonRenderData], frame: &mut glium::Frame, cam: &Camera) {
@@ -279,7 +279,7 @@ fn maybe_fire_bullets(s: &mut Client) {
     }
 }
 
-fn render_bullets(bullets: &Vec<Bullet>, frame: &mut glium::Frame, cam: &Camera) {
+fn render_bullets(bullets: &[Bullet], frame: &mut glium::Frame, cam: &Camera) {
     for bullet in bullets {
         render_polygon::render(&bullet.render, frame, &cam);
     }
@@ -392,7 +392,7 @@ pub fn entry_point_client(s: &mut Client) {
 
         render_the_grid(&mut s.game.grid_render, &mut frame, &s.game.cam);
         render_players(&mut s.game.players, &mut frame, &s.game.cam);
-        render_bullets(&mut s.game.bullets, &mut frame, &s.game.cam);
+        render_bullets(&s.game.bullets, &mut frame, &s.game.cam);
 
         // ---
         stop_benchmark(

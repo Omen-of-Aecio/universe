@@ -44,7 +44,7 @@ pub fn does_line_collide_with_grid<T: Clone + Default>(
     let slope_y = 1.0 + vx * vx / vy / vy;
     let (dx, dy) = (slope_x.sqrt(), slope_y.sqrt());
 
-    let (mut ix, mut iy) = (start.x.floor() as i16 as i32, start.y.floor() as i16 as i32);
+    let (mut ix, mut iy) = (i32::from(start.x.floor() as i16), i32::from(start.y.floor() as i16));
 
     let (sx, sy);
     let (mut ex, mut ey);
@@ -65,8 +65,8 @@ pub fn does_line_collide_with_grid<T: Clone + Default>(
         ey = (1.0 - start.y.fract()) * dy;
     }
 
-    let len = ((stop.x.floor() as i16 as i32 - start.x.floor() as i16 as i32).abs()
-        + (stop.y.floor() as i16 as i32 - start.y.floor() as i16 as i32).abs())
+    let len = ((i32::from(stop.x.floor() as i16) - i32::from(start.x.floor() as i16)).abs()
+        + (i32::from(stop.y.floor() as i16) - i32::from(start.y.floor() as i16)).abs())
         as u16;
 
     let mut it: u16 = 0;

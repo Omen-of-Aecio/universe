@@ -153,15 +153,15 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
                                     "Message parsing succeeded and evaluated, sending response to client",
                                 ),
                             );
-                            if result.len() > 0 {
-                                stream.write(format!["{}", &result].as_bytes())?;
+                            if !result.is_empty() {
+                                stream.write_all(result.as_bytes())?;
                             } else {
-                                stream.write(format!["OK"].as_bytes())?;
+                                stream.write_all(b"OK")?;
                             }
                             stream.flush()?;
                         } else {
                             s.logger.error("gsh", Log::Static("Message parsing failed"));
-                            stream.write(b"Unable to complete query")?;
+                            stream.write_all(b"Unable to complete query")?;
                             stream.flush()?;
                         }
                     } else {

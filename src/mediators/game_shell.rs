@@ -296,6 +296,7 @@ const SPEC: &[(&[X], Fun)] = &[
         log,
     ),
     (&[X::Atom("ex")], number),
+    (&[X::Recurring("void", ANY_STRING)], void),
     (&[X::Recurring("+", ANY_I32)], add),
     (&[X::Recurring("autocomplete", ANY_STRING)], autocomplete),
     (
@@ -462,6 +463,10 @@ mod command_handlers {
         "Command not finished".into()
     }
 
+    pub fn void(s: &mut Gsh, _: &[Input]) -> String {
+        "".into()
+    }
+
     pub fn add(s: &mut Gsh, commands: &[Input]) -> String {
         let mut sum = 0;
         for cmd in commands {
@@ -618,6 +623,36 @@ mod tests {
         std::mem::drop(logger);
         let mut listener = TcpStream::connect("127.0.0.1:32931")?;
         logger_handle.join();
+        Ok(())
+    }
+
+    #[bench]
+    fn speed_of_interpreting_a_raw_command(b: &mut Bencher) -> io::Result<()> {
+        let logger_handle = {
+            // given
+            let (mut logger, logger_handle) = crate::libs::logger::Logger::spawn();
+            logger.set_log_level(0);
+            let keep_running = Arc::new(AtomicBool::new(true));
+            let keep_running_clone = keep_running.clone();
+            let mut nest = Nest::new();
+            for spell in SPEC {
+                build_nest(&mut nest, spell.0, spell.1);
+            }
+            let mut gsh = GameShell {
+                logger,
+                keep_running,
+                commands: Arc::new(nest),
+            };
+
+            // then
+            b.iter(|| {
+                black_box(gsh.interpret_single(black_box("void")));
+            });
+            logger_handle
+        };
+        logger_handle.join();
+
+        // cleanup
         Ok(())
     }
 

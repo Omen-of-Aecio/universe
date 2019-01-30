@@ -622,8 +622,8 @@ mod tests {
     use std::sync::atomic::Ordering;
     use test::{black_box, Bencher};
 
-    #[ignore]
     #[test]
+    #[cfg(test_nondeterministic)]
     fn nondeterministic_change_log_level() -> io::Result<()> {
         let (logger, logger_handle) = crate::libs::logger::Logger::spawn();
         assert_ne![123, logger.get_log_level()];

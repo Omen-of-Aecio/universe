@@ -361,10 +361,8 @@ fn build_nest<'a>(nest: &mut Nest<'a>, commands: &'a [X], handler: Fun<'a>) -> O
                 nest.head
                     .insert(commands[0].name(), (commands[0], result.unwrap()));
             } else {
-                nest.head.insert(
-                    commands[0].name(),
-                    (commands[0], Either::Left(ether)),
-                );
+                nest.head
+                    .insert(commands[0].name(), (commands[0], Either::Left(ether)));
             }
             None
         }
@@ -663,15 +661,32 @@ mod tests {
                 commands: Arc::new(nest),
             };
 
-            assert_eq!["Unrecognized command", gsh.interpret_single("hello world").unwrap()];
-            assert_eq!["6",  gsh.interpret_single("+ 1 2 3").unwrap()];
+            assert_eq![
+                "Unrecognized command",
+                gsh.interpret_single("hello world").unwrap()
+            ];
+            assert_eq!["6", gsh.interpret_single("+ 1 2 3").unwrap()];
             assert_eq!["21", gsh.interpret_single("+ 1 (+ 8 9) 3").unwrap()];
             assert_eq!["21", gsh.interpret_single("+ 1 (+ 8 (+) 9) 3").unwrap()];
             assert_eq!["22", gsh.interpret_single("+ 1 (+ 8 (+ 1) 9) 3").unwrap()];
-            assert_eq!["",   gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 9) 3\nvoid").unwrap()];
-            assert_eq!["Expected: <i32>, but got: \"Expected: <i32>, but got: \\\"0.6\\\"\"", gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 0.6 9) (+ 3\n1\n)").unwrap()];
-            assert_eq!["<atom>", gsh.interpret_single("autocomplete log context").unwrap()];
-            assert_eq!["<u8>",   gsh.interpret_single("autocomplete log context gsh level ").unwrap()];
+            assert_eq![
+                "",
+                gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 9) 3\nvoid").unwrap()
+            ];
+            assert_eq![
+                "Expected: <i32>, but got: \"Expected: <i32>, but got: \\\"0.6\\\"\"",
+                gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 0.6 9) (+ 3\n1\n)")
+                    .unwrap()
+            ];
+            assert_eq![
+                "<atom>",
+                gsh.interpret_single("autocomplete log context").unwrap()
+            ];
+            assert_eq![
+                "<u8>",
+                gsh.interpret_single("autocomplete log context gsh level ")
+                    .unwrap()
+            ];
 
             // then
             logger_handle

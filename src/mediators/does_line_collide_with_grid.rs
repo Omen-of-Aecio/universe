@@ -44,7 +44,10 @@ pub fn does_line_collide_with_grid<T: Clone + Default>(
     let slope_y = 1.0 + vx * vx / vy / vy;
     let (dx, dy) = (slope_x.sqrt(), slope_y.sqrt());
 
-    let (mut ix, mut iy) = (i32::from(start.x.floor() as i16), i32::from(start.y.floor() as i16));
+    let (mut ix, mut iy) = (
+        i32::from(start.x.floor() as i16),
+        i32::from(start.y.floor() as i16),
+    );
 
     let (sx, sy);
     let (mut ex, mut ey);

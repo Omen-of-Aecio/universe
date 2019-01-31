@@ -184,7 +184,7 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
     Ok(())
 }
 
-fn game_shell_thread<'a>(mut s: Gsh<'a>) {
+fn game_shell_thread(mut s: Gsh) {
     let listener = TcpListener::bind("127.0.0.1:32931");
     match listener {
         Ok(listener) => {
@@ -244,10 +244,10 @@ mod predicates {
         Some(Input::String(input.into()))
     }
     fn any_u8_function(input: &str) -> Option<Input> {
-        input.parse::<u8>().ok().map(|x| Input::U8(x))
+        input.parse::<u8>().ok().map(Input::U8)
     }
     fn any_i32_function(input: &str) -> Option<Input> {
-        input.parse::<i32>().ok().map(|x| Input::I32(x))
+        input.parse::<i32>().ok().map(Input::I32)
     }
     pub const ANY_ATOM: Pred = ("<atom>", any_atom_function);
     pub const ANY_STRING: Pred = ("<string>", any_string_function);
@@ -331,7 +331,7 @@ const SPEC: &[(&[X], Fun)] = &[
 ];
 
 fn build_nest<'a>(nest: &mut Nest<'a>, commands: &'a [X], handler: Fun<'a>) -> Option<Ether<'a>> {
-    if commands.len() != 0 {
+    if !commands.is_empty() {
         // Does the nest already contain this command?
         if nest.head.get_mut(&commands[0].name()).is_some() {
             match nest.head.get_mut(&commands[0].name()) {
@@ -356,11 +356,11 @@ fn build_nest<'a>(nest: &mut Nest<'a>, commands: &'a [X], handler: Fun<'a>) -> O
             let result = build_nest(&mut ether, &commands[1..], handler);
             if result.is_some() {
                 nest.head
-                    .insert(commands[0].name(), (commands[0].clone(), result.unwrap()));
+                    .insert(commands[0].name(), (commands[0], result.unwrap()));
             } else {
                 nest.head.insert(
                     commands[0].name(),
-                    (commands[0].clone(), Either::Left(ether)),
+                    (commands[0], Either::Left(ether)),
                 );
             }
             None
@@ -448,7 +448,7 @@ impl<'a> Evaluate<String> for Gsh<'a> {
                         }
                     }
                     None => {
-                        return format!["Unrecognized command"];
+                        return "Unrecognized command".into();
                     }
                 }
             }
@@ -552,7 +552,7 @@ mod command_handlers {
             }
         }
         if waspred {
-            format!["{}", predname]
+            predname.into()
         } else {
             format!["{:?}", nesthead.keys()]
         }

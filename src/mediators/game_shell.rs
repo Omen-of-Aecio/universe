@@ -552,7 +552,7 @@ mod command_handlers {
             }
         }
         if waspred {
-            format!["{:?}", predname]
+            format!["{}", predname]
         } else {
             format!["{:?}", nesthead.keys()]
         }
@@ -643,6 +643,42 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn check_idempotent_statements_work() -> io::Result<()> {
+        let logger_handle = {
+            // given
+            let (mut logger, logger_handle) = crate::libs::logger::Logger::spawn();
+            logger.set_log_level(0);
+            let keep_running = Arc::new(AtomicBool::new(true));
+            let mut nest = Nest::new();
+            for spell in SPEC {
+                build_nest(&mut nest, spell.0, spell.1);
+            }
+            let mut gsh = GameShell {
+                logger,
+                keep_running,
+                commands: Arc::new(nest),
+            };
+
+            assert_eq!["Unrecognized command", gsh.interpret_single("hello world").unwrap()];
+            assert_eq!["6",  gsh.interpret_single("+ 1 2 3").unwrap()];
+            assert_eq!["21", gsh.interpret_single("+ 1 (+ 8 9) 3").unwrap()];
+            assert_eq!["21", gsh.interpret_single("+ 1 (+ 8 (+) 9) 3").unwrap()];
+            assert_eq!["22", gsh.interpret_single("+ 1 (+ 8 (+ 1) 9) 3").unwrap()];
+            assert_eq!["",   gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 9) 3\nvoid").unwrap()];
+            assert_eq!["Expected: <i32>, but got: \"Expected: <i32>, but got: \\\"0.6\\\"\"", gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 0.6 9) (+ 3\n1\n)").unwrap()];
+            assert_eq!["<atom>", gsh.interpret_single("autocomplete log context").unwrap()];
+            assert_eq!["<u8>",   gsh.interpret_single("autocomplete log context gsh level ").unwrap()];
+
+            // then
+            logger_handle
+        };
+        logger_handle.join().unwrap();
+
+        // cleanup
+        Ok(())
+    }
+
     #[bench]
     fn speed_of_interpreting_a_raw_command(b: &mut Bencher) -> io::Result<()> {
         let logger_handle = {
@@ -664,7 +700,7 @@ mod tests {
             b.iter(|| black_box(gsh.interpret_single(black_box("void"))));
             logger_handle
         };
-        logger_handle.join();
+        logger_handle.join().unwrap();
 
         // cleanup
         Ok(())
@@ -677,7 +713,6 @@ mod tests {
             let (mut logger, logger_handle) = crate::libs::logger::Logger::spawn();
             logger.set_log_level(0);
             let keep_running = Arc::new(AtomicBool::new(true));
-            let keep_running_clone = keep_running.clone();
             let mut nest = Nest::new();
             for spell in SPEC {
                 build_nest(&mut nest, spell.0, spell.1);
@@ -692,7 +727,7 @@ mod tests {
             b.iter(|| black_box(gsh.interpret_single(black_box("void (void 123) abc"))));
             logger_handle
         };
-        logger_handle.join();
+        logger_handle.join().unwrap();
 
         // cleanup
         Ok(())
@@ -701,7 +736,7 @@ mod tests {
     #[bench]
     fn message_bandwidth_over_tcp(b: &mut Bencher) -> io::Result<()> {
         let (mut logger, logger_handle) = crate::libs::logger::Logger::spawn();
-        let (mut gsh, keep_running) = spawn(logger.clone());
+        let (mut _gsh, keep_running) = spawn(logger.clone());
         std::thread::sleep(std::time::Duration::new(0, 50_000_000));
         logger.set_log_level(0);
         let mut listener = TcpStream::connect("127.0.0.1:32931")?;
@@ -714,8 +749,8 @@ mod tests {
         keep_running.store(false, Ordering::Release);
         std::mem::drop(listener);
         std::mem::drop(logger);
-        let listener = TcpStream::connect("127.0.0.1:32931")?;
-        logger_handle.join();
+        let _ = TcpStream::connect("127.0.0.1:32931")?;
+        let _ = logger_handle.join().unwrap();
         Ok(())
     }
 }

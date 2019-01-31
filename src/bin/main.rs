@@ -56,9 +56,9 @@ fn run_client_or_server(mut s: glocals::Main) -> glocals::Main {
 }
 
 fn wait_for_threads_to_exit(s: glocals::Main) {
-    s.threads
-        .game_shell_keep_running
-        .map(|x| x.store(false, Ordering::Relaxed));
+    if let Some(x) = s.threads .game_shell_keep_running {
+        x.store(false, Ordering::Relaxed);
+    }
 
     let tcp = TcpStream::connect("127.0.0.1:32931").unwrap();
     std::mem::drop(tcp);

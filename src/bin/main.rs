@@ -56,7 +56,7 @@ fn run_client_or_server(mut s: glocals::Main) -> glocals::Main {
 }
 
 fn wait_for_threads_to_exit(s: glocals::Main) {
-    if let Some(x) = s.threads .game_shell_keep_running {
+    if let Some(x) = s.threads.game_shell_keep_running {
         x.store(false, Ordering::Relaxed);
     }
 

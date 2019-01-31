@@ -17,17 +17,20 @@ pub fn spawn(logger: Logger<Log>) -> (JoinHandle<()>, Arc<AtomicBool>) {
     let keep_running = Arc::new(AtomicBool::new(true));
     let keep_running_clone = keep_running.clone();
     (
-        thread::spawn(move || {
-            let mut nest = Nest::new();
-            for spell in SPEC {
-                build_nest(&mut nest, spell.0, spell.1);
-            }
-            game_shell_thread(GameShell {
-                logger,
-                keep_running,
-                commands: Arc::new(nest),
+        thread::Builder::new()
+            .name("gsh/server".to_string())
+            .spawn(move || {
+                let mut nest = Nest::new();
+                for spell in SPEC {
+                    build_nest(&mut nest, spell.0, spell.1);
+                }
+                game_shell_thread(GameShell {
+                    logger,
+                    keep_running,
+                    commands: Arc::new(nest),
+                })
             })
-        }),
+            .unwrap(),
         keep_running_clone,
     )
 }

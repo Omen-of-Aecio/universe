@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn confirm_message_arrives() {
-        let (mut client, client_port): (Socket<bool>, _) = Socket::new_with_random_port().unwrap();
+        let (mut client, _client_port): (Socket<bool>, _) = Socket::new_with_random_port().unwrap();
         let (mut server, server_port): (Socket<bool>, _) = Socket::new_with_random_port().unwrap();
 
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn confirm_reliable_message_arrives() {
-        let (mut client, client_port): (Socket<bool>, _) = Socket::new_with_random_port().unwrap();
+        let (mut client, _client_port): (Socket<bool>, _) = Socket::new_with_random_port().unwrap();
         let (mut server, server_port): (Socket<bool>, _) = Socket::new_with_random_port().unwrap();
 
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
@@ -196,7 +196,7 @@ mod tests {
 
     #[bench]
     fn time_per_byte(b: &mut Bencher) {
-        let (mut client, client_port): (Socket<u8>, _) = Socket::new_with_random_port().unwrap();
+        let (mut client, _client_port): (Socket<u8>, _) = Socket::new_with_random_port().unwrap();
         let (mut server, server_port): (Socket<u8>, _) = Socket::new_with_random_port().unwrap();
 
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
@@ -216,7 +216,7 @@ mod tests {
 
     #[bench]
     fn time_per_kilobyte(b: &mut Bencher) {
-        let (mut client, client_port): (Socket<Vec<u8>>, _) =
+        let (mut client, _client_port): (Socket<Vec<u8>>, _) =
             Socket::new_with_random_port().unwrap();
         let (mut server, server_port): (Socket<Vec<u8>>, _) =
             Socket::new_with_random_port().unwrap();
@@ -233,7 +233,7 @@ mod tests {
 
     #[bench]
     fn time_per_10_kb(b: &mut Bencher) {
-        let (mut client, client_port): (Socket<Vec<u8>>, _) =
+        let (mut client, _client_port): (Socket<Vec<u8>>, _) =
             Socket::new_with_random_port().unwrap();
         let (mut server, server_port): (Socket<Vec<u8>>, _) =
             Socket::new_with_random_port().unwrap();

@@ -253,11 +253,11 @@ fn parse<'a>(line: &'a str, output: &mut [Data<'a>; BUFFER_SIZE]) -> Result<usiz
     let mut lparen_stack = 0;
     let mut buff_idx = 0;
     let (mut start, mut stop) = (0, 0);
-    for i in line.chars() {
+    for (idx, i) in line.char_indices() {
         if lparen_stack > 0 {
             if i == '(' {
                 lparen_stack += 1;
-                stop += 1;
+                stop = idx + i.len_utf8();
             } else if i == ')' {
                 lparen_stack -= 1;
                 if lparen_stack == 0 {
@@ -266,13 +266,13 @@ fn parse<'a>(line: &'a str, output: &mut [Data<'a>; BUFFER_SIZE]) -> Result<usiz
                     if buff_idx >= output.len() {
                         return Err(ParseError::InputHasTooManyElements);
                     }
-                    stop += 1;
+                    stop = idx + i.len_utf8();
                     start = stop;
                 } else {
-                    stop += 1;
+                    stop = idx + i.len_utf8();
                 }
             } else {
-                stop += 1;
+                stop = idx + i.len_utf8();
             }
         } else if i.is_whitespace() {
             if start != stop {
@@ -282,16 +282,16 @@ fn parse<'a>(line: &'a str, output: &mut [Data<'a>; BUFFER_SIZE]) -> Result<usiz
                     return Err(ParseError::InputHasTooManyElements);
                 }
             }
-            stop += 1;
+            stop = idx + i.len_utf8();
             start = stop;
         } else if i == '(' {
             lparen_stack += 1;
-            stop += 1;
+            stop = idx + i.len_utf8();
             start = stop;
         } else if i == ')' {
             return Err(ParseError::PrematureRightParenthesis);
         } else {
-            stop += 1;
+            stop = idx + i.len_utf8();
         }
     }
     if lparen_stack > 0 {
@@ -342,6 +342,15 @@ mod tests {
         assert_eq![Data::Atom("Log"), data[1]];
         assert_eq![Data::Atom("Level"), data[2]];
         assert_eq![Data::Command(" 0"), data[3]];
+    }
+
+    #[test]
+    fn parse_unicode() {
+        let line = "2";
+        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let count = parse(line, &mut data).unwrap();
+
+        assert_eq![1, count];
     }
 
     #[test]

@@ -1,3 +1,6 @@
+sudo: required
+before_script:
+    - sudo apt install libasound2-dev
 language: rust
 script:
   - cargo build --verbose --all

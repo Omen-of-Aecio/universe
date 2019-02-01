@@ -1,3 +1,9 @@
-Cargo.lock
-target/
-**/*.rs.bk
+/*
+!.gitignore
+!.travis.yml
+!Cargo.toml
+!README.md
+!rustfmt.toml
+!scripts/
+!shaders/
+!src/

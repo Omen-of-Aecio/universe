@@ -3,6 +3,8 @@ before_script:
     - sudo apt update
     - sudo apt install libasound2-dev
 language: rust
+rust:
+    - nightly
 script:
   - cargo build --verbose --all
   - cargo test --verbose --all

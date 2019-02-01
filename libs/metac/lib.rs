@@ -189,7 +189,7 @@ pub trait Evaluate<T: Default> {
                 }
                 lparen_stack -= 1;
             }
-            idx += 1;
+            idx += ch.len_utf8();
         }
         if idx != old_idx {
             result = self.interpret_single(&code[old_idx..idx])?;
@@ -253,12 +253,12 @@ fn parse<'a>(line: &'a str, output: &mut [Data<'a>; BUFFER_SIZE]) -> Result<usiz
     let mut lparen_stack = 0;
     let mut buff_idx = 0;
     let (mut start, mut stop) = (0, 0);
-    for (idx, i) in line.char_indices() {
+    for ch in line.chars() {
         if lparen_stack > 0 {
-            if i == '(' {
+            if ch == '(' {
                 lparen_stack += 1;
-                stop = idx + i.len_utf8();
-            } else if i == ')' {
+                stop += ch.len_utf8();;
+            } else if ch == ')' {
                 lparen_stack -= 1;
                 if lparen_stack == 0 {
                     output[buff_idx] = Data::Command(&line[start..stop]);
@@ -266,15 +266,15 @@ fn parse<'a>(line: &'a str, output: &mut [Data<'a>; BUFFER_SIZE]) -> Result<usiz
                     if buff_idx >= output.len() {
                         return Err(ParseError::InputHasTooManyElements);
                     }
-                    stop = idx + i.len_utf8();
+                    stop += ch.len_utf8();;
                     start = stop;
                 } else {
-                    stop = idx + i.len_utf8();
+                    stop += ch.len_utf8();;
                 }
             } else {
-                stop = idx + i.len_utf8();
+                stop += ch.len_utf8();;
             }
-        } else if i.is_whitespace() {
+        } else if ch.is_whitespace() {
             if start != stop {
                 output[buff_idx] = Data::Atom(&line[start..stop]);
                 buff_idx += 1;
@@ -282,16 +282,16 @@ fn parse<'a>(line: &'a str, output: &mut [Data<'a>; BUFFER_SIZE]) -> Result<usiz
                     return Err(ParseError::InputHasTooManyElements);
                 }
             }
-            stop = idx + i.len_utf8();
+            stop += ch.len_utf8();;
             start = stop;
-        } else if i == '(' {
+        } else if ch == '(' {
             lparen_stack += 1;
-            stop = idx + i.len_utf8();
+            stop += ch.len_utf8();;
             start = stop;
-        } else if i == ')' {
+        } else if ch == ')' {
             return Err(ParseError::PrematureRightParenthesis);
         } else {
-            stop = idx + i.len_utf8();
+            stop += ch.len_utf8();;
         }
     }
     if lparen_stack > 0 {
@@ -449,6 +449,24 @@ mod tests {
     }
 
     // ---
+
+    #[test]
+    fn interpret_unicode() {
+        struct Eval {
+            pub invoked: usize,
+        }
+        impl Evaluate<()> for Eval {
+            fn evaluate<'a>(&mut self, _: &[Data<'a>]) {
+                self.invoked += 1;
+            }
+        }
+        let mut eval = Eval { invoked: 0 };
+
+        let line = "2";
+        eval.interpret_single(line).unwrap();
+        eval.interpret_multiple(line).unwrap();
+        assert_eq![2, eval.invoked];
+    }
 
     #[test]
     fn interpret_multiple_simple() {

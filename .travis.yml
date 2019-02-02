@@ -1,3 +1,7 @@
+addons:
+    apt:
+        sources:
+            - devian-sid
 sudo: required
 before_script:
     - sudo apt update

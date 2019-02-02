@@ -5,7 +5,8 @@ addons:
 sudo: required
 before_script:
     - sudo apt update
-    - sudo apt install binutils-dev libasound2-dev libunwind-dev
+    - sudo apt search libunwind
+    - sudo apt install binutils-dev libasound2-dev libunwind8-dev
 language: rust
 rust:
     - nightly

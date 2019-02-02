@@ -3,6 +3,7 @@
 !.travis.yml
 !Cargo.toml
 !README.md
+!benches/
 !rustfmt.toml
 !scripts/
 !shaders/

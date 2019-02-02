@@ -25,6 +25,7 @@ done
 
 if [ "$failures" -ne 0 ]; then
     echo "$failures scripts failed"
+    exit 1
 else
     echo "All scripts passed"
 fi

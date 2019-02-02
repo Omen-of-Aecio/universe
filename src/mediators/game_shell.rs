@@ -672,6 +672,7 @@ mod tests {
                 build_nest(&mut nest, spell.0, spell.1);
             }
             let mut gsh = GameShell {
+                config_change: None,
                 logger,
                 keep_running,
                 commands: Arc::new(nest),
@@ -725,6 +726,7 @@ mod tests {
                 build_nest(&mut nest, spell.0, spell.1);
             }
             let mut gsh = GameShell {
+                config_change: None,
                 logger,
                 keep_running,
                 commands: Arc::new(nest),
@@ -752,6 +754,7 @@ mod tests {
                 build_nest(&mut nest, spell.0, spell.1);
             }
             let mut gsh = GameShell {
+                config_change: None,
                 logger,
                 keep_running,
                 commands: Arc::new(nest),

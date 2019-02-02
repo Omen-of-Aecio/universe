@@ -11,6 +11,21 @@ use std::sync::{
 };
 use std::thread::{self, JoinHandle};
 
+pub fn make_new_gameshell(logger: Logger<Log>) -> Gsh<'static> {
+    let keep_running = Arc::new(AtomicBool::new(true));
+    let mut nest = Nest::new();
+    for spell in SPEC {
+        build_nest(&mut nest, spell.0, spell.1);
+    }
+    GameShell {
+        logger,
+        keep_running,
+        commands: Arc::new(nest),
+    }
+}
+
+// ---
+
 pub fn spawn(logger: Logger<Log>) -> (JoinHandle<()>, Arc<AtomicBool>) {
     let keep_running = Arc::new(AtomicBool::new(true));
     let keep_running_clone = keep_running.clone();

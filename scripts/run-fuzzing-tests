@@ -4,6 +4,7 @@ set -Eeuo pipefail
 
 cargo install --force honggfuzz
 
+builderr=0
 for TARGET in tests/fuzz/*; do
     FILE="$(basename $TARGET)"
     FILE="${FILE%.*}"
@@ -17,9 +18,16 @@ for TARGET in tests/fuzz/*; do
     HFUZZ_BUILD_ARGS="" \
     HFUZZ_RUN_ARGS="-N1000000 --exit_upon_crash -v ${HFUZZ_INPUT_ARGS:-}" \
     cargo hfuzz run "$FILE"
+    if [ "$?" -ne 0 ]; then
+        builderr="$((builderr + 1))"
+    fi
     set -e
     HFUZZ_INPUT_ARGS=
 done
+
+if [ "$builderr" -gt 0 ]; then
+    echo "$builderr fuzzing tests failed building"
+fi
 
 found=0
 for TARGET in tests/fuzz/*; do
@@ -36,7 +44,11 @@ for TARGET in tests/fuzz/*; do
 done
 
 if [ "$found" -gt 0 ]; then
-    echo "$found fuzzing tests failed"
+    echo "$found fuzzing tests found errors"
+fi
+
+if [ "$builderr" -gt 0 ] || [ "$found" -gt 0 ]; then
     exit 1
 fi
+
 echo "All fuzzing tests passed"

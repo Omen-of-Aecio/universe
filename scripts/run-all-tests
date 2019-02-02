@@ -1,0 +1,6 @@
+#! /usr/bin/env bash
+
+set -Eeuo pipefail
+
+cargo test --verbose --all
+RUSTFLAGS='--cfg test_nondeterministic' cargo test -v --all nondeterministic_

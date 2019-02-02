@@ -1,10 +1,9 @@
 use honggfuzz::fuzz;
-use universe::libs::metac::Evaluate;
-use universe::mediators::game_shell::*;
+use universe::libs::{metac::Evaluate, logger::Logger};
+use universe::mediators::game_shell::make_new_gameshell;
 
 fn main() {
-    // given
-    let (mut logger, _) = universe::libs::logger::Logger::spawn();
+    let (mut logger, _) = Logger::spawn();
     logger.set_log_level(0);
     let mut gsh = make_new_gameshell(logger);
     loop {

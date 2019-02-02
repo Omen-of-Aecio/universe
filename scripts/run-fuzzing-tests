@@ -4,6 +4,10 @@ set -Eeuo pipefail
 
 cargo install --force honggfuzz
 
+if [ -d hfuzz_workspace/ ]; then
+    rm -r hfuzz_workspace/
+fi
+
 builderr=0
 for TARGET in tests/fuzz/*; do
     FILE="$(basename $TARGET)"
@@ -16,7 +20,7 @@ for TARGET in tests/fuzz/*; do
 
     set +e
     HFUZZ_BUILD_ARGS="" \
-    HFUZZ_RUN_ARGS="-N1000000 --exit_upon_crash -v ${HFUZZ_INPUT_ARGS:-}" \
+    HFUZZ_RUN_ARGS="-N1000000 --exit_upon_crash ${HFUZZ_INPUT_ARGS:+-v} ${HFUZZ_INPUT_ARGS:-}" \
     cargo hfuzz run "$FILE"
     if [ "$?" -ne 0 ]; then
         builderr="$((builderr + 1))"

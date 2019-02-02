@@ -10,6 +10,4 @@ language: rust
 rust:
     - nightly
 script:
-  - cargo build --verbose --all
-  - cargo test --verbose --all
-  - ./scripts/run-fuzzing-tests
+  - ./scripts/run-all

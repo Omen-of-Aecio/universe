@@ -1,0 +1,30 @@
+#! /usr/bin/env bash
+
+set -Eeuo pipefail
+
+FILE="$(basename $0)"
+DIR="${0%$FILE}"
+
+cd "$DIR.."
+DIR="${DIR%/*}"
+DIR="${DIR##*/}"
+
+failures=0
+for SCRIPT in "$DIR"/*; do
+    if [ "$SCRIPT" = "$DIR/$FILE" ]; then
+        continue
+    fi
+    echo "Running: $SCRIPT"
+    set +e
+    ./"$SCRIPT"
+    if [ "$?" -ne 0 ]; then
+        failures="$((failures + 1))"
+    fi
+    set -e
+done
+
+if [ "$failures" -ne 0 ]; then
+    echo "$failures scripts failed"
+else
+    echo "All scripts passed"
+fi

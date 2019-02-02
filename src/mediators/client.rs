@@ -351,6 +351,21 @@ pub fn entry_point_client(s: &mut Client) {
     s.logger.set_log_level(196);
 
     loop {
+        let xform = if let Some(ref mut rx) = s.main.config_change_recv {
+            match rx.recv() {
+                Ok(msg) => {
+                    Some(msg)
+                }
+                Err(_) => {
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        if let Some(xform) = xform {
+            xform(&mut s.main.config);
+        }
         // ---
         s.logic_benchmarker.start();
         // ---

@@ -11,7 +11,7 @@ use serde_derive::Deserialize;
 use std::{
     collections::HashMap,
     net::SocketAddr,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{atomic::AtomicBool, mpsc, Arc},
     time::Duration,
     vec::Vec,
 };
@@ -22,6 +22,7 @@ pub type Error = failure::Error;
 
 #[derive(Default)]
 pub struct Main<'a> {
+    pub config_change_recv: Option<mpsc::Receiver<fn(&mut Config)>>,
     pub config: Config,
     pub commandline: clap::ArgMatches<'a>,
     pub threads: Threads,
@@ -38,6 +39,7 @@ pub struct Threads {
 
 #[derive(Clone)]
 pub struct GameShell<T: Send + Sync> {
+    pub config_change: Option<mpsc::SyncSender<fn(&mut Config)>>,
     pub logger: Logger<Log>,
     pub keep_running: Arc<AtomicBool>,
     pub commands: T,

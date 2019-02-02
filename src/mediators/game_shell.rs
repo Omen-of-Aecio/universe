@@ -18,6 +18,7 @@ pub fn make_new_gameshell(logger: Logger<Log>) -> Gsh<'static> {
         build_nest(&mut nest, spell.0, spell.1);
     }
     GameShell {
+        config_change: None,
         logger,
         keep_running,
         commands: Arc::new(nest),
@@ -38,6 +39,7 @@ pub fn spawn(logger: Logger<Log>) -> (JoinHandle<()>, Arc<AtomicBool>) {
                     build_nest(&mut nest, spell.0, spell.1);
                 }
                 game_shell_thread(GameShell {
+                    config_change: None,
                     logger,
                     keep_running,
                     commands: Arc::new(nest),
@@ -59,6 +61,7 @@ fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<
             build_nest(&mut nest, spell.0, spell.1);
         }
         let mut shell_clone = GameShell {
+            config_change: None,
             logger,
             keep_running,
             commands: Arc::new(nest),

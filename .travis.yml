@@ -1,7 +1,7 @@
 sudo: required
 before_script:
     - sudo apt update
-    - sudo apt install binutils-devel libasound2-dev libunwind-devel/libunwind8-devel
+    - sudo apt install binutils-dev libasound2-dev libunwind-dev
 language: rust
 rust:
     - nightly

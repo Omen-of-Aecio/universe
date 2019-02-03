@@ -353,12 +353,8 @@ pub fn entry_point_client(s: &mut Client) {
     loop {
         let xform = if let Some(ref mut rx) = s.main.config_change_recv {
             match rx.try_recv() {
-                Ok(msg) => {
-                    Some(msg)
-                }
-                Err(_) => {
-                    None
-                }
+                Ok(msg) => Some(msg),
+                Err(_) => None,
             }
         } else {
             None

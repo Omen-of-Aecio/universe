@@ -355,7 +355,11 @@ impl<'a> X<'a> {
 
 // ---
 
-pub fn build_nest<'a>(nest: &mut Nest<'a>, commands: &'a [X], handler: Fun<'a>) -> Option<Ether<'a>> {
+pub fn build_nest<'a>(
+    nest: &mut Nest<'a>,
+    commands: &'a [X],
+    handler: Fun<'a>,
+) -> Option<Ether<'a>> {
     if !commands.is_empty() {
         // Does the nest already contain this command?
         if nest.head.get_mut(&commands[0].name()).is_some() {
@@ -539,12 +543,8 @@ mod command_handlers {
             return "Did not get command".into();
         }
         match commands[0] {
-            Input::Command(ref cmd) => {
-                cmd.clone()
-            }
-            _ => {
-                "Error: Not a command".into()
-            }
+            Input::Command(ref cmd) => cmd.clone(),
+            _ => "Error: Not a command".into(),
         }
     }
 

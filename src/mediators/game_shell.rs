@@ -720,6 +720,10 @@ mod tests {
                 "Unrecognized command",
                 gsh.interpret_single("hello world").unwrap()
             ];
+            assert_eq![
+                "some thing\n new ",
+                gsh.interpret_single("str (some thing\n new )").unwrap()
+            ];
             assert_eq!["6", gsh.interpret_single("+ 1 2 3").unwrap()];
             assert_eq!["21", gsh.interpret_single("+ 1 (+ 8 9) 3").unwrap()];
             assert_eq!["21", gsh.interpret_single("+ 1 (+ 8 (+) 9) 3").unwrap()];
@@ -751,6 +755,8 @@ mod tests {
         // cleanup
         Ok(())
     }
+
+    // ---
 
     #[bench]
     fn speed_of_interpreting_a_raw_command(b: &mut Bencher) -> io::Result<()> {

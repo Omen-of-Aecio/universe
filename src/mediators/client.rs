@@ -294,7 +294,7 @@ fn update_bullets(bullets: &mut Vec<Bullet>) {
 
 fn play_song(s: &mut Client) {
     use std::{fs::File, io::BufReader};
-    let file = File::open("04 Video Games.mp3").unwrap();
+    let file = File::open("assets/sound/Kitsune^2 - Rainbow Tylenol.mp3").unwrap();
     let source = rodio::Decoder::new(BufReader::new(file)).unwrap();
     s.audio.append(source);
 }

@@ -1,9 +1,8 @@
-use crate::libs::{
-    benchmarker::Benchmarker,
-    geometry::{cam::Camera, grid2d::Grid, vec::Vec2},
-    input,
-    logger::Logger,
-};
+use benchmarker::Benchmarker;
+use geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
+use input;
+use logger::Logger;
+
 use clap;
 pub use glium::uniforms::{MagnifySamplerFilter, MinifySamplerFilter};
 use glium::{implement_vertex, texture::Texture2d};
@@ -16,6 +15,8 @@ use std::{
     time::Duration,
     vec::Vec,
 };
+
+// mod config;
 
 pub type Error = failure::Error;
 

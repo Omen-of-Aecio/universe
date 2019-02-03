@@ -1,5 +1,5 @@
 use super::pkt::Packet;
-use crate::glocals::Error;
+use failure::Error;
 use serde::{Deserialize, Serialize};
 use std::{
     self,

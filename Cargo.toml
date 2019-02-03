@@ -29,6 +29,16 @@ gfx = "0.17"
 gfx_window_sdl = "0.8"
 sdl2 = "0.31"
 
+# Local libraries
+net =       {path = "libs/net"}
+geometry =  {path = "libs/geometry"}
+input =     {path = "libs/input"}
+config =    {path = "libs/config"}
+
+logger =    {path = "libs/logger"}
+benchmarker = {path = "libs/benchmarker"}
+metac =     {path = "libs/metac"}
+
 [dev-dependencies]
 regex = "1.1.0"
 slog-async = "2.3"

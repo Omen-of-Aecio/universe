@@ -1,8 +1,6 @@
 use crate::glocals::{GameShell, Log};
-use crate::libs::{
-    logger::Logger,
-    metac::{Data, Evaluate, PartialParse},
-};
+use logger::{self, Logger};
+use metac::{Data, Evaluate, PartialParse};
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -626,7 +624,7 @@ mod tests {
     #[test]
     #[cfg(test_nondeterministic)]
     fn nondeterministic_change_log_level() -> io::Result<()> {
-        let (logger, logger_handle) = crate::libs::logger::Logger::spawn();
+        let (logger, logger_handle) = logger::Logger::spawn();
         assert_ne![123, logger.get_log_level()];
         let (_gsh, keep_running) = spawn(logger.clone());
         std::thread::sleep(std::time::Duration::new(0, 50_000_000));
@@ -648,7 +646,7 @@ mod tests {
     fn check_idempotent_statements_work() -> io::Result<()> {
         let logger_handle = {
             // given
-            let (mut logger, logger_handle) = crate::libs::logger::Logger::spawn();
+            let (mut logger, logger_handle) = logger::Logger::spawn();
             logger.set_log_level(0);
             let keep_running = Arc::new(AtomicBool::new(true));
             let mut nest = Nest::new();
@@ -701,7 +699,7 @@ mod tests {
     fn speed_of_interpreting_a_raw_command(b: &mut Bencher) -> io::Result<()> {
         let logger_handle = {
             // given
-            let (mut logger, logger_handle) = crate::libs::logger::Logger::spawn();
+            let (mut logger, logger_handle) = logger::Logger::spawn();
             logger.set_log_level(0);
             let keep_running = Arc::new(AtomicBool::new(true));
             let mut nest = Nest::new();
@@ -728,7 +726,7 @@ mod tests {
     fn speed_of_interpreting_a_nested_command_with_parameters(b: &mut Bencher) -> io::Result<()> {
         let logger_handle = {
             // given
-            let (mut logger, logger_handle) = crate::libs::logger::Logger::spawn();
+            let (mut logger, logger_handle) = logger::Logger::spawn();
             logger.set_log_level(0);
             let keep_running = Arc::new(AtomicBool::new(true));
             let mut nest = Nest::new();
@@ -753,7 +751,7 @@ mod tests {
 
     #[bench]
     fn message_bandwidth_over_tcp(b: &mut Bencher) -> io::Result<()> {
-        let (mut logger, logger_handle) = crate::libs::logger::Logger::spawn();
+        let (mut logger, logger_handle) = logger::Logger::spawn();
         let (mut _gsh, keep_running) = spawn(logger.clone());
         std::thread::sleep(std::time::Duration::new(0, 50_000_000));
         logger.set_log_level(0);

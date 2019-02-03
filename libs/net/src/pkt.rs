@@ -1,4 +1,4 @@
-use crate::glocals::Error;
+use failure::Error;
 use failure::format_err;
 use serde::{Deserialize, Serialize};
 use serde_derive::{Deserialize, Serialize};

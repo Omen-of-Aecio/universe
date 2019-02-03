@@ -1,0 +1,12 @@
+[package]
+name = "benchmarker"
+version = "0.0.0"
+authors = ["Erlend Hofstad Langseth <3rlendhl@gmail.com>", "Kevin Robert Stravers <macocio@gmail.com>"]
+edition = "2018"
+
+[lib]
+name = "benchmarker"
+path = "lib.rs"
+
+[dependencies]
+time = "0.1.40"

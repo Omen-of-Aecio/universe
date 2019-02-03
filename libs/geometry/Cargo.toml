@@ -1,0 +1,13 @@
+[package]
+name = "geometry"
+version = "0.0.0"
+authors = ["Erlend Hofstad Langseth <3rlendhl@gmail.com>", "Kevin Robert Stravers <macocio@gmail.com>"]
+edition = "2018"
+
+[lib]
+name = "geometry"
+path = "src/lib.rs"
+
+[dependencies]
+serde = "1.0"
+serde_derive = "1.0"

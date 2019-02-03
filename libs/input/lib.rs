@@ -1,4 +1,4 @@
-use crate::libs::geometry::vec::Vec2;
+use geometry::vec::Vec2;
 use glium::glutin;
 use glium::glutin::Event::KeyboardInput;
 use glium::glutin::{ElementState, MouseButton, VirtualKeyCode as KeyCode};

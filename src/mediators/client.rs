@@ -1,8 +1,8 @@
 use crate::glocals::*;
-use crate::libs::benchmarker::Benchmarker;
-use crate::libs::geometry::{boxit::Boxit, cam::Camera, grid2d::Grid, vec::Vec2};
-use crate::libs::input::Input;
-use crate::libs::logger::Logger;
+use benchmarker::Benchmarker;
+use geometry::{boxit::Boxit, cam::Camera, grid2d::Grid, vec::Vec2};
+use input::Input;
+use logger::Logger;
 use crate::mediators::{
     does_line_collide_with_grid::*, random_map_generator, render_grid, render_polygon,
 };
@@ -326,7 +326,7 @@ fn stop_benchmark(benchmarker: &mut Benchmarker, logger: &mut Logger<Log>, msg: 
 }
 
 pub fn entry_point_client(s: &mut Client) {
-    play_song(s);
+    // play_song(s);
     s.logger.info("cli", Log::Static("Creating grid"));
     initialize_grid(&mut s.game.grid);
     s.game.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };

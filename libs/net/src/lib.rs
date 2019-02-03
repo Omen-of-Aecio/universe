@@ -3,7 +3,7 @@ mod pkt;
 
 use self::conn::Connection;
 use self::pkt::Packet;
-use crate::glocals::Error;
+use failure::Error;
 
 use failure::{bail, err_msg};
 use serde::{Deserialize, Serialize};

@@ -1,8 +1,3 @@
-/*
-!.gitignore
-!.travis.yml
-!Cargo.toml
-!rustfmt.toml
-!scripts/
-!shaders/
-!src/
+Cargo.lock
+target/
+**/*.rs.bk

@@ -102,8 +102,8 @@
 //!     assert_eq![5, eval.interpret_multiple("This is (\na) single statement").unwrap()];
 //! }
 //! ```
-// #![feature(test)]
-// #![no_std]
+#![feature(test)]
+#![no_std]
 extern crate test;
 
 /// Size of the buffer used during parsing

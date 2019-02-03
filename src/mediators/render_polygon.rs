@@ -1,5 +1,5 @@
 use crate::glocals::{PolygonRenderData, Vertex};
-use crate::libs::geometry::{cam::Camera, vec::Vec2};
+use geometry::{cam::Camera, vec::Vec2};
 use glium::{self, uniform, Display, Surface};
 
 pub fn view_matrix(center_x: f32, center_y: f32, scale_x: f32, scale_y: f32) -> [[f32; 4]; 4] {

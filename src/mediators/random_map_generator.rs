@@ -3,7 +3,7 @@ use glium::{implement_vertex, uniform, Surface};
 use rand::Rng;
 use std::f32::consts::PI;
 
-use crate::libs::geometry::grid2d::Grid;
+use geometry::grid2d::Grid;
 
 static VERT_SRC: &str = include_str!("../../shaders/proc1.vert");
 static FRAG_SRC: &str = include_str!("../../shaders/proc1.frag");

@@ -1,5 +1,5 @@
 use crate::glocals::{GridU8RenderData, Vertex};
-use crate::libs::geometry::grid2d::Grid;
+use geometry::grid2d::Grid;
 use glium;
 use glium::texture::{ClientFormat, RawImage2d};
 use glium::{uniform, Display, Surface};

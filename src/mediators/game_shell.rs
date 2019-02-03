@@ -27,6 +27,36 @@ pub fn make_new_gameshell(logger: Logger<Log>) -> Gsh<'static> {
 
 // ---
 
+const SPEC: &[(&[X], Fun)] = &[
+    (
+        &[
+            X::Atom("log"),
+            X::Atom("global"),
+            X::Predicate("level", ANY_U8),
+        ],
+        log,
+    ),
+    (&[X::Macro("str")], create_string),
+    (&[X::Atom("ex")], number),
+    (&[X::Recurring("void", ANY_STRING)], void),
+    (&[X::Recurring("+", ANY_I32)], add),
+    (&[X::Recurring("autocomplete", ANY_STRING)], autocomplete),
+    (
+        &[X::Atom("log"), X::Recurring("trace", ANY_STRING)],
+        log_trace,
+    ),
+    (
+        &[
+            X::Atom("log"),
+            X::Predicate("context", ANY_ATOM),
+            X::Predicate("level", ANY_U8),
+        ],
+        log_context,
+    ),
+];
+
+// ---
+
 pub fn spawn(logger: Logger<Log>) -> (JoinHandle<()>, Arc<AtomicBool>) {
     let keep_running = Arc::new(AtomicBool::new(true));
     let keep_running_clone = keep_running.clone();
@@ -290,6 +320,7 @@ pub enum Input {
     I32(i32),
     Atom(String),
     String(String),
+    Command(String),
 }
 
 #[derive(Clone)]
@@ -297,7 +328,7 @@ pub struct Nest<'a> {
     pub head: HashMap<&'a str, (X<'a>, Ether<'a>)>,
 }
 impl<'a> Nest<'a> {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             head: HashMap::new(),
         }
@@ -307,6 +338,7 @@ type Pred<'a> = (&'a str, fn(&str) -> Option<Input>);
 #[derive(Clone, Copy)]
 pub enum X<'a> {
     Atom(&'a str),
+    Macro(&'a str),
     Predicate(&'a str, Pred<'a>),
     Recurring(&'a str, Pred<'a>),
 }
@@ -314,6 +346,7 @@ impl<'a> X<'a> {
     fn name(&self) -> &'a str {
         match self {
             X::Atom(name) => name,
+            X::Macro(name) => name,
             X::Predicate(name, _) => name,
             X::Recurring(name, _) => name,
         }
@@ -322,34 +355,7 @@ impl<'a> X<'a> {
 
 // ---
 
-const SPEC: &[(&[X], Fun)] = &[
-    (
-        &[
-            X::Atom("log"),
-            X::Atom("global"),
-            X::Predicate("level", ANY_U8),
-        ],
-        log,
-    ),
-    (&[X::Atom("ex")], number),
-    (&[X::Recurring("void", ANY_STRING)], void),
-    (&[X::Recurring("+", ANY_I32)], add),
-    (&[X::Recurring("autocomplete", ANY_STRING)], autocomplete),
-    (
-        &[X::Atom("log"), X::Recurring("trace", ANY_STRING)],
-        log_trace,
-    ),
-    (
-        &[
-            X::Atom("log"),
-            X::Predicate("context", ANY_ATOM),
-            X::Predicate("level", ANY_U8),
-        ],
-        log_context,
-    ),
-];
-
-fn build_nest<'a>(nest: &mut Nest<'a>, commands: &'a [X], handler: Fun<'a>) -> Option<Ether<'a>> {
+pub fn build_nest<'a>(nest: &mut Nest<'a>, commands: &'a [X], handler: Fun<'a>) -> Option<Ether<'a>> {
     if !commands.is_empty() {
         // Does the nest already contain this command?
         if nest.head.get_mut(&commands[0].name()).is_some() {
@@ -396,6 +402,7 @@ impl<'a> Evaluate<String> for Gsh<'a> {
         let mut nest = self.commands.head.clone();
         let mut to_handle: Fun = unrecognized_command;
         let mut to_predicate: Option<(&str, &str, fn(&str) -> Option<Input>, bool)> = None;
+        let mut is_macro = false;
 
         for c in commands {
             let (atom, string);
@@ -403,6 +410,10 @@ impl<'a> Evaluate<String> for Gsh<'a> {
             match c {
                 Data::Atom(atom2) => atom = *atom2,
                 Data::Command(cmd) => {
+                    if is_macro {
+                        args.push(Input::Command((*cmd).into()));
+                        continue;
+                    }
                     match self.interpret_single(cmd) {
                         Ok(result) => {
                             string = result;
@@ -434,6 +445,13 @@ impl<'a> Evaluate<String> for Gsh<'a> {
                                 self.logger.debug(
                                     "gsh",
                                     Log::StaticDynamic("Found atom", "entry", (*atom).into()),
+                                );
+                            }
+                            X::Macro(_) => {
+                                is_macro = true;
+                                self.logger.debug(
+                                    "gsh",
+                                    Log::StaticDynamic("Found macro", "entry", (*atom).into()),
                                 );
                             }
                             X::Predicate(name, (desc, pred)) => {
@@ -516,6 +534,20 @@ mod command_handlers {
         sum.to_string()
     }
 
+    pub fn create_string(_: &mut Gsh, commands: &[Input]) -> String {
+        if commands.len() != 1 {
+            return "Did not get command".into();
+        }
+        match commands[0] {
+            Input::Command(ref cmd) => {
+                cmd.clone()
+            }
+            _ => {
+                "Error: Not a command".into()
+            }
+        }
+    }
+
     pub fn autocomplete(s: &mut Gsh, commands: &[Input]) -> String {
         let mut nesthead = s.commands.head.clone();
         let mut waspred = false;
@@ -534,6 +566,9 @@ mod command_handlers {
                             X::Atom(_) => {
                                 waspred = false;
                             }
+                            X::Macro(_) => {
+                                waspred = false;
+                            }
                             X::Predicate(_, (n, _)) => {
                                 waspred = true;
                                 predname = n;
@@ -547,6 +582,9 @@ mod command_handlers {
                     }
                     Some((x, Either::Right(_))) => match x {
                         X::Atom(_) => {
+                            waspred = false;
+                        }
+                        X::Macro(_) => {
                             waspred = false;
                         }
                         X::Predicate(_, (n, _)) => {

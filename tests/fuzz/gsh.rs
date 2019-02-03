@@ -1,5 +1,6 @@
 use honggfuzz::fuzz;
-use universe::libs::{metac::Evaluate, logger::Logger};
+use logger::Logger;
+use metac::Evaluate;
 use universe::mediators::game_shell::make_new_gameshell;
 
 fn main() {

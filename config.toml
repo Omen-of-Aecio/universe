@@ -1,18 +1,5 @@
-# Units are in pixels and seconds 
-[player]
-hori_acc = 800
-jump_duration = 0.05
-jump_delay = 0.5
-jump_acc = 8000
-
-# snapshot_rate = 20
-
-[world]
-width = 700
-height = 700
-gravity = 1200
-air_fri = [0.999, 0.999]
-ground_fri = 0.5
-
-[srv]
-tps = 60
+fps = 60
+[physics]
+gravity = 0.5
+[controls]
+down = "S"

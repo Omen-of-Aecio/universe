@@ -1,5 +1,6 @@
-#[macro_use]
-use config::config;
+use serde_derive::{Deserialize, Serialize};
+use config::{config, get_paths_recurse};
+
 // enum Key { A, B, C};
 // impl ConfigValue for Key {
     // fn from_value(v: Value) -> Key {
@@ -9,14 +10,19 @@ use config::config;
     // }
 // }
 
+
 config! {
+#[derive(Serialize, Deserialize, Default)]
+struct Config {
     physics: Physics {
         gravity: f32,
     }
     controls: Controls {
-        down: String, // -> Key (TODO)
+        down: String,
     }
-}
+    fps: f32,
+}}
+
 
 // Turns into:
 /*

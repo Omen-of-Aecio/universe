@@ -7,3 +7,6 @@ edition = "2018"
 [lib]
 name = "config"
 path = "lib.rs"
+
+[dependencies]
+failure = "0.1.5"

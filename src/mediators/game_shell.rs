@@ -21,6 +21,7 @@ pub fn make_new_gameshell(logger: Logger<Log>) -> Gsh<'static> {
         config_change: None,
         logger,
         keep_running,
+        variables: HashMap::new(),
         commands: Arc::new(nest),
     }
 }
@@ -38,6 +39,8 @@ const SPEC: &[(&[X], Fun)] = &[
     ),
     (&[X::Macro("str")], create_string),
     (&[X::Atom("ex")], number),
+    (&[X::Atom("set"), X::Predicate("key", ANY_STRING), X::Predicate("value", ANY_STRING)], do_set),
+    (&[X::Atom("get"), X::Predicate("key", ANY_STRING)], do_get),
     (&[X::Recurring("void", ANY_STRING)], void),
     (&[X::Recurring("+", ANY_I32)], add),
     (&[X::Recurring("autocomplete", ANY_STRING)], autocomplete),
@@ -72,6 +75,7 @@ pub fn spawn(logger: Logger<Log>) -> (JoinHandle<()>, Arc<AtomicBool>) {
                     config_change: None,
                     logger,
                     keep_running,
+                    variables: HashMap::new(),
                     commands: Arc::new(nest),
                 })
             })
@@ -94,6 +98,7 @@ fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<
             config_change: None,
             logger,
             keep_running,
+            variables: HashMap::new(),
             commands: Arc::new(nest),
         };
         let result = connection_loop(&mut shell_clone, stream);
@@ -538,6 +543,45 @@ mod command_handlers {
         sum.to_string()
     }
 
+    pub fn do_get(gsh: &mut Gsh, commands: &[Input]) -> String {
+        let key;
+        match commands[0] {
+            Input::String(ref string) => {
+                key = string.clone();
+            }
+            _ => {
+                return "F".into();
+            }
+        }
+        if let Some(string) = gsh.variables.get(&key) {
+            string.clone()
+        } else {
+            "Does not exist".into()
+        }
+    }
+
+    pub fn do_set(gsh: &mut Gsh, commands: &[Input]) -> String {
+        let (key, value);
+        match commands[0] {
+            Input::String(ref string) => {
+                key = string.clone();
+            }
+            _ => {
+                return "F".into();
+            }
+        }
+        match commands[1] {
+            Input::String(ref string) => {
+                value = string.clone();
+            }
+            _ => {
+                return "F".into();
+            }
+        }
+        gsh.variables.insert(key, value);
+        "OK".into()
+    }
+
     pub fn create_string(_: &mut Gsh, commands: &[Input]) -> String {
         if commands.len() != 1 {
             return "Did not get command".into();
@@ -699,6 +743,44 @@ mod tests {
     }
 
     #[test]
+    fn check_variable_statements() -> io::Result<()> {
+        let logger_handle = {
+            // given
+            let (mut logger, logger_handle) = logger::Logger::spawn();
+            logger.set_log_level(0);
+            let keep_running = Arc::new(AtomicBool::new(true));
+            let mut nest = Nest::new();
+            for spell in SPEC {
+                build_nest(&mut nest, spell.0, spell.1);
+            }
+            let mut gsh = GameShell {
+                config_change: None,
+                logger,
+                keep_running,
+                variables: HashMap::new(),
+                commands: Arc::new(nest),
+            };
+
+            assert_eq![
+                "OK",
+                gsh.interpret_single("set key lorem value ipsum").unwrap()
+            ];
+            assert_eq![
+                "ipsum",
+                gsh.interpret_single("get key lorem")
+                    .unwrap()
+            ];
+
+            // then
+            logger_handle
+        };
+        logger_handle.join().unwrap();
+
+        // cleanup
+        Ok(())
+    }
+
+    #[test]
     fn check_idempotent_statements_work() -> io::Result<()> {
         let logger_handle = {
             // given
@@ -713,6 +795,7 @@ mod tests {
                 config_change: None,
                 logger,
                 keep_running,
+                variables: HashMap::new(),
                 commands: Arc::new(nest),
             };
 
@@ -773,6 +856,7 @@ mod tests {
                 config_change: None,
                 logger,
                 keep_running,
+                variables: HashMap::new(),
                 commands: Arc::new(nest),
             };
 
@@ -801,6 +885,7 @@ mod tests {
                 config_change: None,
                 logger,
                 keep_running,
+                variables: HashMap::new(),
                 commands: Arc::new(nest),
             };
 

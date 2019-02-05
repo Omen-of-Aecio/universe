@@ -42,6 +42,7 @@ pub struct GameShell<T: Send + Sync> {
     pub config_change: Option<mpsc::SyncSender<fn(&mut Config)>>,
     pub logger: Logger<Log>,
     pub keep_running: Arc<AtomicBool>,
+    pub variables: HashMap<String, String>,
     pub commands: T,
 }
 

@@ -2,7 +2,7 @@
 //!
 //! Here's an example:
 //! ```
-//! use universe::libs::metac::{Data, Evaluate};
+//! use metac::{Data, Evaluate};
 //! fn main() {
 //!     struct Eval { }
 //!     impl Evaluate<()> for Eval {
@@ -38,7 +38,7 @@
 //!
 //! # More interesting example #
 //! ```
-//! use universe::libs::metac::{Data, Evaluate};
+//! use metac::{Data, Evaluate};
 //! use std::collections::HashMap;
 //! fn main() {
 //!     struct Eval {
@@ -77,7 +77,7 @@
 //! However, it is sometimes very desirable to write code on multiple lines. The only way to do
 //! this in metac is by using parentheses:
 //! ```
-//! use universe::libs::metac::{Data, Evaluate};
+//! use metac::{Data, Evaluate};
 //! fn main() {
 //!     struct Eval {
 //!         invoked: usize,
@@ -449,6 +449,25 @@ mod tests {
     }
 
     // ---
+
+    #[test]
+    fn interpret_empty() {
+        struct Eval {
+            pub invoked: usize,
+        }
+        impl Evaluate<()> for Eval {
+            fn evaluate<'a>(&mut self, _: &[Data<'a>]) {
+                self.invoked += 1;
+            }
+        }
+        let mut eval = Eval { invoked: 0 };
+
+        let line = "";
+        eval.interpret_single(line).unwrap();
+        assert_eq![1, eval.invoked];
+        eval.interpret_multiple(line).unwrap();
+        assert_eq![1, eval.invoked];
+    }
 
     #[test]
     fn interpret_unicode() {

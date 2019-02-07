@@ -4,3 +4,10 @@ set -Eeuo pipefail
 
 cargo test --verbose --all
 RUSTFLAGS='--cfg test_nondeterministic' cargo test -v --all nondeterministic_
+
+for library in libs/*; do
+    cd "$library"
+    cargo test --verbose --all
+    RUSTFLAGS='--cfg test_nondeterministic' cargo test -v --all nondeterministic_
+    cd ../..
+done

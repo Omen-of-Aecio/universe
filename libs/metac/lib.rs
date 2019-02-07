@@ -456,7 +456,8 @@ mod tests {
             pub invoked: usize,
         }
         impl Evaluate<()> for Eval {
-            fn evaluate<'a>(&mut self, _: &[Data<'a>]) {
+            fn evaluate<'a>(&mut self, data: &[Data<'a>]) {
+                assert_eq![0, data.len()];
                 self.invoked += 1;
             }
         }

@@ -4,7 +4,7 @@
 //! just adds N benchmarks together before returning the sum from `stop`.
 //!
 //! ```
-//! use universe::libs::benchmarker::Benchmarker;
+//! use benchmarker::Benchmarker;
 //!
 //! fn main() {
 //!     // Setup, with 0 buffered benchmarks
@@ -24,7 +24,7 @@
 //! We may also be interested in multiple samples just because.
 //!
 //! ```
-//! use universe::libs::benchmarker::Benchmarker;
+//! use benchmarker::Benchmarker;
 //!
 //! fn main() {
 //!     // Setup, with 99 buffered benchmarks
@@ -50,7 +50,10 @@
 //! Note that with 99 buffers, the final call to `stop` will return a duration
 //! sum representing 99+1 samples. This is to allow the 0-case, where we have
 //! 0+1 samples.
+#![feature(test)]
 use time::{Duration, PreciseTime};
+
+extern crate test;
 
 pub struct Benchmarker {
     last: PreciseTime,

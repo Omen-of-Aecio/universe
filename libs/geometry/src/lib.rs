@@ -1,3 +1,6 @@
+#![feature(test)]
+extern crate test;
+
 pub mod bocs;
 pub mod boxit;
 pub mod cam;

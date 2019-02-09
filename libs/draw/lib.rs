@@ -66,19 +66,19 @@ const COLOR_RANGE: i::SubresourceRange = i::SubresourceRange {
 };
 
 pub struct Draw {
-    device: back::Device,
     command_pool: hal::CommandPool<back::Backend, hal::Graphics>,
+    desc_set: <back::Backend as Backend>::DescriptorSet,
+    device: back::Device,
     frame_fence: <back::Backend as Backend>::Fence,
     frame_semaphore: <back::Backend as Backend>::Semaphore,
-    swap_chain: <back::Backend as Backend>::Swapchain,
-    viewport: pso::Viewport,
-    pipeline: <back::Backend as Backend>::GraphicsPipeline,
-    vertex_buffer: <back::Backend as Backend>::Buffer,
-    pipeline_layout: <back::Backend as Backend>::PipelineLayout,
-    desc_set: <back::Backend as Backend>::DescriptorSet,
-    render_pass: <back::Backend as Backend>::RenderPass,
     framebuffers: Vec<u32>,
+    pipeline: <back::Backend as Backend>::GraphicsPipeline,
+    pipeline_layout: <back::Backend as Backend>::PipelineLayout,
     queue_group: hal::QueueGroup<back::Backend, hal::Graphics>,
+    render_pass: <back::Backend as Backend>::RenderPass,
+    swap_chain: <back::Backend as Backend>::Swapchain,
+    vertex_buffer: <back::Backend as Backend>::Buffer,
+    viewport: pso::Viewport,
 }
 
 impl Draw {
@@ -532,19 +532,19 @@ impl Draw {
         };
 
         Self {
-            device,
             command_pool,
+            desc_set,
+            device,
             frame_fence,
             frame_semaphore,
-            swap_chain,
-            viewport,
-            pipeline,
-            vertex_buffer,
-            pipeline_layout,
-            desc_set,
-            render_pass,
             framebuffers,
+            pipeline,
+            pipeline_layout,
             queue_group,
+            render_pass,
+            swap_chain,
+            vertex_buffer,
+            viewport,
         }
     }
 

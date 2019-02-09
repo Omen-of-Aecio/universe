@@ -69,6 +69,7 @@ pub struct Draw {
     command_pool: hal::CommandPool<back::Backend, hal::Graphics>,
     desc_set: <back::Backend as Backend>::DescriptorSet,
     device: back::Device,
+    format: hal::format::Format,
     frame_fence: <back::Backend as Backend>::Fence,
     frame_semaphore: <back::Backend as Backend>::Semaphore,
     framebuffers: Vec<u32>,
@@ -272,7 +273,7 @@ impl Draw {
             ]);
         }
         // Step 8: Create semaphores
-        let mut frame_semaphore = device.create_semaphore().expect("Can't create semaphore");
+        let frame_semaphore = device.create_semaphore().expect("Can't create semaphore");
         let mut frame_fence = device.create_fence(false).expect("Can't create fence");
         // Step 9: Transfer buffer to texture
         unsafe {
@@ -352,7 +353,7 @@ impl Draw {
         println!("{:?}", swap_config);
         let extent = swap_config.extent.to_extent();
 
-        let (mut swap_chain, mut backbuffer) =
+        let (swap_chain, backbuffer) =
             unsafe { device.create_swapchain(surface, swap_config, None) }
                 .expect("Can't create swapchain");
         // Step 11: Create render pass
@@ -387,7 +388,7 @@ impl Draw {
                 .expect("Can't create render pass")
         };
         // Step 12: Collect framebuffers
-        let (mut frame_images, mut framebuffers) = match backbuffer {
+        let (frame_images, framebuffers) = match backbuffer {
             Backbuffer::Images(images) => {
                 let pairs = images
                     .into_iter()
@@ -521,7 +522,7 @@ impl Draw {
             pipeline.unwrap()
         };
         // Step 14: Set up a viewport
-        let mut viewport = pso::Viewport {
+        let viewport = pso::Viewport {
             rect: pso::Rect {
                 x: 0,
                 y: 0,
@@ -535,6 +536,7 @@ impl Draw {
             command_pool,
             desc_set,
             device,
+            format,
             frame_fence,
             frame_semaphore,
             framebuffers,
@@ -559,6 +561,75 @@ impl Draw {
         }
     }
 
+    // pub fn render_better(&mut self, submission: Submission) {
+    //     self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence));
+    // }
+
+    pub fn swap_it(&mut self, frame: hal::SwapImageIndex) {
+        unsafe {
+            self.device.wait_for_fence(&self.frame_fence, !0).unwrap();
+            if let Err(_) = self.swap_chain.present_nosemaphores(&mut self.queue_group.queues[0], frame) {
+                // self.recreate_swapchain = true;
+            }
+        }
+    }
+
+    pub fn clear(&mut self, frame: hal::SwapImageIndex) {
+        let render_pass = {
+            let color_attachment = pass::Attachment {
+              format: Some(self.format),
+              samples: 1,
+              ops: pass::AttachmentOps {
+                load: pass::AttachmentLoadOp::Clear,
+                store: pass::AttachmentStoreOp::Store,
+              },
+              stencil_ops: pass::AttachmentOps::DONT_CARE,
+              layouts: i::Layout::Undefined..i::Layout::Present,
+            };
+            let subpass = pass::SubpassDesc {
+              colors: &[(0, i::Layout::ColorAttachmentOptimal)],
+              depth_stencil: None,
+              inputs: &[],
+              resolves: &[],
+              preserves: &[],
+            };
+            unsafe {
+              self.device
+                .create_render_pass(&[color_attachment], &[subpass], &[])
+                .map_err(|_| "Couldn't create a render pass!")
+                .unwrap()
+            }
+        };
+        let mut cmd_buffer = self.command_pool.acquire_command_buffer::<command::OneShot>();
+        unsafe {
+            cmd_buffer.begin();
+
+            cmd_buffer.set_viewports(0, &[self.viewport.clone()]);
+            cmd_buffer.set_scissors(0, &[self.viewport.rect]);
+            // cmd_buffer.bind_graphics_pipeline(&self.pipeline);
+            // cmd_buffer.bind_vertex_buffers(0, Some((&self.vertex_buffer, 0)));
+            // cmd_buffer.bind_graphics_descriptor_sets(&self.pipeline_layout, 0, Some(&self.desc_set), &[]);
+
+            cmd_buffer.begin_render_pass_inline(
+                &render_pass,
+                &self.framebuffers[frame as usize],
+                self.viewport.rect,
+                &[command::ClearValue::Color(command::ClearColor::Float([
+                    0.8, 0.8, 0.8, 1.0,
+                ]))],
+            );
+
+            cmd_buffer.finish();
+
+            let submission = Submission {
+                command_buffers: Some(&cmd_buffer),
+                wait_semaphores: Some((&self.frame_semaphore, PipelineStage::BOTTOM_OF_PIPE)),
+                signal_semaphores: &[],
+            };
+            self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence));
+        }
+    }
+
     pub fn render(&mut self, frame: hal::SwapImageIndex) {
         let mut cmd_buffer = self.command_pool.acquire_command_buffer::<command::OneShot>();
         unsafe {
@@ -568,16 +639,14 @@ impl Draw {
             cmd_buffer.set_scissors(0, &[self.viewport.rect]);
             cmd_buffer.bind_graphics_pipeline(&self.pipeline);
             cmd_buffer.bind_vertex_buffers(0, Some((&self.vertex_buffer, 0)));
-            cmd_buffer.bind_graphics_descriptor_sets(&self.pipeline_layout, 0, Some(&self.desc_set), &[]); //TODO
+            cmd_buffer.bind_graphics_descriptor_sets(&self.pipeline_layout, 0, Some(&self.desc_set), &[]);
 
             {
                 let mut encoder = cmd_buffer.begin_render_pass_inline(
                     &self.render_pass,
                     &self.framebuffers[frame as usize],
                     self.viewport.rect,
-                    &[command::ClearValue::Color(command::ClearColor::Float([
-                        0.8, 0.8, 0.8, 1.0,
-                    ]))],
+                    &[],
                 );
                 encoder.draw(0..6, 0..1);
             }
@@ -591,18 +660,45 @@ impl Draw {
             };
             self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence));
 
-            // TODO: replace with semaphore
-            self.device.wait_for_fence(&self.frame_fence, !0).unwrap();
-            self.command_pool.free(Some(cmd_buffer));
+            // self.device.wait_for_fence(&self.frame_fence, !0).unwrap();
+            // self.command_pool.free(Some(cmd_buffer));
 
-            // present frame
-            if let Err(_) = self.swap_chain.present_nosemaphores(&mut self.queue_group.queues[0], frame) {
-                // self.recreate_swapchain = true;
-            }
+            // if let Err(_) = self.swap_chain.present_nosemaphores(&mut self.queue_group.queues[0], frame) {
+            //     // self.recreate_swapchain = true;
+            // }
         }
     }
-
-    pub fn draw_triangle(&mut self, vtx: [(f32, f32); 3]) {
-        unimplemented![];
-    }
 }
+
+// impl std::ops::Drop for Draw {
+//     fn drop(&mut self) {
+//         self.device.wait_idle().unwrap();
+//         unsafe {
+//             self.device.destroy_command_pool(self.command_pool.into_raw());
+//             self.device.destroy_descriptor_pool(self.desc_pool);
+//             self.device.destroy_descriptor_set_layout(self.set_layout);
+
+//             self.device.destroy_buffer(self.vertex_buffer);
+//             self.device.destroy_buffer(self.image_upload_buffer);
+//             self.device.destroy_image(self.image_logo);
+//             self.device.destroy_image_view(self.image_srv);
+//             self.device.destroy_sampler(self.sampler);
+//             self.device.destroy_fence(self.frame_fence);
+//             self.device.destroy_semaphore(self.frame_semaphore);
+//             self.device.destroy_render_pass(self.render_pass);
+//             self.device.free_memory(self.buffer_memory);
+//             self.device.free_memory(self.image_memory);
+//             self.device.free_memory(self.mage_upload_memory);
+//             self.device.destroy_graphics_pipeline(self.pipeline);
+//             self.device.destroy_pipeline_layout(self.pipeline_layout);
+//             for framebuffer in self.framebuffers {
+//                 self.device.destroy_framebuffer(selfframebuffer);
+//             }
+//             for (_, rtv) in self.frame_images {
+//                 self.device.destroy_image_view(rtv);
+//             }
+
+//             self.device.destroy_swapchain(self.swap_chain);
+//         }
+//     }
+// }

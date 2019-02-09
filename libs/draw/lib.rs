@@ -95,7 +95,6 @@ impl Draw {
         // Step 2: Open device supporting Graphics
         let (device, mut queue_group) = adapter
             .open_with::<_, hal::Graphics>(1, |family| {
-                use hal::QueueFamily;
                 surface.supports_queue_family(family)
             })
             .unwrap();
@@ -169,7 +168,8 @@ impl Draw {
             .unwrap()
             .into();
 
-        let buffer_memory = unsafe { device.allocate_memory(upload_type, buffer_req.size) }.unwrap();
+        let buffer_memory =
+            unsafe { device.allocate_memory(upload_type, buffer_req.size) }.unwrap();
 
         unsafe { device.bind_buffer_memory(&buffer_memory, 0, &mut vertex_buffer) }.unwrap();
 
@@ -207,8 +207,8 @@ impl Draw {
                 .acquire_mapping_writer::<u8>(&image_upload_memory, 0..image_mem_reqs.size)
                 .unwrap();
             for y in 0..height as usize {
-                let row = &(*img)
-                    [y * (width as usize) * image_stride..(y + 1) * (width as usize) * image_stride];
+                let row = &(*img)[y * (width as usize) * image_stride
+                    ..(y + 1) * (width as usize) * image_stride];
                 let dest_base = y * row_pitch as usize;
                 data[dest_base..dest_base + row.len()].copy_from_slice(row);
             }
@@ -362,7 +362,7 @@ impl Draw {
                 format: Some(format),
                 samples: 1,
                 ops: pass::AttachmentOps::new(
-                    pass::AttachmentLoadOp::Clear,
+                    pass::AttachmentLoadOp::Load,
                     pass::AttachmentStoreOp::Store,
                 ),
                 stencil_ops: pass::AttachmentOps::DONT_CARE,
@@ -379,7 +379,8 @@ impl Draw {
 
             let dependency = pass::SubpassDependency {
                 passes: pass::SubpassRef::External..pass::SubpassRef::Pass(0),
-                stages: PipelineStage::COLOR_ATTACHMENT_OUTPUT..PipelineStage::COLOR_ATTACHMENT_OUTPUT,
+                stages: PipelineStage::COLOR_ATTACHMENT_OUTPUT
+                    ..PipelineStage::COLOR_ATTACHMENT_OUTPUT,
                 accesses: i::Access::empty()
                     ..(i::Access::COLOR_ATTACHMENT_READ | i::Access::COLOR_ATTACHMENT_WRITE),
             };
@@ -428,20 +429,22 @@ impl Draw {
         let pipeline = {
             let vs_module = {
                 let glsl = fs::read_to_string("data/quad.vert").unwrap();
-                let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
-                    .unwrap()
-                    .bytes()
-                    .map(|b| b.unwrap())
-                    .collect();
+                let spirv: Vec<u8> =
+                    glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
+                        .unwrap()
+                        .bytes()
+                        .map(|b| b.unwrap())
+                        .collect();
                 unsafe { device.create_shader_module(&spirv) }.unwrap()
             };
             let fs_module = {
                 let glsl = fs::read_to_string("data/quad.frag").unwrap();
-                let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Fragment)
-                    .unwrap()
-                    .bytes()
-                    .map(|b| b.unwrap())
-                    .collect();
+                let spirv: Vec<u8> =
+                    glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Fragment)
+                        .unwrap()
+                        .bytes()
+                        .map(|b| b.unwrap())
+                        .collect();
                 unsafe { device.create_shader_module(&spirv) }.unwrap()
             };
 
@@ -554,7 +557,10 @@ impl Draw {
         unsafe {
             self.device.reset_fence(&self.frame_fence).unwrap();
             self.command_pool.reset();
-            match self.swap_chain.acquire_image(!0, FrameSync::Semaphore(&mut self.frame_semaphore)) {
+            match self
+                .swap_chain
+                .acquire_image(!0, FrameSync::Semaphore(&mut self.frame_semaphore))
+            {
                 Ok(i) => Some(i),
                 Err(_) => None,
             }
@@ -568,39 +574,44 @@ impl Draw {
     pub fn swap_it(&mut self, frame: hal::SwapImageIndex) {
         unsafe {
             self.device.wait_for_fence(&self.frame_fence, !0).unwrap();
-            if let Err(_) = self.swap_chain.present_nosemaphores(&mut self.queue_group.queues[0], frame) {
+            if let Err(_) = self
+                .swap_chain
+                .present_nosemaphores(&mut self.queue_group.queues[0], frame)
+            {
                 // self.recreate_swapchain = true;
             }
         }
     }
 
-    pub fn clear(&mut self, frame: hal::SwapImageIndex) {
+    pub fn clear(&mut self, frame: hal::SwapImageIndex, r: f32) {
         let render_pass = {
             let color_attachment = pass::Attachment {
-              format: Some(self.format),
-              samples: 1,
-              ops: pass::AttachmentOps {
-                load: pass::AttachmentLoadOp::Clear,
-                store: pass::AttachmentStoreOp::Store,
-              },
-              stencil_ops: pass::AttachmentOps::DONT_CARE,
-              layouts: i::Layout::Undefined..i::Layout::Present,
+                format: Some(self.format),
+                samples: 1,
+                ops: pass::AttachmentOps {
+                    load: pass::AttachmentLoadOp::Clear,
+                    store: pass::AttachmentStoreOp::Store,
+                },
+                stencil_ops: pass::AttachmentOps::DONT_CARE,
+                layouts: i::Layout::Undefined..i::Layout::Present,
             };
             let subpass = pass::SubpassDesc {
-              colors: &[(0, i::Layout::ColorAttachmentOptimal)],
-              depth_stencil: None,
-              inputs: &[],
-              resolves: &[],
-              preserves: &[],
+                colors: &[(0, i::Layout::ColorAttachmentOptimal)],
+                depth_stencil: None,
+                inputs: &[],
+                resolves: &[],
+                preserves: &[],
             };
             unsafe {
-              self.device
-                .create_render_pass(&[color_attachment], &[subpass], &[])
-                .map_err(|_| "Couldn't create a render pass!")
-                .unwrap()
+                self.device
+                    .create_render_pass(&[color_attachment], &[subpass], &[])
+                    .map_err(|_| "Couldn't create a render pass!")
+                    .unwrap()
             }
         };
-        let mut cmd_buffer = self.command_pool.acquire_command_buffer::<command::OneShot>();
+        let mut cmd_buffer = self
+            .command_pool
+            .acquire_command_buffer::<command::OneShot>();
         unsafe {
             cmd_buffer.begin();
 
@@ -615,7 +626,7 @@ impl Draw {
                 &self.framebuffers[frame as usize],
                 self.viewport.rect,
                 &[command::ClearValue::Color(command::ClearColor::Float([
-                    0.8, 0.8, 0.8, 1.0,
+                    r, 0.8, 0.8, 1.0,
                 ]))],
             );
 
@@ -631,7 +642,9 @@ impl Draw {
     }
 
     pub fn render(&mut self, frame: hal::SwapImageIndex) {
-        let mut cmd_buffer = self.command_pool.acquire_command_buffer::<command::OneShot>();
+        let mut cmd_buffer = self
+            .command_pool
+            .acquire_command_buffer::<command::OneShot>();
         unsafe {
             cmd_buffer.begin();
 
@@ -639,7 +652,12 @@ impl Draw {
             cmd_buffer.set_scissors(0, &[self.viewport.rect]);
             cmd_buffer.bind_graphics_pipeline(&self.pipeline);
             cmd_buffer.bind_vertex_buffers(0, Some((&self.vertex_buffer, 0)));
-            cmd_buffer.bind_graphics_descriptor_sets(&self.pipeline_layout, 0, Some(&self.desc_set), &[]);
+            cmd_buffer.bind_graphics_descriptor_sets(
+                &self.pipeline_layout,
+                0,
+                Some(&self.desc_set),
+                &[],
+            );
 
             {
                 let mut encoder = cmd_buffer.begin_render_pass_inline(

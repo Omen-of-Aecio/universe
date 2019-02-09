@@ -1,6 +1,4 @@
 use draw::Draw;
-use gfx_hal::window::Extent2D;
-use winit;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
 #[cfg(feature = "gl")]
@@ -10,9 +8,14 @@ use gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 use gfx_backend_vulkan as back;
 use gfx_hal::format::{AsFormat, ChannelType, Rgba8Srgb as ColorFormat, Swizzle};
+use gfx_hal::window::Extent2D;
 use gfx_hal::Instance;
+use winit;
 
-const DIMS: Extent2D = Extent2D { width: 1024, height: 768 };
+const DIMS: Extent2D = Extent2D {
+    width: 1024,
+    height: 768,
+};
 
 fn main() {
     let mut events_loop = winit::EventsLoop::new();
@@ -48,11 +51,14 @@ fn main() {
 
     let mut draw = Draw::new(&mut surface);
     loop {
-        let image = draw.acquire_swapchain_image();
-        if let Some(image) = image {
-            draw.clear(image);
-            draw.render(image);
-            draw.swap_it(image);
+        for i in 0..100 {
+            let image = draw.acquire_swapchain_image();
+            println!["{:?}", image];
+            if let Some(image) = image {
+                draw.clear(image, i as f32 / 100f32 );
+                draw.render(image);
+                draw.swap_it(image);
+            }
         }
     }
 

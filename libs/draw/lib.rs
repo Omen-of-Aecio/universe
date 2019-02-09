@@ -71,6 +71,14 @@ pub struct Draw {
     frame_fence: <back::Backend as Backend>::Fence,
     frame_semaphore: <back::Backend as Backend>::Semaphore,
     swap_chain: <back::Backend as Backend>::Swapchain,
+    viewport: pso::Viewport,
+    pipeline: <back::Backend as Backend>::GraphicsPipeline,
+    vertex_buffer: <back::Backend as Backend>::Buffer,
+    pipeline_layout: <back::Backend as Backend>::PipelineLayout,
+    desc_set: <back::Backend as Backend>::DescriptorSet,
+    render_pass: <back::Backend as Backend>::RenderPass,
+    framebuffers: Vec<u32>,
+    queue_group: hal::QueueGroup<back::Backend, hal::Graphics>,
 }
 
 impl Draw {
@@ -512,6 +520,16 @@ impl Draw {
 
             pipeline.unwrap()
         };
+        // Step 14: Set up a viewport
+        let mut viewport = pso::Viewport {
+            rect: pso::Rect {
+                x: 0,
+                y: 0,
+                w: extent.width as _,
+                h: extent.height as _,
+            },
+            depth: 0.0..1.0,
+        };
 
         Self {
             device,
@@ -519,6 +537,14 @@ impl Draw {
             frame_fence,
             frame_semaphore,
             swap_chain,
+            viewport,
+            pipeline,
+            vertex_buffer,
+            pipeline_layout,
+            desc_set,
+            render_pass,
+            framebuffers,
+            queue_group,
         }
     }
 
@@ -529,6 +555,49 @@ impl Draw {
             match self.swap_chain.acquire_image(!0, FrameSync::Semaphore(&mut self.frame_semaphore)) {
                 Ok(i) => Some(i),
                 Err(_) => None,
+            }
+        }
+    }
+
+    pub fn render(&mut self, frame: hal::SwapImageIndex) {
+        let mut cmd_buffer = self.command_pool.acquire_command_buffer::<command::OneShot>();
+        unsafe {
+            cmd_buffer.begin();
+
+            cmd_buffer.set_viewports(0, &[self.viewport.clone()]);
+            cmd_buffer.set_scissors(0, &[self.viewport.rect]);
+            cmd_buffer.bind_graphics_pipeline(&self.pipeline);
+            cmd_buffer.bind_vertex_buffers(0, Some((&self.vertex_buffer, 0)));
+            cmd_buffer.bind_graphics_descriptor_sets(&self.pipeline_layout, 0, Some(&self.desc_set), &[]); //TODO
+
+            {
+                let mut encoder = cmd_buffer.begin_render_pass_inline(
+                    &self.render_pass,
+                    &self.framebuffers[frame as usize],
+                    self.viewport.rect,
+                    &[command::ClearValue::Color(command::ClearColor::Float([
+                        0.8, 0.8, 0.8, 1.0,
+                    ]))],
+                );
+                encoder.draw(0..6, 0..1);
+            }
+
+            cmd_buffer.finish();
+
+            let submission = Submission {
+                command_buffers: Some(&cmd_buffer),
+                wait_semaphores: Some((&self.frame_semaphore, PipelineStage::BOTTOM_OF_PIPE)),
+                signal_semaphores: &[],
+            };
+            self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence));
+
+            // TODO: replace with semaphore
+            self.device.wait_for_fence(&self.frame_fence, !0).unwrap();
+            self.command_pool.free(Some(cmd_buffer));
+
+            // present frame
+            if let Err(_) = self.swap_chain.present_nosemaphores(&mut self.queue_group.queues[0], frame) {
+                // self.recreate_swapchain = true;
             }
         }
     }

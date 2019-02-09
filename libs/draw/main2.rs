@@ -47,6 +47,10 @@ fn main() {
     };
 
     let mut draw = Draw::new(&mut surface);
-
-    println!["{:?}", draw.acquire_swapchain_image()];
+    loop {
+        let image = draw.acquire_swapchain_image();
+        if let Some(image) = image {
+            draw.render(image);
+        }
+    }
 }

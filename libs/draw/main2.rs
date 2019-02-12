@@ -53,10 +53,10 @@ fn main() {
     loop {
         for i in 0..100 {
             let image = draw.acquire_swapchain_image();
-            println!["{:?}", image];
+            // println!["{:?}", image];
             if let Some(image) = image {
                 draw.clear(image, i as f32 / 100f32 );
-                draw.render(image);
+                // draw.render(image);
                 draw.swap_it(image);
             }
         }

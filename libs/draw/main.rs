@@ -128,7 +128,6 @@ fn main() {
     }
     .expect("Can't create command pool");
 
-
     // Setup renderpass and pipeline
     let set_layout = unsafe {
         device.create_descriptor_set_layout(
@@ -765,4 +764,3 @@ fn main() {
 fn main() {
     println!("You need to enable the native API feature (vulkan/metal) in order to test the LL");
 }
-

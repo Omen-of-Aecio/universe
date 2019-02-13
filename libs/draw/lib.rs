@@ -65,22 +65,22 @@ impl Draw {
             println!("Adapter: {:?}", adapter.info);
         }
         let mut adapter = adapters.remove(0);
-        let memory_types = adapter.physical_device.memory_properties().memory_types;
-        let limits = adapter.physical_device.limits();
+        // let memory_types = adapter.physical_device.memory_properties().memory_types;
+        // let limits = adapter.physical_device.limits();
         // Step 2: Open device supporting Graphics
-        let (device, mut queue_group) = adapter
+        let (device, queue_group) = adapter
             .open_with::<_, hal::Graphics>(1, |family| {
                 surface.supports_queue_family(family)
             })
             .expect("Unable to find device supporting graphics");
         // Step 3: Create command pool
-        let mut command_pool = unsafe {
+        let command_pool = unsafe {
             device.create_command_pool_typed(&queue_group, pool::CommandPoolCreateFlags::empty())
         }
         .expect("Can't create command pool");
         // Step 4: Create semaphore
         let frame_semaphore = device.create_semaphore().expect("Can't create semaphore");
-        let mut frame_fence = device.create_fence(false).expect("Can't create fence");
+        let frame_fence = device.create_fence(false).expect("Can't create fence");
         // Step 5: Set up swapchain
         let (caps, formats, present_modes, _composite_alpha) =
             surface.compatibility(&mut adapter.physical_device);
@@ -104,7 +104,7 @@ impl Draw {
         println!["{:?}", present_mode];
         println!["{:?}", caps];
 
-        let mut swap_config = SwapchainConfig::from_caps(&caps, format, DIMS);
+        let swap_config = SwapchainConfig::from_caps(&caps, format, DIMS);
         println!("{:?}", swap_config);
         let extent = swap_config.extent.to_extent();
 
@@ -177,7 +177,7 @@ impl Draw {
                 (Vec::new(), vec![fbo])
             }
         };
-        // Step 14: Set up a viewport
+        // Step 8: Set up a viewport
         let viewport = pso::Viewport {
             rect: pso::Rect {
                 x: 0,
@@ -207,7 +207,7 @@ impl Draw {
             self.command_pool.reset();
             match self
                 .swap_chain
-                .acquire_image(!0, FrameSync::Semaphore(&mut self.frame_semaphore))
+                .acquire_image(u64::max_value(), FrameSync::Semaphore(&mut self.frame_semaphore))
             {
                 Ok(i) => Some(i),
                 Err(_) => None,
@@ -217,7 +217,7 @@ impl Draw {
 
     pub fn swap_it(&mut self, frame: hal::SwapImageIndex) {
         unsafe {
-            self.device.wait_for_fence(&self.frame_fence, !0).unwrap();
+            self.device.wait_for_fence(&self.frame_fence, u64::max_value()).unwrap();
             if let Err(_) = self
                 .swap_chain
                 .present_nosemaphores(&mut self.queue_group.queues[0], frame)
@@ -281,6 +281,7 @@ impl Draw {
                 wait_semaphores: Some((&self.frame_semaphore, PipelineStage::BOTTOM_OF_PIPE)),
                 signal_semaphores: &[],
             };
+            // self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence));
             self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence));
         }
     }

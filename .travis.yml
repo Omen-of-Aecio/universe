@@ -6,9 +6,9 @@ sudo: required
 before_script:
     - sudo apt update
     - sudo apt install binutils-dev libasound2-dev libunwind8-dev g++
-    - ln -s /usr/bin/g++ /usr/bin/c++
 language: rust
 rust:
     - nightly
 script:
+  - export PATH="$PATH:/usr/bin"
   - ./scripts/run-all

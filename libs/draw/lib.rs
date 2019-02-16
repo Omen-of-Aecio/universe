@@ -49,10 +49,13 @@ pub struct Draw {
     command_pool: hal::CommandPool<back::Backend, hal::Graphics>,
     device: back::Device,
     format: hal::format::Format,
-    frame_fence: <back::Backend as Backend>::Fence,
-    frame_semaphore: <back::Backend as Backend>::Semaphore,
+    frame_fence: Vec<<back::Backend as Backend>::Fence>,
+    frame_index: usize,
+    frame_semaphore: Vec<<back::Backend as Backend>::Semaphore>,
     framebuffers: Vec<<back::Backend as Backend>::Framebuffer>,
+    image_count: usize,
     queue_group: hal::QueueGroup<back::Backend, hal::Graphics>,
+    render_finished_semaphore: Vec<<back::Backend as Backend>::Semaphore>,
     swap_chain: <back::Backend as Backend>::Swapchain,
     viewport: pso::Viewport,
 }
@@ -79,8 +82,6 @@ impl Draw {
         }
         .expect("Can't create command pool");
         // Step 4: Create semaphore
-        let frame_semaphore = device.create_semaphore().expect("Can't create semaphore");
-        let frame_fence = device.create_fence(false).expect("Can't create fence");
         // Step 5: Set up swapchain
         let (caps, formats, present_modes, _composite_alpha) =
             surface.compatibility(&mut adapter.physical_device);
@@ -103,6 +104,13 @@ impl Draw {
         println!["{:?}", present_modes];
         println!["{:?}", present_mode];
         println!["{:?}", caps];
+
+        use gfx_hal::window::PresentMode::*;
+        let image_count = if present_mode == Mailbox {
+            (caps.image_count.end - 1).min(3) as usize
+        } else {
+            (caps.image_count.end - 1).min(2) as usize
+        };
 
         let swap_config = SwapchainConfig::from_caps(&caps, format, DIMS);
         println!("{:?}", swap_config);
@@ -188,14 +196,27 @@ impl Draw {
             depth: 0.0..1.0,
         };
 
+        // Step 9: Set up fences and semaphores
+        let mut frame_fence = Vec::with_capacity(image_count);
+        let mut frame_semaphore = Vec::with_capacity(image_count);
+        let mut render_finished_semaphore = Vec::with_capacity(image_count);
+        for i in 0..image_count {
+            frame_fence.push(device.create_fence(false).expect("Can't create fence"));
+            frame_semaphore.push(device.create_semaphore().expect("Can't create semaphore"));
+            render_finished_semaphore.push(device.create_semaphore().expect("Can't create semaphore"));
+        }
+
         Self {
             command_pool,
             device,
             format,
             frame_fence,
+            frame_index: 0,
             frame_semaphore,
             framebuffers,
+            image_count,
             queue_group,
+            render_finished_semaphore,
             swap_chain,
             viewport,
         }
@@ -203,13 +224,16 @@ impl Draw {
 
     pub fn acquire_swapchain_image(&mut self) -> Option<hal::SwapImageIndex> {
         unsafe {
-            self.device.reset_fence(&self.frame_fence).unwrap();
+            // self.device.reset_fence(&self.frame_fence).unwrap();
             self.command_pool.reset();
             match self
                 .swap_chain
-                .acquire_image(u64::max_value(), FrameSync::Semaphore(&mut self.frame_semaphore))
+                .acquire_image(u64::max_value(), FrameSync::Semaphore(&mut self.frame_semaphore[self.frame_index]))
             {
-                Ok(i) => Some(i),
+                Ok(i) => {
+                    self.frame_index = (self.frame_index + 1) % self.image_count;
+                    Some(i)
+                }
                 Err(_) => None,
             }
         }
@@ -217,10 +241,10 @@ impl Draw {
 
     pub fn swap_it(&mut self, frame: hal::SwapImageIndex) {
         unsafe {
-            self.device.wait_for_fence(&self.frame_fence, u64::max_value()).unwrap();
+            // self.device.wait_for_fence(&self.frame_fence, u64::max_value()).unwrap();
             if let Err(_) = self
                 .swap_chain
-                .present_nosemaphores(&mut self.queue_group.queues[0], frame)
+                .present(&mut self.queue_group.queues[0], frame, Some(&self.render_finished_semaphore[self.frame_index]))
             {
                 // self.recreate_swapchain = true;
             }
@@ -278,11 +302,11 @@ impl Draw {
 
             let submission = Submission {
                 command_buffers: Some(&cmd_buffer),
-                wait_semaphores: Some((&self.frame_semaphore, PipelineStage::BOTTOM_OF_PIPE)),
-                signal_semaphores: &[],
+                wait_semaphores: Some((&self.frame_semaphore[self.frame_index], PipelineStage::BOTTOM_OF_PIPE)),
+                signal_semaphores: Some(&self.render_finished_semaphore[self.frame_index]),
             };
             // self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence));
-            self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence));
+            self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence[self.frame_index]));
         }
     }
 }

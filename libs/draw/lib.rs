@@ -307,7 +307,9 @@ impl Draw {
             };
             // self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence));
             // self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence[self.frame_index]));
-            self.queue_group.queues[0].submit(submission, None);
+            self.device.wait_for_fence(&self.frame_fence[self.frame_index], u64::max_value()).expect("Unable to wait on fence");
+            self.device.reset_fence(&self.frame_fence[self.frame_index]).expect("Unable to reset fence");
+            self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence[self.frame_index]));
         }
     }
 }

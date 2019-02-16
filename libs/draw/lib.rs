@@ -306,7 +306,8 @@ impl Draw {
                 signal_semaphores: Some(&self.render_finished_semaphore[self.frame_index]),
             };
             // self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence));
-            self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence[self.frame_index]));
+            // self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence[self.frame_index]));
+            self.queue_group.queues[0].submit(submission, None);
         }
     }
 }

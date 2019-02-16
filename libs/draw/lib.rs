@@ -51,7 +51,7 @@ pub struct Draw {
     format: hal::format::Format,
     frame_fence: <back::Backend as Backend>::Fence,
     frame_semaphore: <back::Backend as Backend>::Semaphore,
-    framebuffers: Vec<u32>,
+    framebuffers: Vec<<back::Backend as Backend>::Framebuffer>,
     queue_group: hal::QueueGroup<back::Backend, hal::Graphics>,
     swap_chain: <back::Backend as Backend>::Swapchain,
     viewport: pso::Viewport,

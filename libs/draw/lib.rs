@@ -282,6 +282,8 @@ impl Draw {
         {
           color = vec4(1.0);
         }";
+
+        // Create a buffer for the vertex data (this is rather involved)
         let (memory, requirements) = unsafe {
             const F32_XY_TRIANGLE: u64 = (std::mem::size_of::<f32>() * 2 * 3) as u64;
             use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
@@ -310,6 +312,7 @@ impl Draw {
             (memory, requirements)
         };
 
+        // Upload vertex data
         unsafe {
             let mut data_target = self
               .device
@@ -321,6 +324,127 @@ impl Draw {
               .device
               .release_mapping_writer(data_target)
               .expect("Couldn't release the mapping writer!");
+        }
+
+        // Compile shader modules
+        let vs_module = {
+            let glsl = VERTEX_SOURCE;
+            let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
+                .unwrap()
+                .bytes()
+                .map(|b| b.unwrap())
+                .collect();
+            unsafe { self.device.create_shader_module(&spirv) }.unwrap()
+        };
+        let fs_module = {
+            let glsl = FRAGMENT_SOURCE;
+            let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Fragment)
+                .unwrap()
+                .bytes()
+                .map(|b| b.unwrap())
+                .collect();
+            unsafe { self.device.create_shader_module(&spirv) }.unwrap()
+        };
+
+        const ENTRY_NAME: &str = "main";
+        let vs_module: <back::Backend as Backend>::ShaderModule = vs_module;
+        use hal::pso;
+        let (vs_entry, fs_entry) = (
+            pso::EntryPoint {
+                entry: ENTRY_NAME,
+                module: &vs_module,
+                // specialization: pso::Specialization {
+                //     constants: &[pso::SpecializationConstant { id: 0, range: 0..4 }],
+                //     data: unsafe { std::mem::transmute::<&f32, &[u8; 4]>(&0.8f32) },
+                // },
+                specialization: pso::Specialization::default(),
+            },
+            pso::EntryPoint {
+                entry: ENTRY_NAME,
+                module: &fs_module,
+                specialization: pso::Specialization::default(),
+            },
+        );
+        let shader_entries = pso::GraphicsShaderSet {
+            vertex: vs_entry,
+            hull: None,
+            domain: None,
+            geometry: None,
+            fragment: Some(fs_entry),
+        };
+
+        // Create a render pass for this thing
+        let render_pass = {
+            let attachment = pass::Attachment {
+                format: Some(self.format),
+                samples: 1,
+                ops: pass::AttachmentOps::new(
+                    pass::AttachmentLoadOp::Load,
+                    pass::AttachmentStoreOp::Store,
+                ),
+                stencil_ops: pass::AttachmentOps::DONT_CARE,
+                layouts: i::Layout::Undefined..i::Layout::Present,
+            };
+
+            let subpass = pass::SubpassDesc {
+                colors: &[(0, i::Layout::ColorAttachmentOptimal)],
+                depth_stencil: None,
+                inputs: &[],
+                resolves: &[],
+                preserves: &[],
+            };
+
+            let dependency = pass::SubpassDependency {
+                passes: pass::SubpassRef::External..pass::SubpassRef::Pass(0),
+                stages: PipelineStage::COLOR_ATTACHMENT_OUTPUT
+                    ..PipelineStage::COLOR_ATTACHMENT_OUTPUT,
+                accesses: i::Access::empty()
+                    ..(i::Access::COLOR_ATTACHMENT_READ | i::Access::COLOR_ATTACHMENT_WRITE),
+            };
+
+            unsafe { self.device.create_render_pass(&[attachment], &[subpass], &[]) }
+                .expect("Can't create render pass")
+        };
+
+        let subpass = Subpass {
+            index: 0,
+            main_pass: &render_pass,
+        };
+
+
+        let bindings = Vec::<pso::DescriptorSetLayoutBinding>::new();
+        let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
+        let set_layout = unsafe {
+            self.device.create_descriptor_set_layout(bindings, immutable_samplers)
+        };
+
+        let pipeline_layout = unsafe {
+            self.device.create_pipeline_layout(
+                &set_layout,
+                &[(pso::ShaderStageFlags::VERTEX, 0..8)],
+            )
+        }
+        .expect("Cant create pipelinelayout");
+
+        let mut pipeline_desc = pso::GraphicsPipelineDesc::new(
+            shader_entries,
+            Primitive::TriangleList,
+            pso::Rasterizer::FILL,
+            &pipeline_layout,
+            subpass,
+        );
+
+        unsafe {
+          self.device
+            .create_graphics_pipeline(&pipeline_desc, None)
+            .expect("Couldn't create a graphics pipeline!");
+        }
+
+        unsafe {
+            self.device.destroy_shader_module(vs_module);
+        }
+        unsafe {
+            self.device.destroy_shader_module(fs_module);
         }
     }
 

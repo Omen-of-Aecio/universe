@@ -46,6 +46,7 @@ const COLOR_RANGE: i::SubresourceRange = i::SubresourceRange {
 };
 
 pub struct Draw {
+    adapter: hal::Adapter<back::Backend>,
     command_pool: hal::CommandPool<back::Backend, hal::Graphics>,
     device: back::Device,
     format: hal::format::Format,
@@ -81,8 +82,7 @@ impl Draw {
             device.create_command_pool_typed(&queue_group, pool::CommandPoolCreateFlags::empty())
         }
         .expect("Can't create command pool");
-        // Step 4: Create semaphore
-        // Step 5: Set up swapchain
+        // Step 4: Set up swapchain
         let (caps, formats, present_modes, _composite_alpha) =
             surface.compatibility(&mut adapter.physical_device);
         let format = formats.map_or(f::Format::Rgba8Srgb, |formats| {
@@ -119,7 +119,7 @@ impl Draw {
         let (swap_chain, backbuffer) =
             unsafe { device.create_swapchain(surface, swap_config, None) }
                 .expect("Can't create swapchain");
-        // Step 6: Create render pass
+        // Step 5: Create render pass
         let render_pass = {
             let attachment = pass::Attachment {
                 format: Some(format),
@@ -151,7 +151,7 @@ impl Draw {
             unsafe { device.create_render_pass(&[attachment], &[subpass], &[dependency]) }
                 .expect("Can't create render pass")
         };
-        // Step 7: Collect framebuffers
+        // Step 6: Collect framebuffers
         let (frame_images, framebuffers) = match backbuffer {
             Backbuffer::Images(images) => {
                 println!["Image backbuffer"];
@@ -185,7 +185,8 @@ impl Draw {
                 (Vec::new(), vec![fbo])
             }
         };
-        // Step 8: Set up a viewport
+
+        // Step 7: Set up a viewport
         let viewport = pso::Viewport {
             rect: pso::Rect {
                 x: 0,
@@ -196,7 +197,7 @@ impl Draw {
             depth: 0.0..1.0,
         };
 
-        // Step 9: Set up fences and semaphores
+        // Step 8: Set up fences and semaphores
         let mut frame_fence = Vec::with_capacity(image_count);
         let mut frame_semaphore = Vec::with_capacity(image_count);
         let mut render_finished_semaphore = Vec::with_capacity(image_count);
@@ -207,6 +208,7 @@ impl Draw {
         }
 
         Self {
+            adapter,
             command_pool,
             device,
             format,
@@ -249,6 +251,76 @@ impl Draw {
                 // self.recreate_swapchain = true;
             }
         }
+    }
+
+    pub fn draw_triangle(&mut self, frame: hal::SwapImageIndex) {
+        pub const VERTEX_SOURCE: &str = "#version 450
+        layout (location = 0) in vec2 position;
+        out gl_PerVertex {
+          vec4 gl_Position;
+        };
+        void main()
+        {
+          gl_Position = vec4(position, 0.0, 1.0);
+        }";
+
+        pub const FRAGMENT_SOURCE: &str = "#version 450
+        layout(location = 0) out vec4 color;
+        void main()
+        {
+          color = vec4(1.0);
+        }";
+        unsafe {
+            use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
+            let mut buffer = self.device.create_buffer(123, gfx_hal::buffer::Usage::VERTEX).expect("cant make bf");
+            let requirements = self.device.get_buffer_requirements(&buffer);
+            let memory_type_id = self.adapter
+                .physical_device
+                .memory_properties()
+                .memory_types
+                .iter()
+                .enumerate()
+                .find(|&(id, memory_type)| {
+                    requirements.type_mask & (1 << id) != 0
+                      && memory_type.properties.contains(Properties::CPU_VISIBLE)
+                })
+                .map(|(id, _)| MemoryTypeId(id))
+                .unwrap();
+            let memory = self.device
+              .allocate_memory(memory_type_id, requirements.size)
+              .expect("Couldn't allocate vertex buffer memory");
+            println!["{:?}", memory];
+            self.device
+              .bind_buffer_memory(&memory, 0, &mut buffer)
+              .expect("Couldn't bind the buffer memory!");
+            // (buffer, memory, requirements)
+        }
+        // let (buffer, memory, requirements) = unsafe {
+        //     const F32_XY_TRIANGLE: u64 = (size_of::<f32>() * 2 * 3) as u64;
+        //     let mut buffer = device
+        //       .create_buffer(F32_XY_TRIANGLE, BufferUsage::VERTEX)
+        //       .map_err(|_| "Couldn't create a buffer for the vertices")?;
+        //     let requirements = device.get_buffer_requirements(&buffer);
+        //     let memory_type_id = adapter
+        //       .physical_device
+        //       .memory_properties()
+        //       .memory_types
+        //       .iter()
+        //       .enumerate()
+        //       .find(|&(id, memory_type)| {
+        //         requirements.type_mask & (1 << id) != 0
+        //           && memory_type.properties.contains(Properties::CPU_VISIBLE)
+        //       })
+        //       .map(|(id, _)| MemoryTypeId(id))
+        //       .ok_or("Couldn't find a memory type to support the vertex buffer!")?;
+        //     let memory = device
+        //       .allocate_memory(memory_type_id, requirements.size)
+        //       .map_err(|_| "Couldn't allocate vertex buffer memory")?;
+        //     device
+        //       .bind_buffer_memory(&memory, 0, &mut buffer)
+        //       .map_err(|_| "Couldn't bind the buffer memory!")?;
+        //     (buffer, memory, requirements)
+        // };
     }
 
     pub fn clear(&mut self, frame: hal::SwapImageIndex, r: f32) {

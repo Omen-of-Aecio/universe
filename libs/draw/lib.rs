@@ -284,7 +284,7 @@ impl Draw {
         }";
 
         // Create a buffer for the vertex data (this is rather involved)
-        let (memory, requirements) = unsafe {
+        let (buffer, memory, requirements) = unsafe {
             const F32_XY_TRIANGLE: u64 = (std::mem::size_of::<f32>() * 2 * 3) as u64;
             use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
             let mut buffer = self.device.create_buffer(F32_XY_TRIANGLE, gfx_hal::buffer::Usage::VERTEX).expect("cant make bf");
@@ -309,7 +309,7 @@ impl Draw {
               .bind_buffer_memory(&memory, 0, &mut buffer)
               .expect("Couldn't bind the buffer memory!");
             // (buffer, memory, requirements)
-            (memory, requirements)
+            (buffer, memory, requirements)
         };
 
         // Upload vertex data
@@ -346,6 +346,7 @@ impl Draw {
             unsafe { self.device.create_shader_module(&spirv) }.unwrap()
         };
 
+        // Describe the shaders
         const ENTRY_NAME: &str = "main";
         let vs_module: <back::Backend as Backend>::ShaderModule = vs_module;
         use hal::pso;
@@ -411,21 +412,25 @@ impl Draw {
             main_pass: &render_pass,
         };
 
+        // Create a descriptor set layout (this is mainly for textures), we just create an empty
+        // one
+        // let bindings = Vec::<pso::DescriptorSetLayoutBinding>::new();
+        // let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
+        // let set_layout = unsafe {
+        //     self.device.create_descriptor_set_layout(bindings, immutable_samplers)
+        // };
 
-        let bindings = Vec::<pso::DescriptorSetLayoutBinding>::new();
-        let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
-        let set_layout = unsafe {
-            self.device.create_descriptor_set_layout(bindings, immutable_samplers)
-        };
-
+        // Create a pipeline layout
         let pipeline_layout = unsafe {
             self.device.create_pipeline_layout(
-                &set_layout,
+                // &set_layout,
+                &[], // No descriptor set layout (no texture/sampler)
                 &[(pso::ShaderStageFlags::VERTEX, 0..8)],
             )
         }
         .expect("Cant create pipelinelayout");
 
+        // Describe the pipeline (rasterization, triangle interpretation)
         let mut pipeline_desc = pso::GraphicsPipelineDesc::new(
             shader_entries,
             Primitive::TriangleList,
@@ -434,11 +439,11 @@ impl Draw {
             subpass,
         );
 
-        unsafe {
+        let pipeline = unsafe {
           self.device
             .create_graphics_pipeline(&pipeline_desc, None)
-            .expect("Couldn't create a graphics pipeline!");
-        }
+            .expect("Couldn't create a graphics pipeline!")
+        };
 
         unsafe {
             self.device.destroy_shader_module(vs_module);
@@ -446,6 +451,47 @@ impl Draw {
         unsafe {
             self.device.destroy_shader_module(fs_module);
         }
+
+        let mut cmd_buffer = self
+            .command_pool
+            .acquire_command_buffer::<command::OneShot>();
+
+        unsafe {
+            cmd_buffer.begin();
+
+            cmd_buffer.set_viewports(0, &[self.viewport.clone()]);
+            cmd_buffer.set_scissors(0, &[self.viewport.rect]);
+            // cmd_buffer.bind_graphics_pipeline(&self.pipeline);
+            // cmd_buffer.bind_vertex_buffers(0, Some((&self.vertex_buffer, 0)));
+            // cmd_buffer.bind_graphics_descriptor_sets(&self.pipeline_layout, 0, Some(&self.desc_set), &[]);
+
+            {
+                let mut encoder = cmd_buffer.begin_render_pass_inline(
+                    &render_pass,
+                    &self.framebuffers[frame as usize],
+                    self.viewport.rect,
+                    &[],
+                );
+                encoder.bind_graphics_pipeline(&pipeline);
+                // let buffer_ref: &<back::Backend as Backend>::Buffer = &buffer;
+                // let buffers: ArrayVec<[_; 1]> = [(buffer_ref, 0)].into();
+                encoder.bind_vertex_buffers(0, std::iter::once((buffer, 0)));
+                encoder.draw(0..3, 0..1);
+            }
+
+            cmd_buffer.finish();
+
+            let submission = Submission {
+                command_buffers: Some(&cmd_buffer),
+                wait_semaphores: Some((&self.frame_semaphore[self.frame_index], PipelineStage::COLOR_ATTACHMENT_OUTPUT)),
+                signal_semaphores: Some(&self.render_finished_semaphore[self.frame_index]),
+            };
+            // self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence));
+            // self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence[self.frame_index]));
+            self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence[self.frame_index]));
+        }
+
+
     }
 
     pub fn clear(&mut self, frame: hal::SwapImageIndex, r: f32) {
@@ -500,7 +546,7 @@ impl Draw {
             let submission = Submission {
                 command_buffers: Some(&cmd_buffer),
                 wait_semaphores: Some((&self.frame_semaphore[self.frame_index], PipelineStage::BOTTOM_OF_PIPE)),
-                signal_semaphores: Some(&self.render_finished_semaphore[self.frame_index]),
+                signal_semaphores: None, // Some(&self.render_finished_semaphore[self.frame_index]),
             };
             // self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence));
             // self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence[self.frame_index]));

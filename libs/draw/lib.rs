@@ -45,6 +45,18 @@ const COLOR_RANGE: i::SubresourceRange = i::SubresourceRange {
     layers: 0..1,
 };
 
+#[derive(Debug, Clone, Copy)]
+pub struct Triangle {
+  pub points: [[f32; 2]; 3],
+}
+impl Triangle {
+  pub fn points_flat(self) -> [f32; 6] {
+    let [[a, b], [c, d], [e, f]] = self.points;
+    [a, b, c, d, e, f]
+  }
+}
+
+
 pub struct Draw {
     adapter: hal::Adapter<back::Backend>,
     command_pool: hal::CommandPool<back::Backend, hal::Graphics>,
@@ -253,7 +265,7 @@ impl Draw {
         }
     }
 
-    pub fn draw_triangle(&mut self, frame: hal::SwapImageIndex) {
+    pub fn draw_triangle(&mut self, frame: hal::SwapImageIndex, triangle: Triangle) {
         pub const VERTEX_SOURCE: &str = "#version 450
         layout (location = 0) in vec2 position;
         out gl_PerVertex {
@@ -270,9 +282,10 @@ impl Draw {
         {
           color = vec4(1.0);
         }";
-        unsafe {
+        let (memory, requirements) = unsafe {
+            const F32_XY_TRIANGLE: u64 = (std::mem::size_of::<f32>() * 2 * 3) as u64;
             use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
-            let mut buffer = self.device.create_buffer(123, gfx_hal::buffer::Usage::VERTEX).expect("cant make bf");
+            let mut buffer = self.device.create_buffer(F32_XY_TRIANGLE, gfx_hal::buffer::Usage::VERTEX).expect("cant make bf");
             let requirements = self.device.get_buffer_requirements(&buffer);
             let memory_type_id = self.adapter
                 .physical_device
@@ -294,33 +307,21 @@ impl Draw {
               .bind_buffer_memory(&memory, 0, &mut buffer)
               .expect("Couldn't bind the buffer memory!");
             // (buffer, memory, requirements)
+            (memory, requirements)
+        };
+
+        unsafe {
+            let mut data_target = self
+              .device
+              .acquire_mapping_writer(&memory, 0..requirements.size)
+              .expect("Failed to acquire a memory writer!");
+            let points = triangle.points_flat();
+            data_target[..points.len()].copy_from_slice(&points);
+            self
+              .device
+              .release_mapping_writer(data_target)
+              .expect("Couldn't release the mapping writer!");
         }
-        // let (buffer, memory, requirements) = unsafe {
-        //     const F32_XY_TRIANGLE: u64 = (size_of::<f32>() * 2 * 3) as u64;
-        //     let mut buffer = device
-        //       .create_buffer(F32_XY_TRIANGLE, BufferUsage::VERTEX)
-        //       .map_err(|_| "Couldn't create a buffer for the vertices")?;
-        //     let requirements = device.get_buffer_requirements(&buffer);
-        //     let memory_type_id = adapter
-        //       .physical_device
-        //       .memory_properties()
-        //       .memory_types
-        //       .iter()
-        //       .enumerate()
-        //       .find(|&(id, memory_type)| {
-        //         requirements.type_mask & (1 << id) != 0
-        //           && memory_type.properties.contains(Properties::CPU_VISIBLE)
-        //       })
-        //       .map(|(id, _)| MemoryTypeId(id))
-        //       .ok_or("Couldn't find a memory type to support the vertex buffer!")?;
-        //     let memory = device
-        //       .allocate_memory(memory_type_id, requirements.size)
-        //       .map_err(|_| "Couldn't allocate vertex buffer memory")?;
-        //     device
-        //       .bind_buffer_memory(&memory, 0, &mut buffer)
-        //       .map_err(|_| "Couldn't bind the buffer memory!")?;
-        //     (buffer, memory, requirements)
-        // };
     }
 
     pub fn clear(&mut self, frame: hal::SwapImageIndex, r: f32) {

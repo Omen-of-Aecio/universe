@@ -1,4 +1,4 @@
-use draw::Draw;
+use draw::{Draw, Triangle};
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
 #[cfg(feature = "gl")]
@@ -56,6 +56,10 @@ fn main() {
             // println!["{:?}", image];
             if let Some(image) = image {
                 draw.clear(image, i as f32 / 100f32 );
+                let triangle = Triangle {
+                    points: [[-0.5, 0.5], [-0.5, -0.5], [0.0, 0.0]],
+                };
+                draw.draw_triangle(image, triangle);
                 // draw.render(image);
                 draw.swap_it(image);
             }

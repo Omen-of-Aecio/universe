@@ -55,9 +55,9 @@ fn main() {
             let image = draw.acquire_swapchain_image();
             // println!["{:?}", image];
             if let Some(image) = image {
-                // draw.clear(image, i as f32 / 100f32 );
+                draw.clear(image, i as f32 / 100f32 );
                 let triangle = Triangle {
-                    points: [[-0.5, 0.5], [-0.5, -0.5], [0.0, 0.0]],
+                    points: [[-0.5, (i as f32 / 100.0f32)], [-0.5, -0.5], [0.0, 0.0]],
                 };
                 draw.draw_triangle(image, triangle);
                 // draw.render(image);

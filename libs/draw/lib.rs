@@ -383,7 +383,7 @@ impl Draw {
                 format: Some(self.format),
                 samples: 1,
                 ops: pass::AttachmentOps::new(
-                    pass::AttachmentLoadOp::Clear,
+                    pass::AttachmentLoadOp::Load,
                     pass::AttachmentStoreOp::Store,
                 ),
                 stencil_ops: pass::AttachmentOps::DONT_CARE,
@@ -493,9 +493,7 @@ impl Draw {
                     &render_pass,
                     &self.framebuffers[frame as usize],
                     self.viewport.rect,
-                    &[command::ClearValue::Color(command::ClearColor::Float([
-                        0.0, 0.2, 0.8, 1.0,
-                    ]))],
+                    &[],
                 );
                 // encoder.bind_graphics_pipeline(&pipeline);
                 // let buffer_ref: &<back::Backend as Backend>::Buffer = &buffer;

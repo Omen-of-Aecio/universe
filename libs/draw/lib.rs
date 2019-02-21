@@ -255,7 +255,7 @@ impl Draw {
 
     pub fn swap_it(&mut self, frame: hal::SwapImageIndex) {
         unsafe {
-            // self.device.wait_for_fence(&self.frame_fence, u64::max_value()).unwrap();
+            self.device.wait_for_fence(&self.frame_fence[self.frame_index], u64::max_value()).unwrap();
             if let Err(_) = self
                 .swap_chain
                 .present(&mut self.queue_group.queues[0], frame, Some(&self.render_finished_semaphore[self.frame_index]))
@@ -267,6 +267,7 @@ impl Draw {
 
     pub fn draw_triangle(&mut self, frame: hal::SwapImageIndex, triangle: Triangle) {
         pub const VERTEX_SOURCE: &str = "#version 450
+        #extension GL_ARG_separate_shader_objects : enable
         layout (location = 0) in vec2 position;
         out gl_PerVertex {
           vec4 gl_Position;
@@ -277,6 +278,7 @@ impl Draw {
         }";
 
         pub const FRAGMENT_SOURCE: &str = "#version 450
+        #extension GL_ARG_separate_shader_objects : enable
         layout(location = 0) out vec4 color;
         void main()
         {
@@ -319,6 +321,7 @@ impl Draw {
               .acquire_mapping_writer(&memory, 0..requirements.size)
               .expect("Failed to acquire a memory writer!");
             let points = triangle.points_flat();
+            println!["Uploading points: {:?}", points];
             data_target[..points.len()].copy_from_slice(&points);
             self
               .device
@@ -380,7 +383,7 @@ impl Draw {
                 format: Some(self.format),
                 samples: 1,
                 ops: pass::AttachmentOps::new(
-                    pass::AttachmentLoadOp::Load,
+                    pass::AttachmentLoadOp::Clear,
                     pass::AttachmentStoreOp::Store,
                 ),
                 stencil_ops: pass::AttachmentOps::DONT_CARE,
@@ -395,13 +398,13 @@ impl Draw {
                 preserves: &[],
             };
 
-            let dependency = pass::SubpassDependency {
-                passes: pass::SubpassRef::External..pass::SubpassRef::Pass(0),
-                stages: PipelineStage::COLOR_ATTACHMENT_OUTPUT
-                    ..PipelineStage::COLOR_ATTACHMENT_OUTPUT,
-                accesses: i::Access::empty()
-                    ..(i::Access::COLOR_ATTACHMENT_READ | i::Access::COLOR_ATTACHMENT_WRITE),
-            };
+            // let dependency = pass::SubpassDependency {
+            //     passes: pass::SubpassRef::External..pass::SubpassRef::Pass(0),
+            //     stages: PipelineStage::COLOR_ATTACHMENT_OUTPUT
+            //         ..PipelineStage::COLOR_ATTACHMENT_OUTPUT,
+            //     accesses: i::Access::empty()
+            //         ..(i::Access::COLOR_ATTACHMENT_READ | i::Access::COLOR_ATTACHMENT_WRITE),
+            // };
 
             unsafe { self.device.create_render_pass(&[attachment], &[subpass], &[]) }
                 .expect("Can't create render pass")
@@ -425,7 +428,7 @@ impl Draw {
             self.device.create_pipeline_layout(
                 // &set_layout,
                 &[], // No descriptor set layout (no texture/sampler)
-                &[(pso::ShaderStageFlags::VERTEX, 0..8)],
+                &[], // &[(pso::ShaderStageFlags::VERTEX, 0..4)],
             )
         }
         .expect("Cant create pipelinelayout");
@@ -438,6 +441,26 @@ impl Draw {
             &pipeline_layout,
             subpass,
         );
+
+        pipeline_desc.vertex_buffers.push(pso::VertexBufferDesc {
+            binding: 0,
+            stride: 8 as u32,
+            rate: 0, // VertexInputRate::Vertex,
+        });
+
+        pipeline_desc.blender.targets.push(pso::ColorBlendDesc(
+            pso::ColorMask::ALL,
+            pso::BlendState::ALPHA,
+        ));
+
+        pipeline_desc.attributes.push(pso::AttributeDesc {
+            location: 0,
+            binding: 0,
+            element: pso::Element {
+                format: f::Format::Rg32Float,
+                offset: 0,
+            },
+        });
 
         let pipeline = unsafe {
           self.device
@@ -461,8 +484,8 @@ impl Draw {
 
             cmd_buffer.set_viewports(0, &[self.viewport.clone()]);
             cmd_buffer.set_scissors(0, &[self.viewport.rect]);
-            // cmd_buffer.bind_graphics_pipeline(&self.pipeline);
-            // cmd_buffer.bind_vertex_buffers(0, Some((&self.vertex_buffer, 0)));
+            cmd_buffer.bind_graphics_pipeline(&pipeline);
+            cmd_buffer.bind_vertex_buffers(0, Some((&buffer, 0)));
             // cmd_buffer.bind_graphics_descriptor_sets(&self.pipeline_layout, 0, Some(&self.desc_set), &[]);
 
             {
@@ -470,12 +493,14 @@ impl Draw {
                     &render_pass,
                     &self.framebuffers[frame as usize],
                     self.viewport.rect,
-                    &[],
+                    &[command::ClearValue::Color(command::ClearColor::Float([
+                        0.0, 0.2, 0.8, 1.0,
+                    ]))],
                 );
-                encoder.bind_graphics_pipeline(&pipeline);
+                // encoder.bind_graphics_pipeline(&pipeline);
                 // let buffer_ref: &<back::Backend as Backend>::Buffer = &buffer;
                 // let buffers: ArrayVec<[_; 1]> = [(buffer_ref, 0)].into();
-                encoder.bind_vertex_buffers(0, std::iter::once((buffer, 0)));
+                // encoder.bind_vertex_buffers(0, std::iter::once((buffer, 0)));
                 encoder.draw(0..3, 0..1);
             }
 
@@ -486,12 +511,10 @@ impl Draw {
                 wait_semaphores: Some((&self.frame_semaphore[self.frame_index], PipelineStage::COLOR_ATTACHMENT_OUTPUT)),
                 signal_semaphores: Some(&self.render_finished_semaphore[self.frame_index]),
             };
-            // self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence));
-            // self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence[self.frame_index]));
             self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence[self.frame_index]));
+            self.device.wait_for_fence(&self.frame_fence[self.frame_index], u64::max_value()).unwrap();
+            self.device.reset_fence(&self.frame_fence[self.frame_index]).expect("Unable to reset fence");
         }
-
-
     }
 
     pub fn clear(&mut self, frame: hal::SwapImageIndex, r: f32) {

@@ -71,8 +71,9 @@ impl StaticWhite2DTriangle {
         unsafe {
             self.cmd_buffer.begin(false);
 
-            // cmd_buffer.set_viewports(0, &[draw.viewport.clone()]);
-            self.cmd_buffer.set_scissors(0, &[draw.viewport.rect]);
+            let mut x = draw.viewport.clone();
+            self.cmd_buffer.set_viewports(0, &[x]);
+            // self.cmd_buffer.set_scissors(0, &[draw.viewport.rect]);
             self.cmd_buffer.bind_graphics_pipeline(&self.pipeline);
             self.cmd_buffer.bind_vertex_buffers(0, Some((&self.buffer, 0)));
             // cmd_buffer.bind_graphics_descriptor_sets(&self.pipeline_layout, 0, Some(&self.desc_set), &[]);
@@ -93,21 +94,18 @@ impl StaticWhite2DTriangle {
         }
     }
 
-    pub fn draw2(&self, draw: &mut Draw, surface: &<back::Backend as Backend>::Framebuffer) {
-        let mut cmd_buffer = draw
-            .command_pool
-            .acquire_command_buffer::<command::OneShot>();
+    pub fn draw2(&mut self, draw: &mut Draw, surface: &<back::Backend as Backend>::Framebuffer) {
         unsafe {
-            cmd_buffer.begin();
+            self.cmd_buffer.begin(false);
 
             // cmd_buffer.set_viewports(0, &[draw.viewport.clone()]);
-            // cmd_buffer.set_scissors(0, &[draw.viewport.rect]);
-            cmd_buffer.bind_graphics_pipeline(&self.pipeline);
-            cmd_buffer.bind_vertex_buffers(0, Some((&self.buffer, 0)));
+            self.cmd_buffer.set_scissors(0, &[draw.viewport.rect]);
+            self.cmd_buffer.bind_graphics_pipeline(&self.pipeline);
+            self.cmd_buffer.bind_vertex_buffers(0, Some((&self.buffer, 0)));
             // cmd_buffer.bind_graphics_descriptor_sets(&self.pipeline_layout, 0, Some(&self.desc_set), &[]);
 
             {
-                let mut encoder = cmd_buffer.begin_render_pass_inline(
+                let mut encoder = self.cmd_buffer.begin_render_pass_inline(
                     &self.render_pass,
                     surface,
                     draw.viewport.rect,
@@ -116,16 +114,9 @@ impl StaticWhite2DTriangle {
                 encoder.draw(0..3, 0..1);
             }
 
-            cmd_buffer.finish();
+            self.cmd_buffer.finish();
 
-            let submission = Submission {
-                command_buffers: Some(&cmd_buffer),
-                wait_semaphores: Some((&draw.frame_semaphore[draw.frame_index], PipelineStage::COLOR_ATTACHMENT_OUTPUT)),
-                signal_semaphores: None, // Some(&draw.render_finished_semaphore[draw.frame_index]),
-            };
-            draw.queue_group.queues[0].submit(submission, None); // Some(&mut draw.frame_fence[draw.frame_index]));
-            // self.device.wait_for_fence(&self.frame_fence[draw.frame_index], u64::max_value()).unwrap();
-            // self.device.reset_fence(&self.frame_fence[draw.frame_index]).expect("Unable to reset fence");
+            draw.queue_group.queues[0].submit_nosemaphores(std::iter::once(&self.cmd_buffer), None);
         }
     }
 }
@@ -345,7 +336,6 @@ impl Draw {
     pub fn swap_it(&mut self, frame: hal::SwapImageIndex) {
         unsafe {
             self.device.wait_for_fence(&self.frame_fence[self.frame_index], u64::max_value()).unwrap();
-            println!["QUEUES: {}", self.queue_group.queues.len()];
             if let Err(_) = self
                 .swap_chain
                 .present(&mut self.queue_group.queues[0], frame, Some(&self.render_finished_semaphore[self.frame_index]))
@@ -354,253 +344,6 @@ impl Draw {
             }
         }
     }
-
-    pub fn draw_triangle(&mut self, frame: hal::SwapImageIndex, triangle: Triangle) {
-        pub const VERTEX_SOURCE: &str = "#version 450
-        #extension GL_ARG_separate_shader_objects : enable
-        layout (location = 0) in vec2 position;
-        out gl_PerVertex {
-          vec4 gl_Position;
-        };
-        void main()
-        {
-          gl_Position = vec4(position, 0.0, 1.0);
-        }";
-
-        pub const FRAGMENT_SOURCE: &str = "#version 450
-        #extension GL_ARG_separate_shader_objects : enable
-        layout(location = 0) out vec4 color;
-        void main()
-        {
-          color = vec4(1.0);
-        }";
-
-        // Create a buffer for the vertex data (this is rather involved)
-        let (buffer, memory, requirements) = unsafe {
-            const F32_XY_TRIANGLE: u64 = (std::mem::size_of::<f32>() * 2 * 3) as u64;
-            use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
-            let mut buffer = self.device.create_buffer(F32_XY_TRIANGLE, gfx_hal::buffer::Usage::VERTEX).expect("cant make bf");
-            let requirements = self.device.get_buffer_requirements(&buffer);
-            let memory_type_id = self.adapter
-                .physical_device
-                .memory_properties()
-                .memory_types
-                .iter()
-                .enumerate()
-                .find(|&(id, memory_type)| {
-                    requirements.type_mask & (1 << id) != 0
-                      && memory_type.properties.contains(Properties::CPU_VISIBLE)
-                })
-                .map(|(id, _)| MemoryTypeId(id))
-                .unwrap();
-            let memory = self.device
-              .allocate_memory(memory_type_id, requirements.size)
-              .expect("Couldn't allocate vertex buffer memory");
-            println!["{:?}", memory];
-            self.device
-              .bind_buffer_memory(&memory, 0, &mut buffer)
-              .expect("Couldn't bind the buffer memory!");
-            // (buffer, memory, requirements)
-            (buffer, memory, requirements)
-        };
-
-        // Upload vertex data
-        unsafe {
-            let mut data_target = self
-              .device
-              .acquire_mapping_writer(&memory, 0..requirements.size)
-              .expect("Failed to acquire a memory writer!");
-            let points = triangle.points_flat();
-            println!["Uploading points: {:?}", points];
-            data_target[..points.len()].copy_from_slice(&points);
-            self
-              .device
-              .release_mapping_writer(data_target)
-              .expect("Couldn't release the mapping writer!");
-        }
-
-        // Compile shader modules
-        let vs_module = {
-            let glsl = VERTEX_SOURCE;
-            let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
-                .unwrap()
-                .bytes()
-                .map(|b| b.unwrap())
-                .collect();
-            unsafe { self.device.create_shader_module(&spirv) }.unwrap()
-        };
-        let fs_module = {
-            let glsl = FRAGMENT_SOURCE;
-            let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Fragment)
-                .unwrap()
-                .bytes()
-                .map(|b| b.unwrap())
-                .collect();
-            unsafe { self.device.create_shader_module(&spirv) }.unwrap()
-        };
-
-        // Describe the shaders
-        const ENTRY_NAME: &str = "main";
-        let vs_module: <back::Backend as Backend>::ShaderModule = vs_module;
-        use hal::pso;
-        let (vs_entry, fs_entry) = (
-            pso::EntryPoint {
-                entry: ENTRY_NAME,
-                module: &vs_module,
-                // specialization: pso::Specialization {
-                //     constants: &[pso::SpecializationConstant { id: 0, range: 0..4 }],
-                //     data: unsafe { std::mem::transmute::<&f32, &[u8; 4]>(&0.8f32) },
-                // },
-                specialization: pso::Specialization::default(),
-            },
-            pso::EntryPoint {
-                entry: ENTRY_NAME,
-                module: &fs_module,
-                specialization: pso::Specialization::default(),
-            },
-        );
-        let shader_entries = pso::GraphicsShaderSet {
-            vertex: vs_entry,
-            hull: None,
-            domain: None,
-            geometry: None,
-            fragment: Some(fs_entry),
-        };
-
-        // Create a render pass for this thing
-        let render_pass = {
-            let attachment = pass::Attachment {
-                format: Some(self.format),
-                samples: 1,
-                ops: pass::AttachmentOps::new(
-                    pass::AttachmentLoadOp::Load,
-                    pass::AttachmentStoreOp::Store,
-                ),
-                stencil_ops: pass::AttachmentOps::DONT_CARE,
-                layouts: i::Layout::Undefined..i::Layout::Present,
-            };
-
-            let subpass = pass::SubpassDesc {
-                colors: &[(0, i::Layout::ColorAttachmentOptimal)],
-                depth_stencil: None,
-                inputs: &[],
-                resolves: &[],
-                preserves: &[],
-            };
-
-            // let dependency = pass::SubpassDependency {
-            //     passes: pass::SubpassRef::External..pass::SubpassRef::Pass(0),
-            //     stages: PipelineStage::COLOR_ATTACHMENT_OUTPUT
-            //         ..PipelineStage::COLOR_ATTACHMENT_OUTPUT,
-            //     accesses: i::Access::empty()
-            //         ..(i::Access::COLOR_ATTACHMENT_READ | i::Access::COLOR_ATTACHMENT_WRITE),
-            // };
-
-            unsafe { self.device.create_render_pass(&[attachment], &[subpass], &[]) }
-                .expect("Can't create render pass")
-        };
-
-        let subpass = Subpass {
-            index: 0,
-            main_pass: &render_pass,
-        };
-
-        // Create a descriptor set layout (this is mainly for textures), we just create an empty
-        // one
-        // let bindings = Vec::<pso::DescriptorSetLayoutBinding>::new();
-        // let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
-        // let set_layout = unsafe {
-        //     self.device.create_descriptor_set_layout(bindings, immutable_samplers)
-        // };
-
-        // Create a pipeline layout
-        let pipeline_layout = unsafe {
-            self.device.create_pipeline_layout(
-                // &set_layout,
-                &[], // No descriptor set layout (no texture/sampler)
-                &[], // &[(pso::ShaderStageFlags::VERTEX, 0..4)],
-            )
-        }
-        .expect("Cant create pipelinelayout");
-
-        // Describe the pipeline (rasterization, triangle interpretation)
-        let mut pipeline_desc = pso::GraphicsPipelineDesc::new(
-            shader_entries,
-            Primitive::TriangleList,
-            pso::Rasterizer::FILL,
-            &pipeline_layout,
-            subpass,
-        );
-
-        pipeline_desc.vertex_buffers.push(pso::VertexBufferDesc {
-            binding: 0,
-            stride: 8 as u32,
-            rate: 0, // VertexInputRate::Vertex,
-        });
-
-        pipeline_desc.blender.targets.push(pso::ColorBlendDesc(
-            pso::ColorMask::ALL,
-            pso::BlendState::ALPHA,
-        ));
-
-        pipeline_desc.attributes.push(pso::AttributeDesc {
-            location: 0,
-            binding: 0,
-            element: pso::Element {
-                format: f::Format::Rg32Float,
-                offset: 0,
-            },
-        });
-
-        let pipeline = unsafe {
-          self.device
-            .create_graphics_pipeline(&pipeline_desc, None)
-            .expect("Couldn't create a graphics pipeline!")
-        };
-
-        unsafe {
-            self.device.destroy_shader_module(vs_module);
-        }
-        unsafe {
-            self.device.destroy_shader_module(fs_module);
-        }
-
-        let mut cmd_buffer = self
-            .command_pool
-            .acquire_command_buffer::<command::OneShot>();
-
-        unsafe {
-            cmd_buffer.begin();
-
-            cmd_buffer.set_viewports(0, &[self.viewport.clone()]);
-            cmd_buffer.set_scissors(0, &[self.viewport.rect]);
-            cmd_buffer.bind_graphics_pipeline(&pipeline);
-            cmd_buffer.bind_vertex_buffers(0, Some((&buffer, 0)));
-            // cmd_buffer.bind_graphics_descriptor_sets(&self.pipeline_layout, 0, Some(&self.desc_set), &[]);
-
-            {
-                let mut encoder = cmd_buffer.begin_render_pass_inline(
-                    &render_pass,
-                    &self.framebuffers[frame as usize],
-                    self.viewport.rect,
-                    &[],
-                );
-                encoder.draw(0..3, 0..1);
-            }
-
-            cmd_buffer.finish();
-
-            let submission = Submission {
-                command_buffers: Some(&cmd_buffer),
-                wait_semaphores: Some((&self.frame_semaphore[self.frame_index], PipelineStage::COLOR_ATTACHMENT_OUTPUT)),
-                signal_semaphores: Some(&self.render_finished_semaphore[self.frame_index]),
-            };
-            self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence[self.frame_index]));
-            self.device.wait_for_fence(&self.frame_fence[self.frame_index], u64::max_value()).unwrap();
-            self.device.reset_fence(&self.frame_fence[self.frame_index]).expect("Unable to reset fence");
-        }
-    }
-
 
     pub fn create_static_white_2d_triangle(&mut self, triangle: &[f32; 6]) -> StaticWhite2DTriangle {
         pub const VERTEX_SOURCE: &str = "#version 450

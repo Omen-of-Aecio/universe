@@ -50,7 +50,7 @@ fn main() {
     };
 
     let mut draw = Draw::new(&mut surface);
-    let tri = draw.create_static_white_2d_triangle(&[-0.5, 0.5, -0.5, -0.5, 0.0, 0.0]);
+    let mut tri = draw.create_static_white_2d_triangle(&[-0.5, 0.5, -0.5, -0.5, 0.5, 0.0]);
     loop {
         for i in 0..100 {
             let image = draw.acquire_swapchain_image();

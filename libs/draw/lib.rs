@@ -32,7 +32,7 @@ use hal::{
 };
 use hal::{Backbuffer, Backend, DescriptorPool, FrameSync, Primitive, SwapchainConfig};
 use hal::{Device, Instance, PhysicalDevice, Surface, Swapchain};
-use gfx_hal::command::CommandBuffer;
+use gfx_hal::command::{CommandBuffer, MultiShot, Primary};
 
 use std::fs;
 use std::io::{Cursor, Read};
@@ -46,24 +46,62 @@ const COLOR_RANGE: i::SubresourceRange = i::SubresourceRange {
     layers: 0..1,
 };
 
+pub struct LinearSurface<'a, 'b> {
+    framebuffer: &'a <back::Backend as Backend>::Framebuffer,
+    wait_semaphores: &'b Vec<<back::Backend as Backend>::Semaphore>
+}
+
 pub struct StaticWhite2DTriangle {
     buffer: <back::Backend as Backend>::Buffer,
-    // cmd_buffer: hal::CommandBuffer<back::Backend, hal::Graphics>,
+    cmd_buffer: CommandBuffer<back::Backend, hal::Graphics, MultiShot, Primary>,
+    memory: <back::Backend as Backend>::Memory,
     pipeline: <back::Backend as Backend>::GraphicsPipeline,
     render_pass: <back::Backend as Backend>::RenderPass,
     signal_semaphore: Vec<<back::Backend as Backend>::Semaphore>,
 }
 
 impl StaticWhite2DTriangle {
-    pub fn draw(&self, draw: &mut Draw, frame: hal::SwapImageIndex) {
+    pub fn get_stage<'a, 'b>(&'b self, framebuffer: &'a <back::Backend as Backend>::Framebuffer) -> LinearSurface<'a, 'b> {
+        LinearSurface {
+            framebuffer,
+            wait_semaphores: &self.signal_semaphore,
+        }
+    }
+    pub fn draw(&mut self, draw: &mut Draw, frame: hal::SwapImageIndex) {
+        unsafe {
+            self.cmd_buffer.begin(false);
+
+            // cmd_buffer.set_viewports(0, &[draw.viewport.clone()]);
+            self.cmd_buffer.set_scissors(0, &[draw.viewport.rect]);
+            self.cmd_buffer.bind_graphics_pipeline(&self.pipeline);
+            self.cmd_buffer.bind_vertex_buffers(0, Some((&self.buffer, 0)));
+            // cmd_buffer.bind_graphics_descriptor_sets(&self.pipeline_layout, 0, Some(&self.desc_set), &[]);
+
+            {
+                let mut encoder = self.cmd_buffer.begin_render_pass_inline(
+                    &self.render_pass,
+                    &draw.framebuffers[frame as usize],
+                    draw.viewport.rect,
+                    &[],
+                );
+                encoder.draw(0..3, 0..1);
+            }
+
+            self.cmd_buffer.finish();
+
+            draw.queue_group.queues[0].submit_nosemaphores(std::iter::once(&self.cmd_buffer), None);
+        }
+    }
+
+    pub fn draw2(&self, draw: &mut Draw, surface: &<back::Backend as Backend>::Framebuffer) {
         let mut cmd_buffer = draw
             .command_pool
             .acquire_command_buffer::<command::OneShot>();
         unsafe {
             cmd_buffer.begin();
 
-            cmd_buffer.set_viewports(0, &[draw.viewport.clone()]);
-            cmd_buffer.set_scissors(0, &[draw.viewport.rect]);
+            // cmd_buffer.set_viewports(0, &[draw.viewport.clone()]);
+            // cmd_buffer.set_scissors(0, &[draw.viewport.rect]);
             cmd_buffer.bind_graphics_pipeline(&self.pipeline);
             cmd_buffer.bind_vertex_buffers(0, Some((&self.buffer, 0)));
             // cmd_buffer.bind_graphics_descriptor_sets(&self.pipeline_layout, 0, Some(&self.desc_set), &[]);
@@ -71,7 +109,7 @@ impl StaticWhite2DTriangle {
             {
                 let mut encoder = cmd_buffer.begin_render_pass_inline(
                     &self.render_pass,
-                    &draw.framebuffers[frame as usize],
+                    surface,
                     draw.viewport.rect,
                     &[],
                 );
@@ -83,9 +121,9 @@ impl StaticWhite2DTriangle {
             let submission = Submission {
                 command_buffers: Some(&cmd_buffer),
                 wait_semaphores: Some((&draw.frame_semaphore[draw.frame_index], PipelineStage::COLOR_ATTACHMENT_OUTPUT)),
-                signal_semaphores: Some(&draw.render_finished_semaphore[draw.frame_index]),
+                signal_semaphores: None, // Some(&draw.render_finished_semaphore[draw.frame_index]),
             };
-            draw.queue_group.queues[0].submit(submission, Some(&mut draw.frame_fence[draw.frame_index]));
+            draw.queue_group.queues[0].submit(submission, None); // Some(&mut draw.frame_fence[draw.frame_index]));
             // self.device.wait_for_fence(&self.frame_fence[draw.frame_index], u64::max_value()).unwrap();
             // self.device.reset_fence(&self.frame_fence[draw.frame_index]).expect("Unable to reset fence");
         }
@@ -118,6 +156,10 @@ pub struct Draw {
     render_finished_semaphore: Vec<<back::Backend as Backend>::Semaphore>,
     swap_chain: <back::Backend as Backend>::Swapchain,
     viewport: pso::Viewport,
+}
+
+pub struct ClearedFrame {
+    draw: Draw,
 }
 
 impl Draw {
@@ -303,6 +345,7 @@ impl Draw {
     pub fn swap_it(&mut self, frame: hal::SwapImageIndex) {
         unsafe {
             self.device.wait_for_fence(&self.frame_fence[self.frame_index], u64::max_value()).unwrap();
+            println!["QUEUES: {}", self.queue_group.queues.len()];
             if let Err(_) = self
                 .swap_chain
                 .present(&mut self.queue_group.queues[0], frame, Some(&self.render_finished_semaphore[self.frame_index]))
@@ -806,6 +849,8 @@ impl Draw {
         let signal_semaphore = vec![self.device.create_semaphore().expect("c sema")];
         StaticWhite2DTriangle {
             buffer,
+            cmd_buffer,
+            memory,
             pipeline,
             render_pass,
             signal_semaphore,

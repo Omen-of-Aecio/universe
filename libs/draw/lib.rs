@@ -108,38 +108,13 @@ impl StaticWhite2DTriangle {
             surface.get_queue_group().queues[0].submit_nosemaphores(std::iter::once(&self.cmd_buffer), None);
         }
     }
-
-    pub fn draw2(&mut self, draw: &mut Draw, surface: &<back::Backend as Backend>::Framebuffer) {
-        unsafe {
-            self.cmd_buffer.begin(false);
-
-            // cmd_buffer.set_viewports(0, &[draw.viewport.clone()]);
-            self.cmd_buffer.set_scissors(0, &[draw.viewport.rect]);
-            self.cmd_buffer.bind_graphics_pipeline(&self.pipeline);
-            self.cmd_buffer.bind_vertex_buffers(0, Some((&self.buffer, 0)));
-            // cmd_buffer.bind_graphics_descriptor_sets(&self.pipeline_layout, 0, Some(&self.desc_set), &[]);
-
-            {
-                let mut encoder = self.cmd_buffer.begin_render_pass_inline(
-                    &self.render_pass,
-                    surface,
-                    draw.viewport.rect,
-                    &[],
-                );
-                encoder.draw(0..3, 0..1);
-            }
-
-            self.cmd_buffer.finish();
-
-            draw.queue_group.queues[0].submit_nosemaphores(std::iter::once(&self.cmd_buffer), None);
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Triangle {
   pub points: [[f32; 2]; 3],
 }
+
 impl Triangle {
   pub fn points_flat(self) -> [f32; 6] {
     let [[a, b], [c, d], [e, f]] = self.points;
@@ -338,10 +313,10 @@ impl Draw {
         }
     }
 
-    pub fn acquire_swapchain_image(&mut self) -> Option<hal::SwapImageIndex> {
+    fn acquire_swapchain_image(&mut self) -> Option<hal::SwapImageIndex> {
         unsafe {
             // self.device.reset_fence(&self.frame_fence).unwrap();
-            self.command_pool.reset();
+            // self.command_pool.reset();
             match self
                 .swap_chain
                 .acquire_image(u64::max_value(), FrameSync::Semaphore(&mut self.frame_semaphore[self.frame_index]))
@@ -684,36 +659,3 @@ impl Draw {
         }
     }
 }
-
-// impl std::ops::Drop for Draw {
-//     fn drop(&mut self) {
-//         self.device.wait_idle().unwrap();
-//         unsafe {
-//             self.device.destroy_command_pool(self.command_pool.into_raw());
-//             self.device.destroy_descriptor_pool(self.desc_pool);
-//             self.device.destroy_descriptor_set_layout(self.set_layout);
-
-//             self.device.destroy_buffer(self.vertex_buffer);
-//             self.device.destroy_buffer(self.image_upload_buffer);
-//             self.device.destroy_image(self.image_logo);
-//             self.device.destroy_image_view(self.image_srv);
-//             self.device.destroy_sampler(self.sampler);
-//             self.device.destroy_fence(self.frame_fence);
-//             self.device.destroy_semaphore(self.frame_semaphore);
-//             self.device.destroy_render_pass(self.render_pass);
-//             self.device.free_memory(self.buffer_memory);
-//             self.device.free_memory(self.image_memory);
-//             self.device.free_memory(self.mage_upload_memory);
-//             self.device.destroy_graphics_pipeline(self.pipeline);
-//             self.device.destroy_pipeline_layout(self.pipeline_layout);
-//             for framebuffer in self.framebuffers {
-//                 self.device.destroy_framebuffer(selfframebuffer);
-//             }
-//             for (_, rtv) in self.frame_images {
-//                 self.device.destroy_image_view(rtv);
-//             }
-
-//             self.device.destroy_swapchain(self.swap_chain);
-//         }
-//     }
-// }

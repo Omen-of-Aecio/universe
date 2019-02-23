@@ -62,17 +62,4 @@ fn main() {
             draw.swap_it(frame);
         }
     }
-
-    // The ideal API:
-    // Draw::draw_texture(surface, filename, matrix)
-    // This is too slow, as we'd need to do a hashmap lookup for the filename to bind the
-    // correct vertex buffer. Bad.
-
-    // The semi-ideal, optimal API
-    // let mut draw = Draw::new(surface);
-    // let sprite = draw.create_sprite(filename, scale);
-    // draw.draw_sprite(&sprite, matrix);
-
-    // Or, when instanced:
-    // draw.draw_sprite_many(&sprite, &[matrix]);
 }

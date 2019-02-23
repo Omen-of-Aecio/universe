@@ -46,9 +46,9 @@ const COLOR_RANGE: i::SubresourceRange = i::SubresourceRange {
     layers: 0..1,
 };
 
-pub struct LinearSurface<'a, 'b> {
-    framebuffer: &'a <back::Backend as Backend>::Framebuffer,
-    wait_semaphores: &'b Vec<<back::Backend as Backend>::Semaphore>
+pub struct LinearSurface<'a> {
+    framebuffer: &'a mut <back::Backend as Backend>::Framebuffer,
+    queue_group: &'a mut hal::QueueGroup<back::Backend, hal::Graphics>,
 }
 
 pub struct StaticWhite2DTriangle {
@@ -61,12 +61,6 @@ pub struct StaticWhite2DTriangle {
 }
 
 impl StaticWhite2DTriangle {
-    pub fn get_stage<'a, 'b>(&'b self, framebuffer: &'a <back::Backend as Backend>::Framebuffer) -> LinearSurface<'a, 'b> {
-        LinearSurface {
-            framebuffer,
-            wait_semaphores: &self.signal_semaphore,
-        }
-    }
     pub fn draw(&mut self, draw: &mut Draw, frame: hal::SwapImageIndex) {
         unsafe {
             self.cmd_buffer.begin(false);
@@ -149,11 +143,13 @@ pub struct Draw {
     viewport: pso::Viewport,
 }
 
-pub struct ClearedFrame {
-    draw: Draw,
-}
-
 impl Draw {
+    pub fn get_linear_surface(&mut self) -> LinearSurface {
+        LinearSurface {
+            framebuffer: &mut self.framebuffers[self.frame_index],
+            queue_group: &mut self.queue_group,
+        }
+    }
     pub fn new(surface: &mut back::Surface) -> Self {
         // Step 1: Find devices on machine
         let mut adapters = surface.enumerate_adapters();

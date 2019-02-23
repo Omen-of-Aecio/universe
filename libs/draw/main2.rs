@@ -51,20 +51,16 @@ fn main() {
 
     let mut draw = Draw::new(&mut surface);
     let mut tri = draw.create_static_white_2d_triangle(&[-0.5, 0.5, -0.5, -0.5, 0.5, 0.0]);
+    let mut tri2 = draw.create_static_white_2d_triangle(&[0.5, -0.5, 0.5, 0.5, -0.5, 0.0]);
     loop {
         for i in 0..100 {
-            let image = draw.acquire_swapchain_image();
-            // println!["{:?}", image];
-            if let Some(image) = image {
-                draw.clear(image, i as f32 / 100f32 );
-                // let triangle = Triangle {
-                //     points: [[-0.5, (i as f32 / 100.0f32)], [-0.5, -0.5], [0.0, 0.0]],
-                // };
-                // draw.draw_triangle(image, triangle);
-                tri.draw(&mut draw, image);
-                // draw.render(image);
-                draw.swap_it(image);
-            }
+            // draw.clear(image, i as f32 / 100f32 );
+            let mut linsur = draw.get_linear_surface();
+            tri.draw(&mut linsur);
+            tri2.draw(&mut linsur);
+            let frame = linsur.frame;
+            std::mem::drop(linsur);
+            draw.swap_it(frame);
         }
     }
 

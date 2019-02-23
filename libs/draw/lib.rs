@@ -47,8 +47,10 @@ const COLOR_RANGE: i::SubresourceRange = i::SubresourceRange {
 };
 
 pub struct LinearSurface<'a> {
+    pub frame: hal::SwapImageIndex,
     framebuffer: &'a mut <back::Backend as Backend>::Framebuffer,
     queue_group: &'a mut hal::QueueGroup<back::Backend, hal::Graphics>,
+    viewport: &'a pso::Viewport,
 }
 
 pub struct StaticWhite2DTriangle {
@@ -61,12 +63,12 @@ pub struct StaticWhite2DTriangle {
 }
 
 impl StaticWhite2DTriangle {
-    pub fn draw(&mut self, draw: &mut Draw, frame: hal::SwapImageIndex) {
+    pub fn draw(&mut self, surface: &mut LinearSurface) {
         unsafe {
             self.cmd_buffer.begin(false);
 
-            let mut x = draw.viewport.clone();
-            self.cmd_buffer.set_viewports(0, &[x]);
+            // let mut x = draw.viewport.clone();
+            // self.cmd_buffer.set_viewports(0, &[x]);
             // self.cmd_buffer.set_scissors(0, &[draw.viewport.rect]);
             self.cmd_buffer.bind_graphics_pipeline(&self.pipeline);
             self.cmd_buffer.bind_vertex_buffers(0, Some((&self.buffer, 0)));
@@ -75,8 +77,8 @@ impl StaticWhite2DTriangle {
             {
                 let mut encoder = self.cmd_buffer.begin_render_pass_inline(
                     &self.render_pass,
-                    &draw.framebuffers[frame as usize],
-                    draw.viewport.rect,
+                    surface.framebuffer,
+                    surface.viewport.rect,
                     &[],
                 );
                 encoder.draw(0..3, 0..1);
@@ -84,7 +86,7 @@ impl StaticWhite2DTriangle {
 
             self.cmd_buffer.finish();
 
-            draw.queue_group.queues[0].submit_nosemaphores(std::iter::once(&self.cmd_buffer), None);
+            surface.queue_group.queues[0].submit_nosemaphores(std::iter::once(&self.cmd_buffer), None);
         }
     }
 
@@ -145,11 +147,16 @@ pub struct Draw {
 
 impl Draw {
     pub fn get_linear_surface(&mut self) -> LinearSurface {
+        let image = self.acquire_swapchain_image().unwrap();
+        self.clear(image, 0.3);
         LinearSurface {
-            framebuffer: &mut self.framebuffers[self.frame_index],
+            frame: image,
+            framebuffer: &mut self.framebuffers[image as usize],
             queue_group: &mut self.queue_group,
+            viewport: &self.viewport,
         }
     }
+
     pub fn new(surface: &mut back::Surface) -> Self {
         // Step 1: Find devices on machine
         let mut adapters = surface.enumerate_adapters();
@@ -331,10 +338,10 @@ impl Draw {
 
     pub fn swap_it(&mut self, frame: hal::SwapImageIndex) {
         unsafe {
-            self.device.wait_for_fence(&self.frame_fence[self.frame_index], u64::max_value()).unwrap();
+            self.device.wait_for_fence(&self.frame_fence[frame as usize], u64::max_value()).unwrap();
             if let Err(_) = self
                 .swap_chain
-                .present(&mut self.queue_group.queues[0], frame, Some(&self.render_finished_semaphore[self.frame_index]))
+                .present_nosemaphores(&mut self.queue_group.queues[0], frame)
             {
                 // self.recreate_swapchain = true;
             }
@@ -596,7 +603,7 @@ impl Draw {
         }
     }
 
-    pub fn clear(&mut self, frame: hal::SwapImageIndex, r: f32) {
+    fn clear(&mut self, frame: hal::SwapImageIndex, r: f32) {
         let render_pass = {
             let color_attachment = pass::Attachment {
                 format: Some(self.format),

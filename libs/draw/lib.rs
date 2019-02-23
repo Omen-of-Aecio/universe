@@ -77,7 +77,6 @@ pub struct StaticWhite2DTriangle {
     memory: <back::Backend as Backend>::Memory,
     pipeline: <back::Backend as Backend>::GraphicsPipeline,
     render_pass: <back::Backend as Backend>::RenderPass,
-    signal_semaphore: Vec<<back::Backend as Backend>::Semaphore>,
 }
 
 impl StaticWhite2DTriangle {
@@ -552,48 +551,16 @@ impl Draw {
             self.device.destroy_shader_module(fs_module);
         }
 
-        let mut cmd_buffer = self
+        let cmd_buffer = self
             .command_pool
             .acquire_command_buffer::<command::MultiShot>();
 
-        // unsafe {
-        //     cmd_buffer.begin();
-
-        //     cmd_buffer.set_viewports(0, &[self.viewport.clone()]);
-        //     cmd_buffer.set_scissors(0, &[self.viewport.rect]);
-        //     cmd_buffer.bind_graphics_pipeline(&pipeline);
-        //     cmd_buffer.bind_vertex_buffers(0, Some((&buffer, 0)));
-        //     // cmd_buffer.bind_graphics_descriptor_sets(&self.pipeline_layout, 0, Some(&self.desc_set), &[]);
-
-        //     {
-        //         let mut encoder = cmd_buffer.begin_render_pass_inline(
-        //             &render_pass,
-        //             &self.framebuffers[frame as usize],
-        //             self.viewport.rect,
-        //             &[],
-        //         );
-        //         encoder.draw(0..3, 0..1);
-        //     }
-
-        //     cmd_buffer.finish();
-
-        //     let submission = Submission {
-        //         command_buffers: Some(&cmd_buffer),
-        //         wait_semaphores: Some((&self.frame_semaphore[self.frame_index], PipelineStage::COLOR_ATTACHMENT_OUTPUT)),
-        //         signal_semaphores: Some(&self.render_finished_semaphore[self.frame_index]),
-        //     };
-        //     self.queue_group.queues[0].submit(submission, Some(&mut self.frame_fence[self.frame_index]));
-        //     self.device.wait_for_fence(&self.frame_fence[self.frame_index], u64::max_value()).unwrap();
-        //     self.device.reset_fence(&self.frame_fence[self.frame_index]).expect("Unable to reset fence");
-        // }
-        let signal_semaphore = vec![self.device.create_semaphore().expect("c sema")];
         StaticWhite2DTriangle {
             buffer,
             cmd_buffer,
             memory,
             pipeline,
             render_pass,
-            signal_semaphore,
         }
     }
 

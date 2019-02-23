@@ -54,8 +54,7 @@ fn main() {
     let mut tri2 = draw.create_static_white_2d_triangle(&[0.5, -0.5, 0.5, 0.5, -0.5, 0.0]);
     loop {
         for i in 0..100 {
-            // draw.clear(image, i as f32 / 100f32 );
-            let mut linsur = draw.get_linear_surface();
+            let mut linsur = draw.prepare_canvas();
             tri.draw(&mut linsur);
             tri2.draw(&mut linsur);
             let frame = linsur.frame;

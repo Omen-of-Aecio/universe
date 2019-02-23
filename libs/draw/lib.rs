@@ -46,11 +46,29 @@ const COLOR_RANGE: i::SubresourceRange = i::SubresourceRange {
     layers: 0..1,
 };
 
-pub struct LinearSurface<'a> {
+pub trait Canvas {
+    fn get_framebuffer(&mut self) -> &mut <back::Backend as Backend>::Framebuffer;
+    fn get_queue_group(&mut self) -> &mut hal::QueueGroup<back::Backend, hal::Graphics>;
+    fn get_viewport(&mut self) -> &pso::Viewport;
+}
+
+pub struct ScreenCanvas<'a> {
     pub frame: hal::SwapImageIndex,
     framebuffer: &'a mut <back::Backend as Backend>::Framebuffer,
     queue_group: &'a mut hal::QueueGroup<back::Backend, hal::Graphics>,
     viewport: &'a pso::Viewport,
+}
+
+impl<'a> Canvas for ScreenCanvas<'a> {
+    fn get_framebuffer(&mut self) -> &mut <back::Backend as Backend>::Framebuffer {
+        self.framebuffer
+    }
+    fn get_queue_group(&mut self) -> &mut hal::QueueGroup<back::Backend, hal::Graphics> {
+        self.queue_group
+    }
+    fn get_viewport(&mut self) -> &pso::Viewport {
+        self.viewport
+    }
 }
 
 pub struct StaticWhite2DTriangle {
@@ -63,7 +81,7 @@ pub struct StaticWhite2DTriangle {
 }
 
 impl StaticWhite2DTriangle {
-    pub fn draw(&mut self, surface: &mut LinearSurface) {
+    pub fn draw<T: Canvas>(&mut self, surface: &mut T) {
         unsafe {
             self.cmd_buffer.begin(false);
 
@@ -75,10 +93,11 @@ impl StaticWhite2DTriangle {
             // cmd_buffer.bind_graphics_descriptor_sets(&self.pipeline_layout, 0, Some(&self.desc_set), &[]);
 
             {
+                let rect = surface.get_viewport().rect.clone();
                 let mut encoder = self.cmd_buffer.begin_render_pass_inline(
                     &self.render_pass,
-                    surface.framebuffer,
-                    surface.viewport.rect,
+                    surface.get_framebuffer(),
+                    rect,
                     &[],
                 );
                 encoder.draw(0..3, 0..1);
@@ -86,7 +105,7 @@ impl StaticWhite2DTriangle {
 
             self.cmd_buffer.finish();
 
-            surface.queue_group.queues[0].submit_nosemaphores(std::iter::once(&self.cmd_buffer), None);
+            surface.get_queue_group().queues[0].submit_nosemaphores(std::iter::once(&self.cmd_buffer), None);
         }
     }
 
@@ -146,10 +165,10 @@ pub struct Draw {
 }
 
 impl Draw {
-    pub fn get_linear_surface(&mut self) -> LinearSurface {
+    pub fn prepare_canvas(&mut self) -> ScreenCanvas {
         let image = self.acquire_swapchain_image().unwrap();
         self.clear(image, 0.3);
-        LinearSurface {
+        ScreenCanvas {
             frame: image,
             framebuffer: &mut self.framebuffers[image as usize],
             queue_group: &mut self.queue_group,

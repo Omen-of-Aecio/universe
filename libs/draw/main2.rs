@@ -54,11 +54,14 @@ fn main() {
     let mut tri2 = draw.create_static_white_2d_triangle(&[0.5, -0.5, 0.5, 0.5, -0.5, 0.0]);
     loop {
         for i in 0..100 {
-            let mut linsur = draw.prepare_canvas();
-            tri.draw(&mut linsur);
-            tri2.draw(&mut linsur);
-            let frame = linsur.frame;
-            std::mem::drop(linsur);
+            let mut canvas = draw.prepare_canvas();
+
+            tri.draw(&mut canvas);
+            tri2.draw(&mut canvas);
+
+            // Swap the frame
+            let frame = canvas.frame;
+            std::mem::drop(canvas);
             draw.swap_it(frame);
         }
     }

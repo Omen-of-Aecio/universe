@@ -80,7 +80,7 @@ pub struct StaticWhite2DTriangle {
 }
 
 impl StaticWhite2DTriangle {
-    pub fn draw<T: Canvas>(&mut self, surface: &mut T) {
+    pub fn draw(&mut self, surface: &mut impl Canvas) {
         unsafe {
             self.cmd_buffer.begin(false);
 

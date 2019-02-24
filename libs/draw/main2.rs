@@ -52,12 +52,14 @@ fn main() {
     let mut draw = Draw::new(&mut surface);
     let mut tri = draw.create_static_white_2d_triangle(&[-0.5, 0.5, -0.5, -0.5, 0.5, 0.0]);
     let mut tri2 = draw.create_static_white_2d_triangle(&[0.5, -0.5, 0.5, 0.5, -0.5, 0.0]);
+    let mut tex = draw.create_static_texture_2d_rectangle();
     loop {
         for i in 0..100 {
             let mut canvas = draw.prepare_canvas();
 
             tri.draw(&mut canvas);
             tri2.draw(&mut canvas);
+            tex.draw(&mut canvas);
 
             // Swap the frame
             let frame = canvas.frame;

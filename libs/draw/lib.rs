@@ -65,10 +65,6 @@ pub trait Canvas {
 }
 
 pub struct ScreenCanvas<'a> {
-    // pub frame: hal::SwapImageIndex,
-    // framebuffer: &'a mut <back::Backend as Backend>::Framebuffer,
-    // queue_group: &'a mut hal::QueueGroup<back::Backend, hal::Graphics>,
-    // viewport: &'a pso::Viewport,
     draw: &'a mut Draw,
     image_index: u32,
 }
@@ -205,10 +201,6 @@ impl Draw {
         ScreenCanvas {
             draw: self,
             image_index: image,
-            // frame: image,
-            // framebuffer: &mut self.framebuffers[image as usize],
-            // queue_group: &mut self.queue_group,
-            // viewport: &self.viewport,
         }
     }
 

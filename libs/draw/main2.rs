@@ -61,14 +61,6 @@ fn main() {
             tri.draw(&mut canvas);
             tri2.draw(&mut canvas);
             tex.draw(&mut canvas);
-
-            // Swap the frame
-            // let frame = canvas.frame;
-            // std::mem::drop(canvas);
-            // draw.swap_it(frame);
-
-            // To be replaced by
-            // canvas.finish();   // Or called by mem::drop?
         }
     }
 }

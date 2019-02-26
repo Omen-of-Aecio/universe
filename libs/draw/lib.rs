@@ -65,23 +65,32 @@ pub trait Canvas {
 }
 
 pub struct ScreenCanvas<'a> {
-    pub frame: hal::SwapImageIndex,
-    framebuffer: &'a mut <back::Backend as Backend>::Framebuffer,
-    queue_group: &'a mut hal::QueueGroup<back::Backend, hal::Graphics>,
-    viewport: &'a pso::Viewport,
+    // pub frame: hal::SwapImageIndex,
+    // framebuffer: &'a mut <back::Backend as Backend>::Framebuffer,
+    // queue_group: &'a mut hal::QueueGroup<back::Backend, hal::Graphics>,
+    // viewport: &'a pso::Viewport,
+    draw: &'a mut Draw,
+    image_index: u32,
 }
 
 impl<'a> Canvas for ScreenCanvas<'a> {
     fn get_framebuffer(&mut self) -> &mut <back::Backend as Backend>::Framebuffer {
-        self.framebuffer
+        &mut self.draw.framebuffers[self.image_index as usize]
     }
     fn get_queue_group(&mut self) -> &mut hal::QueueGroup<back::Backend, hal::Graphics> {
-        self.queue_group
+        &mut self.draw.queue_group
     }
     fn get_viewport(&mut self) -> &pso::Viewport {
-        self.viewport
+        &self.draw.viewport
     }
     fn finish(self) {
+        self.draw.swap_it(self.image_index);
+    }
+}
+
+impl<'a> Drop for ScreenCanvas<'a> {
+    fn drop(&mut self) {
+        self.draw.swap_it(self.image_index);
     }
 }
 
@@ -194,10 +203,12 @@ impl Draw {
         let image = self.acquire_swapchain_image().unwrap();
         self.clear(image, 0.3);
         ScreenCanvas {
-            frame: image,
-            framebuffer: &mut self.framebuffers[image as usize],
-            queue_group: &mut self.queue_group,
-            viewport: &self.viewport,
+            draw: self,
+            image_index: image,
+            // frame: image,
+            // framebuffer: &mut self.framebuffers[image as usize],
+            // queue_group: &mut self.queue_group,
+            // viewport: &self.viewport,
         }
     }
 

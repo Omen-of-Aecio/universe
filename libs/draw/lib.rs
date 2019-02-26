@@ -46,10 +46,22 @@ const COLOR_RANGE: i::SubresourceRange = i::SubresourceRange {
     layers: 0..1,
 };
 
+pub struct SwapChainCount {
+    current_image: usize,
+    image_count: usize,
+}
+
 pub trait Canvas {
     fn get_framebuffer(&mut self) -> &mut <back::Backend as Backend>::Framebuffer;
     fn get_queue_group(&mut self) -> &mut hal::QueueGroup<back::Backend, hal::Graphics>;
     fn get_viewport(&mut self) -> &pso::Viewport;
+    fn get_swapchain_count(&self) -> SwapChainCount {
+        SwapChainCount {
+            current_image: 0,
+            image_count: 1,
+        }
+    }
+    fn finish(self);
 }
 
 pub struct ScreenCanvas<'a> {
@@ -68,6 +80,8 @@ impl<'a> Canvas for ScreenCanvas<'a> {
     }
     fn get_viewport(&mut self) -> &pso::Viewport {
         self.viewport
+    }
+    fn finish(self) {
     }
 }
 

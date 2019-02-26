@@ -53,6 +53,7 @@ fn main() {
     let mut tri = draw.create_static_white_2d_triangle(&[-0.5, 0.5, -0.5, -0.5, 0.5, 0.0]);
     let mut tri2 = draw.create_static_white_2d_triangle(&[0.5, -0.5, 0.5, 0.5, -0.5, 0.0]);
     let mut tex = draw.create_static_texture_2d_rectangle();
+    use draw::Canvas;
     loop {
         for i in 0..100 {
             let mut canvas = draw.prepare_canvas();
@@ -62,9 +63,12 @@ fn main() {
             tex.draw(&mut canvas);
 
             // Swap the frame
-            let frame = canvas.frame;
-            std::mem::drop(canvas);
-            draw.swap_it(frame);
+            // let frame = canvas.frame;
+            // std::mem::drop(canvas);
+            // draw.swap_it(frame);
+
+            // To be replaced by
+            canvas.finish();   // Or called by mem::drop?
         }
     }
 }

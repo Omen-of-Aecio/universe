@@ -136,8 +136,25 @@ impl<'a> Drop for StaticTexture2DRectangle<'a> {
         unsafe {
             self.device.wait_for_fence(&self.memory_fence, u64::max_value());
 
+            let buffer = std::mem::replace(&mut self.buffer, std::mem::MaybeUninit::uninitialized().into_inner());
+            self.device.destroy_buffer(buffer);
+
+            // No cmd_buffer free?
+
+            let image_upload_buffer = std::mem::replace(&mut self.image_upload_buffer, std::mem::MaybeUninit::uninitialized().into_inner());
+            self.device.destroy_buffer(image_upload_buffer);
+
+            let memory = std::mem::replace(&mut self.memory, std::mem::MaybeUninit::uninitialized().into_inner());
+            self.device.free_memory(memory);
+
             let memory_fence = std::mem::replace(&mut self.memory_fence, std::mem::MaybeUninit::uninitialized().into_inner());
             self.device.destroy_fence(memory_fence);
+
+            let pipeline = std::mem::replace(&mut self.pipeline, std::mem::MaybeUninit::uninitialized().into_inner());
+            self.device.destroy_graphics_pipeline(pipeline);
+
+            let render_pass = std::mem::replace(&mut self.render_pass, std::mem::MaybeUninit::uninitialized().into_inner());
+            self.device.destroy_render_pass(render_pass);
         }
     }
 }

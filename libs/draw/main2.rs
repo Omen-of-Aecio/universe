@@ -36,7 +36,7 @@ fn main() {
         (window, instance, adapters, surface)
     };
     #[cfg(feature = "gl")]
-    let (mut adapters, mut surface) = {
+    let mut surface = {
         let window = {
             let builder =
                 back::config_context(back::glutin::ContextBuilder::new(), ColorFormat::SELF, None)
@@ -45,14 +45,17 @@ fn main() {
         };
 
         let surface = back::Surface::from_window(window);
-        let adapters = surface.enumerate_adapters();
-        (adapters, surface)
+        // let adapters = surface.enumerate_adapters();
+        surface
     };
 
-    let mut draw = Draw::new(&mut surface);
-    let mut tri = draw.create_static_white_2d_triangle(&[-0.5, 0.5, -0.5, -0.5, 0.5, 0.0]);
-    let mut tri2 = draw.create_static_white_2d_triangle(&[0.5, -0.5, 0.5, 0.5, -0.5, 0.0]);
-    let mut tex = draw.create_static_texture_2d_rectangle();
+    let (device, queue_group, adapter) = Draw::open_device(&mut surface);
+    let mut draw = Draw::new(&mut surface, &device, queue_group, adapter);
+    {
+    }
+    let mut tri = draw.create_static_white_2d_triangle(&device, &[-0.5, 0.5, -0.5, -0.5, 0.5, 0.0]);
+    let mut tri2 = draw.create_static_white_2d_triangle(&device, &[0.5, -0.5, 0.5, 0.5, -0.5, 0.0]);
+    let mut tex = draw.create_static_texture_2d_rectangle(&device);
     use draw::Canvas;
     loop {
         for i in 0..100 {
@@ -61,6 +64,8 @@ fn main() {
             tri.draw(&mut canvas);
             tri2.draw(&mut canvas);
             tex.draw(&mut canvas);
+
+            canvas.finish();
         }
     }
 }

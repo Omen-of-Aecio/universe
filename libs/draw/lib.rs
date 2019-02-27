@@ -7,6 +7,7 @@
     )),
     allow(dead_code, unused_extern_crates, unused_imports)
 )]
+#![feature(maybe_uninit)]
 
 extern crate env_logger;
 #[cfg(feature = "dx12")]
@@ -64,12 +65,12 @@ pub trait Canvas {
     fn finish(self);
 }
 
-pub struct ScreenCanvas<'a> {
-    draw: &'a mut Draw,
+pub struct ScreenCanvas<'a, 'b> {
+    draw: &'a mut Draw<'b>,
     image_index: u32,
 }
 
-impl<'a> Canvas for ScreenCanvas<'a> {
+impl<'a, 'b> Canvas for ScreenCanvas<'a, 'b> {
     fn get_framebuffer(&mut self) -> &mut <back::Backend as Backend>::Framebuffer {
         &mut self.draw.framebuffers[self.image_index as usize]
     }
@@ -84,21 +85,23 @@ impl<'a> Canvas for ScreenCanvas<'a> {
     }
 }
 
-impl<'a> Drop for ScreenCanvas<'a> {
+impl<'a, 'b> Drop for ScreenCanvas<'a, 'b> {
     fn drop(&mut self) {
         self.draw.swap_it(self.image_index);
     }
 }
 
-pub struct StaticTexture2DRectangle {
+pub struct StaticTexture2DRectangle<'a> {
     buffer: <back::Backend as Backend>::Buffer,
     cmd_buffer: CommandBuffer<back::Backend, hal::Graphics, command::OneShot, Primary>,
+    device: &'a back::Device,
     image_upload_buffer: <back::Backend as Backend>::Buffer,
     memory: <back::Backend as Backend>::Memory,
+    memory_fence: <back::Backend as Backend>::Fence,
     pipeline: <back::Backend as Backend>::GraphicsPipeline,
     render_pass: <back::Backend as Backend>::RenderPass,
 }
-impl StaticTexture2DRectangle {
+impl<'a> StaticTexture2DRectangle<'a> {
     pub fn draw(&mut self, surface: &mut impl Canvas) {
         unsafe {
             self.cmd_buffer.begin();
@@ -127,10 +130,23 @@ impl StaticTexture2DRectangle {
         }
     }
 }
+
+impl<'a> Drop for StaticTexture2DRectangle<'a> {
+    fn drop(&mut self) {
+        unsafe {
+            self.device.wait_for_fence(&self.memory_fence, u64::max_value());
+
+            let memory_fence = std::mem::replace(&mut self.memory_fence, std::mem::MaybeUninit::uninitialized().into_inner());
+            self.device.destroy_fence(memory_fence);
+        }
+    }
+}
+
 pub struct StaticWhite2DTriangle {
     buffer: <back::Backend as Backend>::Buffer,
     cmd_buffer: CommandBuffer<back::Backend, hal::Graphics, MultiShot, Primary>,
     memory: <back::Backend as Backend>::Memory,
+    memory_fence: <back::Backend as Backend>::Fence,
     pipeline: <back::Backend as Backend>::GraphicsPipeline,
     render_pass: <back::Backend as Backend>::RenderPass,
 }
@@ -178,10 +194,10 @@ impl Triangle {
 }
 
 
-pub struct Draw {
+pub struct Draw<'a> {
     adapter: hal::Adapter<back::Backend>,
     command_pool: hal::CommandPool<back::Backend, hal::Graphics>,
-    device: back::Device,
+    device: &'a back::Device,
     format: hal::format::Format,
     frame_fence: Vec<<back::Backend as Backend>::Fence>,
     frame_index: usize,
@@ -194,8 +210,30 @@ pub struct Draw {
     viewport: pso::Viewport,
 }
 
-impl Draw {
-    pub fn prepare_canvas(&mut self) -> ScreenCanvas {
+struct Y<'a, 'b> { data: &'b mut X<'a> }
+impl<'a, 'b> Y<'a, 'b> {
+    fn yeet(&mut self) {}
+}
+struct X<'a> {
+    a: &'a mut i32
+}
+impl<'a> X<'a> {
+    fn dox<'b>(&'b mut self) -> Y<'b, 'a> {
+        Y { data: self }
+    }
+}
+
+fn abba() {
+    let mut a = 123;
+    let mut eks = X { a: &mut a };
+    let mut k = eks.dox();
+    let mut m = eks.dox();
+    // k.yeet(); // illegal
+    m.yeet(); // nice
+}
+
+impl<'a> Draw<'a> {
+    pub fn prepare_canvas<'b>(&'b mut self) -> ScreenCanvas<'b, 'a> {
         let image = self.acquire_swapchain_image().unwrap();
         self.clear(image, 0.3);
         ScreenCanvas {
@@ -204,7 +242,7 @@ impl Draw {
         }
     }
 
-    pub fn new(surface: &mut back::Surface) -> Self {
+    pub fn open_device(surface: &mut back::Surface) -> (back::Device, hal::QueueGroup<back::Backend, hal::Graphics>, hal::Adapter<back::Backend>) {
         // Step 1: Find devices on machine
         let mut adapters = surface.enumerate_adapters();
         for adapter in &adapters {
@@ -219,6 +257,10 @@ impl Draw {
                 surface.supports_queue_family(family)
             })
             .expect("Unable to find device supporting graphics");
+        (device, queue_group, adapter)
+    }
+
+    pub fn new<'b: 'a>(surface: &mut back::Surface, device: &'b back::Device, queue_group: hal::QueueGroup<back::Backend, hal::Graphics>, mut adapter: hal::Adapter<back::Backend>) -> Self {
         // Step 3: Create command pool
         let command_pool = unsafe {
             device.create_command_pool_typed(&queue_group, pool::CommandPoolCreateFlags::empty())
@@ -393,7 +435,7 @@ impl Draw {
         }
     }
 
-    pub fn create_static_texture_2d_rectangle(&mut self) -> StaticTexture2DRectangle {
+    pub fn create_static_texture_2d_rectangle<'b>(&mut self, device: &'b back::Device) -> StaticTexture2DRectangle<'b> {
         const VERTEX_SOURCE: &str = "#version 450
         #extension GL_ARB_separate_shader_objects : enable
 
@@ -425,7 +467,7 @@ impl Draw {
             target0 = texture(sampler2D(u_texture, u_sampler), v_uv);
         }";
         let set_layout = unsafe {
-            self.device.create_descriptor_set_layout(
+            device.create_descriptor_set_layout(
                 &[
                     pso::DescriptorSetLayoutBinding {
                         binding: 0,
@@ -449,7 +491,7 @@ impl Draw {
 
         // Descriptors
         let mut desc_pool = unsafe {
-            self.device.create_descriptor_pool(
+            device.create_descriptor_pool(
                 1, // sets
                 &[
                     pso::DescriptorRangeDesc {
@@ -472,8 +514,8 @@ impl Draw {
         const F32_PER_VERTEX: u64 = 2 + 2; // (x, y, u, v)
         const VERTICES: u64 = 6; // Using a triangle fan, which is the most optimal
         let mut vertex_buffer =
-            unsafe { self.device.create_buffer(F32_SIZE * F32_PER_VERTEX * VERTICES, buffer::Usage::VERTEX) }.unwrap();
-        let requirements = unsafe { self.device.get_buffer_requirements(&vertex_buffer) };
+            unsafe { device.create_buffer(F32_SIZE * F32_PER_VERTEX * VERTICES, buffer::Usage::VERTEX) }.unwrap();
+        let requirements = unsafe { device.get_buffer_requirements(&vertex_buffer) };
 
         use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
         let memory_type_id = self.adapter
@@ -489,8 +531,8 @@ impl Draw {
             .map(|(id, _)| MemoryTypeId(id))
             .unwrap();
 
-        let buffer_memory = unsafe { self.device.allocate_memory(memory_type_id, requirements.size) }.unwrap();
-        unsafe { self.device.bind_buffer_memory(&buffer_memory, 0, &mut vertex_buffer) }.unwrap();
+        let buffer_memory = unsafe { device.allocate_memory(memory_type_id, requirements.size) }.unwrap();
+        unsafe { device.bind_buffer_memory(&buffer_memory, 0, &mut vertex_buffer) }.unwrap();
         unsafe {
             const QUAD: [f32; (F32_PER_VERTEX * VERTICES) as usize] = [
                 -0.5,  0.33, 0.0, 1.0,
@@ -500,11 +542,11 @@ impl Draw {
                 -0.5,  0.33, 0.0, 1.0,
                  0.5, -0.33, 1.0, 0.0,
                 -0.5, -0.33, 0.0, 0.0];
-            let mut vertices = self.device
+            let mut vertices = device
                 .acquire_mapping_writer::<f32>(&buffer_memory, 0..requirements.size)
                 .unwrap();
             vertices[0..QUAD.len()].copy_from_slice(&QUAD);
-            self.device.release_mapping_writer(vertices).unwrap();
+            device.release_mapping_writer(vertices).unwrap();
         }
 
         let img_data = include_bytes!["data/logo.png"];
@@ -520,13 +562,13 @@ impl Draw {
         let upload_size = (height * row_pitch) as u64;
 
         let mut image_upload_buffer =
-            unsafe { self.device.create_buffer(upload_size, buffer::Usage::TRANSFER_SRC) }.unwrap();
-        let image_mem_reqs = unsafe { self.device.get_buffer_requirements(&image_upload_buffer) };
-        let image_upload_memory = unsafe { self.device.allocate_memory(memory_type_id, image_mem_reqs.size) }.unwrap();
-        unsafe { self.device.bind_buffer_memory(&image_upload_memory, 0, &mut image_upload_buffer) }.unwrap();
+            unsafe { device.create_buffer(upload_size, buffer::Usage::TRANSFER_SRC) }.unwrap();
+        let image_mem_reqs = unsafe { device.get_buffer_requirements(&image_upload_buffer) };
+        let image_upload_memory = unsafe { device.allocate_memory(memory_type_id, image_mem_reqs.size) }.unwrap();
+        unsafe { device.bind_buffer_memory(&image_upload_memory, 0, &mut image_upload_buffer) }.unwrap();
 
         unsafe {
-            let mut data = self.device
+            let mut data = device
                 .acquire_mapping_writer::<u8>(&image_upload_memory, 0..image_mem_reqs.size)
                 .unwrap();
             for y in 0..height as usize {
@@ -535,11 +577,11 @@ impl Draw {
                 let dest_base = y * row_pitch as usize;
                 data[dest_base..dest_base + row.len()].copy_from_slice(row);
             }
-            self.device.release_mapping_writer(data).unwrap();
+            device.release_mapping_writer(data).unwrap();
         }
 
         let mut image_logo = unsafe {
-            self.device.create_image(
+            device.create_image(
                 kind,
                 1,
                 ColorFormat::SELF,
@@ -549,7 +591,7 @@ impl Draw {
             )
         }
         .unwrap();
-        let image_req = unsafe { self.device.get_image_requirements(&image_logo) };
+        let image_req = unsafe { device.get_image_requirements(&image_logo) };
         let device_type = self.adapter
             .physical_device
             .memory_properties()
@@ -562,12 +604,12 @@ impl Draw {
             })
             .map(|(id, _)| MemoryTypeId(id))
             .unwrap();
-        let image_memory = unsafe { self.device.allocate_memory(device_type, image_req.size) }.unwrap();
+        let image_memory = unsafe { device.allocate_memory(device_type, image_req.size) }.unwrap();
 
-        unsafe { self.device.bind_image_memory(&image_memory, 0, &mut image_logo) }.unwrap();
+        unsafe { device.bind_image_memory(&image_memory, 0, &mut image_logo) }.unwrap();
 
         let image_srv = unsafe {
-            self.device.create_image_view(
+            device.create_image_view(
                 &image_logo,
                 i::ViewKind::D2,
                 ColorFormat::SELF,
@@ -578,12 +620,12 @@ impl Draw {
         .unwrap();
 
         let sampler = unsafe {
-            self.device.create_sampler(i::SamplerInfo::new(i::Filter::Linear, i::WrapMode::Clamp))
+            device.create_sampler(i::SamplerInfo::new(i::Filter::Linear, i::WrapMode::Clamp))
         }
         .expect("unable to make sampler");
 
         unsafe {
-            self.device.write_descriptor_sets(vec![
+            device.write_descriptor_sets(vec![
                 pso::DescriptorSetWrite {
                     set: &desc_set,
                     binding: 0,
@@ -599,7 +641,7 @@ impl Draw {
             ])
         }
 
-        let mut upload_fence = self.device.create_fence(false).expect("cant make fence");
+        let mut upload_fence = device.create_fence(false).expect("cant make fence");
 
         let cmd_buffer = unsafe {
             let mut cmd_buffer = self.command_pool.acquire_command_buffer::<command::OneShot>();
@@ -657,9 +699,9 @@ impl Draw {
 
             self.queue_group.queues[0].submit_nosemaphores(Some(&cmd_buffer), Some(&mut upload_fence));
 
-            self.device.wait_for_fence(&upload_fence, u64::max_value())
+            device.wait_for_fence(&upload_fence, u64::max_value())
                 .expect("cant wait for fence");
-            self.device.destroy_fence(upload_fence);
+            device.destroy_fence(upload_fence);
 
             cmd_buffer
         };
@@ -672,7 +714,7 @@ impl Draw {
                 .bytes()
                 .map(|b| b.unwrap())
                 .collect();
-            unsafe { self.device.create_shader_module(&spirv) }.unwrap()
+            unsafe { device.create_shader_module(&spirv) }.unwrap()
         };
         let fs_module = {
             let glsl = FRAGMENT_SOURCE;
@@ -681,7 +723,7 @@ impl Draw {
                 .bytes()
                 .map(|b| b.unwrap())
                 .collect();
-            unsafe { self.device.create_shader_module(&spirv) }.unwrap()
+            unsafe { device.create_shader_module(&spirv) }.unwrap()
         };
 
         // Describe the shaders
@@ -740,7 +782,7 @@ impl Draw {
                     ..(i::Access::COLOR_ATTACHMENT_READ | i::Access::COLOR_ATTACHMENT_WRITE),
             };
 
-            unsafe { self.device.create_render_pass(&[attachment], &[subpass], &[dependency]) }
+            unsafe { device.create_render_pass(&[attachment], &[subpass], &[dependency]) }
                 .expect("Can't create render pass")
         };
 
@@ -754,12 +796,12 @@ impl Draw {
         // let bindings = Vec::<pso::DescriptorSetLayoutBinding>::new();
         // let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
         // let set_layout = unsafe {
-        //     self.device.create_descriptor_set_layout(bindings, immutable_samplers)
+        //     device.create_descriptor_set_layout(bindings, immutable_samplers)
         // };
 
         // Create a pipeline layout
         let pipeline_layout = unsafe {
-            self.device.create_pipeline_layout(
+            device.create_pipeline_layout(
                 std::iter::once(&set_layout),
                 // &[], // No descriptor set layout (no texture/sampler)
                 &[(pso::ShaderStageFlags::VERTEX, 0..8)],
@@ -808,28 +850,33 @@ impl Draw {
         });
 
         let pipeline = unsafe {
-          self.device
+          device
             .create_graphics_pipeline(&pipeline_desc, None)
             .expect("Couldn't create a graphics pipeline!")
         };
 
         unsafe {
-            self.device.destroy_shader_module(vs_module);
+            device.destroy_shader_module(vs_module);
         }
         unsafe {
-            self.device.destroy_shader_module(fs_module);
+            device.destroy_shader_module(fs_module);
         }
+
+        let memory_fence = device.create_fence(false).expect("memory fence");
+
         StaticTexture2DRectangle {
             buffer: vertex_buffer,
             cmd_buffer: cmd_buffer,
+            device,
             image_upload_buffer,
             memory: image_memory,
+            memory_fence,
             pipeline,
             render_pass,
         }
     }
 
-    pub fn create_static_white_2d_triangle(&mut self, triangle: &[f32; 6]) -> StaticWhite2DTriangle {
+    pub fn create_static_white_2d_triangle(&mut self, device: &back::Device, triangle: &[f32; 6]) -> StaticWhite2DTriangle {
         pub const VERTEX_SOURCE: &str = "#version 450
         #extension GL_ARG_separate_shader_objects : enable
         layout (location = 0) in vec2 position;
@@ -853,8 +900,8 @@ impl Draw {
         let (buffer, memory, requirements) = unsafe {
             const F32_XY_TRIANGLE: u64 = (std::mem::size_of::<f32>() * 2 * 3) as u64;
             use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
-            let mut buffer = self.device.create_buffer(F32_XY_TRIANGLE, gfx_hal::buffer::Usage::VERTEX).expect("cant make bf");
-            let requirements = self.device.get_buffer_requirements(&buffer);
+            let mut buffer = device.create_buffer(F32_XY_TRIANGLE, gfx_hal::buffer::Usage::VERTEX).expect("cant make bf");
+            let requirements = device.get_buffer_requirements(&buffer);
             let memory_type_id = self.adapter
                 .physical_device
                 .memory_properties()
@@ -867,11 +914,11 @@ impl Draw {
                 })
                 .map(|(id, _)| MemoryTypeId(id))
                 .unwrap();
-            let memory = self.device
+            let memory = device
               .allocate_memory(memory_type_id, requirements.size)
               .expect("Couldn't allocate vertex buffer memory");
             println!["{:?}", memory];
-            self.device
+            device
               .bind_buffer_memory(&memory, 0, &mut buffer)
               .expect("Couldn't bind the buffer memory!");
             // (buffer, memory, requirements)
@@ -901,7 +948,7 @@ impl Draw {
                 .bytes()
                 .map(|b| b.unwrap())
                 .collect();
-            unsafe { self.device.create_shader_module(&spirv) }.unwrap()
+            unsafe { device.create_shader_module(&spirv) }.unwrap()
         };
         let fs_module = {
             let glsl = FRAGMENT_SOURCE;
@@ -910,7 +957,7 @@ impl Draw {
                 .bytes()
                 .map(|b| b.unwrap())
                 .collect();
-            unsafe { self.device.create_shader_module(&spirv) }.unwrap()
+            unsafe { device.create_shader_module(&spirv) }.unwrap()
         };
 
         // Describe the shaders
@@ -970,7 +1017,7 @@ impl Draw {
             //         ..(i::Access::COLOR_ATTACHMENT_READ | i::Access::COLOR_ATTACHMENT_WRITE),
             // };
 
-            unsafe { self.device.create_render_pass(&[attachment], &[subpass], &[]) }
+            unsafe { device.create_render_pass(&[attachment], &[subpass], &[]) }
                 .expect("Can't create render pass")
         };
 
@@ -984,12 +1031,12 @@ impl Draw {
         // let bindings = Vec::<pso::DescriptorSetLayoutBinding>::new();
         // let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
         // let set_layout = unsafe {
-        //     self.device.create_descriptor_set_layout(bindings, immutable_samplers)
+        //     device.create_descriptor_set_layout(bindings, immutable_samplers)
         // };
 
         // Create a pipeline layout
         let pipeline_layout = unsafe {
-            self.device.create_pipeline_layout(
+            device.create_pipeline_layout(
                 // &set_layout,
                 &[], // No descriptor set layout (no texture/sampler)
                 &[], // &[(pso::ShaderStageFlags::VERTEX, 0..4)],
@@ -1029,26 +1076,29 @@ impl Draw {
         });
 
         let pipeline = unsafe {
-          self.device
+          device
             .create_graphics_pipeline(&pipeline_desc, None)
             .expect("Couldn't create a graphics pipeline!")
         };
 
         unsafe {
-            self.device.destroy_shader_module(vs_module);
+            device.destroy_shader_module(vs_module);
         }
         unsafe {
-            self.device.destroy_shader_module(fs_module);
+            device.destroy_shader_module(fs_module);
         }
 
         let cmd_buffer = self
             .command_pool
             .acquire_command_buffer::<command::MultiShot>();
 
+        let memory_fence = device.create_fence(false).expect("Unable to make fence");
+
         StaticWhite2DTriangle {
             buffer,
             cmd_buffer,
             memory,
+            memory_fence,
             pipeline,
             render_pass,
         }

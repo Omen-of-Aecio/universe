@@ -56,16 +56,16 @@ fn main() {
     let mut tri = draw.create_static_white_2d_triangle(&device, &[-0.5, 0.5, -0.5, -0.5, 0.5, 0.0]);
     let mut tri2 = draw.create_static_white_2d_triangle(&device, &[0.5, -0.5, 0.5, 0.5, -0.5, 0.0]);
     let mut tex = draw.create_static_texture_2d_rectangle(&device);
+    let mut bullets = draw.create_bullets(&device);
     use draw::Canvas;
-    loop {
+    // loop {
         for i in 0..100 {
             let mut canvas = draw.prepare_canvas();
 
             tri.draw(&mut canvas);
             tri2.draw(&mut canvas);
-            tex.draw(&mut canvas);
-
-            canvas.finish();
+            bullets.draw(&mut canvas);
+            // tex.draw(&mut canvas);
         }
-    }
+    // }
 }

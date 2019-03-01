@@ -25,18 +25,21 @@ name = "main2"
 path = "main2.rs"
 
 [dependencies]
+chrono = "0.4.6"
 env_logger = "0.5"
 image = "0.19"
 log = "0.4"
 winit = "0.18"
 glsl-to-spirv = "0.1.4"
-gfx-hal = { version = "0.1" }
+gfx-hal = { path = "../../../gfx/src/hal",  version = "0.1" }
+gfx-backend-gl = { path = "../../../gfx/src/backend/gl", optional = true }
+# gfx-hal = { version = "0.1" }
 gfx-backend-empty = { version = "0.1" }
 
-[dependencies.gfx-backend-gl]
-version = "0.1"
-features = ["glutin"]
-optional = true
+# [dependencies.gfx-backend-gl]
+# version = "0.1"
+# features = ["glutin"]
+# optional = true
 
 [dependencies.gfx-backend-vulkan]
 version = "0.1"

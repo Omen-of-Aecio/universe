@@ -534,6 +534,7 @@ impl<'a> Draw<'a> {
         layout(location = 0) in vec2 a_pos;
         layout(location = 1) in vec2 a_uv;
         layout(location = 2) in vec2 a_move;
+        layout(location = 3) in float a_rot;
         layout(location = 0) out vec2 v_uv;
 
         out gl_PerVertex {
@@ -542,7 +543,12 @@ impl<'a> Draw<'a> {
 
         void main() {
             v_uv = a_uv;
-            gl_Position = vec4(scale * a_pos, 0.0, 1.0) + vec4(a_move, 0, 0);
+            float r = a_rot;
+            gl_Position = mat4(
+                cos(r), -sin(r), 0, 0,
+                sin(r),  cos(r), 0, 0,
+                0,       0,      1, 0,
+                0,       0,      0, 1) * vec4(scale * a_pos, 0.0, 1.0) + vec4(a_move, 0, 0);
         }";
 
         const FRAGMENT_SOURCE: &str = "#version 450
@@ -660,7 +666,7 @@ impl<'a> Draw<'a> {
         let instance_buffer_memory = unsafe { device.allocate_memory(instance_buffer_memory_type_id, instance_buffer_requirements.size) }.unwrap();
         unsafe { device.bind_buffer_memory(&instance_buffer_memory, 0, &mut instance_buffer) }.unwrap();
         unsafe {
-            const QUAD: [f32; 4] = [0.2, 0.3, -0.1, -0.3];
+            const QUAD: [f32; 6] = [0.2, 0.3, 0.0, -0.1, -0.3, 0.5];
             let mut vertices = device
                 .acquire_mapping_writer::<f32>(&instance_buffer_memory, 0..requirements.size)
                 .unwrap();
@@ -947,7 +953,7 @@ impl<'a> Draw<'a> {
 
         pipeline_desc.vertex_buffers.push(pso::VertexBufferDesc {
             binding: 1,
-            stride: 8 as u32,
+            stride: 12 as u32,
             rate: pso::VertexInputRate::Instance(1), // VertexInputRate::Vertex,
             // 0 = Per Vertex
             // 1 = Per Instance
@@ -982,6 +988,15 @@ impl<'a> Draw<'a> {
             element: pso::Element {
                 format: f::Format::Rg32Sfloat,
                 offset: 0,
+            },
+        });
+
+        pipeline_desc.attributes.push(pso::AttributeDesc {
+            location: 3,
+            binding: 1,
+            element: pso::Element {
+                format: f::Format::R32Sfloat,
+                offset: 8,
             },
         });
 

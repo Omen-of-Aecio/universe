@@ -94,6 +94,7 @@ impl<'a, 'b> Drop for ScreenCanvas<'a, 'b> {
 pub struct Bullets<'a> {
     buffer: <back::Backend as Backend>::Buffer,
     cmd_buffer: CommandBuffer<back::Backend, hal::Graphics, command::OneShot, Primary>,
+    desc_set: <back::Backend as Backend>::DescriptorSet,
     device: &'a back::Device,
     image_upload_buffer: <back::Backend as Backend>::Buffer,
     instance_buffer: <back::Backend as Backend>::Buffer,
@@ -101,6 +102,7 @@ pub struct Bullets<'a> {
     memory: <back::Backend as Backend>::Memory,
     memory_fence: <back::Backend as Backend>::Fence,
     pipeline: <back::Backend as Backend>::GraphicsPipeline,
+    pipeline_layout: <back::Backend as Backend>::PipelineLayout,
     render_pass: <back::Backend as Backend>::RenderPass,
 }
 impl<'a> Bullets<'a> {
@@ -108,16 +110,9 @@ impl<'a> Bullets<'a> {
         unsafe {
             self.cmd_buffer.begin();
 
-            // let mut x = draw.viewport.clone();
-            // self.cmd_buffer.set_viewports(0, &[x]);
-            // self.cmd_buffer.set_scissors(0, &[draw.viewport.rect]);
             self.cmd_buffer.bind_graphics_pipeline(&self.pipeline);
-            self.cmd_buffer.bind_vertex_buffers(0, Some((&self.buffer, 0)));
-            self.cmd_buffer.bind_vertex_buffers(1, Some((&self.instance_buffer, 0)));
-            // self.cmd_buffer.bind_vertex_buffers(0, Some((&self.instance_buffer, 0)));
-            // self.cmd_buffer.bind_vertex_buffers(2, Some((&self.instance_buffer, 0)));
-            // self.cmd_buffer.bind_vertex_buffers(0, Some((&self.instance_buffer, 0)));
-            // cmd_buffer.bind_graphics_descriptor_sets(&self.pipeline_layout, 0, Some(&self.desc_set), &[]);
+            self.cmd_buffer.bind_vertex_buffers(0, [(&self.buffer, 0u64), (&self.instance_buffer, 0u64)].iter().cloned());
+            self.cmd_buffer.bind_graphics_descriptor_sets(&self.pipeline_layout, 0, Some(&self.desc_set), &[]);
 
             {
                 let rect = surface.get_viewport().rect.clone();
@@ -525,7 +520,7 @@ impl<'a> Draw<'a> {
         }
     }
 
-    pub fn create_bullets<'b>(&mut self, device: &'b back::Device) -> Bullets<'b> {
+    pub fn create_bullets<'b>(&mut self, device: &'b back::Device, image: &[u8]) -> Bullets<'b> {
         const VERTEX_SOURCE: &str = "#version 450
         #extension GL_ARB_separate_shader_objects : enable
 
@@ -674,7 +669,7 @@ impl<'a> Draw<'a> {
             device.release_mapping_writer(vertices).unwrap();
         }
 
-        let img_data = include_bytes!["data/logo.png"];
+        let img_data = image;
         let img = image::load(Cursor::new(&img_data[..]), image::PNG)
             .unwrap()
             .to_rgba();
@@ -1018,6 +1013,7 @@ impl<'a> Draw<'a> {
         Bullets {
             buffer: vertex_buffer,
             cmd_buffer: cmd_buffer,
+            desc_set,
             device,
             image_upload_buffer,
             instance_buffer,
@@ -1025,6 +1021,7 @@ impl<'a> Draw<'a> {
             memory: image_memory,
             memory_fence,
             pipeline,
+            pipeline_layout,
             render_pass,
         }
     }

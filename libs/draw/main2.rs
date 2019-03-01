@@ -56,7 +56,8 @@ fn main() {
     let mut tri = draw.create_static_white_2d_triangle(&device, &[-0.5, 0.5, -0.5, -0.5, 0.5, 0.0]);
     let mut tri2 = draw.create_static_white_2d_triangle(&device, &[0.5, -0.5, 0.5, 0.5, -0.5, 0.0]);
     let mut tex = draw.create_static_texture_2d_rectangle(&device);
-    let mut bullets = draw.create_bullets(&device);
+    let mut bullets = draw.create_bullets(&device, include_bytes!["data/logo.png"]);
+    let mut bullets2 = draw.create_bullets(&device, include_bytes!["data/pagliacci.png"]);
     use draw::Canvas;
     // loop {
         for i in 0..100 {

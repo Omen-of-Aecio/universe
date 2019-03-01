@@ -58,8 +58,21 @@ fn main() {
     let mut tex = draw.create_static_texture_2d_rectangle(&device);
     let mut bullets = draw.create_bullets(&device, include_bytes!["data/logo.png"]);
     let mut bullets2 = draw.create_bullets(&device, include_bytes!["data/pagliacci.png"]);
+    bullets.upload(&[0.0, 0.0, 1.0, 0.5, 0.0, 0.3]);
+    bullets.upload(&[-0.2, 0.5, 0.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.3]);
+    use rand::prelude::*;
+    use rand::distributions::uniform::UniformFloat;
+    let mut rng = rand::thread_rng();
+    let mut vec: Vec<f32> = vec![];
+    for i in 0..900 {
+        let ii = i as f32;
+        vec.push(rng.gen::<f32>() * 2.0 - 1.0);
+        vec.push(rng.gen::<f32>() * 2.0 - 1.0);
+        vec.push(rng.gen::<f32>() * 3.14159);
+    }
+    bullets.upload(&vec[..]);
     use draw::Canvas;
-    // loop {
+    loop {
         for i in 0..100 {
             let mut canvas = draw.prepare_canvas();
 
@@ -68,5 +81,5 @@ fn main() {
             bullets.draw(&mut canvas);
             // tex.draw(&mut canvas);
         }
-    // }
+    }
 }

@@ -93,12 +93,14 @@ impl<'a, 'b> Drop for ScreenCanvas<'a, 'b> {
 
 pub struct Bullets<'a> {
     buffer: <back::Backend as Backend>::Buffer,
+    buffer_size: u64,
     cmd_buffer: CommandBuffer<back::Backend, hal::Graphics, command::OneShot, Primary>,
     desc_set: <back::Backend as Backend>::DescriptorSet,
     device: &'a back::Device,
     image_upload_buffer: <back::Backend as Backend>::Buffer,
     instance_buffer: <back::Backend as Backend>::Buffer,
     instance_buffer_memory: <back::Backend as Backend>::Memory,
+    instance_count: u32,
     memory: <back::Backend as Backend>::Memory,
     memory_fence: <back::Backend as Backend>::Fence,
     pipeline: <back::Backend as Backend>::GraphicsPipeline,
@@ -106,6 +108,22 @@ pub struct Bullets<'a> {
     render_pass: <back::Backend as Backend>::RenderPass,
 }
 impl<'a> Bullets<'a> {
+    pub fn upload(&mut self, data: &[f32]) {
+        unsafe {
+            self.device.wait_for_fence(&self.memory_fence, u64::max_value());
+        }
+        unsafe {
+            // const QUAD: [f32; 6] = [0.2, 0.3, 0.0, -0.1, -0.3, 0.5];
+            println!["{:?}", self.buffer_size];
+            let mut vertices = self.device
+                .acquire_mapping_writer::<f32>(&self.instance_buffer_memory, 0..self.buffer_size)
+                .unwrap();
+            vertices[0..data.len()].copy_from_slice(data);
+            self.device.release_mapping_writer(vertices).unwrap();
+        }
+        assert![data.len() % 3 == 0];
+        self.instance_count = (data.len() / 3) as u32;
+    }
     pub fn draw(&mut self, surface: &mut impl Canvas) {
         unsafe {
             self.cmd_buffer.begin();
@@ -122,12 +140,13 @@ impl<'a> Bullets<'a> {
                     rect,
                     &[],
                 );
-                encoder.draw(0..6, 0..2);
+                encoder.draw(0..6, 0..self.instance_count);
             }
 
             self.cmd_buffer.finish();
 
-            surface.get_queue_group().queues[0].submit_nosemaphores(std::iter::once(&self.cmd_buffer), None);
+            self.device.reset_fence(&self.memory_fence);
+            surface.get_queue_group().queues[0].submit_nosemaphores(std::iter::once(&self.cmd_buffer), Some(&self.memory_fence));
         }
     }
 }
@@ -642,7 +661,7 @@ impl<'a> Draw<'a> {
         }
 
         let mut instance_buffer =
-            unsafe { device.create_buffer(1000, buffer::Usage::VERTEX) }.unwrap();
+            unsafe { device.create_buffer(1000000, buffer::Usage::VERTEX) }.unwrap();
         let instance_buffer_requirements = unsafe { device.get_buffer_requirements(&instance_buffer) };
 
         let instance_buffer_memory_type_id = self.adapter
@@ -1012,12 +1031,14 @@ impl<'a> Draw<'a> {
 
         Bullets {
             buffer: vertex_buffer,
+            buffer_size: instance_buffer_requirements.size,
             cmd_buffer: cmd_buffer,
             desc_set,
             device,
             image_upload_buffer,
             instance_buffer,
             instance_buffer_memory,
+            instance_count: 2,
             memory: image_memory,
             memory_fence,
             pipeline,

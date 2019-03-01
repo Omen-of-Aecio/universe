@@ -30,6 +30,7 @@ env_logger = "0.5"
 image = "0.19"
 log = "0.4"
 winit = "0.18"
+rand = "0.6.5"
 glsl-to-spirv = "0.1.4"
 gfx-hal = { path = "../../../gfx/src/hal",  version = "0.1" }
 gfx-backend-gl = { path = "../../../gfx/src/backend/gl", optional = true }

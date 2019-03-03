@@ -719,6 +719,85 @@ impl<'a> Draw<'a> {
                 .collect();
             unsafe { device.create_shader_module(&spirv) }.unwrap()
         };
+        // Create a render pass for this thing
+        let render_pass = {
+            let attachment = pass::Attachment {
+                format: Some(self.format),
+                samples: 1,
+                ops: pass::AttachmentOps::new(
+                    pass::AttachmentLoadOp::Clear,
+                    pass::AttachmentStoreOp::Store,
+                ),
+                stencil_ops: pass::AttachmentOps::DONT_CARE,
+                layouts: i::Layout::Undefined..i::Layout::Present,
+            };
+
+            let subpass = pass::SubpassDesc {
+                colors: &[(0, i::Layout::ColorAttachmentOptimal)],
+                depth_stencil: None,
+                inputs: &[],
+                resolves: &[],
+                preserves: &[],
+            };
+
+            // let dependency = pass::SubpassDependency {
+            //     passes: pass::SubpassRef::External..pass::SubpassRef::Pass(0),
+            //     stages: PipelineStage::COLOR_ATTACHMENT_OUTPUT
+            //         ..PipelineStage::COLOR_ATTACHMENT_OUTPUT,
+            //     accesses: i::Access::empty()
+            //         ..(i::Access::COLOR_ATTACHMENT_READ | i::Access::COLOR_ATTACHMENT_WRITE),
+            // };
+
+            unsafe { device.create_render_pass(&[attachment], &[subpass], &[]) }
+                .expect("Can't create render pass")
+        };
+        let kind = i::Kind::D2(1000 as i::Size, 1000 as i::Size, 1, 1);
+        let mut image_logo = unsafe {
+            device.create_image(
+                kind,
+                1,
+                ColorFormat::SELF,
+                i::Tiling::Optimal,
+                i::Usage::TRANSFER_DST | i::Usage::SAMPLED,
+                i::ViewCapabilities::empty(),
+            )
+        }
+        .unwrap();
+        let image_req = unsafe { device.get_image_requirements(&image_logo) };
+        use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
+        let device_type = self.adapter
+            .physical_device
+            .memory_properties()
+            .memory_types
+            .iter()
+            .enumerate()
+            .find(|&(id, memory_type)| {
+                image_req.type_mask & (1 << id) != 0
+                  && memory_type.properties.contains(Properties::DEVICE_LOCAL)
+            })
+            .map(|(id, _)| MemoryTypeId(id))
+            .unwrap();
+        let image_memory = unsafe { device.allocate_memory(device_type, image_req.size) }.unwrap();
+
+        unsafe { device.bind_image_memory(&image_memory, 0, &mut image_logo) }.unwrap();
+        let image_srv = unsafe {
+            device.create_image_view(
+                &image_logo,
+                i::ViewKind::D2,
+                ColorFormat::SELF,
+                Swizzle::NO,
+                COLOR_RANGE.clone()
+            )
+        }
+        .unwrap();
+        let extent = i::Extent {
+            width: 1000,
+            height: 1000,
+            depth: 1,
+        };
+        unsafe {
+            device.create_framebuffer(&render_pass, Some(image_srv), extent);
+        }
         DynamicBinaryTexture {
             device
         }

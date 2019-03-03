@@ -58,6 +58,7 @@ fn main() {
     let mut tex = draw.create_static_texture_2d_rectangle(&device);
     let mut bullets = draw.create_bullets(&device, include_bytes!["data/logo.png"]);
     let mut bullets2 = draw.create_bullets(&device, include_bytes!["data/pagliacci.png"]);
+    draw.create_dynamic_binary_texture(&device, 3, &[1, 2, 3, 4, 5, 6, 7, 8, 9]);
     bullets.upload(&[0.0, 0.0, 1.0, 0.5, 0.0, 0.3]);
     bullets.upload(&[-0.2, 0.5, 0.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.3]);
     use rand::prelude::*;

@@ -576,6 +576,10 @@ impl<'a> Draw<'a> {
         layout(location = 0) in vec2 pos;
         layout(location = 0) out vec2 texpos;
 
+        out gl_PerVertex {
+            vec4 gl_Position;
+        };
+
         void main() {
             texpos = (pos + 1)/2;
             gl_Position = vec4(pos, 0, 1);
@@ -701,6 +705,7 @@ impl<'a> Draw<'a> {
             r = step(0.5, r);
             Color = vec4(vec3(r), 1);
         }";
+        static ENTRY_NAME: &str = "main";
         let vs_module = {
             let glsl = VERTEX_SOURCE;
             let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
@@ -778,7 +783,7 @@ impl<'a> Draw<'a> {
             .map(|(id, _)| MemoryTypeId(id))
             .unwrap();
         let image_memory = unsafe { device.allocate_memory(device_type, image_req.size) }.unwrap();
-
+        println!["image req image {:?}", image_req];
         unsafe { device.bind_image_memory(&image_memory, 0, &mut image_logo) }.unwrap();
         let image_srv = unsafe {
             device.create_image_view(
@@ -795,9 +800,138 @@ impl<'a> Draw<'a> {
             height: 1000,
             depth: 1,
         };
-        unsafe {
-            device.create_framebuffer(&render_pass, Some(image_srv), extent);
+        let fbo = unsafe {
+            device.create_framebuffer(&render_pass, Some(image_srv), extent).unwrap()
+        };
+        let (vs_entry, fs_entry) = (
+            pso::EntryPoint {
+                entry: ENTRY_NAME,
+                module: &vs_module,
+                specialization: pso::Specialization {
+                    constants: &[pso::SpecializationConstant { id: 0, range: 0..4 }],
+                    data: unsafe { std::mem::transmute::<&f32, &[u8; 4]>(&0.8f32) },
+                },
+            },
+            pso::EntryPoint {
+                entry: ENTRY_NAME,
+                module: &fs_module,
+                specialization: pso::Specialization::default(),
+            },
+        );
+        let shader_entries = pso::GraphicsShaderSet {
+            vertex: vs_entry,
+            hull: None,
+            domain: None,
+            geometry: None,
+            fragment: Some(fs_entry),
+        };
+        let set_layout = unsafe {
+            device.create_descriptor_set_layout(
+                &[
+                    pso::DescriptorSetLayoutBinding {
+                        binding: 0,
+                        ty: pso::DescriptorType::SampledImage,
+                        count: 1,
+                        stage_flags: ShaderStageFlags::FRAGMENT,
+                        immutable_samplers: false,
+                    },
+                    pso::DescriptorSetLayoutBinding {
+                        binding: 1,
+                        ty: pso::DescriptorType::Sampler,
+                        count: 1,
+                        stage_flags: ShaderStageFlags::FRAGMENT,
+                        immutable_samplers: false,
+                    },
+                ],
+                &[],
+            )
         }
+        .expect("Can't create descriptor set layout");
+        let pipeline_layout = unsafe {
+            device.create_pipeline_layout(
+                std::iter::once(&set_layout),
+                // &[], // No descriptor set layout (no texture/sampler)
+                &[(pso::ShaderStageFlags::VERTEX, 0..8)],
+            )
+        }
+        .expect("Cant create pipelinelayout");
+        let subpass = Subpass {
+            index: 0,
+            main_pass: &render_pass,
+        };
+        let mut pipeline_desc = pso::GraphicsPipelineDesc::new(
+            shader_entries,
+            Primitive::TriangleList,
+            pso::Rasterizer::FILL,
+            &pipeline_layout,
+            subpass,
+        );
+
+        pipeline_desc.vertex_buffers.push(pso::VertexBufferDesc {
+            binding: 0,
+            stride: 8 as u32,
+            rate: pso::VertexInputRate::Vertex,
+            // 0 = Per Vertex
+            // 1 = Per Instance
+        });
+        let pipeline = unsafe {
+            device
+                .create_graphics_pipeline(&pipeline_desc, None)
+                .expect("Unable to make")
+        };
+        let mut vertex_buffer = unsafe { device.create_buffer(4*6*4, buffer::Usage::VERTEX) }.unwrap();
+        let requirements = unsafe { device.get_buffer_requirements(&vertex_buffer) };
+        let memory_type_id = self.adapter
+            .physical_device
+            .memory_properties()
+            .memory_types
+            .iter()
+            .enumerate()
+            .find(|&(id, memory_type)| {
+                requirements.type_mask & (1 << id) != 0
+                  && memory_type.properties.contains(Properties::CPU_VISIBLE)
+            })
+            .map(|(id, _)| MemoryTypeId(id))
+            .unwrap();
+        let buffer_memory = unsafe { device.allocate_memory(memory_type_id, requirements.size) }.unwrap();
+        unsafe { device.bind_buffer_memory(&buffer_memory, 0, &mut vertex_buffer) }.unwrap();
+        unsafe {
+            const QUAD: [f32; 4*6] = [
+                -0.5,  0.33, 0.0, 1.0,
+                 0.5,  0.33, 1.0, 1.0,
+                 0.5, -0.33, 1.0, 0.0,
+
+                -0.5,  0.33, 0.0, 1.0,
+                 0.5, -0.33, 1.0, 0.0,
+                -0.5, -0.33, 0.0, 0.0];
+            let mut vertices = device
+                .acquire_mapping_writer::<f32>(&buffer_memory, 0..requirements.size)
+                .unwrap();
+            vertices[0..QUAD.len()].copy_from_slice(&QUAD);
+            device.release_mapping_writer(vertices).unwrap();
+        }
+        // Section 2, draw it
+        unsafe {
+            let mut cmd_buffer = self.command_pool.acquire_command_buffer::<command::OneShot>();
+            cmd_buffer.begin();
+            cmd_buffer.bind_graphics_pipeline(&pipeline);
+            {
+                let mut pass = cmd_buffer.begin_render_pass_inline(
+                    &render_pass,
+                    &fbo,
+                    pso::Rect { x: 0, y: 0, w: 1000, h: 1000 },
+                    &[command::ClearValue::Color(command::ClearColor::Float([
+                        0.0, 0.0, 0.0, 1.0
+                    ]))],
+                );
+                pass.draw(0..6, 0..1);
+            }
+            cmd_buffer.finish();
+            let fence = device.create_fence(false).unwrap();
+            self.queue_group.queues[0].submit_nosemaphores(Some(&cmd_buffer), Some(&fence));
+            device.wait_for_fence(&fence, u64::max_value()).unwrap();
+            device.destroy_fence(fence);
+        };
         DynamicBinaryTexture {
             device
         }

@@ -85,9 +85,22 @@ impl<'a, 'b> Canvas for ScreenCanvas<'a, 'b> {
     }
 }
 
+impl<'a, 'b> ScreenCanvas<'a, 'b> {
+    fn do_swap(&mut self) {
+        let mut cmd_buffer = self.draw.command_pool.acquire_command_buffer::<command::OneShot>();
+        unsafe {
+            cmd_buffer.begin();
+            cmd_buffer.finish();
+            let index = self.draw.frame_index;
+            self.draw.queue_group.queues[0].submit_nosemaphores(std::iter::once(&cmd_buffer), Some(&self.draw.frame_fence[index]));
+        }
+        self.draw.swap_it(self.image_index);
+    }
+}
+
 impl<'a, 'b> Drop for ScreenCanvas<'a, 'b> {
     fn drop(&mut self) {
-        self.draw.swap_it(self.image_index);
+        self.do_swap();
     }
 }
 
@@ -530,6 +543,7 @@ impl<'a> Draw<'a> {
     }
     pub fn swap_it(&mut self, frame: hal::SwapImageIndex) {
         unsafe {
+            self.device.wait_for_fence(&self.frame_fence[self.frame_index], u64::max_value());
             if let Err(_) = self
                 .swap_chain
                 .present_nosemaphores(&mut self.queue_group.queues[0], frame)

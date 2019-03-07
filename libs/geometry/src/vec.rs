@@ -233,6 +233,54 @@ mod tests {
     }
 
     #[bench]
+    fn single_floating_point_add(b: &mut Bencher) {
+        fn add(l: f32, r: f32) -> f32 {
+            l + r
+        }
+        b.iter(|| {
+            for _ in 0..10_000 {
+                black_box(add(black_box(1.0), black_box(2.0)));
+            }
+        });
+    }
+
+    #[bench]
+    fn double_floating_point_add(b: &mut Bencher) {
+        fn add(l: f64, r: f64) -> f64 {
+            l + r
+        }
+        b.iter(|| {
+            for _ in 0..10_000 {
+                black_box(add(black_box(1.0), black_box(2.0)));
+            }
+        });
+    }
+
+    #[bench]
+    fn single_floating_point_mul(b: &mut Bencher) {
+        fn mul(l: f32, r: f32) -> f32 {
+            l * r
+        }
+        b.iter(|| {
+            for _ in 0..10_000 {
+                black_box(mul(black_box(1.0), black_box(2.0)));
+            }
+        });
+    }
+
+    #[bench]
+    fn double_floating_point_mul(b: &mut Bencher) {
+        fn mul(l: f64, r: f64) -> f64 {
+            l * r
+        }
+        b.iter(|| {
+            for _ in 0..10_000 {
+                black_box(mul(black_box(1.0), black_box(2.0)));
+            }
+        });
+    }
+
+    #[bench]
     fn dot_product_speed(b: &mut Bencher) {
         b.iter(|| {
             for _ in 0..1000 {

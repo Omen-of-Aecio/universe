@@ -5,6 +5,12 @@ use std::collections::HashMap;
 
 // ---
 
+/// Spec: The command specification format
+pub type Spec<'b, 'a, A, D, C> = (
+    &'b [(&'static str, Option<&'a Decider<A, D>>)],
+    fn(&mut C, &[A]),
+);
+
 /// A decision contains information about token consumption by the decider
 ///
 /// If the decider has accepted the tokens, it will return an `Accept(usize)`, if it failed to
@@ -56,26 +62,14 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         }
     }
 
-    pub fn register_many(
-        &mut self,
-        spec: &[(
-            &[(&'static str, Option<&'a Decider<A, D>>)],
-            fn(&mut C, &[A]),
-        )],
-    ) -> Result<(), RegError> {
+    pub fn register_many<'b>(&mut self, spec: &[Spec<'b, 'a, A, D, C>]) -> Result<(), RegError> {
         for subspec in spec {
             self.register(subspec.clone())?;
         }
         Ok(())
     }
 
-    fn register(
-        &mut self,
-        spec: (
-            &[(&'static str, Option<&'a Decider<A, D>>)],
-            fn(&mut C, &[A]),
-        ),
-    ) -> Result<(), RegError> {
+    fn register<'b>(&mut self, spec: Spec<'b, 'a, A, D, C>) -> Result<(), RegError> {
         if spec.0.is_empty() {
             if self.finalizer.is_some() {
                 return Err(RegError::FinalizerAlreadyExists);

@@ -1,6 +1,7 @@
 #![feature(test)]
 extern crate test;
 
+use either::Either;
 use std::collections::HashMap;
 
 // ---
@@ -139,13 +140,16 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         &'b self,
         input: &'b [&str],
         output: &mut [A],
-    ) -> Result<&'b Mapping<'a, A, D, C>, LookError<D>> {
+    ) -> Result<Either<&'b Mapping<'a, A, D, C>, &'a str>, LookError<D>> {
         if input.is_empty() {
-            return Ok(self);
+            return Ok(Either::Left(self));
         }
         if let Some(handler) = self.map.get(&input[0]) {
             let mut advance_output = 0;
             if let Some(ref decider) = handler.decider {
+                if input.len() == 1 {
+                    return Ok(Either::Right(decider.description));
+                }
                 match (decider.decider)(&input[1..], output) {
                     Decision::Accept(res) => {
                         advance_output = res;
@@ -487,31 +491,43 @@ mod tests {
         let mut output = [false; 0];
         let part = mapping
             .partial_lookup(&["lorem", "ipsum"], &mut output)
+            .unwrap()
+            .left()
             .unwrap();
         let key = part.get_direct_keys().next().unwrap();
         assert_eq![(&"dolor", None, true), key];
 
-        let part = mapping.partial_lookup(&["lorem"], &mut output).unwrap();
+        let part = mapping
+            .partial_lookup(&["lorem"], &mut output)
+            .unwrap()
+            .left()
+            .unwrap();
         let key = part.get_direct_keys().next().unwrap();
         assert_eq![(&"ipsum", None, true), key];
 
-        let part = mapping.partial_lookup(&["mirana"], &mut output).unwrap();
+        let part = mapping
+            .partial_lookup(&["mirana"], &mut output)
+            .unwrap()
+            .left()
+            .unwrap();
         let key = part.get_direct_keys().next().unwrap();
         assert_eq![(&"ipsum", Some("Do nothing"), true), key];
 
         let mut output = [false; 1];
         let part = mapping
             .partial_lookup(&["consume", "123"], &mut output)
+            .unwrap()
+            .left()
             .unwrap();
         let key = part.get_direct_keys().next().unwrap();
         assert_eq![(&"dummy", None, true), key];
 
-        let part = mapping.partial_lookup(&["consume"], &mut output);
-        if let Err(err) = part {
-            assert_eq![LookError::DeciderDenied(()), err];
-        } else {
-            assert![false];
-        }
+        let part = mapping
+            .partial_lookup(&["consume"], &mut output)
+            .unwrap()
+            .right()
+            .unwrap();
+        assert_eq!["Consume a single element, regardless of what it is", part];
     }
 
     // ---
@@ -529,6 +545,23 @@ mod tests {
         b.iter(|| {
             mapping
                 .lookup(black_box(&["lorem", "ipsum", "dolor"]), &mut output)
+                .unwrap();
+        });
+    }
+
+    #[bench]
+    fn partial_lookup_speed(b: &mut Bencher) {
+        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        mapping
+            .register((
+                &[("lorem", None), ("ipsum", None), ("dolor", None)],
+                add_one,
+            ))
+            .unwrap();
+        let mut output = [false; 0];
+        b.iter(|| {
+            mapping
+                .partial_lookup(black_box(&["lorem"]), &mut output)
                 .unwrap();
         });
     }

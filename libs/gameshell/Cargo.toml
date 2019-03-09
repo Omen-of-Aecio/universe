@@ -9,3 +9,4 @@ name = "gameshell"
 path = "lib.rs"
 
 [dependencies]
+either = "1.5.0"

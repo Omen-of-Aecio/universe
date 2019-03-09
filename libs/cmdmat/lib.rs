@@ -45,15 +45,15 @@ pub struct Decider<A, D> {
 
 #[derive(Debug, PartialEq)]
 pub enum RegError {
-    FinalizerAlreadyExists,
     DeciderAlreadyExists,
+    FinalizerAlreadyExists,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum LookError<D> {
-    FinalizerDoesNotExist,
-    DeciderDenied(D),
     DeciderAdvancedTooFar,
+    DeciderDenied(D),
+    FinalizerDoesNotExist,
     UnknownMapping,
 }
 

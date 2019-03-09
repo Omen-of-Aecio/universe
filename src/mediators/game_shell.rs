@@ -1,4 +1,5 @@
 use crate::glocals::{GameShell, Log};
+use cmdmat;
 use logger::{self, Logger};
 use metac::{Data, Evaluate, PartialParse};
 use std::collections::HashMap;
@@ -10,6 +11,65 @@ use std::sync::{
     Arc,
 };
 use std::thread::{self, JoinHandle};
+
+mod new_predicates {
+    use super::*;
+    use cmdmat::{Decider, Decision};
+    fn any_atom_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
+        for i in input[0].chars() {
+            if i.is_whitespace() {
+                return Decision::Deny("Expected atom, item contains whitespace".into());
+            }
+        }
+        out[0] = Input::Atom(input[0].to_string());
+        Decision::Accept(1)
+    }
+    fn any_string_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
+        out[0] = Input::String(input[0].to_string());
+        Decision::Accept(1)
+    }
+    fn any_u8_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
+        out[0] = input[0].parse::<u8>().ok().map(Input::U8).unwrap();
+        Decision::Accept(1)
+    }
+    fn any_i32_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
+        out[0] = input[0].parse::<i32>().ok().map(Input::I32).unwrap();
+        Decision::Accept(1)
+    }
+    pub const ANY_ATOM: Decider<Input, String> = Decider {
+        description: "<atom>",
+        decider: any_atom_function,
+    };
+    pub const ANY_STRING: &Decider<Input, String> = &Decider {
+        description: "<string>",
+        decider: any_string_function,
+    };
+    pub const ANY_U8: &Decider<Input, String> = &Decider {
+        description: "<u8>",
+        decider: any_u8_function,
+    };
+    pub const ANY_I32: &Decider<Input, String> = &Decider {
+        description: "<i32>",
+        decider: any_i32_function,
+    };
+}
+#[rustfmt::skip]
+const NSPEC: &[cmdmat::Spec<Input, String, Gsh>] = &[
+    (&[("sample", None)], sample),
+    (&[("log", None), ("global", None), ("level", Some(new_predicates::ANY_U8))], log2),
+    // (&[("str", None)], create_string),
+    // (&[("ex", None)], number),
+    // (&[("set, None"), ("key", new_predicates::ANY_STRING), ("value", new_predicates::ANY_STRING)], do_set),
+    // (&[("get, None"), ("key", new_predicates::ANY_STRING)], do_get),
+    // (&[("void", new_predicates::ANY_STRING)], void),
+    // (&[("+", ANY_I32)], add),
+    // (&[("autocomplete", new_predicates::ANY_STRING)], autocomplete),
+    // (&[("log"), ("trace", new_predicates::ANY_STRING)], log_trace),
+    // (&[("log", None), ("context", ANY_ATOM), ("level", ANY_U8)], log_context),
+];
+
+fn sample(gsh: &mut Gsh, tks: &[Input]) {
+}
 
 pub fn make_new_gameshell(logger: Logger<Log>) -> Gsh<'static> {
     let keep_running = Arc::new(AtomicBool::new(true));
@@ -655,6 +715,16 @@ mod command_handlers {
         } else {
             format!["{:?}", nesthead.keys()]
         }
+    }
+
+    pub fn log2(s: &mut Gsh, commands: &[Input]) {
+        let _: String = match commands[0] {
+            Input::U8(level) => {
+                s.logger.set_log_level(level);
+                "OK: Changed log level".into()
+            }
+            _ => "Usage: log level <u8>".into(),
+        };
     }
 
     pub fn log(s: &mut Gsh, commands: &[Input]) -> String {

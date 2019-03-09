@@ -1,3 +1,12 @@
+//! A command matching engine
+//!
+//! This library is a matching engine specifically for `metac`-like commands. It allows for
+//! arbitrary `decider` functions to parse parts of the input into any other format, which is
+//! subsequently provided to a transfer function.
+//!
+//! The engine also allows for autocompletion of commands, including deciders. Because deciders are
+//! completely arbitrary code, we can not autocomplete beyond a single decider, so autocompletion
+//! is "one step at a time".
 #![feature(test)]
 extern crate test;
 
@@ -28,8 +37,8 @@ pub enum Decision<D> {
 /// it has consumed. If it could not process the input tokens it will return a `Deny`, containing
 /// the reason for denying. Calling a decider with &[] should always yield its deny value.
 pub struct Decider<A, D> {
-    description: &'static str,
-    decider: fn(&[&str], &mut [A]) -> Decision<D>,
+    pub description: &'static str,
+    pub decider: fn(&[&str], &mut [A]) -> Decision<D>,
 }
 
 #[derive(Debug, PartialEq)]

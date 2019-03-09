@@ -1,11 +1,7 @@
 #![feature(test)]
 extern crate test;
 
-use std::borrow::Borrow;
-use std::cmp::Eq;
 use std::collections::HashMap;
-use std::fmt::Debug;
-use std::hash::Hash;
 
 // ---
 
@@ -45,14 +41,14 @@ pub enum LookError<D> {
 
 // ---
 
-struct Mapping<'a, A, D, C> {
+pub struct Mapping<'a, A, D, C> {
     map: HashMap<&'a str, Mapping<'a, A, D, C>>,
     decider: Option<&'a Decider<A, D>>,
     finalizer: Option<fn(&mut C, &[A])>,
 }
 
 impl<'a, A, D, C> Mapping<'a, A, D, C> {
-    fn new() -> Mapping<'a, A, D, C> {
+    pub fn new() -> Mapping<'a, A, D, C> {
         Mapping {
             map: HashMap::new(),
             decider: None,
@@ -60,7 +56,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         }
     }
 
-    fn register_many(&mut self, spec: &[(&[(&'static str, Option<&'a Decider<A, D>>)], fn(&mut C, &[A]))]) -> Result<(), RegError> {
+    pub fn register_many(&mut self, spec: &[(&[(&'static str, Option<&'a Decider<A, D>>)], fn(&mut C, &[A]))]) -> Result<(), RegError> {
         for subspec in spec {
             self.register(subspec.clone())?;
         }
@@ -81,20 +77,20 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
             if decider.is_some() {
                 return Err(RegError::DeciderAlreadyExists);
             }
-            entry.register((&spec.0[1..], spec.1));
+            entry.register((&spec.0[1..], spec.1))?;
         } else {
             let mut mapping = Mapping::<A, D, C> {
                 map: HashMap::new(),
                 decider: decider,
                 finalizer: None,
             };
-            mapping.register((&spec.0[1..], spec.1));
+            mapping.register((&spec.0[1..], spec.1))?;
             self.map.insert(key, mapping);
         }
         Ok(())
     }
 
-    fn lookup(&self, input: &[&str], output: &mut [A]) -> Result<fn(&mut C, &[A]), LookError<D>> {
+    pub fn lookup(&self, input: &[&str], output: &mut [A]) -> Result<fn(&mut C, &[A]), LookError<D>> {
         if input.is_empty() {
             if let Some(finalizer) = self.finalizer {
                 return Ok(finalizer);
@@ -123,13 +119,13 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         Err(LookError::UnknownMapping)
     }
 
-    fn get_direct_keys(&self) -> impl Iterator<Item = (&&str, Option<&'static str>, bool)> {
+    pub fn get_direct_keys(&self) -> impl Iterator<Item = (&&str, Option<&'static str>, bool)> {
         self.map.iter().map(|(k, v)| {
             (k, v.decider.map(|d| d.description), v.finalizer.is_some())
         })
     }
 
-    fn partial_lookup<'b>(&'b self, input: &'b [&str], output: &mut [A]) -> Result<&'b Mapping<'a, A, D, C>, LookError<D>> {
+    pub fn partial_lookup<'b>(&'b self, input: &'b [&str], output: &mut [A]) -> Result<&'b Mapping<'a, A, D, C>, LookError<D>> {
         if input.is_empty() {
             return Ok(self);
         }
@@ -157,12 +153,6 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
 
 // ---
 
-fn x() {}
-#[rustfmt::skip]
-const SPEC: &[(&[(&'static str, Option<fn(&str) -> bool>)], fn())] = &[
-    (&[("log", None)], x),
-];
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -173,7 +163,7 @@ mod tests {
     type Accept = bool;
     type Context = u32;
 
-    fn add_one(ctx: &mut Context, s: &[Accept]) {
+    fn add_one(ctx: &mut Context, _: &[Accept]) {
         *ctx += 1;
     }
 
@@ -192,7 +182,7 @@ mod tests {
 
     #[test]
     fn mapping_does_not_exist() {
-        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        let mapping: Mapping<Accept, (), Context> = Mapping::new();
         let mut output = [true; 0];
         if let Err(err) = mapping.lookup(&["add-one"], &mut output) {
             assert_eq![LookError::UnknownMapping, err];
@@ -218,7 +208,7 @@ mod tests {
     }
 
     #[test]
-    fn sequences_decider_succeeds() {
+    fn sequences_decider_fails() {
         fn decide(_: &[&str], _: &mut [Accept]) -> Decision<()> {
             Decision::Deny(())
         }
@@ -230,7 +220,11 @@ mod tests {
 
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
         mapping.register((&[("add-one", Some(&DECIDE))], add_one)).unwrap();
-        mapping.register((&[("add-one", None)], add_one)).unwrap();
+        if let Err(err) = mapping.register((&[("add-one", None)], add_one)) {
+            assert_eq![RegError::FinalizerAlreadyExists, err];
+        } else {
+            assert![false];
+        }
     }
 
     #[test]
@@ -249,7 +243,7 @@ mod tests {
         mapping.register((&[("add-one", Some(&DECIDE))], add_one)).unwrap();
 
         let mut output = [false; 3];
-        let handler = mapping.lookup(&["add-one", "123"], &mut output).unwrap();
+        mapping.lookup(&["add-one", "123"], &mut output).unwrap();
         assert_eq![true, output[0]];
         assert_eq![false, output[1]];
         assert_eq![false, output[2]];
@@ -296,7 +290,7 @@ mod tests {
         mapping.register((&[("add-one", Some(&DECIDE))], add_one)).unwrap();
 
         let mut output = [false; 3];
-        mapping.lookup(&["add-one", "123", "456"], &mut output);
+        mapping.lookup(&["add-one", "123", "456"], &mut output).unwrap();
         assert_eq![true, output[0]];
         assert_eq![true, output[1]];
         assert_eq![false, output[2]];
@@ -304,7 +298,7 @@ mod tests {
 
     #[test]
     fn decider_of_two_short_output() {
-        fn decide(_: &[&str], out: &mut [Accept]) -> Decision<()> {
+        fn decide(_: &[&str], _: &mut [Accept]) -> Decision<()> {
             Decision::Accept(2)
         }
 
@@ -363,15 +357,6 @@ mod tests {
 
     #[test]
     fn nested() {
-        fn decide(_: &[&str], _: &mut [Accept]) -> Decision<()> {
-            Decision::Accept(0)
-        }
-
-        const DECIDE: Decider<Accept, ()> = Decider {
-            description: "Do nothing",
-            decider: decide,
-        };
-
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
         mapping.register((&[("lorem", None), ("ipsum", None), ("dolor", None)], add_one)).unwrap();
 
@@ -391,9 +376,6 @@ mod tests {
 
     #[test]
     fn finalizer_at_multiple_levels() {
-        fn decide(_: &[&str], _: &mut [Accept]) -> Decision<()> {
-            Decision::Accept(0)
-        }
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
         mapping.register((&[("lorem", None), ("ipsum", None), ("dolor", None)], add_one)).unwrap();
         mapping.register((&[("lorem", None), ("ipsum", None)], add_one)).unwrap();

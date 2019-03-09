@@ -110,7 +110,7 @@ extern crate test;
 const BUFFER_SIZE: usize = 32;
 
 /// Distinguishes atoms from commands
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq)]
 pub enum Data<'a> {
     /// An atom is a single, non-whitespace non-(), connected string of characters
     Atom(&'a str),

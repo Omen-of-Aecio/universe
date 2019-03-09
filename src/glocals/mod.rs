@@ -39,11 +39,16 @@ pub struct Threads {
 
 #[derive(Clone)]
 pub struct GameShell<T: Send + Sync> {
+    pub gshctx: GameShellContext,
+    pub commands: T,
+}
+
+#[derive(Clone)]
+pub struct GameShellContext {
     pub config_change: Option<mpsc::SyncSender<fn(&mut Config)>>,
     pub logger: Logger<Log>,
     pub keep_running: Arc<AtomicBool>,
     pub variables: HashMap<String, String>,
-    pub commands: T,
 }
 
 // ---

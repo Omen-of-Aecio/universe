@@ -24,7 +24,10 @@ pub enum Decision<D> {
 /// It puts tokens into the output array according to interal logic and returns how many elements
 /// it has consumed. If it could not process the input tokens it will return a `Deny`, containing
 /// the reason for denying. Calling a decider with &[] should always yield its deny value.
-pub type Decider<A, D> = fn(&[&str], &mut [A]) -> Decision<D>;
+pub struct Decider<A, D> {
+    description: &'static str,
+    decider: fn(&[&str], &mut [A]) -> Decision<D>,
+}
 
 #[derive(Debug, PartialEq)]
 pub enum RegError {
@@ -44,7 +47,7 @@ pub enum LookError<D> {
 
 struct Mapping<'a, A, D, C> {
     map: HashMap<&'a str, Mapping<'a, A, D, C>>,
-    decider: Option<Decider<A, D>>,
+    decider: Option<&'a Decider<A, D>>,
     finalizer: Option<fn(&mut C, &[A])>,
 }
 
@@ -57,14 +60,14 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         }
     }
 
-    fn register_many(&mut self, spec: &[(&[(&'static str, Option<Decider<A, D>>)], fn(&mut C, &[A]))]) -> Result<(), RegError> {
+    fn register_many(&mut self, spec: &[(&[(&'static str, Option<&'a Decider<A, D>>)], fn(&mut C, &[A]))]) -> Result<(), RegError> {
         for subspec in spec {
             self.register(subspec.clone())?;
         }
         Ok(())
     }
 
-    fn register(&mut self, spec: (&[(&'static str, Option<Decider<A, D>>)], fn(&mut C, &[A]))) -> Result<(), RegError> {
+    fn register(&mut self, spec: (&[(&'static str, Option<&'a Decider<A, D>>)], fn(&mut C, &[A]))) -> Result<(), RegError> {
         if spec.0.is_empty() {
             if self.finalizer.is_some() {
                 return Err(RegError::FinalizerAlreadyExists);
@@ -101,8 +104,8 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         }
         if let Some(handler) = self.map.get(&input[0]) {
             let mut advance_output = 0;
-            if let Some(decider) = handler.decider {
-                match decider(&input[1..], output) {
+            if let Some(ref decider) = handler.decider {
+                match (decider.decider)(&input[1..], output) {
                     Decision::Accept(res) => {
                         advance_output = res;
                     }
@@ -120,10 +123,9 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         Err(LookError::UnknownMapping)
     }
 
-    fn get_direct_keys(&self) -> impl Iterator<Item = (&&str, Option<Decision<D>>, bool)> {
+    fn get_direct_keys(&self) -> impl Iterator<Item = (&&str, Option<&'static str>, bool)> {
         self.map.iter().map(|(k, v)| {
-            let mut out: [_; 0] = [];
-            (k, v.decider.map(|d| d(&[], &mut out)), v.finalizer.is_some())
+            (k, v.decider.map(|d| d.description), v.finalizer.is_some())
         })
     }
 
@@ -133,8 +135,8 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         }
         if let Some(handler) = self.map.get(&input[0]) {
             let mut advance_output = 0;
-            if let Some(decider) = handler.decider {
-                match decider(&input[1..], output) {
+            if let Some(ref decider) = handler.decider {
+                match (decider.decider)(&input[1..], output) {
                     Decision::Accept(res) => {
                         advance_output = res;
                     }
@@ -204,9 +206,15 @@ mod tests {
         fn decide(_: &[&str], _: &mut [Accept]) -> Decision<()> {
             Decision::Deny(())
         }
+
+        const DECIDE: Decider<Accept, ()> = Decider {
+            description: "",
+            decider: decide,
+        };
+
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
         mapping.register((&[("add-one", None)], add_one)).unwrap();
-        assert_eq![Err(RegError::DeciderAlreadyExists), mapping.register((&[("add-one", Some(decide))], add_one))];
+        assert_eq![Err(RegError::DeciderAlreadyExists), mapping.register((&[("add-one", Some(&DECIDE))], add_one))];
     }
 
     #[test]
@@ -214,8 +222,14 @@ mod tests {
         fn decide(_: &[&str], _: &mut [Accept]) -> Decision<()> {
             Decision::Deny(())
         }
+
+        const DECIDE: Decider<Accept, ()> = Decider {
+            description: "",
+            decider: decide,
+        };
+
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
-        mapping.register((&[("add-one", Some(decide))], add_one)).unwrap();
+        mapping.register((&[("add-one", Some(&DECIDE))], add_one)).unwrap();
         mapping.register((&[("add-one", None)], add_one)).unwrap();
     }
 
@@ -225,8 +239,14 @@ mod tests {
             out[0] = true;
             Decision::Accept(1)
         }
+
+        const DECIDE: Decider<Accept, ()> = Decider {
+            description: "",
+            decider: decide,
+        };
+
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
-        mapping.register((&[("add-one", Some(decide))], add_one)).unwrap();
+        mapping.register((&[("add-one", Some(&DECIDE))], add_one)).unwrap();
 
         let mut output = [false; 3];
         let handler = mapping.lookup(&["add-one", "123"], &mut output).unwrap();
@@ -242,8 +262,14 @@ mod tests {
             out[1] = true;
             Decision::Accept(2)
         }
+
+        const DECIDE: Decider<Accept, ()> = Decider {
+            description: "",
+            decider: decide,
+        };
+
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
-        mapping.register((&[("add-one", Some(decide))], add_one)).unwrap();
+        mapping.register((&[("add-one", Some(&DECIDE))], add_one)).unwrap();
 
         let mut output = [false; 3];
         if let Err(err) = mapping.lookup(&["add-one", "123"], &mut output) {
@@ -260,8 +286,14 @@ mod tests {
             out[1] = true;
             Decision::Accept(2)
         }
+
+        const DECIDE: Decider<Accept, ()> = Decider {
+            description: "",
+            decider: decide,
+        };
+
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
-        mapping.register((&[("add-one", Some(decide))], add_one)).unwrap();
+        mapping.register((&[("add-one", Some(&DECIDE))], add_one)).unwrap();
 
         let mut output = [false; 3];
         mapping.lookup(&["add-one", "123", "456"], &mut output);
@@ -275,8 +307,14 @@ mod tests {
         fn decide(_: &[&str], out: &mut [Accept]) -> Decision<()> {
             Decision::Accept(2)
         }
+
+        const DECIDE: Decider<Accept, ()> = Decider {
+            description: "",
+            decider: decide,
+        };
+
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
-        mapping.register((&[("add-one", Some(decide))], add_one)).unwrap();
+        mapping.register((&[("add-one", Some(&DECIDE))], add_one)).unwrap();
 
         let mut output = [false; 1];
         if let Err(err) = mapping.lookup(&["add-one", "123", "456"], &mut output) {
@@ -301,13 +339,19 @@ mod tests {
             }
             Decision::Accept(input.len())
         }
+
+        const DECIDE: Decider<i32, ()> = Decider {
+            description: "",
+            decider: decide,
+        };
+
         fn do_sum(ctx: &mut u32, out: &[i32]) {
             for i in out {
                 *ctx += *i as u32;
             }
         }
         let mut mapping: Mapping<i32, (), Context> = Mapping::new();
-        mapping.register((&[("sum", Some(decide))], do_sum)).unwrap();
+        mapping.register((&[("sum", Some(&DECIDE))], do_sum)).unwrap();
 
         let mut output = [0; 3];
         let handler = mapping.lookup(&["sum", "123", "456", "789"], &mut output).unwrap();
@@ -322,6 +366,12 @@ mod tests {
         fn decide(_: &[&str], _: &mut [Accept]) -> Decision<()> {
             Decision::Accept(0)
         }
+
+        const DECIDE: Decider<Accept, ()> = Decider {
+            description: "Do nothing",
+            decider: decide,
+        };
+
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
         mapping.register((&[("lorem", None), ("ipsum", None), ("dolor", None)], add_one)).unwrap();
 
@@ -363,9 +413,30 @@ mod tests {
         fn decide(_: &[&str], _: &mut [Accept]) -> Decision<()> {
             Decision::Accept(0)
         }
+
+        const DECIDE: Decider<Accept, ()> = Decider {
+            description: "Do nothing",
+            decider: decide,
+        };
+
+        fn consume_decide(input: &[&str], _: &mut [Accept]) -> Decision<()> {
+            if input.is_empty() {
+                Decision::Deny(())
+            } else {
+                Decision::Accept(1)
+            }
+        }
+
+        const CONSUME_DECIDE: Decider<Accept, ()> = Decider {
+            description: "Consume a single element, regardless of what it is",
+            decider: consume_decide,
+        };
+
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
         mapping.register((&[("lorem", None), ("ipsum", None), ("dolor", None)], add_one)).unwrap();
         mapping.register((&[("lorem", None), ("ipsum", None)], add_one)).unwrap();
+        mapping.register((&[("mirana", None), ("ipsum", Some(&DECIDE))], add_one)).unwrap();
+        mapping.register((&[("consume", Some(&CONSUME_DECIDE)), ("dummy", None)], add_one)).unwrap();
 
         let mut output = [false; 0];
         let part = mapping.partial_lookup(&["lorem", "ipsum"], &mut output).unwrap();
@@ -376,8 +447,21 @@ mod tests {
         let key = part.get_direct_keys().next().unwrap();
         assert_eq![(&"ipsum", None, true), key];
 
-        let key = mapping.get_direct_keys().next().unwrap();
-        assert_eq![(&"lorem", None, false), key];
+        let part = mapping.partial_lookup(&["mirana"], &mut output).unwrap();
+        let key = part.get_direct_keys().next().unwrap();
+        assert_eq![(&"ipsum", Some("Do nothing"), true), key];
+
+        let mut output = [false; 1];
+        let part = mapping.partial_lookup(&["consume", "123"], &mut output).unwrap();
+        let key = part.get_direct_keys().next().unwrap();
+        assert_eq![(&"dummy", None, true), key];
+
+        let part = mapping.partial_lookup(&["consume"], &mut output);
+        if let Err(err) = part {
+            assert_eq![LookError::DeciderDenied(()), err];
+        } else {
+            assert![false];
+        }
     }
 
     // ---

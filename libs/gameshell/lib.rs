@@ -32,7 +32,7 @@ pub enum RegError {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum LookError<D: std::fmt::Debug + PartialEq> {
+pub enum LookError<D> {
     FinalizerDoesNotExist,
     DeciderDenied(D),
     DeciderAdvancedTooFar,
@@ -41,13 +41,13 @@ pub enum LookError<D: std::fmt::Debug + PartialEq> {
 
 // ---
 
-struct Mapping<'a, A, D: Debug, C> {
+struct Mapping<'a, A, D, C> {
     map: HashMap<&'a str, Mapping<'a, A, D, C>>,
     decider: Option<Decider<A, D>>,
     finalizer: Option<fn(&mut C, &[A])>,
 }
 
-impl<'a, A, D: Debug + PartialEq, C> Mapping<'a, A, D, C> {
+impl<'a, A, D, C> Mapping<'a, A, D, C> {
     fn new() -> Mapping<'a, A, D, C> {
         Mapping {
             map: HashMap::new(),

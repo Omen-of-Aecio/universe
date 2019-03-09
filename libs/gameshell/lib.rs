@@ -13,6 +13,7 @@ use std::hash::Hash;
 ///
 /// If the decider has accepted the tokens, it will return an `Accept(usize)`, if it failed to
 /// parse interpret the tokens, it will return a deny value.
+#[derive(Debug, PartialEq)]
 pub enum Decision<D> {
     Accept(usize),
     Deny(D),
@@ -112,6 +113,38 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
             }
             if input.len() > advance_output && output.len() >= advance_output {
                 return handler.lookup(&input[1+advance_output..], &mut output[advance_output..]);
+            } else {
+                return Err(LookError::DeciderAdvancedTooFar);
+            }
+        }
+        Err(LookError::UnknownMapping)
+    }
+
+    fn get_direct_keys(&self) -> impl Iterator<Item = (&&str, Option<Decision<D>>, bool)> {
+        self.map.iter().map(|(k, v)| {
+            let mut out: [_; 0] = [];
+            (k, v.decider.map(|d| d(&[], &mut out)), v.finalizer.is_some())
+        })
+    }
+
+    fn partial_lookup<'b>(&'b self, input: &'b [&str], output: &mut [A]) -> Result<&'b Mapping<'a, A, D, C>, LookError<D>> {
+        if input.is_empty() {
+            return Ok(self);
+        }
+        if let Some(handler) = self.map.get(&input[0]) {
+            let mut advance_output = 0;
+            if let Some(decider) = handler.decider {
+                match decider(&input[1..], output) {
+                    Decision::Accept(res) => {
+                        advance_output = res;
+                    }
+                    Decision::Deny(res) => {
+                        return Err(LookError::DeciderDenied(res));
+                    }
+                }
+            }
+            if input.len() > advance_output && output.len() >= advance_output {
+                return handler.partial_lookup(&input[1+advance_output..], &mut output[advance_output..]);
             } else {
                 return Err(LookError::DeciderAdvancedTooFar);
             }
@@ -323,6 +356,28 @@ mod tests {
             assert![false];
         }
         mapping.lookup(&["lorem", "ipsum"], &mut output).unwrap();
+    }
+
+    #[test]
+    fn partial_lookup() {
+        fn decide(_: &[&str], _: &mut [Accept]) -> Decision<()> {
+            Decision::Accept(0)
+        }
+        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        mapping.register((&[("lorem", None), ("ipsum", None), ("dolor", None)], add_one)).unwrap();
+        mapping.register((&[("lorem", None), ("ipsum", None)], add_one)).unwrap();
+
+        let mut output = [false; 0];
+        let part = mapping.partial_lookup(&["lorem", "ipsum"], &mut output).unwrap();
+        let key = part.get_direct_keys().next().unwrap();
+        assert_eq![(&"dolor", None, true), key];
+
+        let part = mapping.partial_lookup(&["lorem"], &mut output).unwrap();
+        let key = part.get_direct_keys().next().unwrap();
+        assert_eq![(&"ipsum", None, true), key];
+
+        let key = mapping.get_direct_keys().next().unwrap();
+        assert_eq![(&"lorem", None, false), key];
     }
 
     // ---

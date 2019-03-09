@@ -112,10 +112,10 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         &self,
         input: &[&str],
         output: &mut [A],
-    ) -> Result<Finalizer<A, C>, LookError<D>> {
+    ) -> Result<(Finalizer<A, C>, usize), LookError<D>> {
         if input.is_empty() {
             if let Some(finalizer) = self.finalizer {
-                return Ok(finalizer);
+                return Ok((finalizer, 0));
             } else {
                 return Err(LookError::FinalizerDoesNotExist);
             }
@@ -133,7 +133,13 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
                 }
             }
             if input.len() > advance_output && output.len() >= advance_output {
-                return handler.lookup(&input[1 + advance_output..], &mut output[advance_output..]);
+                let res = handler.lookup(&input[1 + advance_output..], &mut output[advance_output..]);
+                if let Ok(mut res) = res {
+                    res.1 += advance_output;
+                    return Ok(res);
+                } else {
+                    return res;
+                }
             } else {
                 return Err(LookError::DeciderAdvancedTooFar);
             }
@@ -206,8 +212,9 @@ mod tests {
         mapping.register((&[("add-one", None)], add_one)).unwrap();
         let mut output = [true; 10];
         let handler = mapping.lookup(&["add-one"], &mut output).unwrap();
+        assert_eq![0, handler.1];
         let mut ctx = 123;
-        handler(&mut ctx, &output);
+        handler.0(&mut ctx, &output).unwrap();
         assert_eq![124, ctx];
     }
 
@@ -400,9 +407,10 @@ mod tests {
         let handler = mapping
             .lookup(&["sum", "123", "456", "789"], &mut output)
             .unwrap();
+        assert_eq![3, handler.1];
 
         let mut ctx = 0;
-        handler(&mut ctx, &output);
+        handler.0(&mut ctx, &output).unwrap();
         assert_eq![1368, ctx];
     }
 

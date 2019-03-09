@@ -18,8 +18,10 @@ use std::collections::HashMap;
 /// Spec: The command specification format
 pub type Spec<'b, 'a, A, D, C> = (
     &'b [(&'static str, Option<&'a Decider<A, D>>)],
-    fn(&mut C, &[A]),
+    Finalizer<A, C>,
 );
+
+pub type Finalizer<A, C> = fn(&mut C, &[A]) -> Result<String, String>;
 
 /// A decision contains information about token consumption by the decider
 ///
@@ -60,7 +62,7 @@ pub enum LookError<D> {
 pub struct Mapping<'a, A, D, C> {
     map: HashMap<&'a str, Mapping<'a, A, D, C>>,
     decider: Option<&'a Decider<A, D>>,
-    finalizer: Option<fn(&mut C, &[A])>,
+    finalizer: Option<Finalizer<A, C>>,
 }
 
 impl<'a, A, D, C> Mapping<'a, A, D, C> {
@@ -110,7 +112,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         &self,
         input: &[&str],
         output: &mut [A],
-    ) -> Result<fn(&mut C, &[A]), LookError<D>> {
+    ) -> Result<Finalizer<A, C>, LookError<D>> {
         if input.is_empty() {
             if let Some(finalizer) = self.finalizer {
                 return Ok(finalizer);
@@ -191,8 +193,9 @@ mod tests {
     type Accept = bool;
     type Context = u32;
 
-    fn add_one(ctx: &mut Context, _: &[Accept]) {
+    fn add_one(ctx: &mut Context, _: &[Accept]) -> Result<String, String> {
         *ctx += 1;
+        Ok("".into())
     }
 
     // ---
@@ -382,10 +385,11 @@ mod tests {
             decider: decide,
         };
 
-        fn do_sum(ctx: &mut u32, out: &[i32]) {
+        fn do_sum(ctx: &mut u32, out: &[i32]) -> Result<String, String> {
             for i in out {
                 *ctx += *i as u32;
             }
+            Ok("".into())
         }
         let mut mapping: Mapping<i32, (), Context> = Mapping::new();
         mapping

@@ -56,14 +56,26 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         }
     }
 
-    pub fn register_many(&mut self, spec: &[(&[(&'static str, Option<&'a Decider<A, D>>)], fn(&mut C, &[A]))]) -> Result<(), RegError> {
+    pub fn register_many(
+        &mut self,
+        spec: &[(
+            &[(&'static str, Option<&'a Decider<A, D>>)],
+            fn(&mut C, &[A]),
+        )],
+    ) -> Result<(), RegError> {
         for subspec in spec {
             self.register(subspec.clone())?;
         }
         Ok(())
     }
 
-    fn register(&mut self, spec: (&[(&'static str, Option<&'a Decider<A, D>>)], fn(&mut C, &[A]))) -> Result<(), RegError> {
+    fn register(
+        &mut self,
+        spec: (
+            &[(&'static str, Option<&'a Decider<A, D>>)],
+            fn(&mut C, &[A]),
+        ),
+    ) -> Result<(), RegError> {
         if spec.0.is_empty() {
             if self.finalizer.is_some() {
                 return Err(RegError::FinalizerAlreadyExists);
@@ -90,7 +102,11 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         Ok(())
     }
 
-    pub fn lookup(&self, input: &[&str], output: &mut [A]) -> Result<fn(&mut C, &[A]), LookError<D>> {
+    pub fn lookup(
+        &self,
+        input: &[&str],
+        output: &mut [A],
+    ) -> Result<fn(&mut C, &[A]), LookError<D>> {
         if input.is_empty() {
             if let Some(finalizer) = self.finalizer {
                 return Ok(finalizer);
@@ -111,7 +127,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
                 }
             }
             if input.len() > advance_output && output.len() >= advance_output {
-                return handler.lookup(&input[1+advance_output..], &mut output[advance_output..]);
+                return handler.lookup(&input[1 + advance_output..], &mut output[advance_output..]);
             } else {
                 return Err(LookError::DeciderAdvancedTooFar);
             }
@@ -120,12 +136,16 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
     }
 
     pub fn get_direct_keys(&self) -> impl Iterator<Item = (&&str, Option<&'static str>, bool)> {
-        self.map.iter().map(|(k, v)| {
-            (k, v.decider.map(|d| d.description), v.finalizer.is_some())
-        })
+        self.map
+            .iter()
+            .map(|(k, v)| (k, v.decider.map(|d| d.description), v.finalizer.is_some()))
     }
 
-    pub fn partial_lookup<'b>(&'b self, input: &'b [&str], output: &mut [A]) -> Result<&'b Mapping<'a, A, D, C>, LookError<D>> {
+    pub fn partial_lookup<'b>(
+        &'b self,
+        input: &'b [&str],
+        output: &mut [A],
+    ) -> Result<&'b Mapping<'a, A, D, C>, LookError<D>> {
         if input.is_empty() {
             return Ok(self);
         }
@@ -142,7 +162,8 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
                 }
             }
             if input.len() > advance_output && output.len() >= advance_output {
-                return handler.partial_lookup(&input[1+advance_output..], &mut output[advance_output..]);
+                return handler
+                    .partial_lookup(&input[1 + advance_output..], &mut output[advance_output..]);
             } else {
                 return Err(LookError::DeciderAdvancedTooFar);
             }
@@ -204,7 +225,10 @@ mod tests {
 
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
         mapping.register((&[("add-one", None)], add_one)).unwrap();
-        assert_eq![Err(RegError::DeciderAlreadyExists), mapping.register((&[("add-one", Some(&DECIDE))], add_one))];
+        assert_eq![
+            Err(RegError::DeciderAlreadyExists),
+            mapping.register((&[("add-one", Some(&DECIDE))], add_one))
+        ];
     }
 
     #[test]
@@ -219,7 +243,9 @@ mod tests {
         };
 
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
-        mapping.register((&[("add-one", Some(&DECIDE))], add_one)).unwrap();
+        mapping
+            .register((&[("add-one", Some(&DECIDE))], add_one))
+            .unwrap();
         if let Err(err) = mapping.register((&[("add-one", None)], add_one)) {
             assert_eq![RegError::FinalizerAlreadyExists, err];
         } else {
@@ -240,7 +266,9 @@ mod tests {
         };
 
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
-        mapping.register((&[("add-one", Some(&DECIDE))], add_one)).unwrap();
+        mapping
+            .register((&[("add-one", Some(&DECIDE))], add_one))
+            .unwrap();
 
         let mut output = [false; 3];
         mapping.lookup(&["add-one", "123"], &mut output).unwrap();
@@ -263,11 +291,13 @@ mod tests {
         };
 
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
-        mapping.register((&[("add-one", Some(&DECIDE))], add_one)).unwrap();
+        mapping
+            .register((&[("add-one", Some(&DECIDE))], add_one))
+            .unwrap();
 
         let mut output = [false; 3];
         if let Err(err) = mapping.lookup(&["add-one", "123"], &mut output) {
-            assert_eq![LookError::DeciderAdvancedTooFar , err];
+            assert_eq![LookError::DeciderAdvancedTooFar, err];
         } else {
             assert![false];
         }
@@ -287,10 +317,14 @@ mod tests {
         };
 
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
-        mapping.register((&[("add-one", Some(&DECIDE))], add_one)).unwrap();
+        mapping
+            .register((&[("add-one", Some(&DECIDE))], add_one))
+            .unwrap();
 
         let mut output = [false; 3];
-        mapping.lookup(&["add-one", "123", "456"], &mut output).unwrap();
+        mapping
+            .lookup(&["add-one", "123", "456"], &mut output)
+            .unwrap();
         assert_eq![true, output[0]];
         assert_eq![true, output[1]];
         assert_eq![false, output[2]];
@@ -308,7 +342,9 @@ mod tests {
         };
 
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
-        mapping.register((&[("add-one", Some(&DECIDE))], add_one)).unwrap();
+        mapping
+            .register((&[("add-one", Some(&DECIDE))], add_one))
+            .unwrap();
 
         let mut output = [false; 1];
         if let Err(err) = mapping.lookup(&["add-one", "123", "456"], &mut output) {
@@ -345,10 +381,14 @@ mod tests {
             }
         }
         let mut mapping: Mapping<i32, (), Context> = Mapping::new();
-        mapping.register((&[("sum", Some(&DECIDE))], do_sum)).unwrap();
+        mapping
+            .register((&[("sum", Some(&DECIDE))], do_sum))
+            .unwrap();
 
         let mut output = [0; 3];
-        let handler = mapping.lookup(&["sum", "123", "456", "789"], &mut output).unwrap();
+        let handler = mapping
+            .lookup(&["sum", "123", "456", "789"], &mut output)
+            .unwrap();
 
         let mut ctx = 0;
         handler(&mut ctx, &output);
@@ -358,10 +398,17 @@ mod tests {
     #[test]
     fn nested() {
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
-        mapping.register((&[("lorem", None), ("ipsum", None), ("dolor", None)], add_one)).unwrap();
+        mapping
+            .register((
+                &[("lorem", None), ("ipsum", None), ("dolor", None)],
+                add_one,
+            ))
+            .unwrap();
 
         let mut output = [false; 0];
-        mapping.lookup(&["lorem", "ipsum", "dolor"], &mut output).unwrap();
+        mapping
+            .lookup(&["lorem", "ipsum", "dolor"], &mut output)
+            .unwrap();
         if let Err(err) = mapping.lookup(&["lorem", "ipsum", "dolor", "exceed"], &mut output) {
             assert_eq![LookError::UnknownMapping, err];
         } else {
@@ -377,11 +424,20 @@ mod tests {
     #[test]
     fn finalizer_at_multiple_levels() {
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
-        mapping.register((&[("lorem", None), ("ipsum", None), ("dolor", None)], add_one)).unwrap();
-        mapping.register((&[("lorem", None), ("ipsum", None)], add_one)).unwrap();
+        mapping
+            .register((
+                &[("lorem", None), ("ipsum", None), ("dolor", None)],
+                add_one,
+            ))
+            .unwrap();
+        mapping
+            .register((&[("lorem", None), ("ipsum", None)], add_one))
+            .unwrap();
 
         let mut output = [false; 0];
-        mapping.lookup(&["lorem", "ipsum", "dolor"], &mut output).unwrap();
+        mapping
+            .lookup(&["lorem", "ipsum", "dolor"], &mut output)
+            .unwrap();
         if let Err(err) = mapping.lookup(&["lorem", "ipsum", "dolor", "exceed"], &mut output) {
             assert_eq![LookError::UnknownMapping, err];
         } else {
@@ -415,13 +471,29 @@ mod tests {
         };
 
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
-        mapping.register((&[("lorem", None), ("ipsum", None), ("dolor", None)], add_one)).unwrap();
-        mapping.register((&[("lorem", None), ("ipsum", None)], add_one)).unwrap();
-        mapping.register((&[("mirana", None), ("ipsum", Some(&DECIDE))], add_one)).unwrap();
-        mapping.register((&[("consume", Some(&CONSUME_DECIDE)), ("dummy", None)], add_one)).unwrap();
+        mapping
+            .register((
+                &[("lorem", None), ("ipsum", None), ("dolor", None)],
+                add_one,
+            ))
+            .unwrap();
+        mapping
+            .register((&[("lorem", None), ("ipsum", None)], add_one))
+            .unwrap();
+        mapping
+            .register((&[("mirana", None), ("ipsum", Some(&DECIDE))], add_one))
+            .unwrap();
+        mapping
+            .register((
+                &[("consume", Some(&CONSUME_DECIDE)), ("dummy", None)],
+                add_one,
+            ))
+            .unwrap();
 
         let mut output = [false; 0];
-        let part = mapping.partial_lookup(&["lorem", "ipsum"], &mut output).unwrap();
+        let part = mapping
+            .partial_lookup(&["lorem", "ipsum"], &mut output)
+            .unwrap();
         let key = part.get_direct_keys().next().unwrap();
         assert_eq![(&"dolor", None, true), key];
 
@@ -434,7 +506,9 @@ mod tests {
         assert_eq![(&"ipsum", Some("Do nothing"), true), key];
 
         let mut output = [false; 1];
-        let part = mapping.partial_lookup(&["consume", "123"], &mut output).unwrap();
+        let part = mapping
+            .partial_lookup(&["consume", "123"], &mut output)
+            .unwrap();
         let key = part.get_direct_keys().next().unwrap();
         assert_eq![(&"dummy", None, true), key];
 
@@ -451,10 +525,17 @@ mod tests {
     #[bench]
     fn lookup_speed(b: &mut Bencher) {
         let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
-        mapping.register((&[("lorem", None), ("ipsum", None), ("dolor", None)], add_one)).unwrap();
+        mapping
+            .register((
+                &[("lorem", None), ("ipsum", None), ("dolor", None)],
+                add_one,
+            ))
+            .unwrap();
         let mut output = [false; 0];
         b.iter(|| {
-            mapping.lookup(black_box(&["lorem", "ipsum", "dolor"]), &mut output).unwrap();
+            mapping
+                .lookup(black_box(&["lorem", "ipsum", "dolor"]), &mut output)
+                .unwrap();
         });
     }
 }

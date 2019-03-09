@@ -1,11 +1,11 @@
 [package]
-name = "gameshell"
+name = "cmdmat"
 version = "0.1.0"
 authors = ["Kevin Robert Stravers <macocio@gmail.com>"]
 edition = "2018"
 
 [lib]
-name = "gameshell"
+name = "cmdmat"
 path = "lib.rs"
 
 [dependencies]

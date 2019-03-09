@@ -38,6 +38,7 @@ config =    {path = "libs/config"}
 logger =    {path = "libs/logger"}
 benchmarker = {path = "libs/benchmarker"}
 metac =     {path = "libs/metac"}
+cmdmat =     {path = "libs/cmdmat"}
 
 [dev-dependencies]
 regex = "1.1.0"

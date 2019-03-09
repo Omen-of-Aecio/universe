@@ -278,4 +278,45 @@ mod tests {
         handler(&mut ctx, &output);
         assert_eq![1368, ctx];
     }
+
+    #[test]
+    fn nested() {
+        fn decide(_: &[&str], _: &mut [Accept]) -> Decision<()> {
+            Decision::Accept(0)
+        }
+        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        mapping.register((&[("lorem", None), ("ipsum", None), ("dolor", None)], add_one)).unwrap();
+
+        let mut output = [false; 0];
+        mapping.lookup(&["lorem", "ipsum", "dolor"], &mut output).unwrap();
+        if let Err(err) = mapping.lookup(&["lorem", "ipsum", "dolor", "exceed"], &mut output) {
+            assert_eq![LookError::UnknownMapping, err];
+        } else {
+            assert![false];
+        }
+        if let Err(err) = mapping.lookup(&["lorem", "ipsum"], &mut output) {
+            assert_eq![LookError::FinalizerDoesNotExist, err];
+        } else {
+            assert![false];
+        }
+    }
+
+    #[test]
+    fn finalizer_at_multiple_levels() {
+        fn decide(_: &[&str], _: &mut [Accept]) -> Decision<()> {
+            Decision::Accept(0)
+        }
+        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        mapping.register((&[("lorem", None), ("ipsum", None), ("dolor", None)], add_one)).unwrap();
+        mapping.register((&[("lorem", None), ("ipsum", None)], add_one)).unwrap();
+
+        let mut output = [false; 0];
+        mapping.lookup(&["lorem", "ipsum", "dolor"], &mut output).unwrap();
+        if let Err(err) = mapping.lookup(&["lorem", "ipsum", "dolor", "exceed"], &mut output) {
+            assert_eq![LookError::UnknownMapping, err];
+        } else {
+            assert![false];
+        }
+        mapping.lookup(&["lorem", "ipsum"], &mut output).unwrap();
+    }
 }

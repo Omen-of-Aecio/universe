@@ -359,11 +359,11 @@ impl<'a> X<'a> {
 
 fn abba() {
     let mut a = 123;
-    let mut eks = X { a: &mut a };
-    let mut k = eks.dox();
-    let mut m = eks.dox();
+    // let mut eks = X { a: &mut a };
+    // let mut k = eks.dox();
+    // let mut m = eks.dox();
     // k.yeet(); // illegal
-    m.yeet(); // nice
+    // m.yeet(); // nice
 }
 
 impl<'a> Draw<'a> {
@@ -589,10 +589,10 @@ impl<'a> Draw<'a> {
         layout(location = 0) in vec2 texpos;
         layout(location = 0) out vec4 Color;
 
-        layout(push_constant) uniform RandomSeed {
-            vec3 rand_seed;
-            float width;
-        } PushConstant;
+        layout(constant_id = 0) const float rand_seed1 = 0.0f;
+        layout(constant_id = 1) const float rand_seed2 = 0.0f;
+        layout(constant_id = 2) const float rand_seed3 = 0.0f;
+        layout(constant_id = 3) const float width = 1.2f;
 
         // Hash function: http://amindforeverprogramming.blogspot.com/2013/07/random-floats-in-glsl-330.html
         uint hash( uint x ) {
@@ -679,7 +679,7 @@ impl<'a> Draw<'a> {
             float result = 0;
             float p;
 
-            pos *= PushConstant.width; // Frequency = pixel
+            pos *= width; // Frequency = pixel
             /* pos *= 1000; */
 
             const float power = 3;  // Higher -> lower frequencies dominate. Normally 2.
@@ -701,7 +701,7 @@ impl<'a> Draw<'a> {
         {
             int octaves = 8;
             float r;
-            r = FBM(vec3(texpos,0) + PushConstant.rand_seed, octaves);
+            r = FBM(vec3(texpos,0) + vec3(rand_seed1, rand_seed2, rand_seed3), octaves);
             r = step(0.5, r);
             Color = vec4(vec3(r), 1);
         }";
@@ -761,8 +761,9 @@ impl<'a> Draw<'a> {
             device.create_image(
                 kind,
                 1,
-                ColorFormat::SELF,
-                i::Tiling::Optimal,
+                // ColorFormat::SELF,
+                hal::format::Format::Rgba8Srgb,
+                i::Tiling::Linear,
                 i::Usage::TRANSFER_DST | i::Usage::SAMPLED,
                 i::ViewCapabilities::empty(),
             )
@@ -778,7 +779,7 @@ impl<'a> Draw<'a> {
             .enumerate()
             .find(|&(id, memory_type)| {
                 image_req.type_mask & (1 << id) != 0
-                  && memory_type.properties.contains(Properties::DEVICE_LOCAL)
+                  && memory_type.properties.contains(Properties::CPU_VISIBLE )
             })
             .map(|(id, _)| MemoryTypeId(id))
             .unwrap();
@@ -808,8 +809,14 @@ impl<'a> Draw<'a> {
                 entry: ENTRY_NAME,
                 module: &vs_module,
                 specialization: pso::Specialization {
-                    constants: &[pso::SpecializationConstant { id: 0, range: 0..4 }],
-                    data: unsafe { std::mem::transmute::<&f32, &[u8; 4]>(&0.8f32) },
+                    constants: &[pso::SpecializationConstant { id: 0, range: 0..1 },
+                                 pso::SpecializationConstant { id: 1, range: 0..1 },
+                                 pso::SpecializationConstant { id: 2, range: 0..1 },
+                                 pso::SpecializationConstant { id: 3, range: 0..1 },
+                                 ],
+                    data: unsafe { 
+                        std::mem::transmute::<&[f32; 4], &[u8; 16]>(&[0.8f32, 0.3f32, 0.1f32, 3912.0f32])
+                    },
                 },
             },
             pso::EntryPoint {
@@ -825,32 +832,32 @@ impl<'a> Draw<'a> {
             geometry: None,
             fragment: Some(fs_entry),
         };
-        let set_layout = unsafe {
-            device.create_descriptor_set_layout(
-                &[
-                    pso::DescriptorSetLayoutBinding {
-                        binding: 0,
-                        ty: pso::DescriptorType::SampledImage,
-                        count: 1,
-                        stage_flags: ShaderStageFlags::FRAGMENT,
-                        immutable_samplers: false,
-                    },
-                    pso::DescriptorSetLayoutBinding {
-                        binding: 1,
-                        ty: pso::DescriptorType::Sampler,
-                        count: 1,
-                        stage_flags: ShaderStageFlags::FRAGMENT,
-                        immutable_samplers: false,
-                    },
-                ],
-                &[],
-            )
-        }
-        .expect("Can't create descriptor set layout");
+        // let set_layout = unsafe {
+        //     device.create_descriptor_set_layout(
+        //         &[
+        //             pso::DescriptorSetLayoutBinding {
+        //                 binding: 0,
+        //                 ty: pso::DescriptorType::SampledImage,
+        //                 count: 1,
+        //                 stage_flags: ShaderStageFlags::FRAGMENT,
+        //                 immutable_samplers: false,
+        //             },
+        //             pso::DescriptorSetLayoutBinding {
+        //                 binding: 1,
+        //                 ty: pso::DescriptorType::Sampler,
+        //                 count: 1,
+        //                 stage_flags: ShaderStageFlags::FRAGMENT,
+        //                 immutable_samplers: false,
+        //             },
+        //         ],
+        //         &[],
+        //     )
+        // }
+        // .expect("Can't create descriptor set layout");
         let pipeline_layout = unsafe {
             device.create_pipeline_layout(
-                std::iter::once(&set_layout),
-                // &[], // No descriptor set layout (no texture/sampler)
+                // std::iter::once(&set_layout),
+                &[], // No descriptor set layout (no texture/sampler)
                 &[(pso::ShaderStageFlags::VERTEX, 0..8)],
             )
         }
@@ -874,6 +881,18 @@ impl<'a> Draw<'a> {
             // 0 = Per Vertex
             // 1 = Per Instance
         });
+        pipeline_desc.attributes.push(pso::AttributeDesc {
+            location: 0,
+            binding: 0,
+            element: pso::Element {
+                format: f::Format::Rg32Sfloat,
+                offset: 0,
+            },
+        });
+        pipeline_desc.blender.targets.push(pso::ColorBlendDesc(
+            pso::ColorMask::ALL,
+            pso::BlendState::ALPHA,
+        ));
         let pipeline = unsafe {
             device
                 .create_graphics_pipeline(&pipeline_desc, None)
@@ -914,7 +933,10 @@ impl<'a> Draw<'a> {
         unsafe {
             let mut cmd_buffer = self.command_pool.acquire_command_buffer::<command::OneShot>();
             cmd_buffer.begin();
+            // Unfortunately not in GL
+            // cmd_buffer.push_graphics_constants(&pipeline_layout, pso::ShaderStageFlags::FRAGMENT, 0, &[1, 2, 3, 4]);
             cmd_buffer.bind_graphics_pipeline(&pipeline);
+            cmd_buffer.bind_vertex_buffers(0, [(&vertex_buffer, 0u64)].iter().cloned());
             {
                 let mut pass = cmd_buffer.begin_render_pass_inline(
                     &render_pass,
@@ -931,6 +953,12 @@ impl<'a> Draw<'a> {
             self.queue_group.queues[0].submit_nosemaphores(Some(&cmd_buffer), Some(&fence));
             device.wait_for_fence(&fence, u64::max_value()).unwrap();
             device.destroy_fence(fence);
+        };
+
+        unsafe { device.bind_image_memory(&image_memory, 0, &mut image_logo) }.unwrap();
+        unsafe {
+            let reader = device.acquire_mapping_reader::<f32>(&image_memory, 0..image_req.size).unwrap();
+            device.release_mapping_reader(reader);
         };
         DynamicBinaryTexture {
             device

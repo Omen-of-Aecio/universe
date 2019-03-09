@@ -10,6 +10,7 @@ use gfx_backend_vulkan as back;
 use gfx_hal::format::{AsFormat, ChannelType, Rgba8Srgb as ColorFormat, Swizzle};
 use gfx_hal::window::Extent2D;
 use gfx_hal::Instance;
+use gfx_hal::Backend;
 use winit;
 
 const DIMS: Extent2D = Extent2D {
@@ -18,6 +19,11 @@ const DIMS: Extent2D = Extent2D {
 };
 
 fn main() {
+    // let instance = <back::Backend as Backend>::Instance;
+    // for (idx, adapter) in gfx_hal::Instance::enumerate_adapters(&instance).iter().enumerate() {
+    //     println!("Adapter {}: {:?}", idx, adapter.info);
+    // }
+
     let mut events_loop = winit::EventsLoop::new();
 
     let wb = winit::WindowBuilder::new()
@@ -65,7 +71,7 @@ fn main() {
     use rand::distributions::uniform::UniformFloat;
     let mut rng = rand::thread_rng();
     let mut vec: Vec<f32> = vec![];
-    for i in 0..900 {
+    for i in 0..300 {
         let ii = i as f32;
         vec.push(rng.gen::<f32>() * 2.0 - 1.0);
         vec.push(rng.gen::<f32>() * 2.0 - 1.0);

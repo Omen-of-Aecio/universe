@@ -54,6 +54,9 @@ impl<'a, A, D: Debug + PartialEq, C> Mapping<'a, A, D, C> {
     }
 
     fn register_many(&mut self, spec: &[(&[(&'static str, Option<Decider<A, D>>)], fn(&mut C, &[A]))]) -> Result<(), RegError> {
+        for subspec in spec {
+            self.register(subspec.clone())?;
+        }
         Ok(())
     }
 

@@ -1,3 +1,6 @@
+#![feature(test)]
+extern crate test;
+
 use std::borrow::Borrow;
 use std::cmp::Eq;
 use std::collections::HashMap;
@@ -125,8 +128,10 @@ const SPEC: &[(&[(&'static str, Option<fn(&str) -> bool>)], fn())] = &[
     (&[("log", None)], x),
 ];
 
+#[cfg(test)]
 mod tests {
     use super::*;
+    use test::{black_box, Bencher};
 
     // ---
 
@@ -318,5 +323,17 @@ mod tests {
             assert![false];
         }
         mapping.lookup(&["lorem", "ipsum"], &mut output).unwrap();
+    }
+
+    // ---
+
+    #[bench]
+    fn lookup_speed(b: &mut Bencher) {
+        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        mapping.register((&[("lorem", None), ("ipsum", None), ("dolor", None)], add_one)).unwrap();
+        let mut output = [false; 0];
+        b.iter(|| {
+            mapping.lookup(black_box(&["lorem", "ipsum", "dolor"]), &mut output).unwrap();
+        });
     }
 }

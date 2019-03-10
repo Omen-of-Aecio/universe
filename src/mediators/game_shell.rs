@@ -485,7 +485,7 @@ mod predicates {
 
 pub fn make_new_gameshell(logger: Logger<Log>) -> Gsh<'static> {
     let keep_running = Arc::new(AtomicBool::new(true));
-    let mut cmdmat = cmdmat::Mapping::new();
+    let mut cmdmat = cmdmat::Mapping::default();
     cmdmat.register_many(SPEC).unwrap();
     GameShell {
         gshctx: GameShellContext {
@@ -507,7 +507,7 @@ pub fn spawn(logger: Logger<Log>) -> (JoinHandle<()>, Arc<AtomicBool>) {
         thread::Builder::new()
             .name("gsh/server".to_string())
             .spawn(move || {
-                let mut cmdmat = cmdmat::Mapping::new();
+                let mut cmdmat = cmdmat::Mapping::default();
                 cmdmat.register_many(SPEC).unwrap();
                 game_shell_thread(GameShell {
                     gshctx: GameShellContext {
@@ -530,7 +530,7 @@ fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<
     let logger = s.gshctx.logger.clone();
     let keep_running = s.gshctx.keep_running.clone();
     thread::spawn(move || {
-        let mut cmdmat = cmdmat::Mapping::new();
+        let mut cmdmat = cmdmat::Mapping::default();
         cmdmat.register_many(SPEC).unwrap();
         let mut shell_clone = GameShell {
             gshctx: GameShellContext {
@@ -839,7 +839,7 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
                         return EvalRes::Err("Decider advanced too far".into());
                     }
                     Err(LookError::DeciderDenied(desc, decider)) => {
-                        return EvalRes::Err(format!["Expected {} but got: {}", desc, decider);
+                        return EvalRes::Err(format!["Expected {} but got: {}", desc, decider]);
                     }
                     Err(LookError::FinalizerDoesNotExist) => {
                         return EvalRes::Err("Finalizer does not exist".into());
@@ -864,7 +864,7 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
                 return EvalRes::Err("Decider advanced too far".into());
             }
             Err(LookError::DeciderDenied(desc, decider)) => {
-                return EvalRes::Err(format!["Expected {} but got: {}", desc, decider);
+                return EvalRes::Err(format!["Expected {} but got: {}", desc, decider]);
             }
             Err(LookError::FinalizerDoesNotExist) => {
                 let mapping = self.commands.partial_lookup(&content_ref[..], &mut stack);
@@ -915,7 +915,7 @@ mod tests {
             let (mut logger, logger_handle) = logger::Logger::spawn();
             logger.set_log_level(0);
             let keep_running = Arc::new(AtomicBool::new(true));
-            let mut cmdmat = cmdmat::Mapping::new();
+            let mut cmdmat = cmdmat::Mapping::default();
             cmdmat.register_many(SPEC).unwrap();
             let mut gsh = GameShell {
                 gshctx: GameShellContext {
@@ -965,7 +965,7 @@ mod tests {
             let (mut logger, logger_handle) = logger::Logger::spawn();
             logger.set_log_level(0);
             let keep_running = Arc::new(AtomicBool::new(true));
-            let mut cmdmat = cmdmat::Mapping::new();
+            let mut cmdmat = cmdmat::Mapping::default();
             cmdmat.register_many(SPEC).unwrap();
             let mut gsh = GameShell {
                 gshctx: GameShellContext {
@@ -1124,7 +1124,7 @@ mod tests {
             let (mut logger, logger_handle) = logger::Logger::spawn();
             logger.set_log_level(0);
             let keep_running = Arc::new(AtomicBool::new(true));
-            let mut cmdmat = cmdmat::Mapping::new();
+            let mut cmdmat = cmdmat::Mapping::default();
             cmdmat.register_many(SPEC).unwrap();
             let mut gsh = GameShell {
                 gshctx: GameShellContext {
@@ -1153,7 +1153,7 @@ mod tests {
             let (mut logger, logger_handle) = logger::Logger::spawn();
             logger.set_log_level(0);
             let keep_running = Arc::new(AtomicBool::new(true));
-            let mut cmdmat = cmdmat::Mapping::new();
+            let mut cmdmat = cmdmat::Mapping::default();
             cmdmat.register_many(SPEC).unwrap();
             let mut gsh = GameShell {
                 gshctx: GameShellContext {
@@ -1182,7 +1182,7 @@ mod tests {
             let (mut logger, logger_handle) = logger::Logger::spawn();
             logger.set_log_level(0);
             let keep_running = Arc::new(AtomicBool::new(true));
-            let mut cmdmat = cmdmat::Mapping::new();
+            let mut cmdmat = cmdmat::Mapping::default();
             cmdmat.register_many(SPEC).unwrap();
             let mut gsh = GameShell {
                 gshctx: GameShellContext {

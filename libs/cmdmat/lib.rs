@@ -56,7 +56,7 @@
 //! };
 //!
 //! fn main() {
-//!     let mut mapping = Mapping::new();
+//!     let mut mapping = Mapping::default();
 //!     mapping.register(SPEC).unwrap();
 //!
 //!     let mut accept_buf = [Accept::I32(0)];
@@ -91,6 +91,9 @@ pub type Spec<'b, 'a, A, D, C> = (
 /// A finalizer is the function that runs to handle the entirety of the command after it has been
 /// verified by the deciders.
 pub type Finalizer<A, C> = fn(&mut C, &[A]) -> Result<String, String>;
+
+/// Either a mapping or a descriptor of a mapping
+pub type MapOrDesc<'a, 'b, A, D, C> = Either<&'b Mapping<'a, A, D, C>, &'a str>;
 
 /// A decision contains information about token consumption by the decider
 ///
@@ -141,16 +144,17 @@ pub struct Mapping<'a, A, D, C> {
     finalizer: Option<Finalizer<A, C>>,
 }
 
-impl<'a, A, D, C> Mapping<'a, A, D, C> {
-    /// Create a new mapping instance
-    pub fn new() -> Mapping<'a, A, D, C> {
+impl<'a, A, D, C> Default for Mapping<'a, A, D, C> {
+    fn default() -> Self {
         Mapping {
             map: HashMap::new(),
             decider: None,
             finalizer: None,
         }
     }
+}
 
+impl<'a, A, D, C> Mapping<'a, A, D, C> {
     /// Register many command specs at once, see `register` for more detail
     pub fn register_many<'b>(&mut self, spec: &[Spec<'b, 'a, A, D, C>]) -> Result<(), RegError> {
         for subspec in spec {
@@ -182,7 +186,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         } else {
             let mut mapping = Mapping::<A, D, C> {
                 map: HashMap::new(),
-                decider: decider,
+                decider,
                 finalizer: None,
             };
             mapping.register((&spec.0[1..], spec.1))?;
@@ -247,7 +251,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         &'b self,
         input: &'b [&str],
         output: &mut [A],
-    ) -> Result<Either<&'b Mapping<'a, A, D, C>, &'a str>, LookError<D>> {
+    ) -> Result<MapOrDesc<'a, 'b, A, D, C>, LookError<D>> {
         if input.is_empty() {
             return Ok(Either::Left(self));
         }
@@ -298,7 +302,7 @@ mod tests {
 
     #[test]
     fn single_mapping() {
-        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        let mut mapping: Mapping<Accept, (), Context> = Mapping::default();
         mapping.register((&[("add-one", None)], add_one)).unwrap();
         let mut output = [true; 10];
         let handler = mapping.lookup(&["add-one"], &mut output).unwrap();
@@ -310,7 +314,7 @@ mod tests {
 
     #[test]
     fn mapping_does_not_exist() {
-        let mapping: Mapping<Accept, (), Context> = Mapping::new();
+        let mapping: Mapping<Accept, (), Context> = Mapping::default();
         let mut output = [true; 0];
         if let Err(err) = mapping.lookup(&["add-one"], &mut output) {
             assert_eq![LookError::UnknownMapping, err];
@@ -330,7 +334,7 @@ mod tests {
             decider: decide,
         };
 
-        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        let mut mapping: Mapping<Accept, (), Context> = Mapping::default();
         mapping.register((&[("add-one", None)], add_one)).unwrap();
         assert_eq![
             Err(RegError::DeciderAlreadyExists),
@@ -349,7 +353,7 @@ mod tests {
             decider: decide,
         };
 
-        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        let mut mapping: Mapping<Accept, (), Context> = Mapping::default();
         mapping
             .register((&[("add-one", Some(&DECIDE))], add_one))
             .unwrap();
@@ -372,7 +376,7 @@ mod tests {
             decider: decide,
         };
 
-        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        let mut mapping: Mapping<Accept, (), Context> = Mapping::default();
         mapping
             .register((&[("add-one", Some(&DECIDE))], add_one))
             .unwrap();
@@ -397,7 +401,7 @@ mod tests {
             decider: decide,
         };
 
-        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        let mut mapping: Mapping<Accept, (), Context> = Mapping::default();
         mapping
             .register((&[("add-one", Some(&DECIDE))], add_one))
             .unwrap();
@@ -423,7 +427,7 @@ mod tests {
             decider: decide,
         };
 
-        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        let mut mapping: Mapping<Accept, (), Context> = Mapping::default();
         mapping
             .register((&[("add-one", Some(&DECIDE))], add_one))
             .unwrap();
@@ -448,7 +452,7 @@ mod tests {
             decider: decide,
         };
 
-        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        let mut mapping: Mapping<Accept, (), Context> = Mapping::default();
         mapping
             .register((&[("add-one", Some(&DECIDE))], add_one))
             .unwrap();
@@ -488,7 +492,7 @@ mod tests {
             }
             Ok("".into())
         }
-        let mut mapping: Mapping<i32, (), Context> = Mapping::new();
+        let mut mapping: Mapping<i32, (), Context> = Mapping::default();
         mapping
             .register((&[("sum", Some(&DECIDE))], do_sum))
             .unwrap();
@@ -506,7 +510,7 @@ mod tests {
 
     #[test]
     fn nested() {
-        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        let mut mapping: Mapping<Accept, (), Context> = Mapping::default();
         mapping
             .register((
                 &[("lorem", None), ("ipsum", None), ("dolor", None)],
@@ -532,7 +536,7 @@ mod tests {
 
     #[test]
     fn finalizer_at_multiple_levels() {
-        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        let mut mapping: Mapping<Accept, (), Context> = Mapping::default();
         mapping
             .register((
                 &[("lorem", None), ("ipsum", None), ("dolor", None)],
@@ -579,7 +583,7 @@ mod tests {
             decider: consume_decide,
         };
 
-        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        let mut mapping: Mapping<Accept, (), Context> = Mapping::default();
         mapping
             .register((
                 &[("lorem", None), ("ipsum", None), ("dolor", None)],
@@ -645,7 +649,7 @@ mod tests {
 
     #[bench]
     fn lookup_speed(b: &mut Bencher) {
-        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        let mut mapping: Mapping<Accept, (), Context> = Mapping::default();
         mapping
             .register((
                 &[("lorem", None), ("ipsum", None), ("dolor", None)],
@@ -662,7 +666,7 @@ mod tests {
 
     #[bench]
     fn partial_lookup_speed(b: &mut Bencher) {
-        let mut mapping: Mapping<Accept, (), Context> = Mapping::new();
+        let mut mapping: Mapping<Accept, (), Context> = Mapping::default();
         mapping
             .register((
                 &[("lorem", None), ("ipsum", None), ("dolor", None)],

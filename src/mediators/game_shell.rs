@@ -2,6 +2,8 @@ use crate::glocals::{GameShell, GameShellContext, Log};
 use cmdmat;
 use logger::{self, Logger};
 use metac::{Data, Evaluate, PartialParse};
+use self::command_handlers::*;
+use self::predicates::*;
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -12,9 +14,219 @@ use std::sync::{
 };
 use std::thread::{self, JoinHandle};
 
-mod predicates {
+// ---
+
+#[rustfmt::skip]
+const SPEC: &[cmdmat::Spec<Input, String, GameShellContext>] = &[
+    (&[("log", None), ("global", None), ("level", ANY_U8)], log),
+    (&[("set", None), ("key", ANY_STRING), ("value", ANY_STRING)], do_set),
+    (&[("get", None), ("key", ANY_STRING)], do_get),
+    (&[("str", ANY_STRING)], create_string),
+    (&[("void", IGNORE_ALL)], void),
+    (&[("+", MANY_I32)], add),
+    // (&[("autocomplete", predicates::ANY_STRING)], autocomplete),
+    (&[("log", None), ("trace", ANY_STRING)], log_trace),
+    (&[("log", None), ("context", ANY_ATOM), ("level", ANY_U8)], log_context),
+];
+
+// ---
+
+mod command_handlers {
     use super::*;
+
+    pub fn void(_: &mut GameShellContext, _: &[Input]) -> Result<String, String> {
+        Ok("".into())
+    }
+
+    pub fn add(_: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        let mut sum = 0;
+        for cmd in commands {
+            match cmd {
+                Input::I32(x) => {
+                    sum += x;
+                }
+                _ => {
+                    return Err("Expected i32".into());
+                }
+            }
+        }
+        Ok(sum.to_string())
+    }
+
+    pub fn do_get(gsh: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        let key;
+        match commands[0] {
+            Input::String(ref string) => {
+                key = string.clone();
+            }
+            _ => {
+                return Err("F".into());
+            }
+        }
+        if let Some(string) = gsh.variables.get(&key) {
+            Ok(string.clone())
+        } else {
+            Err("Does not exist".into())
+        }
+    }
+
+    pub fn do_set(gsh: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        let (key, value);
+        match commands[0] {
+            Input::String(ref string) => {
+                key = string.clone();
+            }
+            _ => {
+                return Err("F".into());
+            }
+        }
+        match commands[1] {
+            Input::String(ref string) => {
+                value = string.clone();
+            }
+            _ => {
+                return Err("F".into());
+            }
+        }
+        gsh.variables.insert(key, value);
+        Ok("OK".into())
+    }
+
+    pub fn create_string(_: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        if commands.len() != 1 {
+            return Err("Did not get command".into());
+        }
+        match commands[0] {
+            Input::String(ref cmd) => Ok(cmd.clone()),
+            _ => Err("Error: Not a command".into()),
+        }
+    }
+
+//     pub fn autocomplete(s: &mut Gsh, commands: &[Input]) -> String {
+//         let mut nesthead = s.commands.head.clone();
+//         let mut waspred = false;
+//         let mut predname = "";
+//         let mut recur = false;
+//         for cmd in commands {
+//             if waspred {
+//                 waspred = recur;
+//                 continue;
+//             }
+//             match cmd {
+//                 Input::String(string) => match nesthead.clone().get(&string[..]) {
+//                     Some((x, Either::Left(nest))) => {
+//                         nesthead = nest.head.clone();
+//                         match x {
+//                             X::Atom(_) => {
+//                                 waspred = false;
+//                             }
+//                             X::Macro(_) => {
+//                                 waspred = false;
+//                             }
+//                             X::Predicate(_, (n, _)) => {
+//                                 waspred = true;
+//                                 predname = n;
+//                             }
+//                             X::Recurring(_, (n, _)) => {
+//                                 waspred = true;
+//                                 predname = n;
+//                                 recur = true;
+//                             }
+//                         }
+//                     }
+//                     Some((x, Either::Right(_))) => match x {
+//                         X::Atom(_) => {
+//                             waspred = false;
+//                         }
+//                         X::Macro(_) => {
+//                             waspred = false;
+//                         }
+//                         X::Predicate(_, (n, _)) => {
+//                             waspred = true;
+//                             predname = n;
+//                         }
+//                         X::Recurring(_, (n, _)) => {
+//                             waspred = true;
+//                             predname = n;
+//                             recur = true;
+//                         }
+//                     },
+//                     None => {
+//                         return "Exceeded command parameter count".into();
+//                     }
+//                 },
+//                 _ => {
+//                     unreachable![];
+//                 }
+//             }
+//         }
+//         if waspred {
+//             predname.into()
+//         } else {
+//             format!["{:?}", nesthead.keys()]
+//         }
+//     }
+
+    pub fn log(s: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        match commands[0] {
+            Input::U8(level) => {
+                s.logger.set_log_level(level);
+                Ok("OK: Changed log level".into())
+            }
+            _ => Err("Usage: log level <u8>".into()),
+        }
+    }
+
+//     pub fn number(_: &mut Gsh, _: &[Input]) -> String {
+//         "0".into()
+//     }
+
+    pub fn log_trace(s: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        let mut sum = String::new();
+        for (idx, cmd) in commands.iter().enumerate() {
+            match cmd {
+                Input::String(ref string) => {
+                    if idx + 1 < commands.len() && idx != 0 {
+                        sum.push(' ');
+                    }
+                    sum += string;
+                }
+                _ => return Err("Error".into()),
+            }
+        }
+        s.logger.trace("user", Log::Dynamic(sum));
+        Ok("OK".into())
+    }
+
+    pub fn log_context(s: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        let ctx;
+        match commands[0] {
+            Input::Atom(ref context) => {
+                ctx = match &context[..] {
+                    "cli" => "cli",
+                    "trace" => "trace",
+                    "gsh" => "gsh",
+                    "benchmark" => "benchmark",
+                    "logger" => "logger",
+                    _ => return Err("Invalid logging context".into()),
+                };
+            }
+            _ => return Err("Usage: log context <atom> level <u8>".into()),
+        }
+        match commands[1] {
+            Input::U8(level) => {
+                s.logger.set_context_specific_log_level(ctx, level);
+                Ok("OK: Changed log level".into())
+            }
+            _ => Err("Usage: log context <atom> level <u8>".into()),
+        }
+    }
+}
+
+mod predicates {
     use cmdmat::{Decider, Decision};
+    use super::*;
+
     fn any_atom_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
         for i in input[0].chars() {
             if i.is_whitespace() {
@@ -24,6 +236,7 @@ mod predicates {
         out[0] = Input::Atom(input[0].to_string());
         Decision::Accept(1)
     }
+
     fn any_string_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
         if out.is_empty() {
             return Decision::Deny("No space in output".into());
@@ -31,52 +244,72 @@ mod predicates {
         out[0] = Input::String(input[0].to_string());
         Decision::Accept(1)
     }
+
     fn any_u8_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
         out[0] = input[0].parse::<u8>().ok().map(Input::U8).unwrap();
         Decision::Accept(1)
     }
+
     fn any_i32_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
         out[0] = input[0].parse::<i32>().ok().map(Input::I32).unwrap();
         Decision::Accept(1)
     }
-    pub const ANY_ATOM: Decider<Input, String> = Decider {
+
+    fn many_i32_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
+        let mut cnt = 0;
+        for i in input.iter() {
+            if let Some(input) = i.parse::<i32>().ok().map(Input::I32) {
+                out[cnt] = input;
+                cnt += 1;
+            } else {
+                break
+            }
+        }
+        Decision::Accept(cnt)
+    }
+
+    fn ignore_all(_: &[&str], out: &mut [Input]) -> Decision<String> {
+        Decision::Accept(0)
+    }
+
+    type SomeDec = Option<&'static Decider<Input, String>>;
+    pub const ANY_ATOM: SomeDec = Some(&Decider {
         description: "<atom>",
         decider: any_atom_function,
-    };
-    pub const ANY_STRING: Option<&Decider<Input, String>> = Some(&Decider {
+    });
+
+    pub const ANY_STRING: SomeDec = Some(&Decider {
         description: "<string>",
         decider: any_string_function,
     });
-    pub const ANY_U8: &Decider<Input, String> = &Decider {
+
+    pub const ANY_U8: SomeDec = Some(&Decider {
         description: "<u8>",
         decider: any_u8_function,
-    };
-    pub const ANY_I32: &Decider<Input, String> = &Decider {
+    });
+
+    pub const ANY_I32: SomeDec = Some(&Decider {
         description: "<i32>",
         decider: any_i32_function,
-    };
+    });
+
+    pub const MANY_I32: SomeDec = Some(&Decider {
+        description: "<i32> ...",
+        decider: many_i32_function,
+    });
+
+    pub const IGNORE_ALL: SomeDec = Some(&Decider {
+        description: "<anything> ...",
+        decider: ignore_all,
+    });
 }
 
-use self::predicates::*;
-
-#[rustfmt::skip]
-const SPEC: &[cmdmat::Spec<Input, String, GameShellContext>] = &[
-    (&[("log", None), ("global", None), ("level", Some(ANY_U8))], log),
-    (&[("set", None), ("key", ANY_STRING), ("value", ANY_STRING)], do_set),
-    (&[("get", None), ("key", ANY_STRING)], do_get),
-    // (&[("str", None)], create_string),
-    // (&[("ex", None)], number),
-    // (&[("void", predicates::ANY_STRING)], void),
-    // (&[("+", ANY_I32)], add),
-    // (&[("autocomplete", predicates::ANY_STRING)], autocomplete),
-    // (&[("log"), ("trace", predicates::ANY_STRING)], log_trace),
-    // (&[("log", None), ("context", ANY_ATOM), ("level", ANY_U8)], log_context),
-];
+// ---
 
 pub fn make_new_gameshell(logger: Logger<Log>) -> Gsh<'static> {
     let keep_running = Arc::new(AtomicBool::new(true));
     let mut cmdmat = cmdmat::Mapping::new();
-    cmdmat.register_many(SPEC);
+    cmdmat.register_many(SPEC).unwrap();
     GameShell {
         gshctx: GameShellContext {
             config_change: None,
@@ -98,7 +331,7 @@ pub fn spawn(logger: Logger<Log>) -> (JoinHandle<()>, Arc<AtomicBool>) {
             .name("gsh/server".to_string())
             .spawn(move || {
                 let mut cmdmat = cmdmat::Mapping::new();
-                cmdmat.register_many(SPEC);
+                cmdmat.register_many(SPEC).unwrap();
                 game_shell_thread(GameShell {
                     gshctx: GameShellContext {
                         config_change: None,
@@ -121,7 +354,7 @@ fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<
     let keep_running = s.gshctx.keep_running.clone();
     thread::spawn(move || {
         let mut cmdmat = cmdmat::Mapping::new();
-        cmdmat.register_many(SPEC);
+        cmdmat.register_many(SPEC).unwrap();
         let mut shell_clone = GameShell {
             gshctx: GameShellContext {
                 config_change: None,
@@ -315,8 +548,6 @@ fn game_shell_thread(mut s: Gsh) {
 
 // ---
 
-use self::command_handlers::*;
-
 type Gsh<'a> = GameShell<Arc<cmdmat::Mapping<'a, Input, String, GameShellContext>>>;
 #[derive(Clone)]
 pub enum Input {
@@ -346,13 +577,17 @@ impl<'a> Evaluate<String> for Gsh<'a> {
                     content.push((*string).into());
                 }
                 Data::Command(string) => {
-                    let res = self.interpret_single(string);
-                    match res {
-                        Ok(string) => {
-                            content.push(string);
-                        }
-                        Err(_) => {
-                            panic![];
+                    if &(*string)[0..1] == "#" {
+                        content.push((string[1..]).into());
+                    } else {
+                        let res = self.interpret_single(string);
+                        match res {
+                            Ok(string) => {
+                                content.push(string);
+                            }
+                            Err(_) => {
+                                panic![];
+                            }
                         }
                     }
                 }
@@ -381,215 +616,22 @@ impl<'a> Evaluate<String> for Gsh<'a> {
                 };
             }
             Err(LookError::DeciderAdvancedTooFar) => {
+                return "Decider advanced too far".into();
             }
-            Err(LookError::DeciderDenied(_decider)) => {
+            Err(LookError::DeciderDenied(decider)) => {
+                return decider.into();
             }
             Err(LookError::FinalizerDoesNotExist) => {
+                return "Finalizer does not exist".into();
             }
             Err(LookError::UnknownMapping) => {
+                return "Unrecognized command".into();
             }
         }
-        "".into()
     }
 }
 
 // ---
-
-mod command_handlers {
-    use super::*;
-
-//     pub fn unrecognized_command(_: &mut Gsh, _: &[Input]) -> String {
-//         "Command not finished".into()
-//     }
-
-//     pub fn void(_: &mut Gsh, _: &[Input]) -> String {
-//         "".into()
-//     }
-
-//     pub fn add(_: &mut Gsh, commands: &[Input]) -> String {
-//         let mut sum = 0;
-//         for cmd in commands {
-//             match cmd {
-//                 Input::I32(x) => {
-//                     sum += x;
-//                 }
-//                 _ => {
-//                     return "Expected i32".into();
-//                 }
-//             }
-//         }
-//         sum.to_string()
-//     }
-
-    pub fn do_get(gsh: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
-        let key;
-        match commands[0] {
-            Input::String(ref string) => {
-                key = string.clone();
-            }
-            _ => {
-                return Err("F".into());
-            }
-        }
-        if let Some(string) = gsh.variables.get(&key) {
-            Ok(string.clone())
-        } else {
-            Err("Does not exist".into())
-        }
-    }
-
-    pub fn do_set(gsh: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
-        let (key, value);
-        match commands[0] {
-            Input::String(ref string) => {
-                key = string.clone();
-            }
-            _ => {
-                return Err("F".into());
-            }
-        }
-        match commands[1] {
-            Input::String(ref string) => {
-                value = string.clone();
-            }
-            _ => {
-                return Err("F".into());
-            }
-        }
-        gsh.variables.insert(key, value);
-        Ok("OK".into())
-    }
-
-//     pub fn create_string(_: &mut Gsh, commands: &[Input]) -> String {
-//         if commands.len() != 1 {
-//             return "Did not get command".into();
-//         }
-//         match commands[0] {
-//             Input::Command(ref cmd) => cmd.clone(),
-//             _ => "Error: Not a command".into(),
-//         }
-//     }
-
-//     pub fn autocomplete(s: &mut Gsh, commands: &[Input]) -> String {
-//         let mut nesthead = s.commands.head.clone();
-//         let mut waspred = false;
-//         let mut predname = "";
-//         let mut recur = false;
-//         for cmd in commands {
-//             if waspred {
-//                 waspred = recur;
-//                 continue;
-//             }
-//             match cmd {
-//                 Input::String(string) => match nesthead.clone().get(&string[..]) {
-//                     Some((x, Either::Left(nest))) => {
-//                         nesthead = nest.head.clone();
-//                         match x {
-//                             X::Atom(_) => {
-//                                 waspred = false;
-//                             }
-//                             X::Macro(_) => {
-//                                 waspred = false;
-//                             }
-//                             X::Predicate(_, (n, _)) => {
-//                                 waspred = true;
-//                                 predname = n;
-//                             }
-//                             X::Recurring(_, (n, _)) => {
-//                                 waspred = true;
-//                                 predname = n;
-//                                 recur = true;
-//                             }
-//                         }
-//                     }
-//                     Some((x, Either::Right(_))) => match x {
-//                         X::Atom(_) => {
-//                             waspred = false;
-//                         }
-//                         X::Macro(_) => {
-//                             waspred = false;
-//                         }
-//                         X::Predicate(_, (n, _)) => {
-//                             waspred = true;
-//                             predname = n;
-//                         }
-//                         X::Recurring(_, (n, _)) => {
-//                             waspred = true;
-//                             predname = n;
-//                             recur = true;
-//                         }
-//                     },
-//                     None => {
-//                         return "Exceeded command parameter count".into();
-//                     }
-//                 },
-//                 _ => {
-//                     unreachable![];
-//                 }
-//             }
-//         }
-//         if waspred {
-//             predname.into()
-//         } else {
-//             format!["{:?}", nesthead.keys()]
-//         }
-//     }
-
-    pub fn log(s: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
-        match commands[0] {
-            Input::U8(level) => {
-                s.logger.set_log_level(level);
-                Ok("OK: Changed log level".into())
-            }
-            _ => Err("Usage: log level <u8>".into()),
-        }
-    }
-
-//     pub fn number(_: &mut Gsh, _: &[Input]) -> String {
-//         "0".into()
-//     }
-
-//     pub fn log_trace(s: &mut Gsh, commands: &[Input]) -> String {
-//         let mut sum = String::new();
-//         for (idx, cmd) in commands.iter().enumerate() {
-//             match cmd {
-//                 Input::String(ref string) => {
-//                     if idx + 1 < commands.len() && idx != 0 {
-//                         sum.push(' ');
-//                     }
-//                     sum += string;
-//                 }
-//                 _ => return "Error".into(),
-//             }
-//         }
-//         s.gshctx.logger.trace("user", Log::Dynamic(sum));
-//         "OK".into()
-//     }
-
-//     pub fn log_context(s: &mut Gsh, commands: &[Input]) -> String {
-//         let ctx;
-//         match commands[0] {
-//             Input::Atom(ref context) => {
-//                 ctx = match &context[..] {
-//                     "cli" => "cli",
-//                     "trace" => "trace",
-//                     "gsh" => "gsh",
-//                     "benchmark" => "benchmark",
-//                     "logger" => "logger",
-//                     _ => return "Invalid logging context".into(),
-//                 };
-//             }
-//             _ => return "Usage: log context <atom> level <u8>".into(),
-//         }
-//         match commands[1] {
-//             Input::U8(level) => {
-//                 s.gshctx.logger.set_context_specific_log_level(ctx, level);
-//                 "OK: Changed log level".into()
-//             }
-//             _ => "Usage: log context <atom> level <u8>".into(),
-//         }
-//     }
-}
 
 #[cfg(test)]
 mod tests {
@@ -628,7 +670,7 @@ mod tests {
             logger.set_log_level(0);
             let keep_running = Arc::new(AtomicBool::new(true));
             let mut cmdmat = cmdmat::Mapping::new();
-            cmdmat.register_many(SPEC);
+            cmdmat.register_many(SPEC).unwrap();
             let mut gsh = GameShell {
                 gshctx: GameShellContext {
                     config_change: None,
@@ -666,7 +708,7 @@ mod tests {
             logger.set_log_level(0);
             let keep_running = Arc::new(AtomicBool::new(true));
             let mut cmdmat = cmdmat::Mapping::new();
-            cmdmat.register_many(SPEC);
+            cmdmat.register_many(SPEC).unwrap();
             let mut gsh = GameShell {
                 gshctx: GameShellContext {
                     config_change: None,
@@ -683,7 +725,7 @@ mod tests {
             ];
             assert_eq![
                 "some thing\n new ",
-                gsh.interpret_single("str (some thing\n new )").unwrap()
+                gsh.interpret_single("str (#some thing\n new )").unwrap()
             ];
             assert_eq!["6", gsh.interpret_single("+ 1 2 3").unwrap()];
             assert_eq!["21", gsh.interpret_single("+ 1 (+ 8 9) 3").unwrap()];
@@ -694,19 +736,19 @@ mod tests {
                 gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 9) 3\nvoid").unwrap()
             ];
             assert_eq![
-                "Expected: <i32>, but got: \"Expected: <i32>, but got: \\\"0.6\\\"\"",
+                "Unrecognized command",
                 gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 0.6 9) (+ 3\n1\n)")
                     .unwrap()
             ];
-            assert_eq![
-                "<atom>",
-                gsh.interpret_single("autocomplete log context").unwrap()
-            ];
-            assert_eq![
-                "<u8>",
-                gsh.interpret_single("autocomplete log context gsh level ")
-                    .unwrap()
-            ];
+            // assert_eq![
+            //     "<atom>",
+            //     gsh.interpret_single("autocomplete log context").unwrap()
+            // ];
+            // assert_eq![
+            //     "<u8>",
+            //     gsh.interpret_single("autocomplete log context gsh level ")
+            //         .unwrap()
+            // ];
 
             // then
             logger_handle
@@ -727,7 +769,7 @@ mod tests {
             logger.set_log_level(0);
             let keep_running = Arc::new(AtomicBool::new(true));
             let mut cmdmat = cmdmat::Mapping::new();
-            cmdmat.register_many(SPEC);
+            cmdmat.register_many(SPEC).unwrap();
             let mut gsh = GameShell {
                 gshctx: GameShellContext {
                     config_change: None,
@@ -756,7 +798,7 @@ mod tests {
             logger.set_log_level(0);
             let keep_running = Arc::new(AtomicBool::new(true));
             let mut cmdmat = cmdmat::Mapping::new();
-            cmdmat.register_many(SPEC);
+            cmdmat.register_many(SPEC).unwrap();
             let mut gsh = GameShell {
                 gshctx: GameShellContext {
                     config_change: None,

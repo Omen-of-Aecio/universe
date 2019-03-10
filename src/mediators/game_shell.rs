@@ -1,9 +1,10 @@
-use crate::glocals::{GameShell, GameShellContext, Log};
-use cmdmat;
-use logger::{self, Logger};
-use metac::{Data, Evaluate, PartialParse};
 use self::command_handlers::*;
 use self::predicates::*;
+use crate::glocals::{GameShell, GameShellContext, Log};
+use cmdmat;
+use either::Either;
+use logger::{self, Logger};
+use metac::{Data, Evaluate, PartialParse};
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -102,71 +103,6 @@ mod command_handlers {
         }
     }
 
-//     pub fn autocomplete(s: &mut Gsh, commands: &[Input]) -> String {
-//         let mut nesthead = s.commands.head.clone();
-//         let mut waspred = false;
-//         let mut predname = "";
-//         let mut recur = false;
-//         for cmd in commands {
-//             if waspred {
-//                 waspred = recur;
-//                 continue;
-//             }
-//             match cmd {
-//                 Input::String(string) => match nesthead.clone().get(&string[..]) {
-//                     Some((x, Either::Left(nest))) => {
-//                         nesthead = nest.head.clone();
-//                         match x {
-//                             X::Atom(_) => {
-//                                 waspred = false;
-//                             }
-//                             X::Macro(_) => {
-//                                 waspred = false;
-//                             }
-//                             X::Predicate(_, (n, _)) => {
-//                                 waspred = true;
-//                                 predname = n;
-//                             }
-//                             X::Recurring(_, (n, _)) => {
-//                                 waspred = true;
-//                                 predname = n;
-//                                 recur = true;
-//                             }
-//                         }
-//                     }
-//                     Some((x, Either::Right(_))) => match x {
-//                         X::Atom(_) => {
-//                             waspred = false;
-//                         }
-//                         X::Macro(_) => {
-//                             waspred = false;
-//                         }
-//                         X::Predicate(_, (n, _)) => {
-//                             waspred = true;
-//                             predname = n;
-//                         }
-//                         X::Recurring(_, (n, _)) => {
-//                             waspred = true;
-//                             predname = n;
-//                             recur = true;
-//                         }
-//                     },
-//                     None => {
-//                         return "Exceeded command parameter count".into();
-//                     }
-//                 },
-//                 _ => {
-//                     unreachable![];
-//                 }
-//             }
-//         }
-//         if waspred {
-//             predname.into()
-//         } else {
-//             format!["{:?}", nesthead.keys()]
-//         }
-//     }
-
     pub fn log(s: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
         match commands[0] {
             Input::U8(level) => {
@@ -176,10 +112,6 @@ mod command_handlers {
             _ => Err("Usage: log level <u8>".into()),
         }
     }
-
-//     pub fn number(_: &mut Gsh, _: &[Input]) -> String {
-//         "0".into()
-//     }
 
     pub fn log_trace(s: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
         let mut sum = String::new();
@@ -224,8 +156,8 @@ mod command_handlers {
 }
 
 mod predicates {
-    use cmdmat::{Decider, Decision};
     use super::*;
+    use cmdmat::{Decider, Decision};
 
     fn any_atom_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
         for i in input[0].chars() {
@@ -262,7 +194,7 @@ mod predicates {
                 out[cnt] = input;
                 cnt += 1;
             } else {
-                break
+                break;
             }
         }
         Decision::Accept(cnt)
@@ -383,7 +315,9 @@ fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<
 }
 
 fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
-    s.gshctx.logger.debug("gsh", Log::Static("Acquired new stream"));
+    s.gshctx
+        .logger
+        .debug("gsh", Log::Static("Acquired new stream"));
     const BUFFER_SIZE: usize = 2048;
     let mut buffer = [0; BUFFER_SIZE];
     let mut begin = 0;
@@ -398,7 +332,8 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
             Log::Usize2("Loop entry", "shift", shift, "begin", begin),
         );
         begin -= shift;
-        s.gshctx.logger
+        s.gshctx
+            .logger
             .trace("gsh", Log::Usize("Loop entry (new)", "begin", begin));
         if begin > 0 {
             match from_utf8(&buffer[0..begin]) {
@@ -446,7 +381,8 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
             );
             break 'receiver;
         }
-        s.gshctx.logger
+        s.gshctx
+            .logger
             .trace("gsh", Log::Usize("Message from farend", "length", count));
         for ch in buffer[begin..(begin + count)].iter() {
             begin += 1;
@@ -478,7 +414,9 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
                             }
                             stream.flush()?;
                         } else {
-                            s.gshctx.logger.error("gsh", Log::Static("Message parsing failed"));
+                            s.gshctx
+                                .logger
+                                .error("gsh", Log::Static("Message parsing failed"));
                             stream.write_all(b"Unable to complete query")?;
                             stream.flush()?;
                         }
@@ -506,12 +444,14 @@ fn game_shell_thread(mut s: Gsh) {
     let listener = TcpListener::bind("127.0.0.1:32931");
     match listener {
         Ok(listener) => {
-            s.gshctx.logger
+            s.gshctx
+                .logger
                 .info("gsh", Log::Static("Started GameShell server"));
             'outer_loop: loop {
                 for stream in listener.incoming() {
                     if !s.gshctx.keep_running.load(Ordering::Acquire) {
-                        s.gshctx.logger
+                        s.gshctx
+                            .logger
                             .info("gsh", Log::Static("Stopped GameShell server"));
                         break 'outer_loop;
                     }
@@ -602,17 +542,55 @@ impl<'a> Evaluate<String> for Gsh<'a> {
             content_ref
         };
 
+        if let Some(front) = content_ref.first() {
+            if *front == "autocomplete" {
+                match self.commands.partial_lookup(&content_ref[1..], &mut stack) {
+                    Ok(Either::Left(mapping)) => {
+                        let mut res = String::new();
+                        let mut col = mapping
+                            .get_direct_keys()
+                            .map(|k| {
+                                let mut s = String::new() + *k.0;
+                                if k.1.is_some() {
+                                    s += " ";
+                                }
+                                s += if k.1.is_some() { k.1.unwrap() } else { "" };
+                                if k.2 {
+                                    s += " ";
+                                }
+                                s += if k.2 { "(final)" } else { "" };
+                                s
+                            })
+                            .collect::<Vec<_>>();
+                        col.sort();
+                        return col.join(", ");
+                    }
+                    Ok(Either::Right(name)) => {
+                        return name.into();
+                    }
+                    Err(LookError::DeciderAdvancedTooFar) => {
+                        return "Decider advanced too far".into();
+                    }
+                    Err(LookError::DeciderDenied(decider)) => {
+                        return decider.into();
+                    }
+                    Err(LookError::FinalizerDoesNotExist) => {
+                        return "Finalizer does not exist".into();
+                    }
+                    Err(LookError::UnknownMapping) => {
+                        return "Unrecognized command".into();
+                    }
+                }
+            }
+        }
+
         let res = self.commands.lookup(&content_ref[..], &mut stack);
         match res {
             Ok(fin) => {
                 let res = fin.0(&mut self.gshctx, &stack[..fin.1]);
                 return match res {
-                    Ok(res) => {
-                        res.into()
-                    }
-                    Err(res) => {
-                        res.into()
-                    }
+                    Ok(res) => res.into(),
+                    Err(res) => res.into(),
                 };
             }
             Err(LookError::DeciderAdvancedTooFar) => {
@@ -685,11 +663,7 @@ mod tests {
                 "OK",
                 gsh.interpret_single("set key lorem value ipsum").unwrap()
             ];
-            assert_eq![
-                "ipsum",
-                gsh.interpret_single("get key lorem")
-                    .unwrap()
-            ];
+            assert_eq!["ipsum", gsh.interpret_single("get key lorem").unwrap()];
 
             // then
             logger_handle
@@ -740,15 +714,19 @@ mod tests {
                 gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 0.6 9) (+ 3\n1\n)")
                     .unwrap()
             ];
-            // assert_eq![
-            //     "<atom>",
-            //     gsh.interpret_single("autocomplete log context").unwrap()
-            // ];
-            // assert_eq![
-            //     "<u8>",
-            //     gsh.interpret_single("autocomplete log context gsh level ")
-            //         .unwrap()
-            // ];
+            assert_eq![
+                "<atom>",
+                gsh.interpret_single("autocomplete log context").unwrap()
+            ];
+            assert_eq![
+                "<u8>",
+                gsh.interpret_single("autocomplete log context gsh level ")
+                    .unwrap()
+            ];
+            assert_eq![
+                "context <atom>, global, trace <string> (final)",
+                gsh.interpret_single("autocomplete log").unwrap()
+            ];
 
             // then
             logger_handle

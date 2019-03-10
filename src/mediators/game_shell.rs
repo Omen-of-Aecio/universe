@@ -25,6 +25,13 @@ const SPEC: &[cmdmat::Spec<Input, String, GameShellContext>] = &[
     (&[("str", ANY_STRING)], create_string),
     (&[("void", IGNORE_ALL)], void),
     (&[("+", MANY_I32)], add),
+    (&[("-", MANY_I32)], sub),
+    (&[("*", MANY_I32)], mul),
+    (&[("/", MANY_I32)], div),
+    (&[("%", MANY_I32)], modulo),
+    (&[("^", MANY_I32)], xor),
+    (&[("&", MANY_I32)], band),
+    (&[("|", MANY_I32)], bor),
     (&[("log", None), ("trace", ANY_STRING)], log_trace),
     (&[("log", None), ("context", ANY_ATOM), ("level", ANY_U8)], log_context),
 ];
@@ -44,6 +51,171 @@ mod command_handlers {
             match cmd {
                 Input::I32(x) => {
                     sum += x;
+                }
+                _ => {
+                    return Err("Expected i32".into());
+                }
+            }
+        }
+        Ok(sum.to_string())
+    }
+
+    pub fn sub(_: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        let mut sum = 0;
+        if let Some(cmd) = commands.iter().next() {
+            match cmd {
+                Input::I32(x) => {
+                    sum = if commands.len() == 1 { -*x } else { *x };
+                }
+                _ => {
+                    return Err("Expected i32".into());
+                }
+            }
+        }
+        for cmd in commands.iter().skip(1) {
+            match cmd {
+                Input::I32(x) => {
+                    sum -= x;
+                }
+                _ => {
+                    return Err("Expected i32".into());
+                }
+            }
+        }
+        Ok(sum.to_string())
+    }
+
+    pub fn mul(_: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        let mut sum = 1;
+        for cmd in commands {
+            match cmd {
+                Input::I32(x) => {
+                    sum *= x;
+                }
+                _ => {
+                    return Err("Expected i32".into());
+                }
+            }
+        }
+        Ok(sum.to_string())
+    }
+
+    pub fn div(_: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        let mut sum = 0;
+        if let Some(cmd) = commands.iter().next() {
+            match cmd {
+                Input::I32(x) => {
+                    sum = *x;
+                }
+                _ => {
+                    return Err("Expected i32".into());
+                }
+            }
+        }
+        for cmd in commands.iter().skip(1) {
+            match cmd {
+                Input::I32(x) => {
+                    sum /= x;
+                }
+                _ => {
+                    return Err("Expected i32".into());
+                }
+            }
+        }
+        Ok(sum.to_string())
+    }
+
+    pub fn modulo(_: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        let mut sum = 0;
+        if let Some(cmd) = commands.iter().next() {
+            match cmd {
+                Input::I32(x) => {
+                    sum = *x;
+                }
+                _ => {
+                    return Err("Expected i32".into());
+                }
+            }
+        }
+        for cmd in commands.iter().skip(1) {
+            match cmd {
+                Input::I32(x) => {
+                    sum %= x;
+                }
+                _ => {
+                    return Err("Expected i32".into());
+                }
+            }
+        }
+        Ok(sum.to_string())
+    }
+
+    pub fn xor(_: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        let mut sum = 0;
+        if let Some(cmd) = commands.iter().next() {
+            match cmd {
+                Input::I32(x) => {
+                    sum = *x;
+                }
+                _ => {
+                    return Err("Expected i32".into());
+                }
+            }
+        }
+        for cmd in commands.iter().skip(1) {
+            match cmd {
+                Input::I32(x) => {
+                    sum ^= x;
+                }
+                _ => {
+                    return Err("Expected i32".into());
+                }
+            }
+        }
+        Ok(sum.to_string())
+    }
+
+    pub fn band(_: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        let mut sum = 0;
+        if let Some(cmd) = commands.iter().next() {
+            match cmd {
+                Input::I32(x) => {
+                    sum = *x;
+                }
+                _ => {
+                    return Err("Expected i32".into());
+                }
+            }
+        }
+        for cmd in commands.iter().skip(1) {
+            match cmd {
+                Input::I32(x) => {
+                    sum &= x;
+                }
+                _ => {
+                    return Err("Expected i32".into());
+                }
+            }
+        }
+        Ok(sum.to_string())
+    }
+
+    pub fn bor(_: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        let mut sum = 0;
+        if let Some(cmd) = commands.iter().next() {
+            match cmd {
+                Input::I32(x) => {
+                    sum = *x;
+                }
+                _ => {
+                    return Err("Expected i32".into());
+                }
+            }
+        }
+        for cmd in commands.iter().skip(1) {
+            match cmd {
+                Input::I32(x) => {
+                    sum |= x;
                 }
                 _ => {
                     return Err("Expected i32".into());
@@ -761,6 +933,38 @@ mod tests {
             assert_eq![
                 EvalRes::Ok("2".into()),
                 gsh.interpret_single("+ (+ 1 0 0 0 0 0 0 0 0 1)").unwrap()
+            ];
+            assert_eq![
+                EvalRes::Ok("-3".into()),
+                gsh.interpret_single("- 3").unwrap()
+            ];
+            assert_eq![
+                EvalRes::Ok("3".into()),
+                gsh.interpret_single("- 3 0").unwrap()
+            ];
+            assert_eq![
+                EvalRes::Ok("6".into()),
+                gsh.interpret_single("* 3 2").unwrap()
+            ];
+            assert_eq![
+                EvalRes::Ok("1".into()),
+                gsh.interpret_single("/ 3 2").unwrap()
+            ];
+            assert_eq![
+                EvalRes::Ok("1".into()),
+                gsh.interpret_single("% 7 2").unwrap()
+            ];
+            assert_eq![
+                EvalRes::Ok("3".into()),
+                gsh.interpret_single("^ 1 2").unwrap()
+            ];
+            assert_eq![
+                EvalRes::Ok("0".into()),
+                gsh.interpret_single("& 1 2").unwrap()
+            ];
+            assert_eq![
+                EvalRes::Ok("6".into()),
+                gsh.interpret_single("| 4 2").unwrap()
             ];
             assert_eq![
                 EvalRes::Ok("<atom>".into()),

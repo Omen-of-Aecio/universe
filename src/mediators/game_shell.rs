@@ -435,8 +435,8 @@ mod predicates {
         Decision::Accept(cnt)
     }
 
-    fn ignore_all(_: &[&str], _: &mut [Input]) -> Decision<String> {
-        Decision::Accept(0)
+    fn ignore_all(input: &[&str], _: &mut [Input]) -> Decision<String> {
+        Decision::Accept(input.len())
     }
 
     type SomeDec = Option<&'static Decider<Input, String>>;
@@ -1094,6 +1094,11 @@ mod tests {
             assert_eq![
                 EvalRes::Ok("alphabetagammayotta6Hello World".into()),
                 gsh.interpret_single("cat alpha beta (cat gamma yotta) (+ 1 2 3) (#Hello World)")
+                    .unwrap()
+            ];
+            assert_eq![
+                EvalRes::Ok("".into()),
+                gsh.interpret_single("void alpha beta (cat gamma yotta) (+ 1 2 3) (#Hello World)")
                     .unwrap()
             ];
 

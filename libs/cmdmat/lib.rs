@@ -7,6 +7,73 @@
 //! The engine also allows for autocompletion of commands, including deciders. Because deciders are
 //! completely arbitrary code, we can not autocomplete beyond a single decider, so autocompletion
 //! is "one step at a time".
+//! ```
+//! use cmdmat::{Decider, Decision, Mapping, Spec};
+//!
+//! // The accept type is the type enum containing accepted tokens, parsed into useful formats
+//! // the list of accepted input is at last passed to the finalizer
+//! #[derive(Debug)]
+//! enum Accept {
+//!     I32(i32),
+//! }
+//!
+//! // Deny is the type returned by a decider when it denies an input (the input is invalid)
+//! type Deny = String;
+//!
+//! // The context is the type on which "finalizers" (the actual command handler) will run
+//! type Context = i32;
+//!
+//! // This is a `spec` (command specification)
+//! const SPEC: Spec<Accept, Deny, Context> = (&[("my-command-name", Some(&DEC))], print_hello);
+//!
+//! fn print_hello(_ctx: &mut Context, args: &[Accept]) -> Result<String, String> {
+//!     println!["Hello world!"];
+//!     assert_eq![1, args.len()];
+//!     println!["The args I got: {:?}", args];
+//!     Ok("".into())
+//! }
+//!
+//! // This decider accepts only a single number
+//! fn decider_function(input: &[&str], out: &mut [Accept]) -> Decision<Deny> {
+//!     if input.is_empty() {
+//!         return Decision::Deny("No argument provided".into());
+//!     }
+//!     if out.is_empty() {
+//!         return Decision::Deny("Output stack is full".into());
+//!     }
+//!     let num = input[0].parse::<i32>();
+//!     if let Ok(num) = num {
+//!         out[0] = Accept::I32(num);
+//!         Decision::Accept(1)
+//!     } else {
+//!         Decision::Deny("Number is not a valid i32".into())
+//!     }
+//! }
+//!
+//! const DEC: Decider<Accept, Deny> = Decider {
+//!     description: "<i32>",
+//!     decider: decider_function,
+//! };
+//!
+//! fn main() {
+//!     let mut mapping = Mapping::new();
+//!     mapping.register(SPEC);
+//!
+//!     let mut accept_buf = [Accept::I32(0)];
+//!     let handler = mapping.lookup(&["my-command-name", "123"], &mut accept_buf);
+//!
+//!     match handler {
+//!         Ok((func, bufsiz)) => {
+//!             let mut ctx = 0i32;
+//!             func(&mut ctx, &accept_buf[..bufsiz]); // prints hello world
+//!         }
+//!         Err(look_err) => {
+//!             println!["{:?}", look_err];
+//!             assert![false];
+//!         }
+//!     }
+//! }
+//! ```
 #![feature(test)]
 extern crate test;
 
@@ -81,7 +148,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         Ok(())
     }
 
-    fn register<'b>(&mut self, spec: Spec<'b, 'a, A, D, C>) -> Result<(), RegError> {
+    pub fn register<'b>(&mut self, spec: Spec<'b, 'a, A, D, C>) -> Result<(), RegError> {
         if spec.0.is_empty() {
             if self.finalizer.is_some() {
                 return Err(RegError::FinalizerAlreadyExists);

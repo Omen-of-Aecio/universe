@@ -523,7 +523,18 @@ impl Default for EvalRes {
 impl<'a> Evaluate<EvalRes> for Gsh<'a> {
     fn evaluate(&mut self, commands: &[Data]) -> EvalRes {
         use cmdmat::LookError;
-        let mut stack = [Input::U8(0), Input::default(), Input::default()];
+        let mut stack = [
+            Input::default(),
+            Input::default(),
+            Input::default(),
+            Input::default(),
+            Input::default(),
+            Input::default(),
+            Input::default(),
+            Input::default(),
+            Input::default(),
+            Input::default(),
+        ];
         let mut content: Vec<String> = Vec::new();
         for cmd in commands {
             match cmd {
@@ -679,7 +690,10 @@ mod tests {
                 EvalRes::Ok("OK".into()),
                 gsh.interpret_single("set key lorem value ipsum").unwrap()
             ];
-            assert_eq![EvalRes::Ok("ipsum".into()), gsh.interpret_single("get key lorem").unwrap()];
+            assert_eq![
+                EvalRes::Ok("ipsum".into()),
+                gsh.interpret_single("get key lorem").unwrap()
+            ];
 
             // then
             logger_handle
@@ -717,10 +731,22 @@ mod tests {
                 EvalRes::Ok("some thing\n new ".into()),
                 gsh.interpret_single("str (#some thing\n new )").unwrap()
             ];
-            assert_eq![EvalRes::Ok("6".into()), gsh.interpret_single("+ 1 2 3").unwrap()];
-            assert_eq![EvalRes::Ok("21".into()), gsh.interpret_single("+ 1 (+ 8 9) 3").unwrap()];
-            assert_eq![EvalRes::Ok("21".into()), gsh.interpret_single("+ 1 (+ 8 (+) 9) 3").unwrap()];
-            assert_eq![EvalRes::Ok("22".into()), gsh.interpret_single("+ 1 (+ 8 (+ 1) 9) 3").unwrap()];
+            assert_eq![
+                EvalRes::Ok("6".into()),
+                gsh.interpret_single("+ 1 2 3").unwrap()
+            ];
+            assert_eq![
+                EvalRes::Ok("21".into()),
+                gsh.interpret_single("+ 1 (+ 8 9) 3").unwrap()
+            ];
+            assert_eq![
+                EvalRes::Ok("21".into()),
+                gsh.interpret_single("+ 1 (+ 8 (+) 9) 3").unwrap()
+            ];
+            assert_eq![
+                EvalRes::Ok("22".into()),
+                gsh.interpret_single("+ 1 (+ 8 (+ 1) 9) 3").unwrap()
+            ];
             assert_eq![
                 EvalRes::Ok("".into()),
                 gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 9) 3\nvoid").unwrap()
@@ -729,6 +755,18 @@ mod tests {
                 EvalRes::Err("Unrecognized command".into()),
                 gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 0.6 9) (+ 3\n1\n)")
                     .unwrap()
+            ];
+            assert_eq![
+                EvalRes::Err("Unrecognized command".into()),
+                gsh.interpret_single("+ (undefined)").unwrap()
+            ];
+            assert_eq![
+                EvalRes::Ok("1".into()),
+                gsh.interpret_single("+ (+ 1)").unwrap()
+            ];
+            assert_eq![
+                EvalRes::Ok("2".into()),
+                gsh.interpret_single("+ (+ 1 0 0 0 0 0 0 0 0 1)").unwrap()
             ];
             assert_eq![
                 EvalRes::Ok("<atom>".into()),

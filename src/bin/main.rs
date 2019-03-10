@@ -64,8 +64,8 @@ fn wait_for_threads_to_exit(s: glocals::Main) {
     let tcp = TcpStream::connect("127.0.0.1:32931").unwrap();
     std::mem::drop(tcp);
 
-    s.threads.game_shell.map(|x| x.join());
-    s.threads.logger.map(|x| x.join());
+    s.threads.game_shell.map(std::thread::JoinHandle::join);
+    s.threads.logger.map(std::thread::JoinHandle::join);
 }
 
 // ---

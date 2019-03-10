@@ -4,7 +4,7 @@ use crate::glocals::{GameShell, GameShellContext, Log};
 use cmdmat;
 use either::Either;
 use logger::{self, Logger};
-use metac::{Data, Evaluate, PartialParse};
+use metac::{Data, Evaluate, ParseError, PartialParse};
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -226,7 +226,7 @@ mod command_handlers {
         Ok(sum.to_string())
     }
 
-    pub fn cat(gsh: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+    pub fn cat(_: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
         let mut string = String::new();
         for cmd in commands {
             match cmd {
@@ -358,11 +358,20 @@ mod predicates {
         }};
     }
 
-    fn aslen(input: &[&str], input_l: usize, out: &[Input], out_l: usize) -> Result<(), Decision<String>> {
+    fn aslen(
+        input: &[&str],
+        input_l: usize,
+        out: &[Input],
+        out_l: usize,
+    ) -> Result<(), Decision<String>> {
         if input.len() < input_l {
             Err(Decision::Deny(format!["Too few elements: {:?}", input]))
         } else if out.len() < out_l {
-            Err(Decision::Deny(format!["Too few outputs: {}, desired: {}", out.len(), out_l]))
+            Err(Decision::Deny(format![
+                "Too few outputs: {}, desired: {}",
+                out.len(),
+                out_l
+            ]))
         } else {
             Ok(())
         }
@@ -415,12 +424,6 @@ mod predicates {
         Decision::Accept(1)
     }
 
-    fn any_i32_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
-        ret_if_err![aslen(input, 1, out, 1)];
-        out[0] = input[0].parse::<i32>().ok().map(Input::I32).unwrap();
-        Decision::Accept(1)
-    }
-
     fn many_i32_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
         let mut cnt = 0;
         for i in input.iter() {
@@ -463,11 +466,6 @@ mod predicates {
     pub const ANY_U8: SomeDec = Some(&Decider {
         description: "<u8>",
         decider: any_u8_function,
-    });
-
-    pub const ANY_I32: SomeDec = Some(&Decider {
-        description: "<i32>",
-        decider: any_i32_function,
     });
 
     pub const MANY_I32: SomeDec = Some(&Decider {
@@ -799,8 +797,14 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
                             Ok(ref res @ EvalRes::Err(_)) => {
                                 return res.clone();
                             }
-                            Err(_) => {
-                                panic![];
+                            Err(ParseError::DanglingLeftParenthesis) => {
+                                return EvalRes::Err("Dangling left parenthesis".into());
+                            }
+                            Err(ParseError::InputHasTooManyElements) => {
+                                return EvalRes::Err("Too many elements to parse".into());
+                            }
+                            Err(ParseError::PrematureRightParenthesis) => {
+                                return EvalRes::Err("Right parenthesis encountered with no matching left parenthesis".into());
                             }
                         }
                     }
@@ -855,23 +859,22 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
         match res {
             Ok(fin) => {
                 let res = fin.0(&mut self.gshctx, &stack[..fin.1]);
-                return match res {
-                    Ok(res) => EvalRes::Ok(res.into()),
-                    Err(res) => EvalRes::Err(res.into()),
-                };
+                match res {
+                    Ok(res) => EvalRes::Ok(res),
+                    Err(res) => EvalRes::Err(res),
+                }
             }
             Err(LookError::DeciderAdvancedTooFar) => {
-                return EvalRes::Err("Decider advanced too far".into());
+                EvalRes::Err("Decider advanced too far".into())
             }
             Err(LookError::DeciderDenied(desc, decider)) => {
-                return EvalRes::Err(format!["Expected {} but got: {}", desc, decider]);
+                EvalRes::Err(format!["Expected {} but got: {}", desc, decider])
             }
             Err(LookError::FinalizerDoesNotExist) => {
-                let mapping = self.commands.partial_lookup(&content_ref[..], &mut stack);
-                return EvalRes::Err("Finalizer does not exist".into());
+                EvalRes::Err("Finalizer does not exist".into())
             }
             Err(LookError::UnknownMapping(token)) => {
-                return EvalRes::Err(format!["Unrecognized mapping: {}", token]);
+                EvalRes::Err(format!["Unrecognized mapping: {}", token])
             }
         }
     }
@@ -1026,10 +1029,7 @@ mod tests {
                 EvalRes::Ok("-3".into()),
                 gsh.interpret_single("- 3").unwrap()
             ];
-            assert_eq![
-                EvalRes::Ok("0".into()),
-                gsh.interpret_single("-").unwrap()
-            ];
+            assert_eq![EvalRes::Ok("0".into()), gsh.interpret_single("-").unwrap()];
             assert_eq![
                 EvalRes::Ok("3".into()),
                 gsh.interpret_single("- 3 0").unwrap()
@@ -1082,8 +1082,7 @@ mod tests {
             ];
             assert_eq![
                 EvalRes::Err("Expected <u8> but got: -1".into()),
-                gsh.interpret_single("log context gsh level -1")
-                    .unwrap()
+                gsh.interpret_single("log context gsh level -1").unwrap()
             ];
             assert_eq![
                 EvalRes::Err("Expected <u8> but got: -1".into()),

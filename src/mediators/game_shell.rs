@@ -20,8 +20,8 @@ use std::thread::{self, JoinHandle};
 #[rustfmt::skip]
 const SPEC: &[cmdmat::Spec<Input, String, GameShellContext>] = &[
     (&[("log", None), ("global", None), ("level", ANY_U8)], log),
-    (&[("set", None), ("key", ANY_STRING), ("value", ANY_STRING)], do_set),
-    (&[("get", None), ("key", ANY_STRING)], do_get),
+    (&[("set", TWO_STRINGS)], do_set),
+    (&[("get", ANY_STRING)], do_get),
     (&[("str", ANY_STRING)], create_string),
     (&[("void", IGNORE_ALL)], void),
     (&[("+", MANY_I32)], add),
@@ -348,6 +348,18 @@ mod predicates {
         Decision::Accept(1)
     }
 
+    fn two_string_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
+        if out.len() < 2 {
+            return Decision::Deny("No space in output".into());
+        }
+        if input.len() < 2 {
+            return Decision::Deny("Not enough arguments provided".into());
+        }
+        out[0] = Input::String(input[0].to_string());
+        out[1] = Input::String(input[1].to_string());
+        Decision::Accept(2)
+    }
+
     fn any_u8_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
         out[0] = input[0].parse::<u8>().ok().map(Input::U8).unwrap();
         Decision::Accept(1)
@@ -384,6 +396,11 @@ mod predicates {
     pub const ANY_STRING: SomeDec = Some(&Decider {
         description: "<string>",
         decider: any_string_function,
+    });
+
+    pub const TWO_STRINGS: SomeDec = Some(&Decider {
+        description: "<string> <string>",
+        decider: two_string_function,
     });
 
     pub const ANY_U8: SomeDec = Some(&Decider {
@@ -854,14 +871,18 @@ mod tests {
 
             assert_eq![
                 EvalRes::Ok("OK".into()),
-                gsh.interpret_single("set key lorem value ipsum").unwrap()
+                gsh.interpret_single("set key some-value").unwrap()
             ];
             assert_eq![
-                EvalRes::Ok("ipsum".into()),
-                gsh.interpret_single("get key lorem").unwrap()
+                EvalRes::Ok("some-value".into()),
+                gsh.interpret_single("get key").unwrap()
             ];
 
-            // then
+            assert_eq![
+                EvalRes::Err("Unrecognized command".into()),
+                gsh.interpret_single("set key some-value extra").unwrap()
+            ];
+
             logger_handle
         };
         logger_handle.join().unwrap();

@@ -1176,6 +1176,35 @@ mod tests {
     }
 
     #[bench]
+    fn adding_a_bunch_of_numbers(b: &mut Bencher) -> io::Result<()> {
+        let logger_handle = {
+            // given
+            let (mut logger, logger_handle) = logger::Logger::spawn();
+            logger.set_log_level(0);
+            let keep_running = Arc::new(AtomicBool::new(true));
+            let mut cmdmat = cmdmat::Mapping::new();
+            cmdmat.register_many(SPEC).unwrap();
+            let mut gsh = GameShell {
+                gshctx: GameShellContext {
+                    config_change: None,
+                    logger,
+                    keep_running,
+                    variables: HashMap::new(),
+                },
+                commands: Arc::new(cmdmat),
+            };
+
+            // then
+            b.iter(|| black_box(gsh.interpret_single(black_box("+ 1 2 3 (- 4 5 6) (* 9 9)"))));
+            logger_handle
+        };
+        logger_handle.join().unwrap();
+
+        // cleanup
+        Ok(())
+    }
+
+    #[bench]
     fn message_bandwidth_over_tcp(b: &mut Bencher) -> io::Result<()> {
         let (mut logger, logger_handle) = logger::Logger::spawn();
         let (mut _gsh, keep_running) = spawn(logger.clone());

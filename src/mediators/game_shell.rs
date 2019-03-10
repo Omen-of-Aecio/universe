@@ -19,22 +19,22 @@ use std::thread::{self, JoinHandle};
 
 #[rustfmt::skip]
 const SPEC: &[cmdmat::Spec<Input, String, GameShellContext>] = &[
-    (&[("log", None), ("global", None), ("level", ANY_U8)], log),
-    (&[("set", TWO_STRINGS)], do_set),
-    (&[("get", ANY_STRING)], do_get),
-    (&[("str", ANY_STRING)], create_string),
-    (&[("void", IGNORE_ALL)], void),
+    (&[("%", MANY_I32)], modulo),
+    (&[("&", MANY_I32)], band),
+    (&[("*", MANY_I32)], mul),
     (&[("+", MANY_I32)], add),
     (&[("-", MANY_I32)], sub),
-    (&[("*", MANY_I32)], mul),
     (&[("/", MANY_I32)], div),
-    (&[("%", MANY_I32)], modulo),
     (&[("^", MANY_I32)], xor),
-    (&[("&", MANY_I32)], band),
-    (&[("|", MANY_I32)], bor),
     (&[("cat", MANY_STRING)], cat),
-    (&[("log", None), ("trace", ANY_STRING)], log_trace),
+    (&[("get", ANY_STRING)], do_get),
     (&[("log", None), ("context", ANY_ATOM), ("level", ANY_U8)], log_context),
+    (&[("log", None), ("global", None), ("level", ANY_U8)], log),
+    (&[("log", None), ("trace", ANY_STRING)], log_trace),
+    (&[("set", TWO_STRINGS)], do_set),
+    (&[("str", ANY_STRING)], create_string),
+    (&[("void", IGNORE_ALL)], void),
+    (&[("|", MANY_I32)], bor),
 ];
 
 // ---

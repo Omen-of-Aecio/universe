@@ -25,7 +25,6 @@ const SPEC: &[cmdmat::Spec<Input, String, GameShellContext>] = &[
     (&[("str", ANY_STRING)], create_string),
     (&[("void", IGNORE_ALL)], void),
     (&[("+", MANY_I32)], add),
-    // (&[("autocomplete", predicates::ANY_STRING)], autocomplete),
     (&[("log", None), ("trace", ANY_STRING)], log_trace),
     (&[("log", None), ("context", ANY_ATOM), ("level", ANY_U8)], log_context),
 ];

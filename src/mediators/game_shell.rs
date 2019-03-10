@@ -25,6 +25,9 @@ mod predicates {
         Decision::Accept(1)
     }
     fn any_string_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
+        if out.is_empty() {
+            return Decision::Deny("No space in output".into());
+        }
         out[0] = Input::String(input[0].to_string());
         Decision::Accept(1)
     }
@@ -40,10 +43,10 @@ mod predicates {
         description: "<atom>",
         decider: any_atom_function,
     };
-    pub const ANY_STRING: &Decider<Input, String> = &Decider {
+    pub const ANY_STRING: Option<&Decider<Input, String>> = Some(&Decider {
         description: "<string>",
         decider: any_string_function,
-    };
+    });
     pub const ANY_U8: &Decider<Input, String> = &Decider {
         description: "<u8>",
         decider: any_u8_function,
@@ -54,13 +57,15 @@ mod predicates {
     };
 }
 
+use self::predicates::*;
+
 #[rustfmt::skip]
 const SPEC: &[cmdmat::Spec<Input, String, GameShellContext>] = &[
-    (&[("log", None), ("global", None), ("level", Some(predicates::ANY_U8))], log),
+    (&[("log", None), ("global", None), ("level", Some(ANY_U8))], log),
+    (&[("set", None), ("key", ANY_STRING), ("value", ANY_STRING)], do_set),
+    (&[("get", None), ("key", ANY_STRING)], do_get),
     // (&[("str", None)], create_string),
     // (&[("ex", None)], number),
-    // (&[("set, None"), ("key", predicates::ANY_STRING), ("value", predicates::ANY_STRING)], do_set),
-    // (&[("get, None"), ("key", predicates::ANY_STRING)], do_get),
     // (&[("void", predicates::ANY_STRING)], void),
     // (&[("+", ANY_I32)], add),
     // (&[("autocomplete", predicates::ANY_STRING)], autocomplete),
@@ -322,20 +327,58 @@ pub enum Input {
     Command(String),
 }
 
+impl Default for Input {
+    fn default() -> Input {
+        Input::U8(0)
+    }
+}
+
 // ---
 
 impl<'a> Evaluate<String> for Gsh<'a> {
     fn evaluate(&mut self, commands: &[Data]) -> String {
         use cmdmat::LookError;
-        let mut stack = [Input::U8(0)];
-        let mut content = Vec::new();
+        let mut stack = [Input::U8(0), Input::default(), Input::default()];
+        let mut content: Vec<String> = Vec::new();
         for cmd in commands {
-            content.push(cmd.content());
+            match cmd {
+                Data::Atom(string) => {
+                    content.push((*string).into());
+                }
+                Data::Command(string) => {
+                    let res = self.interpret_single(string);
+                    match res {
+                        Ok(string) => {
+                            content.push(string);
+                        }
+                        Err(_) => {
+                            panic![];
+                        }
+                    }
+                }
+            }
         }
-        let res = self.commands.lookup(&content[..], &mut stack);
+
+        let content_ref = {
+            let mut content_ref = Vec::new();
+            for i in content.iter() {
+                content_ref.push(&i[..]);
+            }
+            content_ref
+        };
+
+        let res = self.commands.lookup(&content_ref[..], &mut stack);
         match res {
             Ok(fin) => {
-                fin.0(&mut self.gshctx, &stack[..fin.1]);
+                let res = fin.0(&mut self.gshctx, &stack[..fin.1]);
+                return match res {
+                    Ok(res) => {
+                        res.into()
+                    }
+                    Err(res) => {
+                        res.into()
+                    }
+                };
             }
             Err(LookError::DeciderAdvancedTooFar) => {
             }
@@ -378,44 +421,44 @@ mod command_handlers {
 //         sum.to_string()
 //     }
 
-//     pub fn do_get(gsh: &mut Gsh, commands: &[Input]) -> String {
-//         let key;
-//         match commands[0] {
-//             Input::String(ref string) => {
-//                 key = string.clone();
-//             }
-//             _ => {
-//                 return "F".into();
-//             }
-//         }
-//         if let Some(string) = gsh.variables.get(&key) {
-//             string.clone()
-//         } else {
-//             "Does not exist".into()
-//         }
-//     }
+    pub fn do_get(gsh: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        let key;
+        match commands[0] {
+            Input::String(ref string) => {
+                key = string.clone();
+            }
+            _ => {
+                return Err("F".into());
+            }
+        }
+        if let Some(string) = gsh.variables.get(&key) {
+            Ok(string.clone())
+        } else {
+            Err("Does not exist".into())
+        }
+    }
 
-//     pub fn do_set(gsh: &mut Gsh, commands: &[Input]) -> String {
-//         let (key, value);
-//         match commands[0] {
-//             Input::String(ref string) => {
-//                 key = string.clone();
-//             }
-//             _ => {
-//                 return "F".into();
-//             }
-//         }
-//         match commands[1] {
-//             Input::String(ref string) => {
-//                 value = string.clone();
-//             }
-//             _ => {
-//                 return "F".into();
-//             }
-//         }
-//         gsh.variables.insert(key, value);
-//         "OK".into()
-//     }
+    pub fn do_set(gsh: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        let (key, value);
+        match commands[0] {
+            Input::String(ref string) => {
+                key = string.clone();
+            }
+            _ => {
+                return Err("F".into());
+            }
+        }
+        match commands[1] {
+            Input::String(ref string) => {
+                value = string.clone();
+            }
+            _ => {
+                return Err("F".into());
+            }
+        }
+        gsh.variables.insert(key, value);
+        Ok("OK".into())
+    }
 
 //     pub fn create_string(_: &mut Gsh, commands: &[Input]) -> String {
 //         if commands.len() != 1 {
@@ -587,10 +630,12 @@ mod tests {
             let mut cmdmat = cmdmat::Mapping::new();
             cmdmat.register_many(SPEC);
             let mut gsh = GameShell {
-                config_change: None,
-                logger,
-                keep_running,
-                variables: HashMap::new(),
+                gshctx: GameShellContext {
+                    config_change: None,
+                    logger,
+                    keep_running,
+                    variables: HashMap::new(),
+                },
                 commands: Arc::new(cmdmat),
             };
 
@@ -623,10 +668,12 @@ mod tests {
             let mut cmdmat = cmdmat::Mapping::new();
             cmdmat.register_many(SPEC);
             let mut gsh = GameShell {
-                config_change: None,
-                logger,
-                keep_running,
-                variables: HashMap::new(),
+                gshctx: GameShellContext {
+                    config_change: None,
+                    logger,
+                    keep_running,
+                    variables: HashMap::new(),
+                },
                 commands: Arc::new(cmdmat),
             };
 

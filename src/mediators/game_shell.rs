@@ -562,13 +562,7 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
             }
         }
 
-        let content_ref = {
-            let mut content_ref = Vec::new();
-            for i in content.iter() {
-                content_ref.push(&i[..]);
-            }
-            content_ref
-        };
+        let content_ref = content.iter().map(|s| &s[..]).collect::<Vec<_>>();
 
         if let Some(front) = content_ref.first() {
             if *front == "autocomplete" {

@@ -1071,6 +1071,10 @@ mod tests {
                 EvalRes::Ok("context <atom>, global, trace <string> (final)".into()),
                 gsh.interpret_single("autocomplete log").unwrap()
             ];
+            assert_eq![
+                EvalRes::Ok("<string> <string>".into()),
+                gsh.interpret_single("autocomplete set").unwrap()
+            ];
 
             assert_eq![
                 EvalRes::Err("Finalizer does not exist".into()),

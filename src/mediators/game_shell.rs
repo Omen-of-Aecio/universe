@@ -407,10 +407,13 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
                                     "Message parsing succeeded and evaluated, sending response to client",
                                 ),
                             );
-                            if !result.is_empty() {
-                                stream.write_all(result.as_bytes())?;
-                            } else {
-                                stream.write_all(b"OK")?;
+                            match result {
+                                EvalRes::Ok(_res) => {
+                                    stream.write_all(b"OK")?;
+                                }
+                                EvalRes::Err(res) => {
+                                    stream.write_all(res.as_bytes())?;
+                                }
                             }
                             stream.flush()?;
                         } else {
@@ -504,10 +507,22 @@ impl Default for Input {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum EvalRes {
+    Ok(String),
+    Err(String),
+}
+
+impl Default for EvalRes {
+    fn default() -> Self {
+        EvalRes::Ok(String::default())
+    }
+}
+
 // ---
 
-impl<'a> Evaluate<String> for Gsh<'a> {
-    fn evaluate(&mut self, commands: &[Data]) -> String {
+impl<'a> Evaluate<EvalRes> for Gsh<'a> {
+    fn evaluate(&mut self, commands: &[Data]) -> EvalRes {
         use cmdmat::LookError;
         let mut stack = [Input::U8(0), Input::default(), Input::default()];
         let mut content: Vec<String> = Vec::new();
@@ -522,8 +537,11 @@ impl<'a> Evaluate<String> for Gsh<'a> {
                     } else {
                         let res = self.interpret_single(string);
                         match res {
-                            Ok(string) => {
+                            Ok(EvalRes::Ok(string)) => {
                                 content.push(string);
+                            }
+                            Ok(ref res @ EvalRes::Err(_)) => {
+                                return res.clone();
                             }
                             Err(_) => {
                                 panic![];
@@ -562,22 +580,22 @@ impl<'a> Evaluate<String> for Gsh<'a> {
                             })
                             .collect::<Vec<_>>();
                         col.sort();
-                        return col.join(", ");
+                        return EvalRes::Ok(col.join(", "));
                     }
                     Ok(Either::Right(name)) => {
-                        return name.into();
+                        return EvalRes::Ok(name.into());
                     }
                     Err(LookError::DeciderAdvancedTooFar) => {
-                        return "Decider advanced too far".into();
+                        return EvalRes::Err("Decider advanced too far".into());
                     }
                     Err(LookError::DeciderDenied(decider)) => {
-                        return decider.into();
+                        return EvalRes::Err(decider.into());
                     }
                     Err(LookError::FinalizerDoesNotExist) => {
-                        return "Finalizer does not exist".into();
+                        return EvalRes::Err("Finalizer does not exist".into());
                     }
                     Err(LookError::UnknownMapping) => {
-                        return "Unrecognized command".into();
+                        return EvalRes::Err("Unrecognized command".into());
                     }
                 }
             }
@@ -588,21 +606,21 @@ impl<'a> Evaluate<String> for Gsh<'a> {
             Ok(fin) => {
                 let res = fin.0(&mut self.gshctx, &stack[..fin.1]);
                 return match res {
-                    Ok(res) => res.into(),
-                    Err(res) => res.into(),
+                    Ok(res) => EvalRes::Ok(res.into()),
+                    Err(res) => EvalRes::Err(res.into()),
                 };
             }
             Err(LookError::DeciderAdvancedTooFar) => {
-                return "Decider advanced too far".into();
+                return EvalRes::Err("Decider advanced too far".into());
             }
             Err(LookError::DeciderDenied(decider)) => {
-                return decider.into();
+                return EvalRes::Err(decider.into());
             }
             Err(LookError::FinalizerDoesNotExist) => {
-                return "Finalizer does not exist".into();
+                return EvalRes::Err("Finalizer does not exist".into());
             }
             Err(LookError::UnknownMapping) => {
-                return "Unrecognized command".into();
+                return EvalRes::Err("Unrecognized command".into());
             }
         }
     }
@@ -659,10 +677,10 @@ mod tests {
             };
 
             assert_eq![
-                "OK",
+                EvalRes::Ok("OK".into()),
                 gsh.interpret_single("set key lorem value ipsum").unwrap()
             ];
-            assert_eq!["ipsum", gsh.interpret_single("get key lorem").unwrap()];
+            assert_eq![EvalRes::Ok("ipsum".into()), gsh.interpret_single("get key lorem").unwrap()];
 
             // then
             logger_handle
@@ -693,37 +711,37 @@ mod tests {
             };
 
             assert_eq![
-                "Unrecognized command",
+                EvalRes::Err("Unrecognized command".into()),
                 gsh.interpret_single("hello world").unwrap()
             ];
             assert_eq![
-                "some thing\n new ",
+                EvalRes::Ok("some thing\n new ".into()),
                 gsh.interpret_single("str (#some thing\n new )").unwrap()
             ];
-            assert_eq!["6", gsh.interpret_single("+ 1 2 3").unwrap()];
-            assert_eq!["21", gsh.interpret_single("+ 1 (+ 8 9) 3").unwrap()];
-            assert_eq!["21", gsh.interpret_single("+ 1 (+ 8 (+) 9) 3").unwrap()];
-            assert_eq!["22", gsh.interpret_single("+ 1 (+ 8 (+ 1) 9) 3").unwrap()];
+            assert_eq![EvalRes::Ok("6".into()), gsh.interpret_single("+ 1 2 3").unwrap()];
+            assert_eq![EvalRes::Ok("21".into()), gsh.interpret_single("+ 1 (+ 8 9) 3").unwrap()];
+            assert_eq![EvalRes::Ok("21".into()), gsh.interpret_single("+ 1 (+ 8 (+) 9) 3").unwrap()];
+            assert_eq![EvalRes::Ok("22".into()), gsh.interpret_single("+ 1 (+ 8 (+ 1) 9) 3").unwrap()];
             assert_eq![
-                "",
+                EvalRes::Ok("".into()),
                 gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 9) 3\nvoid").unwrap()
             ];
             assert_eq![
-                "Unrecognized command",
+                EvalRes::Err("Unrecognized command".into()),
                 gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 0.6 9) (+ 3\n1\n)")
                     .unwrap()
             ];
             assert_eq![
-                "<atom>",
+                EvalRes::Ok("<atom>".into()),
                 gsh.interpret_single("autocomplete log context").unwrap()
             ];
             assert_eq![
-                "<u8>",
+                EvalRes::Ok("<u8>".into()),
                 gsh.interpret_single("autocomplete log context gsh level ")
                     .unwrap()
             ];
             assert_eq![
-                "context <atom>, global, trace <string> (final)",
+                EvalRes::Ok("context <atom>, global, trace <string> (final)".into()),
                 gsh.interpret_single("autocomplete log").unwrap()
             ];
 

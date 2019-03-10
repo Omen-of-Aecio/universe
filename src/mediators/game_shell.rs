@@ -883,6 +883,16 @@ mod tests {
                 gsh.interpret_single("set key some-value extra").unwrap()
             ];
 
+            assert_eq![
+                EvalRes::Ok("OK".into()),
+                gsh.interpret_single("set a 123").unwrap()
+            ];
+            assert_eq![
+                EvalRes::Ok("130".into()),
+                gsh.interpret_single("+ 7 (get a)").unwrap()
+            ];
+
+
             logger_handle
         };
         logger_handle.join().unwrap();

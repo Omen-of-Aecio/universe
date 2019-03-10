@@ -787,8 +787,8 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
                     Err(LookError::FinalizerDoesNotExist) => {
                         return EvalRes::Err("Finalizer does not exist".into());
                     }
-                    Err(LookError::UnknownMapping) => {
-                        return EvalRes::Err("Unrecognized command".into());
+                    Err(LookError::UnknownMapping(token)) => {
+                        return EvalRes::Err(format!["Unrecognized mapping: {}", token]);
                     }
                 }
             }
@@ -812,8 +812,8 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
             Err(LookError::FinalizerDoesNotExist) => {
                 return EvalRes::Err("Finalizer does not exist".into());
             }
-            Err(LookError::UnknownMapping) => {
-                return EvalRes::Err("Unrecognized command".into());
+            Err(LookError::UnknownMapping(token)) => {
+                return EvalRes::Err(format!["Unrecognized mapping: {}", token]);
             }
         }
     }
@@ -879,7 +879,7 @@ mod tests {
             ];
 
             assert_eq![
-                EvalRes::Err("Unrecognized command".into()),
+                EvalRes::Err("Unrecognized mapping: extra".into()),
                 gsh.interpret_single("set key some-value extra").unwrap()
             ];
 
@@ -891,7 +891,6 @@ mod tests {
                 EvalRes::Ok("130".into()),
                 gsh.interpret_single("+ 7 (get a)").unwrap()
             ];
-
 
             logger_handle
         };
@@ -921,7 +920,7 @@ mod tests {
             };
 
             assert_eq![
-                EvalRes::Err("Unrecognized command".into()),
+                EvalRes::Err("Unrecognized mapping: hello".into()),
                 gsh.interpret_single("hello world").unwrap()
             ];
             assert_eq![
@@ -949,12 +948,12 @@ mod tests {
                 gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 9) 3\nvoid").unwrap()
             ];
             assert_eq![
-                EvalRes::Err("Unrecognized command".into()),
+                EvalRes::Err("Unrecognized mapping: 0.6".into()),
                 gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 0.6 9) (+ 3\n1\n)")
                     .unwrap()
             ];
             assert_eq![
-                EvalRes::Err("Unrecognized command".into()),
+                EvalRes::Err("Unrecognized mapping: undefined".into()),
                 gsh.interpret_single("+ (undefined)").unwrap()
             ];
             assert_eq![

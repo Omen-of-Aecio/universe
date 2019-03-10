@@ -125,7 +125,7 @@ pub enum LookError<D> {
     DeciderAdvancedTooFar,
     DeciderDenied(D),
     FinalizerDoesNotExist,
-    UnknownMapping,
+    UnknownMapping(String),
 }
 
 // ---
@@ -229,7 +229,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
                 return Err(LookError::DeciderAdvancedTooFar);
             }
         }
-        Err(LookError::UnknownMapping)
+        Err(LookError::UnknownMapping(input[0].to_string()))
     }
 
     /// Iterator over the current `Mapping` keys: containing subcommands
@@ -273,7 +273,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
                 return Err(LookError::DeciderAdvancedTooFar);
             }
         }
-        Err(LookError::UnknownMapping)
+        Err(LookError::UnknownMapping(input[0].to_string()))
     }
 }
 

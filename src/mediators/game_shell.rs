@@ -407,11 +407,11 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
                                 ),
                             );
                             match result {
-                                EvalRes::Ok(_res) => {
-                                    stream.write_all(b"OK")?;
+                                EvalRes::Ok(res) => {
+                                    stream.write_all(format!["Ok: {}", res].as_bytes())?;
                                 }
                                 EvalRes::Err(res) => {
-                                    stream.write_all(res.as_bytes())?;
+                                    stream.write_all(format!["Err: {}", res].as_bytes())?;
                                 }
                             }
                             stream.flush()?;
@@ -419,7 +419,7 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
                             s.gshctx
                                 .logger
                                 .error("gsh", Log::Static("Message parsing failed"));
-                            stream.write_all(b"Unable to complete query")?;
+                            stream.write_all(b"Unable to complete query (parse error)")?;
                             stream.flush()?;
                         }
                     } else {

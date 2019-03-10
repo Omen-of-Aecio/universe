@@ -32,6 +32,7 @@ const SPEC: &[cmdmat::Spec<Input, String, GameShellContext>] = &[
     (&[("^", MANY_I32)], xor),
     (&[("&", MANY_I32)], band),
     (&[("|", MANY_I32)], bor),
+    (&[("cat", MANY_STRING)], cat),
     (&[("log", None), ("trace", ANY_STRING)], log_trace),
     (&[("log", None), ("context", ANY_ATOM), ("level", ANY_U8)], log_context),
 ];
@@ -225,6 +226,21 @@ mod command_handlers {
         Ok(sum.to_string())
     }
 
+    pub fn cat(gsh: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        let mut string = String::new();
+        for cmd in commands {
+            match cmd {
+                Input::String(res) => {
+                    string += res;
+                }
+                _ => {
+                    return Err("Expected string".into());
+                }
+            }
+        }
+        Ok(string)
+    }
+
     pub fn do_get(gsh: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
         let key;
         match commands[0] {
@@ -369,6 +385,16 @@ mod predicates {
         Decision::Accept(1)
     }
 
+    fn many_string_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
+        ret_if_err![aslen(input, input.len(), out, input.len())];
+        let mut cnt = 0;
+        for (idx, i) in input.iter().enumerate() {
+            out[idx] = Input::String((*i).into());
+            cnt = idx + 1;
+        }
+        Decision::Accept(cnt)
+    }
+
     fn two_string_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
         ret_if_err![aslen(input, 2, out, 2)];
         out[0] = Input::String(input[0].to_string());
@@ -422,6 +448,11 @@ mod predicates {
     pub const ANY_STRING: SomeDec = Some(&Decider {
         description: "<string>",
         decider: any_string_function,
+    });
+
+    pub const MANY_STRING: SomeDec = Some(&Decider {
+        description: "<string> ...",
+        decider: many_string_function,
     });
 
     pub const TWO_STRINGS: SomeDec = Some(&Decider {
@@ -1048,6 +1079,21 @@ mod tests {
             assert_eq![
                 EvalRes::Err("Expected <u8> but got: -1".into()),
                 gsh.interpret_single("log context gsh level -1")
+                    .unwrap()
+            ];
+            assert_eq![
+                EvalRes::Err("Expected <u8> but got: -1".into()),
+                gsh.interpret_single("log context gsh level (+ 1 2 -4)")
+                    .unwrap()
+            ];
+            assert_eq![
+                EvalRes::Err("Unrecognized mapping: xyz".into()),
+                gsh.interpret_single("log context gsh level (+ xyz)")
+                    .unwrap()
+            ];
+            assert_eq![
+                EvalRes::Ok("alphabetagammayotta6Hello World".into()),
+                gsh.interpret_single("cat alpha beta (cat gamma yotta) (+ 1 2 3) (#Hello World)")
                     .unwrap()
             ];
 

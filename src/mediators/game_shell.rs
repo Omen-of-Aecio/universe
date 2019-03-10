@@ -200,7 +200,7 @@ mod predicates {
         Decision::Accept(cnt)
     }
 
-    fn ignore_all(_: &[&str], out: &mut [Input]) -> Decision<String> {
+    fn ignore_all(_: &[&str], _: &mut [Input]) -> Decision<String> {
         Decision::Accept(0)
     }
 
@@ -546,7 +546,6 @@ impl<'a> Evaluate<String> for Gsh<'a> {
             if *front == "autocomplete" {
                 match self.commands.partial_lookup(&content_ref[1..], &mut stack) {
                     Ok(Either::Left(mapping)) => {
-                        let mut res = String::new();
                         let mut col = mapping
                             .get_direct_keys()
                             .map(|k| {

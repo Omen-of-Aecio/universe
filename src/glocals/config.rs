@@ -1,15 +1,14 @@
-use serde_derive::{Deserialize, Serialize};
 use config::{config, get_paths_recurse};
+use serde_derive::{Deserialize, Serialize};
 
 // enum Key { A, B, C};
 // impl ConfigValue for Key {
-    // fn from_value(v: Value) -> Key {
-        // if let Value::String(s) = v {
-            // // ...
-        // }
-    // }
+// fn from_value(v: Value) -> Key {
+// if let Value::String(s) = v {
+// // ...
 // }
-
+// }
+// }
 
 config! {
 #[derive(Serialize, Deserialize, Default)]
@@ -22,7 +21,6 @@ struct Config {
     }
     fps: f32,
 }}
-
 
 // Turns into:
 /*

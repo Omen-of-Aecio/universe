@@ -7,6 +7,7 @@ use clap;
 pub use glium::uniforms::{MagnifySamplerFilter, MinifySamplerFilter};
 use glium::{implement_vertex, texture::Texture2d};
 use rodio;
+use serde_derive::Deserialize;
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -14,7 +15,6 @@ use std::{
     time::Duration,
     vec::Vec,
 };
-use serde_derive::{Deserialize};
 
 pub mod config;
 

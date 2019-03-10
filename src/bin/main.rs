@@ -1,12 +1,12 @@
+use benchmarker::Benchmarker;
 use clap::crate_authors;
 use clap::{App, Arg};
 use glium::{glutin, DisplayBuild};
+use input;
 use rodio;
 use std::net::TcpStream;
 use std::sync::atomic::Ordering;
-use benchmarker::Benchmarker;
 use universe::{glocals::*, *};
-use input;
 
 // ---
 

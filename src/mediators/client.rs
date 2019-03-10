@@ -1,16 +1,16 @@
 use crate::glocals::*;
-use benchmarker::Benchmarker;
-use geometry::{boxit::Boxit, cam::Camera, grid2d::Grid, vec::Vec2};
-use input::Input;
-use logger::Logger;
 use crate::mediators::{
     does_line_collide_with_grid::*, random_map_generator, render_grid, render_polygon,
 };
+use benchmarker::Benchmarker;
+use geometry::{boxit::Boxit, cam::Camera, grid2d::Grid, vec::Vec2};
 use glium::{
     self,
     glutin::{self, MouseScrollDelta, VirtualKeyCode as Key},
     Surface,
 };
+use input::Input;
+use logger::Logger;
 
 fn initialize_grid(s: &mut Grid<u8>) {
     s.resize(1000, 1000);

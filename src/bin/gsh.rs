@@ -1,3 +1,4 @@
+use metac::PartialParse;
 use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;
@@ -6,7 +7,6 @@ use rustyline::{Editor, Helper};
 use std::cell::{Cell, RefCell};
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
-use metac::PartialParse;
 
 static HISTORY_FILE: &str = ".gsh-history.txt";
 

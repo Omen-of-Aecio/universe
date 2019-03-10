@@ -133,7 +133,8 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
                 }
             }
             if input.len() > advance_output && output.len() >= advance_output {
-                let res = handler.lookup(&input[1 + advance_output..], &mut output[advance_output..]);
+                let res =
+                    handler.lookup(&input[1 + advance_output..], &mut output[advance_output..]);
                 if let Ok(mut res) = res {
                     res.1 += advance_output;
                     return Ok(res);

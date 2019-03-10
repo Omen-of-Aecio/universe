@@ -57,7 +57,7 @@
 //!
 //! fn main() {
 //!     let mut mapping = Mapping::new();
-//!     mapping.register(SPEC);
+//!     mapping.register(SPEC).unwrap();
 //!
 //!     let mut accept_buf = [Accept::I32(0)];
 //!     let handler = mapping.lookup(&["my-command-name", "123"], &mut accept_buf);
@@ -82,12 +82,14 @@ use std::collections::HashMap;
 
 // ---
 
-/// Spec: The command specification format
+/// The command specification format
 pub type Spec<'b, 'a, A, D, C> = (
     &'b [(&'static str, Option<&'a Decider<A, D>>)],
     Finalizer<A, C>,
 );
 
+/// A finalizer is the function that runs to handle the entirety of the command after it has been
+/// verified by the deciders.
 pub type Finalizer<A, C> = fn(&mut C, &[A]) -> Result<String, String>;
 
 /// A decision contains information about token consumption by the decider
@@ -110,12 +112,14 @@ pub struct Decider<A, D> {
     pub decider: fn(&[&str], &mut [A]) -> Decision<D>,
 }
 
+/// Errors we can get by registering specs.
 #[derive(Debug, PartialEq)]
 pub enum RegError {
     DeciderAlreadyExists,
     FinalizerAlreadyExists,
 }
 
+/// Errors happening during lookup of a command.
 #[derive(Debug, PartialEq)]
 pub enum LookError<D> {
     DeciderAdvancedTooFar,
@@ -126,6 +130,11 @@ pub enum LookError<D> {
 
 // ---
 
+/// Node in the matching tree
+///
+/// A `Mapping` is used to interface with `cmdmat`. Each node defines a point in a command tree,
+/// containing subcommands, deciders for argument parsing, and a finalizer if this mapping can be
+/// run.
 pub struct Mapping<'a, A, D, C> {
     map: HashMap<&'a str, Mapping<'a, A, D, C>>,
     decider: Option<&'a Decider<A, D>>,
@@ -133,6 +142,7 @@ pub struct Mapping<'a, A, D, C> {
 }
 
 impl<'a, A, D, C> Mapping<'a, A, D, C> {
+    /// Create a new mapping instance
     pub fn new() -> Mapping<'a, A, D, C> {
         Mapping {
             map: HashMap::new(),
@@ -141,6 +151,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         }
     }
 
+    /// Register many command specs at once, see `register` for more detail
     pub fn register_many<'b>(&mut self, spec: &[Spec<'b, 'a, A, D, C>]) -> Result<(), RegError> {
         for subspec in spec {
             self.register(subspec.clone())?;
@@ -148,6 +159,11 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         Ok(())
     }
 
+    /// Register a single command specification into the tree
+    ///
+    /// The specification will be merged with existing command specifications, and may not
+    /// overwrite commands with new deciders or finalizers. The overriding decider must be `None`
+    /// to avoid an error.
     pub fn register<'b>(&mut self, spec: Spec<'b, 'a, A, D, C>) -> Result<(), RegError> {
         if spec.0.is_empty() {
             if self.finalizer.is_some() {
@@ -175,6 +191,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         Ok(())
     }
 
+    /// Looks up a command and runs deciders to collect all arguments
     pub fn lookup(
         &self,
         input: &[&str],
@@ -215,12 +232,17 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         Err(LookError::UnknownMapping)
     }
 
+    /// Iterator over the current `Mapping` keys: containing subcommands
     pub fn get_direct_keys(&self) -> impl Iterator<Item = (&&str, Option<&'static str>, bool)> {
         self.map
             .iter()
             .map(|(k, v)| (k, v.decider.map(|d| d.description), v.finalizer.is_some()))
     }
 
+    /// Perform a partial lookup, useful for autocompletion
+    ///
+    /// Due to the node structure of `Mapping`, this function returns either a `Mapping` or a
+    /// `&str` describing the active decider.
     pub fn partial_lookup<'b>(
         &'b self,
         input: &'b [&str],

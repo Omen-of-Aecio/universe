@@ -123,7 +123,7 @@ pub enum RegError {
 #[derive(Debug, PartialEq)]
 pub enum LookError<D> {
     DeciderAdvancedTooFar,
-    DeciderDenied(D),
+    DeciderDenied(String, D),
     FinalizerDoesNotExist,
     UnknownMapping(String),
 }
@@ -212,7 +212,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
                         advance_output = res;
                     }
                     Decision::Deny(res) => {
-                        return Err(LookError::DeciderDenied(res));
+                        return Err(LookError::DeciderDenied(decider.description.into(), res));
                     }
                 }
             }
@@ -262,7 +262,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
                         advance_output = res;
                     }
                     Decision::Deny(res) => {
-                        return Err(LookError::DeciderDenied(res));
+                        return Err(LookError::DeciderDenied(decider.description.into(), res));
                     }
                 }
             }

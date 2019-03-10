@@ -330,10 +330,33 @@ mod predicates {
     use super::*;
     use cmdmat::{Decider, Decision};
 
+    macro_rules! ret_if_err {
+        ($e:expr) => {{
+            let res = $e;
+            match res {
+                Ok(x) => x,
+                Err(res) => {
+                    return res;
+                }
+            }
+        }};
+    }
+
+    fn aslen(input: &[&str], input_l: usize, out: &[Input], out_l: usize) -> Result<(), Decision<String>> {
+        if input.len() < input_l {
+            Err(Decision::Deny(format!["Too few elements: {:?}", input]))
+        } else if out.len() < out_l {
+            Err(Decision::Deny(format!["Too few outputs: {}, desired: {}", out.len(), out_l]))
+        } else {
+            Ok(())
+        }
+    }
+
     fn any_atom_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
+        ret_if_err![aslen(input, 1, out, 1)];
         for i in input[0].chars() {
             if i.is_whitespace() {
-                return Decision::Deny("Expected atom, item contains whitespace".into());
+                return Decision::Deny(input[0].into());
             }
         }
         out[0] = Input::Atom(input[0].to_string());
@@ -341,31 +364,33 @@ mod predicates {
     }
 
     fn any_string_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
-        if out.is_empty() {
-            return Decision::Deny("No space in output".into());
-        }
+        ret_if_err![aslen(input, 1, out, 1)];
         out[0] = Input::String(input[0].to_string());
         Decision::Accept(1)
     }
 
     fn two_string_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
-        if out.len() < 2 {
-            return Decision::Deny("No space in output".into());
-        }
-        if input.len() < 2 {
-            return Decision::Deny("Not enough arguments provided".into());
-        }
+        ret_if_err![aslen(input, 2, out, 2)];
         out[0] = Input::String(input[0].to_string());
         out[1] = Input::String(input[1].to_string());
         Decision::Accept(2)
     }
 
     fn any_u8_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
-        out[0] = input[0].parse::<u8>().ok().map(Input::U8).unwrap();
+        ret_if_err![aslen(input, 1, out, 1)];
+        match input[0].parse::<u8>().ok().map(Input::U8) {
+            Some(num) => {
+                out[0] = num;
+            }
+            None => {
+                return Decision::Deny(input[0].into());
+            }
+        }
         Decision::Accept(1)
     }
 
     fn any_i32_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
+        ret_if_err![aslen(input, 1, out, 1)];
         out[0] = input[0].parse::<i32>().ok().map(Input::I32).unwrap();
         Decision::Accept(1)
     }
@@ -373,8 +398,9 @@ mod predicates {
     fn many_i32_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
         let mut cnt = 0;
         for i in input.iter() {
-            if let Some(input) = i.parse::<i32>().ok().map(Input::I32) {
-                out[cnt] = input;
+            if let Some(num) = i.parse::<i32>().ok().map(Input::I32) {
+                ret_if_err![aslen(input, cnt + 1, out, cnt + 1)];
+                out[cnt] = num;
                 cnt += 1;
             } else {
                 break;
@@ -781,8 +807,8 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
                     Err(LookError::DeciderAdvancedTooFar) => {
                         return EvalRes::Err("Decider advanced too far".into());
                     }
-                    Err(LookError::DeciderDenied(decider)) => {
-                        return EvalRes::Err(decider.into());
+                    Err(LookError::DeciderDenied(desc, decider)) => {
+                        return EvalRes::Err(format!["Expected {} but got: {}", desc, decider);
                     }
                     Err(LookError::FinalizerDoesNotExist) => {
                         return EvalRes::Err("Finalizer does not exist".into());
@@ -806,10 +832,11 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
             Err(LookError::DeciderAdvancedTooFar) => {
                 return EvalRes::Err("Decider advanced too far".into());
             }
-            Err(LookError::DeciderDenied(decider)) => {
-                return EvalRes::Err(decider.into());
+            Err(LookError::DeciderDenied(desc, decider)) => {
+                return EvalRes::Err(format!["Expected {} but got: {}", desc, decider);
             }
             Err(LookError::FinalizerDoesNotExist) => {
+                let mapping = self.commands.partial_lookup(&content_ref[..], &mut stack);
                 return EvalRes::Err("Finalizer does not exist".into());
             }
             Err(LookError::UnknownMapping(token)) => {
@@ -969,6 +996,10 @@ mod tests {
                 gsh.interpret_single("- 3").unwrap()
             ];
             assert_eq![
+                EvalRes::Ok("0".into()),
+                gsh.interpret_single("-").unwrap()
+            ];
+            assert_eq![
                 EvalRes::Ok("3".into()),
                 gsh.interpret_single("- 3 0").unwrap()
             ];
@@ -1008,6 +1039,16 @@ mod tests {
             assert_eq![
                 EvalRes::Ok("context <atom>, global, trace <string> (final)".into()),
                 gsh.interpret_single("autocomplete log").unwrap()
+            ];
+
+            assert_eq![
+                EvalRes::Err("Finalizer does not exist".into()),
+                gsh.interpret_single("log").unwrap()
+            ];
+            assert_eq![
+                EvalRes::Err("Expected <u8> but got: -1".into()),
+                gsh.interpret_single("log context gsh level -1")
+                    .unwrap()
             ];
 
             // then

@@ -197,6 +197,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         Ok(())
     }
 
+    /// Looks up a command and runs deciders to collect all arguments
     pub fn lookup<'o>(
         &self,
         input: &[&str],

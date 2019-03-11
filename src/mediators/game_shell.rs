@@ -775,22 +775,10 @@ fn lookerr_to_string(err: LookError<String>) -> String {
 
 // ---
 
-impl<'a> Evaluate<EvalRes> for Gsh<'a> {
-    fn evaluate(&mut self, commands: &[Data]) -> EvalRes {
-        let mut stack = [
-            Input::default(),
-            Input::default(),
-            Input::default(),
-            Input::default(),
-            Input::default(),
-            Input::default(),
-            Input::default(),
-            Input::default(),
-            Input::default(),
-            Input::default(),
-        ];
+impl<'a> Gsh<'a> {
+    fn parse_subcommands(&mut self, cmds: &[Data]) -> Result<Vec<String>, EvalRes> {
         let mut content: Vec<String> = Vec::new();
-        for cmd in commands {
+        for cmd in cmds {
             match cmd {
                 Data::Atom(string) => {
                     content.push((*string).into());
@@ -805,23 +793,45 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
                                 content.push(string);
                             }
                             Ok(ref res @ EvalRes::Err(_)) => {
-                                return res.clone();
+                                return Err(res.clone());
                             }
                             Err(ParseError::DanglingLeftParenthesis) => {
-                                return EvalRes::Err("Dangling left parenthesis".into());
+                                return Err(EvalRes::Err("Dangling left parenthesis".into()));
                             }
                             Err(ParseError::InputHasTooManyElements) => {
-                                return EvalRes::Err("Too many elements to parse".into());
+                                return Err(EvalRes::Err("Too many elements to parse".into()));
                             }
                             Err(ParseError::PrematureRightParenthesis) => {
-                                return EvalRes::Err("Right parenthesis encountered with no matching left parenthesis".into());
+                                return Err(EvalRes::Err("Right parenthesis encountered with no matching left parenthesis".into()));
                             }
                         }
                     }
                 }
             }
         }
+        Ok(content)
+    }
+}
 
+impl<'a> Evaluate<EvalRes> for Gsh<'a> {
+    fn evaluate(&mut self, commands: &[Data]) -> EvalRes {
+        let mut stack = [
+            Input::default(),
+            Input::default(),
+            Input::default(),
+            Input::default(),
+            Input::default(),
+            Input::default(),
+            Input::default(),
+            Input::default(),
+            Input::default(),
+            Input::default(),
+        ];
+
+        let content = match self.parse_subcommands(commands) {
+            Ok(content) => content,
+            Err(err) => return err,
+        };
         let content_ref = content.iter().map(|s| &s[..]).collect::<Vec<_>>();
 
         if let Some(front) = content_ref.first() {
@@ -865,9 +875,7 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
                     Err(res) => EvalRes::Err(res),
                 }
             }
-            Err(err) => {
-                return EvalRes::Err(lookerr_to_string(err));
-            }
+            Err(err) => EvalRes::Err(lookerr_to_string(err)),
         }
     }
 }

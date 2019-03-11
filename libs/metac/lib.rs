@@ -75,27 +75,25 @@
 //! the interpreter will separately interpret each line.
 //!
 //! However, it is sometimes very desirable to write code on multiple lines. The only way to do
-//! this in metac is by using parentheses:
+//! this in metac is by using parentheses or `interpret_single`:
 //! ```
 //! use metac::{Data, Evaluate};
 //! fn main() {
-//!     struct Eval {
-//!         invoked: usize,
-//!     }
+//!     struct Eval { }
 //!     impl Evaluate<usize> for Eval {
 //!         fn evaluate(&mut self, statement: &[Data]) -> usize {
 //!             statement.len()
 //!         }
 //!     }
 //!
-//!     let mut eval = Eval { invoked: 0 };
+//!     let mut eval = Eval { };
 //!
 //!     assert_eq![5, eval.interpret_single("This is\na single statement").unwrap()];
 //!
 //!     // Note: The return value is the result of interpreting the last statement, which is why
 //!     // it returns 3 instead of 2 (the first statement) or 5 (the sum).
 //!     assert_eq![3, eval.interpret_multiple("Here are\ntwo unrelated statements").unwrap()];
-//!     assert_eq![5, eval.interpret_single("Here are\ntwo unrelated statements").unwrap()];
+//!     assert_eq![5, eval.interpret_single("Here are\ntwo related statements").unwrap()];
 //!
 //!     // Because the "\n" was present during an opening parenthesis, both lines are considered
 //!     // part of the same statement, hence 5 elements in this statement.
@@ -195,7 +193,7 @@ pub trait Evaluate<T: Default> {
     }
 }
 
-/// A partial parse is a parse where we send single bytes into the parser and get back a complete↲
+/// A partial parse is a parse where we send single bytes into the parser and get back a complete
 /// parsing state. This is useful when reading TCP streams or other streams that may yield at any
 /// point in time.
 ///

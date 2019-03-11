@@ -56,13 +56,12 @@
 //!     let mut mapping = Mapping::default();
 //!     mapping.register(SPEC).unwrap();
 //!
-//!     let mut accept_buf = SVec::<_>::new();
-//!     let handler = mapping.lookup(&["my-command-name", "123"], &mut accept_buf);
+//!     let handler = mapping.lookup(&["my-command-name", "123"]);
 //!
 //!     match handler {
 //!         Ok((func, buf)) => {
 //!             let mut ctx = 0i32;
-//!             func(&mut ctx, buf); // prints hello world
+//!             func(&mut ctx, &buf); // prints hello world
 //!         }
 //!         Err(look_err) => {
 //!             println!["{:?}", look_err];
@@ -92,7 +91,7 @@ pub type Spec<'b, 'a, A, D, C> = (
 /// verified by the deciders.
 pub type Finalizer<A, C> = fn(&mut C, &[A]) -> Result<String, String>;
 
-pub type FinWithArgs<'o, A, C> = (Finalizer<A, C>, &'o mut [A]);
+pub type FinWithArgs<'o, A, C> = (Finalizer<A, C>, SVec<A>);
 
 /// Either a mapping or a descriptor of a mapping
 pub type MapOrDesc<'a, 'b, A, D, C> = Either<&'b Mapping<'a, A, D, C>, &'a str>;
@@ -198,13 +197,10 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
     }
 
     /// Looks up a command and runs deciders to collect all arguments
-    pub fn lookup<'o>(
-        &self,
-        input: &[&str],
-        output: &'o mut SVec<A>,
-    ) -> Result<FinWithArgs<'o, A, C>, LookError<D>> {
-        match self.lookup_internal(input, output) {
-            Ok((finalizer, advance)) => Ok((finalizer, &mut output[..])),
+    pub fn lookup(&self, input: &[&str]) -> Result<FinWithArgs<A, C>, LookError<D>> {
+        let mut output = SVec::<A>::new();
+        match self.lookup_internal(input, &mut output) {
+            Ok((finalizer, _advance)) => Ok((finalizer, output)),
             Err(err) => Err(err),
         }
     }
@@ -235,8 +231,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
                 }
             }
             if input.len() > advance_output {
-                let res = handler
-                    .lookup_internal(&input[1 + advance_output..], output);
+                let res = handler.lookup_internal(&input[1 + advance_output..], output);
                 if let Ok(mut res) = res {
                     res.1 += advance_output;
                     return Ok(res);
@@ -285,8 +280,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
                 }
             }
             if input.len() > advance_output {
-                return handler
-                    .partial_lookup(&input[1 + advance_output..], output);
+                return handler.partial_lookup(&input[1 + advance_output..], output);
             } else {
                 return Err(LookError::DeciderAdvancedTooFar);
             }
@@ -319,7 +313,7 @@ mod tests {
         let mut mapping: Mapping<Accept, (), Context> = Mapping::default();
         mapping.register((&[("add-one", None)], add_one)).unwrap();
         let mut output = SVec::<_>::new();
-        let handler = mapping.lookup(&["add-one"], &mut output).unwrap();
+        let handler = mapping.lookup(&["add-one"]).unwrap();
         assert_eq![0, handler.1.len()];
         let mut ctx = 123;
         handler.0(&mut ctx, &output).unwrap();
@@ -329,8 +323,7 @@ mod tests {
     #[test]
     fn mapping_does_not_exist() {
         let mapping: Mapping<Accept, (), Context> = Mapping::default();
-        let mut output = SVec::<_>::new();
-        if let Err(err) = mapping.lookup(&["add-one"], &mut output) {
+        if let Err(err) = mapping.lookup(&["add-one"]) {
             assert_eq![LookError::UnknownMapping("add-one".into()), err];
         } else {
             assert![false];
@@ -395,8 +388,7 @@ mod tests {
             .register((&[("add-one", Some(&DECIDE))], add_one))
             .unwrap();
 
-        let mut output = SVec::<_>::new();
-        let out = mapping.lookup(&["add-one", "123"], &mut output).unwrap();
+        let out = mapping.lookup(&["add-one", "123"]).unwrap();
         assert_eq![1, out.1.len()];
         assert_eq![true, out.1[0]];
     }
@@ -419,8 +411,7 @@ mod tests {
             .register((&[("add-one", Some(&DECIDE))], add_one))
             .unwrap();
 
-        let mut output = SVec::<_>::new();
-        if let Err(err) = mapping.lookup(&["add-one", "123"], &mut output) {
+        if let Err(err) = mapping.lookup(&["add-one", "123"]) {
             assert_eq![LookError::DeciderAdvancedTooFar, err];
         } else {
             assert![false];
@@ -445,10 +436,7 @@ mod tests {
             .register((&[("add-one", Some(&DECIDE))], add_one))
             .unwrap();
 
-        let mut output = SVec::<_>::new();
-        mapping
-            .lookup(&["add-one", "123", "456"], &mut output)
-            .unwrap();
+        let output = mapping.lookup(&["add-one", "123", "456"]).unwrap().1;
         assert_eq![2, output.len()];
         assert_eq![true, output[0]];
         assert_eq![false, output[1]];
@@ -470,9 +458,8 @@ mod tests {
             .register((&[("add-one", Some(&DECIDE))], add_one))
             .unwrap();
 
-        let mut output = SVec::<_>::new();
-        mapping.lookup(&["add-one", "123", "456"], &mut output).unwrap();
-        assert_eq![0, output.len()];
+        let output = mapping.lookup(&["add-one", "123", "456"]).unwrap();
+        assert_eq![0, output.1.len()];
     }
 
     #[test]
@@ -505,14 +492,11 @@ mod tests {
             .register((&[("sum", Some(&DECIDE))], do_sum))
             .unwrap();
 
-        let mut output = SVec::<_>::new();
-        let handler = mapping
-            .lookup(&["sum", "123", "456", "789"], &mut output)
-            .unwrap();
+        let handler = mapping.lookup(&["sum", "123", "456", "789"]).unwrap();
         assert_eq![3, handler.1.len()];
 
         let mut ctx = 0;
-        handler.0(&mut ctx, &output).unwrap();
+        handler.0(&mut ctx, &handler.1).unwrap();
         assert_eq![1368, ctx];
     }
 
@@ -526,16 +510,13 @@ mod tests {
             ))
             .unwrap();
 
-        let mut output = SVec::<_>::new();
-        mapping
-            .lookup(&["lorem", "ipsum", "dolor"], &mut output)
-            .unwrap();
-        if let Err(err) = mapping.lookup(&["lorem", "ipsum", "dolor", "exceed"], &mut output) {
+        mapping.lookup(&["lorem", "ipsum", "dolor"]).unwrap();
+        if let Err(err) = mapping.lookup(&["lorem", "ipsum", "dolor", "exceed"]) {
             assert_eq![LookError::UnknownMapping("exceed".into()), err];
         } else {
             assert![false];
         }
-        if let Err(err) = mapping.lookup(&["lorem", "ipsum"], &mut output) {
+        if let Err(err) = mapping.lookup(&["lorem", "ipsum"]) {
             assert_eq![LookError::FinalizerDoesNotExist, err];
         } else {
             assert![false];
@@ -555,16 +536,13 @@ mod tests {
             .register((&[("lorem", None), ("ipsum", None)], add_one))
             .unwrap();
 
-        let mut output = SVec::<_>::new();
-        mapping
-            .lookup(&["lorem", "ipsum", "dolor"], &mut output)
-            .unwrap();
-        if let Err(err) = mapping.lookup(&["lorem", "ipsum", "dolor", "exceed"], &mut output) {
+        mapping.lookup(&["lorem", "ipsum", "dolor"]).unwrap();
+        if let Err(err) = mapping.lookup(&["lorem", "ipsum", "dolor", "exceed"]) {
             assert_eq![LookError::UnknownMapping("exceed".into()), err];
         } else {
             assert![false];
         }
-        mapping.lookup(&["lorem", "ipsum"], &mut output).unwrap();
+        mapping.lookup(&["lorem", "ipsum"]).unwrap();
     }
 
     #[test]
@@ -664,11 +642,8 @@ mod tests {
                 add_one,
             ))
             .unwrap();
-        let mut output = SVec::<_>::new();
         b.iter(|| {
-            mapping
-                .lookup(black_box(&["lorem", "ipsum", "dolor"]), &mut output)
-                .unwrap();
+            black_box(mapping.lookup(black_box(&["lorem", "ipsum", "dolor"]))).unwrap();
         });
     }
 

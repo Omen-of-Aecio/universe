@@ -358,12 +358,7 @@ mod predicates {
         }};
     }
 
-    fn aslen(
-        input: &[&str],
-        input_l: usize,
-        out: &[Input],
-        out_l: usize,
-    ) -> Result<(), Decision<String>> {
+    fn aslen(input: &[&str], input_l: usize) -> Result<(), Decision<String>> {
         if input.len() < input_l {
             Err(Decision::Deny(format!["Too few elements: {:?}", input]))
         } else {
@@ -372,7 +367,7 @@ mod predicates {
     }
 
     fn any_atom_function(input: &[&str], out: &mut SVec<Input>) -> Decision<String> {
-        ret_if_err![aslen(input, 1, out, 1)];
+        ret_if_err![aslen(input, 1)];
         for i in input[0].chars() {
             if i.is_whitespace() {
                 return Decision::Deny(input[0].into());
@@ -383,13 +378,13 @@ mod predicates {
     }
 
     fn any_string_function(input: &[&str], out: &mut SVec<Input>) -> Decision<String> {
-        ret_if_err![aslen(input, 1, out, 1)];
+        ret_if_err![aslen(input, 1)];
         out.push(Input::String(input[0].to_string()));
         Decision::Accept(1)
     }
 
     fn many_string_function(input: &[&str], out: &mut SVec<Input>) -> Decision<String> {
-        ret_if_err![aslen(input, input.len(), out, input.len())];
+        ret_if_err![aslen(input, input.len())];
         let mut cnt = 0;
         for (idx, i) in input.iter().enumerate() {
             out.push(Input::String((*i).into()));
@@ -399,14 +394,14 @@ mod predicates {
     }
 
     fn two_string_function(input: &[&str], out: &mut SVec<Input>) -> Decision<String> {
-        ret_if_err![aslen(input, 2, out, 2)];
+        ret_if_err![aslen(input, 2)];
         out.push(Input::String(input[0].to_string()));
         out.push(Input::String(input[1].to_string()));
         Decision::Accept(2)
     }
 
     fn any_u8_function(input: &[&str], out: &mut SVec<Input>) -> Decision<String> {
-        ret_if_err![aslen(input, 1, out, 1)];
+        ret_if_err![aslen(input, 1)];
         match input[0].parse::<u8>().ok().map(Input::U8) {
             Some(num) => {
                 out.push(num);
@@ -422,7 +417,7 @@ mod predicates {
         let mut cnt = 0;
         for i in input.iter() {
             if let Some(num) = i.parse::<i32>().ok().map(Input::I32) {
-                ret_if_err![aslen(input, cnt + 1, out, cnt + 1)];
+                ret_if_err![aslen(input, cnt + 1)];
                 out.push(num);
                 cnt += 1;
             } else {
@@ -848,10 +843,10 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
             }
         }
 
-        let res = self.commands.lookup(&content_ref[..], &mut stack);
+        let res = self.commands.lookup(&content_ref[..]);
         match res {
             Ok(fin) => {
-                let res = fin.0(&mut self.gshctx, fin.1);
+                let res = fin.0(&mut self.gshctx, &fin.1);
                 match res {
                     Ok(res) => EvalRes::Ok(res),
                     Err(res) => EvalRes::Err(res),
@@ -1157,7 +1152,7 @@ mod tests {
     }
 
     #[bench]
-    fn adding_a_bunch_of_numbers(b: &mut Bencher) -> io::Result<()> {
+    fn speed_of_adding_a_bunch_of_numbers(b: &mut Bencher) -> io::Result<()> {
         let logger_handle = {
             // given
             let (mut logger, logger_handle) = logger::Logger::spawn();

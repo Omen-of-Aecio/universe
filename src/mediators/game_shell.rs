@@ -1,7 +1,7 @@
 use self::command_handlers::*;
 use self::predicates::*;
 use crate::glocals::{GameShell, GameShellContext, Log};
-use cmdmat::{self, LookError};
+use cmdmat::{self, LookError, SVec};
 use either::Either;
 use logger::{self, Logger};
 use metac::{Data, Evaluate, ParseError, PartialParse};
@@ -366,56 +366,50 @@ mod predicates {
     ) -> Result<(), Decision<String>> {
         if input.len() < input_l {
             Err(Decision::Deny(format!["Too few elements: {:?}", input]))
-        } else if out.len() < out_l {
-            Err(Decision::Deny(format![
-                "Too few outputs: {}, desired: {}",
-                out.len(),
-                out_l
-            ]))
         } else {
             Ok(())
         }
     }
 
-    fn any_atom_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
+    fn any_atom_function(input: &[&str], out: &mut SVec<Input>) -> Decision<String> {
         ret_if_err![aslen(input, 1, out, 1)];
         for i in input[0].chars() {
             if i.is_whitespace() {
                 return Decision::Deny(input[0].into());
             }
         }
-        out[0] = Input::Atom(input[0].to_string());
+        out.push(Input::Atom(input[0].to_string()));
         Decision::Accept(1)
     }
 
-    fn any_string_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
+    fn any_string_function(input: &[&str], out: &mut SVec<Input>) -> Decision<String> {
         ret_if_err![aslen(input, 1, out, 1)];
-        out[0] = Input::String(input[0].to_string());
+        out.push(Input::String(input[0].to_string()));
         Decision::Accept(1)
     }
 
-    fn many_string_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
+    fn many_string_function(input: &[&str], out: &mut SVec<Input>) -> Decision<String> {
         ret_if_err![aslen(input, input.len(), out, input.len())];
         let mut cnt = 0;
         for (idx, i) in input.iter().enumerate() {
-            out[idx] = Input::String((*i).into());
+            out.push(Input::String((*i).into()));
             cnt = idx + 1;
         }
         Decision::Accept(cnt)
     }
 
-    fn two_string_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
+    fn two_string_function(input: &[&str], out: &mut SVec<Input>) -> Decision<String> {
         ret_if_err![aslen(input, 2, out, 2)];
-        out[0] = Input::String(input[0].to_string());
-        out[1] = Input::String(input[1].to_string());
+        out.push(Input::String(input[0].to_string()));
+        out.push(Input::String(input[1].to_string()));
         Decision::Accept(2)
     }
 
-    fn any_u8_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
+    fn any_u8_function(input: &[&str], out: &mut SVec<Input>) -> Decision<String> {
         ret_if_err![aslen(input, 1, out, 1)];
         match input[0].parse::<u8>().ok().map(Input::U8) {
             Some(num) => {
-                out[0] = num;
+                out.push(num);
             }
             None => {
                 return Decision::Deny(input[0].into());
@@ -424,12 +418,12 @@ mod predicates {
         Decision::Accept(1)
     }
 
-    fn many_i32_function(input: &[&str], out: &mut [Input]) -> Decision<String> {
+    fn many_i32_function(input: &[&str], out: &mut SVec<Input>) -> Decision<String> {
         let mut cnt = 0;
         for i in input.iter() {
             if let Some(num) = i.parse::<i32>().ok().map(Input::I32) {
                 ret_if_err![aslen(input, cnt + 1, out, cnt + 1)];
-                out[cnt] = num;
+                out.push(num);
                 cnt += 1;
             } else {
                 break;
@@ -438,7 +432,7 @@ mod predicates {
         Decision::Accept(cnt)
     }
 
-    fn ignore_all(input: &[&str], _: &mut [Input]) -> Decision<String> {
+    fn ignore_all(input: &[&str], _: &mut SVec<Input>) -> Decision<String> {
         Decision::Accept(input.len())
     }
 
@@ -815,19 +809,7 @@ impl<'a> Gsh<'a> {
 
 impl<'a> Evaluate<EvalRes> for Gsh<'a> {
     fn evaluate(&mut self, commands: &[Data]) -> EvalRes {
-        let mut stack = [
-            Input::default(),
-            Input::default(),
-            Input::default(),
-            Input::default(),
-            Input::default(),
-            Input::default(),
-            Input::default(),
-            Input::default(),
-            Input::default(),
-            Input::default(),
-        ];
-
+        let mut stack = SVec::<_>::new();
         let content = match self.parse_subcommands(commands) {
             Ok(content) => content,
             Err(err) => return err,

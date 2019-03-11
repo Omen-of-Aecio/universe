@@ -8,7 +8,7 @@
 //! completely arbitrary code, we can not autocomplete beyond a single decider, so autocompletion
 //! is "one step at a time".
 //! ```
-//! use cmdmat::{Decider, Decision, Mapping, Spec};
+//! use cmdmat::{Decider, Decision, Mapping, Spec, SVec};
 //!
 //! // The accept type is the type enum containing accepted tokens, parsed into useful formats
 //! // the list of accepted input is at last passed to the finalizer
@@ -34,16 +34,13 @@
 //! }
 //!
 //! // This decider accepts only a single number
-//! fn decider_function(input: &[&str], out: &mut [Accept]) -> Decision<Deny> {
+//! fn decider_function(input: &[&str], out: &mut SVec<Accept>) -> Decision<Deny> {
 //!     if input.is_empty() {
 //!         return Decision::Deny("No argument provided".into());
 //!     }
-//!     if out.is_empty() {
-//!         return Decision::Deny("Output stack is full".into());
-//!     }
 //!     let num = input[0].parse::<i32>();
 //!     if let Ok(num) = num {
-//!         out[0] = Accept::I32(num);
+//!         out.push(Accept::I32(num));
 //!         Decision::Accept(1)
 //!     } else {
 //!         Decision::Deny("Number is not a valid i32".into())
@@ -59,7 +56,7 @@
 //!     let mut mapping = Mapping::default();
 //!     mapping.register(SPEC).unwrap();
 //!
-//!     let mut accept_buf = [Accept::I32(0)];
+//!     let mut accept_buf = SVec::<_>::new();
 //!     let handler = mapping.lookup(&["my-command-name", "123"], &mut accept_buf);
 //!
 //!     match handler {
@@ -78,9 +75,12 @@
 extern crate test;
 
 use either::Either;
+use smallvec::SmallVec;
 use std::collections::HashMap;
 
 // ---
+
+pub type SVec<A> = SmallVec<[A; 8]>;
 
 /// The command specification format
 pub type Spec<'b, 'a, A, D, C> = (
@@ -114,7 +114,7 @@ pub enum Decision<D> {
 /// the reason for denying. Calling a decider with &[] should always yield its deny value.
 pub struct Decider<A, D> {
     pub description: &'static str,
-    pub decider: fn(&[&str], &mut [A]) -> Decision<D>,
+    pub decider: fn(&[&str], &mut SVec<A>) -> Decision<D>,
 }
 
 /// Errors we can get by registering specs.
@@ -201,10 +201,10 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
     pub fn lookup<'o>(
         &self,
         input: &[&str],
-        output: &'o mut [A],
+        output: &'o mut SVec<A>,
     ) -> Result<FinWithArgs<'o, A, C>, LookError<D>> {
         match self.lookup_internal(input, output) {
-            Ok((finalizer, advance)) => Ok((finalizer, &mut output[..advance])),
+            Ok((finalizer, advance)) => Ok((finalizer, &mut output[..])),
             Err(err) => Err(err),
         }
     }
@@ -213,7 +213,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
     fn lookup_internal(
         &self,
         input: &[&str],
-        output: &mut [A],
+        output: &mut SVec<A>,
     ) -> Result<(Finalizer<A, C>, usize), LookError<D>> {
         if input.is_empty() {
             if let Some(finalizer) = self.finalizer {
@@ -234,9 +234,9 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
                     }
                 }
             }
-            if input.len() > advance_output && output.len() >= advance_output {
+            if input.len() > advance_output {
                 let res = handler
-                    .lookup_internal(&input[1 + advance_output..], &mut output[advance_output..]);
+                    .lookup_internal(&input[1 + advance_output..], output);
                 if let Ok(mut res) = res {
                     res.1 += advance_output;
                     return Ok(res);
@@ -264,7 +264,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
     pub fn partial_lookup<'b>(
         &'b self,
         input: &'b [&str],
-        output: &mut [A],
+        output: &mut SVec<A>,
     ) -> Result<MapOrDesc<'a, 'b, A, D, C>, LookError<D>> {
         if input.is_empty() {
             return Ok(Either::Left(self));
@@ -284,9 +284,9 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
                     }
                 }
             }
-            if input.len() > advance_output && output.len() >= advance_output {
+            if input.len() > advance_output {
                 return handler
-                    .partial_lookup(&input[1 + advance_output..], &mut output[advance_output..]);
+                    .partial_lookup(&input[1 + advance_output..], output);
             } else {
                 return Err(LookError::DeciderAdvancedTooFar);
             }
@@ -318,7 +318,7 @@ mod tests {
     fn single_mapping() {
         let mut mapping: Mapping<Accept, (), Context> = Mapping::default();
         mapping.register((&[("add-one", None)], add_one)).unwrap();
-        let mut output = [true; 10];
+        let mut output = SVec::<_>::new();
         let handler = mapping.lookup(&["add-one"], &mut output).unwrap();
         assert_eq![0, handler.1.len()];
         let mut ctx = 123;
@@ -329,7 +329,7 @@ mod tests {
     #[test]
     fn mapping_does_not_exist() {
         let mapping: Mapping<Accept, (), Context> = Mapping::default();
-        let mut output = [true; 0];
+        let mut output = SVec::<_>::new();
         if let Err(err) = mapping.lookup(&["add-one"], &mut output) {
             assert_eq![LookError::UnknownMapping("add-one".into()), err];
         } else {
@@ -339,7 +339,7 @@ mod tests {
 
     #[test]
     fn overlapping_decider_fails() {
-        fn decide(_: &[&str], _: &mut [Accept]) -> Decision<()> {
+        fn decide(_: &[&str], _: &mut SVec<Accept>) -> Decision<()> {
             Decision::Deny(())
         }
 
@@ -358,7 +358,7 @@ mod tests {
 
     #[test]
     fn sequences_decider_fails() {
-        fn decide(_: &[&str], _: &mut [Accept]) -> Decision<()> {
+        fn decide(_: &[&str], _: &mut SVec<Accept>) -> Decision<()> {
             Decision::Deny(())
         }
 
@@ -380,8 +380,8 @@ mod tests {
 
     #[test]
     fn decider_of_one() {
-        fn decide(_: &[&str], out: &mut [Accept]) -> Decision<()> {
-            out[0] = true;
+        fn decide(_: &[&str], out: &mut SVec<Accept>) -> Decision<()> {
+            out.push(true);
             Decision::Accept(1)
         }
 
@@ -395,7 +395,7 @@ mod tests {
             .register((&[("add-one", Some(&DECIDE))], add_one))
             .unwrap();
 
-        let mut output = [false; 3];
+        let mut output = SVec::<_>::new();
         let out = mapping.lookup(&["add-one", "123"], &mut output).unwrap();
         assert_eq![1, out.1.len()];
         assert_eq![true, out.1[0]];
@@ -403,9 +403,9 @@ mod tests {
 
     #[test]
     fn decider_of_two_overrun() {
-        fn decide(_: &[&str], out: &mut [Accept]) -> Decision<()> {
-            out[0] = true;
-            out[1] = true;
+        fn decide(_: &[&str], out: &mut SVec<Accept>) -> Decision<()> {
+            out.push(true);
+            out.push(true);
             Decision::Accept(2)
         }
 
@@ -419,7 +419,7 @@ mod tests {
             .register((&[("add-one", Some(&DECIDE))], add_one))
             .unwrap();
 
-        let mut output = [false; 3];
+        let mut output = SVec::<_>::new();
         if let Err(err) = mapping.lookup(&["add-one", "123"], &mut output) {
             assert_eq![LookError::DeciderAdvancedTooFar, err];
         } else {
@@ -429,9 +429,9 @@ mod tests {
 
     #[test]
     fn decider_of_two() {
-        fn decide(_: &[&str], out: &mut [Accept]) -> Decision<()> {
-            out[0] = true;
-            out[1] = true;
+        fn decide(_: &[&str], out: &mut SVec<Accept>) -> Decision<()> {
+            out.push(true);
+            out.push(false);
             Decision::Accept(2)
         }
 
@@ -445,18 +445,18 @@ mod tests {
             .register((&[("add-one", Some(&DECIDE))], add_one))
             .unwrap();
 
-        let mut output = [false; 3];
+        let mut output = SVec::<_>::new();
         mapping
             .lookup(&["add-one", "123", "456"], &mut output)
             .unwrap();
+        assert_eq![2, output.len()];
         assert_eq![true, output[0]];
-        assert_eq![true, output[1]];
-        assert_eq![false, output[2]];
+        assert_eq![false, output[1]];
     }
 
     #[test]
     fn decider_of_two_short_output() {
-        fn decide(_: &[&str], _: &mut [Accept]) -> Decision<()> {
+        fn decide(_: &[&str], _: &mut SVec<Accept>) -> Decision<()> {
             Decision::Accept(2)
         }
 
@@ -470,25 +470,20 @@ mod tests {
             .register((&[("add-one", Some(&DECIDE))], add_one))
             .unwrap();
 
-        let mut output = [false; 1];
-        if let Err(err) = mapping.lookup(&["add-one", "123", "456"], &mut output) {
-            assert_eq![LookError::DeciderAdvancedTooFar, err];
-        } else {
-            assert![false];
-        }
+        let mut output = SVec::<_>::new();
+        mapping.lookup(&["add-one", "123", "456"], &mut output).unwrap();
+        assert_eq![0, output.len()];
     }
 
     #[test]
     fn decider_of_many() {
-        fn decide(input: &[&str], out: &mut [i32]) -> Decision<()> {
-            if out.len() >= input.len() {
-                for (idx, i) in input.iter().enumerate() {
-                    let number = i.parse::<i32>();
-                    if let Ok(number) = number {
-                        out[idx] = number;
-                    } else {
-                        return Decision::Deny(());
-                    }
+        fn decide(input: &[&str], out: &mut SVec<i32>) -> Decision<()> {
+            for (idx, i) in input.iter().enumerate() {
+                let number = i.parse::<i32>();
+                if let Ok(number) = number {
+                    out.push(number);
+                } else {
+                    return Decision::Deny(());
                 }
             }
             Decision::Accept(input.len())
@@ -510,7 +505,7 @@ mod tests {
             .register((&[("sum", Some(&DECIDE))], do_sum))
             .unwrap();
 
-        let mut output = [0; 3];
+        let mut output = SVec::<_>::new();
         let handler = mapping
             .lookup(&["sum", "123", "456", "789"], &mut output)
             .unwrap();
@@ -531,7 +526,7 @@ mod tests {
             ))
             .unwrap();
 
-        let mut output = [false; 0];
+        let mut output = SVec::<_>::new();
         mapping
             .lookup(&["lorem", "ipsum", "dolor"], &mut output)
             .unwrap();
@@ -560,7 +555,7 @@ mod tests {
             .register((&[("lorem", None), ("ipsum", None)], add_one))
             .unwrap();
 
-        let mut output = [false; 0];
+        let mut output = SVec::<_>::new();
         mapping
             .lookup(&["lorem", "ipsum", "dolor"], &mut output)
             .unwrap();
@@ -574,7 +569,7 @@ mod tests {
 
     #[test]
     fn partial_lookup() {
-        fn decide(_: &[&str], _: &mut [Accept]) -> Decision<()> {
+        fn decide(_: &[&str], _: &mut SVec<Accept>) -> Decision<()> {
             Decision::Accept(0)
         }
 
@@ -583,7 +578,7 @@ mod tests {
             decider: decide,
         };
 
-        fn consume_decide(input: &[&str], _: &mut [Accept]) -> Decision<()> {
+        fn consume_decide(input: &[&str], _: &mut SVec<Accept>) -> Decision<()> {
             if input.is_empty() {
                 Decision::Deny(())
             } else {
@@ -616,7 +611,7 @@ mod tests {
             ))
             .unwrap();
 
-        let mut output = [false; 0];
+        let mut output = SVec::<_>::new();
         let part = mapping
             .partial_lookup(&["lorem", "ipsum"], &mut output)
             .unwrap()
@@ -641,7 +636,7 @@ mod tests {
         let key = part.get_direct_keys().next().unwrap();
         assert_eq![(&"ipsum", Some("Do nothing"), true), key];
 
-        let mut output = [false; 1];
+        let mut output = SVec::<_>::new();
         let part = mapping
             .partial_lookup(&["consume", "123"], &mut output)
             .unwrap()
@@ -669,7 +664,7 @@ mod tests {
                 add_one,
             ))
             .unwrap();
-        let mut output = [false; 0];
+        let mut output = SVec::<_>::new();
         b.iter(|| {
             mapping
                 .lookup(black_box(&["lorem", "ipsum", "dolor"]), &mut output)
@@ -686,7 +681,7 @@ mod tests {
                 add_one,
             ))
             .unwrap();
-        let mut output = [false; 0];
+        let mut output = SVec::<_>::new();
         b.iter(|| {
             mapping
                 .partial_lookup(black_box(&["lorem"]), &mut output)

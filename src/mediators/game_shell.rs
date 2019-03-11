@@ -787,9 +787,6 @@ impl<'a> Gsh<'a> {
                             Err(ParseError::DanglingLeftParenthesis) => {
                                 return Err(EvalRes::Err("Dangling left parenthesis".into()));
                             }
-                            Err(ParseError::InputHasTooManyElements) => {
-                                return Err(EvalRes::Err("Too many elements to parse".into()));
-                            }
                             Err(ParseError::PrematureRightParenthesis) => {
                                 return Err(EvalRes::Err("Right parenthesis encountered with no matching left parenthesis".into()));
                             }

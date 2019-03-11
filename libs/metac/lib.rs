@@ -108,10 +108,8 @@ extern crate test;
 
 use smallvec::SmallVec;
 
+/// A specific-sized small vector
 type SVec<A> = SmallVec<[A; 8]>;
-
-/// Size of the buffer used during parsing
-const BUFFER_SIZE: usize = 32;
 
 /// Distinguishes atoms from commands
 #[derive(Clone, Copy, Debug, Hash, PartialEq)]
@@ -141,11 +139,6 @@ impl<'a> Data<'a> {
 pub enum ParseError {
     /// A left parenthesis has been left open
     DanglingLeftParenthesis,
-    /// There are too many elements for the parser to handle
-    ///
-    /// To avoid this, either shorten the code or edit the `BUFFER_SIZE`
-    /// inside metac.
-    InputHasTooManyElements,
     /// A right parenthesis has been found without having read a corresponding left parenthesis
     PrematureRightParenthesis,
 }
@@ -167,7 +160,7 @@ pub trait Evaluate<T: Default> {
     /// newlines, which are considered whitespace and skipped.
     fn interpret_single(&mut self, statement: &str) -> Result<T, ParseError> {
         let mut data = SVec::<_>::new();
-        let size = parse(statement, &mut data)?;
+        parse(statement, &mut data)?;
         Ok(self.evaluate(&data[..]))
     }
     /// Interpret several statements one-by-one
@@ -253,9 +246,8 @@ impl PartialParse {
 // ---
 
 /// Parse an input line into a classified output buffer
-fn parse<'a>(line: &'a str, output: &mut SVec<Data<'a>>) -> Result<usize, ParseError> {
+fn parse<'a>(line: &'a str, output: &mut SVec<Data<'a>>) -> Result<(), ParseError> {
     let mut lparen_stack = 0;
-    let mut buff_idx = 0;
     let (mut start, mut stop) = (0, 0);
     for ch in line.chars() {
         if lparen_stack > 0 {
@@ -266,10 +258,6 @@ fn parse<'a>(line: &'a str, output: &mut SVec<Data<'a>>) -> Result<usize, ParseE
                 lparen_stack -= 1;
                 if lparen_stack == 0 {
                     output.push(Data::Command(&line[start..stop]));
-                    buff_idx += 1;
-                    // if buff_idx >= output.len() {
-                    //     return Err(ParseError::InputHasTooManyElements);
-                    // }
                     stop += ch.len_utf8();;
                     start = stop;
                 } else {
@@ -281,10 +269,6 @@ fn parse<'a>(line: &'a str, output: &mut SVec<Data<'a>>) -> Result<usize, ParseE
         } else if ch.is_whitespace() {
             if start != stop {
                 output.push(Data::Atom(&line[start..stop]));
-                buff_idx += 1;
-                // if buff_idx >= output.len() {
-                //     return Err(ParseError::InputHasTooManyElements);
-                // }
             }
             stop += ch.len_utf8();;
             start = stop;
@@ -303,9 +287,8 @@ fn parse<'a>(line: &'a str, output: &mut SVec<Data<'a>>) -> Result<usize, ParseE
     }
     if start != stop {
         output.push(Data::Atom(&line[start..stop]));
-        buff_idx += 1;
     }
-    Ok(buff_idx)
+    Ok(())
 }
 
 #[cfg(test)]
@@ -317,18 +300,18 @@ mod tests {
     fn empty_parse() {
         let line = "";
         let mut data = SVec::<Data>::new();
-        let count = parse(line, &mut data).unwrap();
+        parse(line, &mut data).unwrap();
 
-        assert_eq![0, count];
+        assert_eq![true, data.is_empty()];
     }
 
     #[test]
     fn basic_parse() {
         let line = "Set Log Level 0";
         let mut data = SVec::<Data>::new();
-        let count = parse(line, &mut data).unwrap();
+        parse(line, &mut data).unwrap();
 
-        assert_eq![4, count];
+        assert_eq![4, data.len()];
         assert_eq![Data::Atom("Set"), data[0]];
         assert_eq![Data::Atom("Log"), data[1]];
         assert_eq![Data::Atom("Level"), data[2]];
@@ -339,9 +322,9 @@ mod tests {
     fn parse_weird_whitespace() {
         let line = "Set Log\n\n\n Level  ( 0)";
         let mut data = SVec::<Data>::new();
-        let count = parse(line, &mut data).unwrap();
+        parse(line, &mut data).unwrap();
 
-        assert_eq![4, count];
+        assert_eq![4, data.len()];
         assert_eq![Data::Atom("Set"), data[0]];
         assert_eq![Data::Atom("Log"), data[1]];
         assert_eq![Data::Atom("Level"), data[2]];
@@ -352,18 +335,18 @@ mod tests {
     fn parse_unicode() {
         let line = "2";
         let mut data = SVec::<Data>::new();
-        let count = parse(line, &mut data).unwrap();
+        parse(line, &mut data).unwrap();
 
-        assert_eq![1, count];
+        assert_eq![1, data.len()];
     }
 
     #[test]
     fn empty_subcommand_parse() {
         let line = "()";
         let mut data = SVec::<Data>::new();
-        let count = parse(line, &mut data).unwrap();
+        parse(line, &mut data).unwrap();
 
-        assert_eq![1, count];
+        assert_eq![1, data.len()];
         assert_eq![Data::Command(""), data[0]];
     }
 
@@ -371,9 +354,9 @@ mod tests {
     fn empty_nested_subcommand_parse() {
         let line = "(())";
         let mut data = SVec::<Data>::new();
-        let count = parse(line, &mut data).unwrap();
+        parse(line, &mut data).unwrap();
 
-        assert_eq![1, count];
+        assert_eq![1, data.len()];
         assert_eq![Data::Command("()"), data[0]];
     }
 
@@ -381,9 +364,9 @@ mod tests {
     fn empty_nested_subcommand_with_more_empty_parse() {
         let line = "(())()";
         let mut data = SVec::<Data>::new();
-        let count = parse(line, &mut data).unwrap();
+        parse(line, &mut data).unwrap();
 
-        assert_eq![2, count];
+        assert_eq![2, data.len()];
         assert_eq![Data::Command("()"), data[0]];
         assert_eq![Data::Command(""), data[1]];
     }
@@ -392,9 +375,9 @@ mod tests {
     fn subcommand_parse() {
         let line = "Set Log Level (Get Log Level)";
         let mut data = SVec::<Data>::new();
-        let count = parse(line, &mut data).unwrap();
+        parse(line, &mut data).unwrap();
 
-        assert_eq![4, count];
+        assert_eq![4, data.len()];
         assert_eq![Data::Atom("Set"), data[0]];
         assert_eq![Data::Atom("Log"), data[1]];
         assert_eq![Data::Atom("Level"), data[2]];
@@ -405,17 +388,17 @@ mod tests {
     fn subcommand_parse_multiline() {
         let line = "Set Log Level (\n\tGet Logger Levels\n)";
         let mut data = SVec::<Data>::new();
-        let count = parse(line, &mut data).unwrap();
+        parse(line, &mut data).unwrap();
 
-        assert_eq![4, count];
+        assert_eq![4, data.len()];
         assert_eq![Data::Atom("Set"), data[0]];
         assert_eq![Data::Atom("Log"), data[1]];
         assert_eq![Data::Atom("Level"), data[2]];
         assert_eq![Data::Command("\n\tGet Logger Levels\n"), data[3]];
 
         let mut new_data = SVec::<Data>::new();
-        let count = parse(data[3].content(), &mut new_data).unwrap();
-        assert_eq![3, count];
+        parse(data[3].content(), &mut new_data).unwrap();
+        assert_eq![3, new_data.len()];
         assert_eq![Data::Atom("Get"), new_data[0]];
         assert_eq![Data::Atom("Logger"), new_data[1]];
         assert_eq![Data::Atom("Levels"), new_data[2]];

@@ -63,9 +63,9 @@
 //!     let handler = mapping.lookup(&["my-command-name", "123"], &mut accept_buf);
 //!
 //!     match handler {
-//!         Ok((func, bufsiz)) => {
+//!         Ok((func, buf)) => {
 //!             let mut ctx = 0i32;
-//!             func(&mut ctx, &accept_buf[..bufsiz]); // prints hello world
+//!             func(&mut ctx, buf); // prints hello world
 //!         }
 //!         Err(look_err) => {
 //!             println!["{:?}", look_err];
@@ -91,6 +91,8 @@ pub type Spec<'b, 'a, A, D, C> = (
 /// A finalizer is the function that runs to handle the entirety of the command after it has been
 /// verified by the deciders.
 pub type Finalizer<A, C> = fn(&mut C, &[A]) -> Result<String, String>;
+
+pub type FinWithArgs<'o, A, C> = (Finalizer<A, C>, &'o mut [A]);
 
 /// Either a mapping or a descriptor of a mapping
 pub type MapOrDesc<'a, 'b, A, D, C> = Either<&'b Mapping<'a, A, D, C>, &'a str>;
@@ -195,8 +197,19 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
         Ok(())
     }
 
+    pub fn lookup<'o>(
+        &self,
+        input: &[&str],
+        output: &'o mut [A],
+    ) -> Result<FinWithArgs<'o, A, C>, LookError<D>> {
+        match self.lookup_internal(input, output) {
+            Ok((finalizer, advance)) => Ok((finalizer, &mut output[..advance])),
+            Err(err) => Err(err),
+        }
+    }
+
     /// Looks up a command and runs deciders to collect all arguments
-    pub fn lookup(
+    fn lookup_internal(
         &self,
         input: &[&str],
         output: &mut [A],
@@ -221,8 +234,8 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
                 }
             }
             if input.len() > advance_output && output.len() >= advance_output {
-                let res =
-                    handler.lookup(&input[1 + advance_output..], &mut output[advance_output..]);
+                let res = handler
+                    .lookup_internal(&input[1 + advance_output..], &mut output[advance_output..]);
                 if let Ok(mut res) = res {
                     res.1 += advance_output;
                     return Ok(res);
@@ -306,7 +319,7 @@ mod tests {
         mapping.register((&[("add-one", None)], add_one)).unwrap();
         let mut output = [true; 10];
         let handler = mapping.lookup(&["add-one"], &mut output).unwrap();
-        assert_eq![0, handler.1];
+        assert_eq![0, handler.1.len()];
         let mut ctx = 123;
         handler.0(&mut ctx, &output).unwrap();
         assert_eq![124, ctx];
@@ -317,7 +330,7 @@ mod tests {
         let mapping: Mapping<Accept, (), Context> = Mapping::default();
         let mut output = [true; 0];
         if let Err(err) = mapping.lookup(&["add-one"], &mut output) {
-            assert_eq![LookError::UnknownMapping, err];
+            assert_eq![LookError::UnknownMapping("add-one".into()), err];
         } else {
             assert![false];
         }
@@ -382,10 +395,9 @@ mod tests {
             .unwrap();
 
         let mut output = [false; 3];
-        mapping.lookup(&["add-one", "123"], &mut output).unwrap();
-        assert_eq![true, output[0]];
-        assert_eq![false, output[1]];
-        assert_eq![false, output[2]];
+        let out = mapping.lookup(&["add-one", "123"], &mut output).unwrap();
+        assert_eq![1, out.1.len()];
+        assert_eq![true, out.1[0]];
     }
 
     #[test]
@@ -501,7 +513,7 @@ mod tests {
         let handler = mapping
             .lookup(&["sum", "123", "456", "789"], &mut output)
             .unwrap();
-        assert_eq![3, handler.1];
+        assert_eq![3, handler.1.len()];
 
         let mut ctx = 0;
         handler.0(&mut ctx, &output).unwrap();
@@ -523,7 +535,7 @@ mod tests {
             .lookup(&["lorem", "ipsum", "dolor"], &mut output)
             .unwrap();
         if let Err(err) = mapping.lookup(&["lorem", "ipsum", "dolor", "exceed"], &mut output) {
-            assert_eq![LookError::UnknownMapping, err];
+            assert_eq![LookError::UnknownMapping("exceed".into()), err];
         } else {
             assert![false];
         }
@@ -552,7 +564,7 @@ mod tests {
             .lookup(&["lorem", "ipsum", "dolor"], &mut output)
             .unwrap();
         if let Err(err) = mapping.lookup(&["lorem", "ipsum", "dolor", "exceed"], &mut output) {
-            assert_eq![LookError::UnknownMapping, err];
+            assert_eq![LookError::UnknownMapping("exceed".into()), err];
         } else {
             assert![false];
         }

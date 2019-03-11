@@ -858,7 +858,7 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
         let res = self.commands.lookup(&content_ref[..], &mut stack);
         match res {
             Ok(fin) => {
-                let res = fin.0(&mut self.gshctx, &stack[..fin.1]);
+                let res = fin.0(&mut self.gshctx, fin.1);
                 match res {
                     Ok(res) => EvalRes::Ok(res),
                     Err(res) => EvalRes::Err(res),

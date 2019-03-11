@@ -745,8 +745,8 @@ mod tests {
     #[bench]
     fn parse_very_long(b: &mut Bencher) {
         let line = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris tristique massa magna, eget consectetur dui posuere congue. Etiam rhoncus porttitor enim, eget malesuada ante dapibus eget. Duis neque dui, tincidunt ut varius";
-        let mut data = SVec::<_>::new();
         b.iter(|| {
+            let mut data = SVec::<_>::new();
             parse(black_box(line), &mut data).unwrap();
         });
     }

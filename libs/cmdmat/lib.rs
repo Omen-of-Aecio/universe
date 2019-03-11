@@ -79,6 +79,7 @@ use std::collections::HashMap;
 
 // ---
 
+/// A specific-sized small vector
 pub type SVec<A> = SmallVec<[A; 8]>;
 
 /// The command specification format

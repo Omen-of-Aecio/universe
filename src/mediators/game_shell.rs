@@ -1,7 +1,7 @@
 use self::command_handlers::*;
 use self::predicates::*;
 use crate::glocals::{GameShell, GameShellContext, Log};
-use cmdmat;
+use cmdmat::{self, LookError};
 use either::Either;
 use logger::{self, Logger};
 use metac::{Data, Evaluate, ParseError, PartialParse};
@@ -762,11 +762,21 @@ impl Default for EvalRes {
     }
 }
 
+fn lookerr_to_string(err: LookError<String>) -> String {
+    match err {
+        LookError::DeciderAdvancedTooFar => "Decider advanced too far".into(),
+        LookError::DeciderDenied(desc, decider) => {
+            format!["Expected {} but got: {}", desc, decider]
+        }
+        LookError::FinalizerDoesNotExist => "Finalizer does not exist".into(),
+        LookError::UnknownMapping(token) => format!["Unrecognized mapping: {}", token],
+    }
+}
+
 // ---
 
 impl<'a> Evaluate<EvalRes> for Gsh<'a> {
     fn evaluate(&mut self, commands: &[Data]) -> EvalRes {
-        use cmdmat::LookError;
         let mut stack = [
             Input::default(),
             Input::default(),
@@ -839,17 +849,8 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
                     Ok(Either::Right(name)) => {
                         return EvalRes::Ok(name.into());
                     }
-                    Err(LookError::DeciderAdvancedTooFar) => {
-                        return EvalRes::Err("Decider advanced too far".into());
-                    }
-                    Err(LookError::DeciderDenied(desc, decider)) => {
-                        return EvalRes::Err(format!["Expected {} but got: {}", desc, decider]);
-                    }
-                    Err(LookError::FinalizerDoesNotExist) => {
-                        return EvalRes::Err("Finalizer does not exist".into());
-                    }
-                    Err(LookError::UnknownMapping(token)) => {
-                        return EvalRes::Err(format!["Unrecognized mapping: {}", token]);
+                    Err(err) => {
+                        return EvalRes::Err(lookerr_to_string(err));
                     }
                 }
             }
@@ -864,17 +865,8 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
                     Err(res) => EvalRes::Err(res),
                 }
             }
-            Err(LookError::DeciderAdvancedTooFar) => {
-                EvalRes::Err("Decider advanced too far".into())
-            }
-            Err(LookError::DeciderDenied(desc, decider)) => {
-                EvalRes::Err(format!["Expected {} but got: {}", desc, decider])
-            }
-            Err(LookError::FinalizerDoesNotExist) => {
-                EvalRes::Err("Finalizer does not exist".into())
-            }
-            Err(LookError::UnknownMapping(token)) => {
-                EvalRes::Err(format!["Unrecognized mapping: {}", token])
+            Err(err) => {
+                return EvalRes::Err(lookerr_to_string(err));
             }
         }
     }

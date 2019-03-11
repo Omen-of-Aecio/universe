@@ -106,6 +106,10 @@
 #![no_std]
 extern crate test;
 
+use smallvec::SmallVec;
+
+type SVec<A> = SmallVec<[A; 8]>;
+
 /// Size of the buffer used during parsing
 const BUFFER_SIZE: usize = 32;
 
@@ -162,9 +166,9 @@ pub trait Evaluate<T: Default> {
     /// separate statements, but rather one single whole statement, even if it contains
     /// newlines, which are considered whitespace and skipped.
     fn interpret_single(&mut self, statement: &str) -> Result<T, ParseError> {
-        let mut data = [Data::Atom(&statement[0..]); BUFFER_SIZE]; // TODO Use MaybeUninit here to prevent default initialization, currently only on nightly
+        let mut data = SVec::<_>::new();
         let size = parse(statement, &mut data)?;
-        Ok(self.evaluate(&data[0..size]))
+        Ok(self.evaluate(&data[..]))
     }
     /// Interpret several statements one-by-one
     ///
@@ -249,7 +253,7 @@ impl PartialParse {
 // ---
 
 /// Parse an input line into a classified output buffer
-fn parse<'a>(line: &'a str, output: &mut [Data<'a>; BUFFER_SIZE]) -> Result<usize, ParseError> {
+fn parse<'a>(line: &'a str, output: &mut SVec<Data<'a>>) -> Result<usize, ParseError> {
     let mut lparen_stack = 0;
     let mut buff_idx = 0;
     let (mut start, mut stop) = (0, 0);
@@ -261,11 +265,11 @@ fn parse<'a>(line: &'a str, output: &mut [Data<'a>; BUFFER_SIZE]) -> Result<usiz
             } else if ch == ')' {
                 lparen_stack -= 1;
                 if lparen_stack == 0 {
-                    output[buff_idx] = Data::Command(&line[start..stop]);
+                    output.push(Data::Command(&line[start..stop]));
                     buff_idx += 1;
-                    if buff_idx >= output.len() {
-                        return Err(ParseError::InputHasTooManyElements);
-                    }
+                    // if buff_idx >= output.len() {
+                    //     return Err(ParseError::InputHasTooManyElements);
+                    // }
                     stop += ch.len_utf8();;
                     start = stop;
                 } else {
@@ -276,11 +280,11 @@ fn parse<'a>(line: &'a str, output: &mut [Data<'a>; BUFFER_SIZE]) -> Result<usiz
             }
         } else if ch.is_whitespace() {
             if start != stop {
-                output[buff_idx] = Data::Atom(&line[start..stop]);
+                output.push(Data::Atom(&line[start..stop]));
                 buff_idx += 1;
-                if buff_idx >= output.len() {
-                    return Err(ParseError::InputHasTooManyElements);
-                }
+                // if buff_idx >= output.len() {
+                //     return Err(ParseError::InputHasTooManyElements);
+                // }
             }
             stop += ch.len_utf8();;
             start = stop;
@@ -298,7 +302,7 @@ fn parse<'a>(line: &'a str, output: &mut [Data<'a>; BUFFER_SIZE]) -> Result<usiz
         return Err(ParseError::DanglingLeftParenthesis);
     }
     if start != stop {
-        output[buff_idx] = Data::Atom(&line[start..stop]);
+        output.push(Data::Atom(&line[start..stop]));
         buff_idx += 1;
     }
     Ok(buff_idx)
@@ -312,7 +316,7 @@ mod tests {
     #[test]
     fn empty_parse() {
         let line = "";
-        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let mut data = SVec::<Data>::new();
         let count = parse(line, &mut data).unwrap();
 
         assert_eq![0, count];
@@ -321,7 +325,7 @@ mod tests {
     #[test]
     fn basic_parse() {
         let line = "Set Log Level 0";
-        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let mut data = SVec::<Data>::new();
         let count = parse(line, &mut data).unwrap();
 
         assert_eq![4, count];
@@ -334,7 +338,7 @@ mod tests {
     #[test]
     fn parse_weird_whitespace() {
         let line = "Set Log\n\n\n Level  ( 0)";
-        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let mut data = SVec::<Data>::new();
         let count = parse(line, &mut data).unwrap();
 
         assert_eq![4, count];
@@ -347,7 +351,7 @@ mod tests {
     #[test]
     fn parse_unicode() {
         let line = "2";
-        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let mut data = SVec::<Data>::new();
         let count = parse(line, &mut data).unwrap();
 
         assert_eq![1, count];
@@ -356,7 +360,7 @@ mod tests {
     #[test]
     fn empty_subcommand_parse() {
         let line = "()";
-        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let mut data = SVec::<Data>::new();
         let count = parse(line, &mut data).unwrap();
 
         assert_eq![1, count];
@@ -366,7 +370,7 @@ mod tests {
     #[test]
     fn empty_nested_subcommand_parse() {
         let line = "(())";
-        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let mut data = SVec::<Data>::new();
         let count = parse(line, &mut data).unwrap();
 
         assert_eq![1, count];
@@ -376,7 +380,7 @@ mod tests {
     #[test]
     fn empty_nested_subcommand_with_more_empty_parse() {
         let line = "(())()";
-        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let mut data = SVec::<Data>::new();
         let count = parse(line, &mut data).unwrap();
 
         assert_eq![2, count];
@@ -387,7 +391,7 @@ mod tests {
     #[test]
     fn subcommand_parse() {
         let line = "Set Log Level (Get Log Level)";
-        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let mut data = SVec::<Data>::new();
         let count = parse(line, &mut data).unwrap();
 
         assert_eq![4, count];
@@ -400,7 +404,7 @@ mod tests {
     #[test]
     fn subcommand_parse_multiline() {
         let line = "Set Log Level (\n\tGet Logger Levels\n)";
-        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let mut data = SVec::<Data>::new();
         let count = parse(line, &mut data).unwrap();
 
         assert_eq![4, count];
@@ -409,11 +413,12 @@ mod tests {
         assert_eq![Data::Atom("Level"), data[2]];
         assert_eq![Data::Command("\n\tGet Logger Levels\n"), data[3]];
 
-        let count = parse(data[3].content(), &mut data).unwrap();
+        let mut new_data = SVec::<Data>::new();
+        let count = parse(data[3].content(), &mut new_data).unwrap();
         assert_eq![3, count];
-        assert_eq![Data::Atom("Get"), data[0]];
-        assert_eq![Data::Atom("Logger"), data[1]];
-        assert_eq![Data::Atom("Levels"), data[2]];
+        assert_eq![Data::Atom("Get"), new_data[0]];
+        assert_eq![Data::Atom("Logger"), new_data[1]];
+        assert_eq![Data::Atom("Levels"), new_data[2]];
     }
 
     // ---
@@ -421,17 +426,14 @@ mod tests {
     #[test]
     fn fail_parse_too_long() {
         let line = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse viverra porta lacus, quis pretium nibh lacinia at. Mauris convallis sed lectus nec dapibus. Interdum et malesuada fames ac ante ipsum primis in faucibus. Nulla vulputate sapien dui. Aliquam finibus ante ut purus facilisis, in sagittis tortor varius. Nunc interdum fermentum libero, et egestas arcu convallis sed. Maecenas nec diam a libero vulputate suscipit. Phasellus ac dolor ut nunc ultricies fringilla. Maecenas sed feugiat nunc. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae. Quisque tincidunt metus ut ante dapibus, et molestie massa varius. Sed ultrices sapien sed mauris congue pretium. Pellentesque bibendum hendrerit sagittis. Vestibulum dignissim egestas feugiat. Ut porttitor et massa a posuere. Ut euismod metus a sem facilisis ullamcorper. Proin pharetra placerat enim";
-        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
-        assert_eq![
-            ParseError::InputHasTooManyElements,
-            parse(line, &mut data).unwrap_err()
-        ];
+        let mut data = SVec::<_>::new();
+        parse(line, &mut data).unwrap();
     }
 
     #[test]
     fn fail_parse_closing_parenthesis() {
         let line = "command ) will not work";
-        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let mut data = SVec::<_>::new();
         assert_eq![
             ParseError::PrematureRightParenthesis,
             parse(line, &mut data).unwrap_err()
@@ -441,7 +443,7 @@ mod tests {
     #[test]
     fn fail_parse_dangling_open_parenthesis() {
         let line = "command ( will not work";
-        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let mut data = SVec::<_>::new();
         assert_eq![
             ParseError::DanglingLeftParenthesis,
             parse(line, &mut data).unwrap_err()
@@ -760,7 +762,7 @@ mod tests {
     #[bench]
     fn parse_very_long(b: &mut Bencher) {
         let line = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris tristique massa magna, eget consectetur dui posuere congue. Etiam rhoncus porttitor enim, eget malesuada ante dapibus eget. Duis neque dui, tincidunt ut varius";
-        let mut data = [Data::Atom(&line[0..]); BUFFER_SIZE];
+        let mut data = SVec::<_>::new();
         b.iter(|| {
             parse(black_box(line), &mut data).unwrap();
         });

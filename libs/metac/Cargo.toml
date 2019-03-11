@@ -7,3 +7,6 @@ edition = "2018"
 [lib]
 name = "metac"
 path = "lib.rs"
+
+[dependencies]
+smallvec = "0.6.9"

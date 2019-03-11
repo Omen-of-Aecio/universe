@@ -1,12 +1,59 @@
 //! A command matching engine
 //!
-//! This library is a matching engine specifically for `metac`-like commands. It allows for
-//! arbitrary `decider` functions to parse parts of the input into any other format, which is
-//! subsequently provided to a transfer function.
+//! This library matches a list of input parameters such as:
+//! `["example", "input", "123"]`
+//! to a handler that is able to handle these inputs.
 //!
-//! The engine also allows for autocompletion of commands, including deciders. Because deciders are
-//! completely arbitrary code, we can not autocomplete beyond a single decider, so autocompletion
-//! is "one step at a time".
+//! The handlers are registered using the `Spec` (specification) format:
+//! ```
+//! use cmdmat::{Decider, Decision, Spec, SVec};
+//!
+//! type Accept = i32;
+//! type Deny = String;
+//! type Context = i32;
+//!
+//! fn handler(_ctx: &mut Context, _args: &[Accept]) -> Result<String, String> {
+//!     Ok("".into())
+//! }
+//!
+//! fn accept_integer(input: &[&str], out: &mut SVec<Accept>) -> Decision<Deny> {
+//!     if input.len() != 1 {
+//!         return Decision::Deny("Require exactly 1 input".into());
+//!     }
+//!     if let Ok(num) = input[0].parse::<Accept>() {
+//!         out.push(num);
+//!         Decision::Accept(1)
+//!     } else {
+//!         Decision::Deny("Unable to get number".into())
+//!     }
+//! }
+//!
+//! const DEC: Decider<Accept, Deny> = Decider {
+//!     description: "<i32>",
+//!     decider: accept_integer,
+//! };
+//!
+//! const SPEC: Spec<Accept, Deny, Context> = (&[("example", None), ("input", Some(&DEC))], handler);
+//!
+//! ```
+//!
+//! In the above the `SPEC` variable defines a path to get to the `handler`, requiring first
+//! `"example"` with no validator `None`, then followed by `"input"` which takes a single
+//! integer.
+//!
+//! If the validator `accept_integer` fails, then the command lookup will also fail.
+//!
+//! The `Spec`s will be collected inside a `Mapping`, where lookup will happen among a tree of
+//! merged `Spec`s.
+//!
+//! The reason we have a separate literal string and validator is to make it easy and unambiguous
+//! to find the next node in the search tree. If we only used validators (which can be completely
+//! arbitrary), then we can not sort a tree to make searching `O(log n)`. These fixed literal
+//! search points also give us a good way to debug commands if they happen to not match anything.
+//!
+//! Here is an example with actual lookup where we call a handler:
+//! (Unfortunately, a bit of setup is required.)
+//!
 //! ```
 //! use cmdmat::{Decider, Decision, Mapping, Spec, SVec};
 //!
@@ -70,6 +117,63 @@
 //!     }
 //! }
 //! ```
+//!
+//! This library also allows partial lookups and iterating over the direct descendants in order
+//! to make autocomplete easy to implement for terminal interfaces.
+//! ```
+//! use cmdmat::{Decider, Decision, Mapping, Spec, SVec};
+//!
+//! #[derive(Debug)]
+//! enum Accept {
+//!     I32(i32),
+//! }
+//! type Deny = String;
+//! type Context = i32;
+//!
+//! const SPEC: Spec<Accept, Deny, Context> = 
+//!     (&[("my-command-name", Some(&DEC)), ("something", None)], print_hello);
+//!
+//! fn print_hello(_ctx: &mut Context, args: &[Accept]) -> Result<String, String> {
+//!     Ok("".into())
+//! }
+//!
+//! fn decider_function(input: &[&str], out: &mut SVec<Accept>) -> Decision<Deny> {
+//!     if input.is_empty() {
+//!         return Decision::Deny("No argument provided".into());
+//!     }
+//!     let num = input[0].parse::<i32>();
+//!     if let Ok(num) = num {
+//!         out.push(Accept::I32(num));
+//!         Decision::Accept(1)
+//!     } else {
+//!         Decision::Deny("Number is not a valid i32".into())
+//!     }
+//! }
+//!
+//! const DEC: Decider<Accept, Deny> = Decider {
+//!     description: "<i32>",
+//!     decider: decider_function,
+//! };
+//!
+//! fn main() {
+//!     let mut mapping = Mapping::default();
+//!     mapping.register(SPEC).unwrap();
+//!
+//!     // When a decider is "next-up", we get its description
+//!     // We can't know in advance what the decider will consume because it is arbitrary code,
+//!     // so we will have to trust its description to be valuable.
+//!     let decider_desc = mapping.partial_lookup(&["my-command-name"]).unwrap().right().unwrap();
+//!     assert_eq!["<i32>", decider_desc];
+//!
+//!     // In this case the decider succeeded during the partial lookup, so the next step in the
+//!     // tree is the "something" node.
+//!     let mapping = mapping.partial_lookup(&["my-command-name", "123"]).unwrap().left().unwrap();
+//!     let (name, decider, has_handler) = mapping.get_direct_keys().next().unwrap();
+//!     assert_eq!["something", *name];
+//!     assert_eq![None, decider];
+//!     assert_eq![true, has_handler];
+//! }
+//! ```
 #![feature(test)]
 extern crate test;
 
@@ -92,6 +196,7 @@ pub type Spec<'b, 'a, A, D, C> = (
 /// verified by the deciders.
 pub type Finalizer<A, C> = fn(&mut C, &[A]) -> Result<String, String>;
 
+/// Finalizer with associated vector of arguments
 pub type FinWithArgs<'o, A, C> = (Finalizer<A, C>, SVec<A>);
 
 /// Either a mapping or a descriptor of a mapping
@@ -111,7 +216,7 @@ pub enum Decision<D> {
 ///
 /// It puts tokens into the output array according to interal logic and returns how many elements
 /// it has consumed. If it could not process the input tokens it will return a `Deny`, containing
-/// the reason for denying. Calling a decider with &[] should always yield its deny value.
+/// the reason for denying.
 pub struct Decider<A, D> {
     pub description: &'static str,
     pub decider: fn(&[&str], &mut SVec<A>) -> Decision<D>,
@@ -253,11 +358,16 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
             .map(|(k, v)| (k, v.decider.map(|d| d.description), v.finalizer.is_some()))
     }
 
+    pub fn partial_lookup<'b>(&'b self, input: &'b [&str]) -> Result<MapOrDesc<'a, 'b, A, D, C>, LookError<D>> {
+        let mut output = SVec::<A>::new();
+        self.partial_lookup_internal(input, &mut output)
+    }
+
     /// Perform a partial lookup, useful for autocompletion
     ///
     /// Due to the node structure of `Mapping`, this function returns either a `Mapping` or a
     /// `&str` describing the active decider.
-    pub fn partial_lookup<'b>(
+    fn partial_lookup_internal<'b>(
         &'b self,
         input: &'b [&str],
         output: &mut SVec<A>,
@@ -281,7 +391,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
                 }
             }
             if input.len() > advance_output {
-                return handler.partial_lookup(&input[1 + advance_output..], output);
+                return handler.partial_lookup_internal(&input[1 + advance_output..], output);
             } else {
                 return Err(LookError::DeciderAdvancedTooFar);
             }
@@ -590,9 +700,8 @@ mod tests {
             ))
             .unwrap();
 
-        let mut output = SVec::<_>::new();
         let part = mapping
-            .partial_lookup(&["lorem", "ipsum"], &mut output)
+            .partial_lookup(&["lorem", "ipsum"])
             .unwrap()
             .left()
             .unwrap();
@@ -600,7 +709,7 @@ mod tests {
         assert_eq![(&"dolor", None, true), key];
 
         let part = mapping
-            .partial_lookup(&["lorem"], &mut output)
+            .partial_lookup(&["lorem"])
             .unwrap()
             .left()
             .unwrap();
@@ -608,16 +717,15 @@ mod tests {
         assert_eq![(&"ipsum", None, true), key];
 
         let part = mapping
-            .partial_lookup(&["mirana"], &mut output)
+            .partial_lookup(&["mirana"])
             .unwrap()
             .left()
             .unwrap();
         let key = part.get_direct_keys().next().unwrap();
         assert_eq![(&"ipsum", Some("Do nothing"), true), key];
 
-        let mut output = SVec::<_>::new();
         let part = mapping
-            .partial_lookup(&["consume", "123"], &mut output)
+            .partial_lookup(&["consume", "123"])
             .unwrap()
             .left()
             .unwrap();
@@ -625,7 +733,7 @@ mod tests {
         assert_eq![(&"dummy", None, true), key];
 
         let part = mapping
-            .partial_lookup(&["consume"], &mut output)
+            .partial_lookup(&["consume"])
             .unwrap()
             .right()
             .unwrap();
@@ -657,10 +765,9 @@ mod tests {
                 add_one,
             ))
             .unwrap();
-        let mut output = SVec::<_>::new();
         b.iter(|| {
             mapping
-                .partial_lookup(black_box(&["lorem"]), &mut output)
+                .partial_lookup(black_box(&["lorem"]))
                 .unwrap();
         });
     }

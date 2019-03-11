@@ -130,7 +130,7 @@
 //! type Deny = String;
 //! type Context = i32;
 //!
-//! const SPEC: Spec<Accept, Deny, Context> = 
+//! const SPEC: Spec<Accept, Deny, Context> =
 //!     (&[("my-command-name", Some(&DEC)), ("something", None)], print_hello);
 //!
 //! fn print_hello(_ctx: &mut Context, args: &[Accept]) -> Result<String, String> {
@@ -358,7 +358,10 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
             .map(|(k, v)| (k, v.decider.map(|d| d.description), v.finalizer.is_some()))
     }
 
-    pub fn partial_lookup<'b>(&'b self, input: &'b [&str]) -> Result<MapOrDesc<'a, 'b, A, D, C>, LookError<D>> {
+    pub fn partial_lookup<'b>(
+        &'b self,
+        input: &'b [&str],
+    ) -> Result<MapOrDesc<'a, 'b, A, D, C>, LookError<D>> {
         let mut output = SVec::<A>::new();
         self.partial_lookup_internal(input, &mut output)
     }
@@ -708,19 +711,11 @@ mod tests {
         let key = part.get_direct_keys().next().unwrap();
         assert_eq![(&"dolor", None, true), key];
 
-        let part = mapping
-            .partial_lookup(&["lorem"])
-            .unwrap()
-            .left()
-            .unwrap();
+        let part = mapping.partial_lookup(&["lorem"]).unwrap().left().unwrap();
         let key = part.get_direct_keys().next().unwrap();
         assert_eq![(&"ipsum", None, true), key];
 
-        let part = mapping
-            .partial_lookup(&["mirana"])
-            .unwrap()
-            .left()
-            .unwrap();
+        let part = mapping.partial_lookup(&["mirana"]).unwrap().left().unwrap();
         let key = part.get_direct_keys().next().unwrap();
         assert_eq![(&"ipsum", Some("Do nothing"), true), key];
 
@@ -766,9 +761,7 @@ mod tests {
             ))
             .unwrap();
         b.iter(|| {
-            mapping
-                .partial_lookup(black_box(&["lorem"]))
-                .unwrap();
+            mapping.partial_lookup(black_box(&["lorem"])).unwrap();
         });
     }
 }

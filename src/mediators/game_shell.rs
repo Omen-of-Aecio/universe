@@ -801,7 +801,6 @@ impl<'a> Gsh<'a> {
 
 impl<'a> Evaluate<EvalRes> for Gsh<'a> {
     fn evaluate(&mut self, commands: &[Data]) -> EvalRes {
-        let mut stack = SVec::<_>::new();
         let content = match self.parse_subcommands(commands) {
             Ok(content) => content,
             Err(err) => return err,
@@ -810,7 +809,7 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
 
         if let Some(front) = content_ref.first() {
             if *front == "autocomplete" {
-                match self.commands.partial_lookup(&content_ref[1..], &mut stack) {
+                match self.commands.partial_lookup(&content_ref[1..]) {
                     Ok(Either::Left(mapping)) => {
                         let mut col = mapping
                             .get_direct_keys()

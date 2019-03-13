@@ -811,7 +811,7 @@ impl<'a> Gsh<'a> {
                     content.push((*string).into());
                 }
                 Data::Command(string) => {
-                    if &(*string)[0..1] == "#" {
+                    if !string.is_empty() && &(*string)[0..1] == "#" {
                         content.push((string[1..]).into());
                     } else {
                         let res = self.interpret_single(string);

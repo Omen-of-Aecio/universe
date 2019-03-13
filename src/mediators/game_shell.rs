@@ -4,7 +4,7 @@ use crate::glocals::{GameShell, GameShellContext, Log};
 use cmdmat::{self, LookError, SVec};
 use either::Either;
 use logger::{self, Logger};
-use metac::{Data, Evaluate, ParseError, PartialParse};
+use metac::{Data, Evaluate, ParseError, PartialParse, PartialParseOp};
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -619,7 +619,7 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
         for ch in buffer[begin..(begin + count)].iter() {
             begin += 1;
             match partial_parser.parse_increment(*ch) {
-                Some(true) => {
+                PartialParseOp::Ready => {
                     shift = begin;
                     let string = from_utf8(&buffer[(begin - shift)..begin]);
                     if let Ok(string) = string {
@@ -661,10 +661,10 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
                         break 'receiver;
                     }
                 }
-                Some(false) => {
+                PartialParseOp::Unready => {
                     // Do nothing
                 }
-                None => {
+                PartialParseOp::Discard => {
                     // Set the shift register = begin, this means that all bytes so far will
                     // not be used to interpret a command. They will instead be overwritten.
                     shift = begin;

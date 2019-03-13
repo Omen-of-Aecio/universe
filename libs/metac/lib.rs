@@ -207,36 +207,44 @@ pub struct PartialParse {
     has_encountered_rparen: bool,
 }
 
+/// Description of the parsing state
+#[derive(Debug, PartialEq)]
+pub enum PartialParseOp {
+    Ready,
+    Unready,
+    Discard,
+}
+
 impl PartialParse {
     /// Parses. 1 byte at a time
     ///
     /// This function assumes that a linear stream of bytes is fed into it.
     ///
-    /// It will return None when there has been an error. In such cases, _all_ previous bytes ought
+    /// It will return `PartialParseOp::Discard` when there has been an error. In such cases, _all_ previous bytes ought
     /// to be discarded and not interpreted.
     ///
-    /// When it returns Some(true), it means that the previous bytes (except for those that were
-    /// marked None) can be sent into `interpret_single` safely.
+    /// When it returns `PartialParseOp::Ready`, it means that the previous bytes (except for those that were
+    /// marked `PartialParseOp::Discard`) can be sent into `interpret_single` safely.
     ///
-    /// When it returns Some(false), it means that the parser simply noticed the character and
+    /// When it returns `PartialParseOp::Unready`, it means that the parser simply noticed the character and
     /// advanced its internal state.
-    pub fn parse_increment(&mut self, input: u8) -> Option<bool> {
+    pub fn parse_increment(&mut self, input: u8) -> PartialParseOp {
         if input == b'\n' && self.lparen_stack == 0 {
             self.has_encountered_rparen = false;
-            return Some(true);
+            return PartialParseOp::Ready;
         } else if input == b'(' {
             self.lparen_stack += 1;
         } else if input == b')' {
             if self.lparen_stack == 0 {
                 self.has_encountered_rparen = true;
-                return None;
+                return PartialParseOp::Discard;
             }
             self.lparen_stack -= 1;
         }
         if self.has_encountered_rparen {
-            None
+            PartialParseOp::Unready
         } else {
-            Some(false)
+            PartialParseOp::Unready
         }
     }
 }
@@ -600,75 +608,75 @@ mod tests {
     fn partial_parse_single_line() {
         let mut part = PartialParse::default();
         for ch in "hello world".bytes() {
-            assert_eq![Some(false), part.parse_increment(ch)];
+            assert_eq![PartialParseOp::Unready, part.parse_increment(ch)];
         }
-        assert_eq![Some(true), part.parse_increment(b'\n')];
+        assert_eq![PartialParseOp::Ready, part.parse_increment(b'\n')];
     }
 
     #[test]
     fn partial_parse_multi_line() {
         let mut part = PartialParse::default();
         for ch in "hello world (".bytes() {
-            assert_eq![Some(false), part.parse_increment(ch)];
+            assert_eq![PartialParseOp::Unready, part.parse_increment(ch)];
         }
-        assert_eq![Some(false), part.parse_increment(b'\n')];
+        assert_eq![PartialParseOp::Unready, part.parse_increment(b'\n')];
 
         for ch in "this is a message".bytes() {
-            assert_eq![Some(false), part.parse_increment(ch)];
+            assert_eq![PartialParseOp::Unready, part.parse_increment(ch)];
         }
-        assert_eq![Some(false), part.parse_increment(b'\n')];
-        assert_eq![Some(false), part.parse_increment(b')')];
+        assert_eq![PartialParseOp::Unready, part.parse_increment(b'\n')];
+        assert_eq![PartialParseOp::Unready, part.parse_increment(b')')];
 
         for ch in "last few words".bytes() {
-            assert_eq![Some(false), part.parse_increment(ch)];
+            assert_eq![PartialParseOp::Unready, part.parse_increment(ch)];
         }
-        assert_eq![Some(true), part.parse_increment(b'\n')];
+        assert_eq![PartialParseOp::Ready, part.parse_increment(b'\n')];
     }
 
     #[test]
     fn partial_parse_multi_line_nested() {
         let mut part = PartialParse::default();
         for ch in "hello world (".bytes() {
-            assert_eq![Some(false), part.parse_increment(ch)];
+            assert_eq![PartialParseOp::Unready, part.parse_increment(ch)];
         }
-        assert_eq![Some(false), part.parse_increment(b'\n')];
+        assert_eq![PartialParseOp::Unready, part.parse_increment(b'\n')];
 
         for ch in "this) (is (a message".bytes() {
-            assert_eq![Some(false), part.parse_increment(ch)];
+            assert_eq![PartialParseOp::Unready, part.parse_increment(ch)];
         }
-        assert_eq![Some(false), part.parse_increment(b'\n')];
-        assert_eq![Some(false), part.parse_increment(b')')];
+        assert_eq![PartialParseOp::Unready, part.parse_increment(b'\n')];
+        assert_eq![PartialParseOp::Unready, part.parse_increment(b')')];
 
         for ch in "last few words".bytes() {
-            assert_eq![Some(false), part.parse_increment(ch)];
+            assert_eq![PartialParseOp::Unready, part.parse_increment(ch)];
         }
-        assert_eq![Some(false), part.parse_increment(b'\n')];
-        assert_eq![Some(false), part.parse_increment(b')')];
-        assert_eq![Some(true), part.parse_increment(b'\n')];
+        assert_eq![PartialParseOp::Unready, part.parse_increment(b'\n')];
+        assert_eq![PartialParseOp::Unready, part.parse_increment(b')')];
+        assert_eq![PartialParseOp::Ready, part.parse_increment(b'\n')];
     }
 
     #[test]
     fn partial_parse_error() {
         let mut part = PartialParse::default();
         for ch in "hello world".bytes() {
-            assert_eq![Some(false), part.parse_increment(ch)];
+            assert_eq![PartialParseOp::Unready, part.parse_increment(ch)];
         }
-        assert_eq![None, part.parse_increment(b')')];
-        assert_eq![Some(true), part.parse_increment(b'\n')];
+        assert_eq![PartialParseOp::Discard, part.parse_increment(b')')];
+        assert_eq![PartialParseOp::Ready, part.parse_increment(b'\n')];
     }
 
     #[test]
     fn partial_parse_error_complex() {
         let mut part = PartialParse::default();
         for ch in "hello world (\na b c) d ".bytes() {
-            assert_eq![Some(false), part.parse_increment(ch)];
+            assert_eq![PartialParseOp::Unready, part.parse_increment(ch)];
         }
-        assert_eq![None, part.parse_increment(b')')];
+        assert_eq![PartialParseOp::Discard, part.parse_increment(b')')];
         for ch in "opener (\na b c d\ne f".bytes() {
-            assert_eq![None, part.parse_increment(ch)];
+            assert_eq![PartialParseOp::Unready, part.parse_increment(ch)];
         }
-        assert_eq![None, part.parse_increment(b')')];
-        assert_eq![Some(true), part.parse_increment(b'\n')];
+        assert_eq![PartialParseOp::Unready, part.parse_increment(b')')];
+        assert_eq![PartialParseOp::Ready, part.parse_increment(b'\n')];
     }
 
     // ---

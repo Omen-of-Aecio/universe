@@ -1,4 +1,4 @@
-use metac::PartialParse;
+use metac::{PartialParse, PartialParseOp};
 use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;
@@ -74,19 +74,25 @@ fn main() -> io::Result<()> {
             Ok(line) => {
                 for ch in line.bytes() {
                     match parse.parse_increment(ch) {
-                        Some(x) => {
-                            rl.helper_mut().unwrap().1.set(x);
+                        PartialParseOp::Ready => {
+                            rl.helper_mut().unwrap().1.set(true);
                         }
-                        None => {
+                        PartialParseOp::Unready => {
+                            rl.helper_mut().unwrap().1.set(false);
+                        }
+                        PartialParseOp::Discard => {
                             rl.helper_mut().unwrap().1.set(false);
                         }
                     }
                 }
                 match parse.parse_increment(b'\n') {
-                    Some(x) => {
-                        rl.helper_mut().unwrap().1.set(x);
+                    PartialParseOp::Ready => {
+                        rl.helper_mut().unwrap().1.set(true);
                     }
-                    None => {
+                    PartialParseOp::Unready => {
+                        rl.helper_mut().unwrap().1.set(false);
+                    }
+                    PartialParseOp::Discard => {
                         rl.helper_mut().unwrap().1.set(false);
                     }
                 }

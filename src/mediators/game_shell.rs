@@ -497,16 +497,18 @@ pub fn spawn(mut logger: Logger<Log>) -> Option<(JoinHandle<()>, Arc<AtomicBool>
                 .spawn(move || {
                     let mut cmdmat = cmdmat::Mapping::default();
                     cmdmat.register_many(SPEC).unwrap();
-                    game_shell_thread(GameShell {
-                        gshctx: GameShellContext {
-                            config_change: None,
-                            logger,
-                            keep_running,
-                            variables: HashMap::new(),
+                    game_shell_thread(
+                        GameShell {
+                            gshctx: GameShellContext {
+                                config_change: None,
+                                logger,
+                                keep_running,
+                                variables: HashMap::new(),
+                            },
+                            commands: Arc::new(cmdmat),
                         },
-                        commands: Arc::new(cmdmat),
-                    },
-                    listener)
+                        listener,
+                    )
                 })
                 .unwrap(),
             keep_running_clone,
@@ -522,166 +524,211 @@ pub fn spawn(mut logger: Logger<Log>) -> Option<(JoinHandle<()>, Arc<AtomicBool>
 fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<()> {
     let logger = s.gshctx.logger.clone();
     let keep_running = s.gshctx.keep_running.clone();
-    thread::spawn(move || {
-        let mut cmdmat = cmdmat::Mapping::default();
-        cmdmat.register_many(SPEC).unwrap();
-        let mut shell_clone = GameShell {
-            gshctx: GameShellContext {
-                config_change: None,
-                logger,
-                keep_running,
-                variables: HashMap::new(),
-            },
-            commands: Arc::new(cmdmat),
-        };
-        let result = connection_loop(&mut shell_clone, stream);
-        match result {
-            Ok(()) => {
-                shell_clone
-                    .gshctx
-                    .logger
-                    .debug("gsh", Log::Static("Connection ended ok"));
-            }
-            Err(error) => {
-                shell_clone.gshctx.logger.debug(
-                    "gsh",
-                    Log::StaticDynamic("Connection errored out", "reason", format!["{:?}", error]),
-                );
-            }
-        }
-    })
-}
-
-fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
-    s.gshctx
-        .logger
-        .debug("gsh", Log::Static("Acquired new stream"));
-    const BUFFER_SIZE: usize = 2048;
-    let mut buffer = [0; BUFFER_SIZE];
-    let mut begin = 0;
-    let mut shift = 0;
-    let mut partial_parser = PartialParse::default();
-    'receiver: loop {
-        for (base, idx) in (shift..begin).enumerate() {
-            buffer[base] = buffer[idx];
-        }
-        s.gshctx.logger.trace(
-            "gsh",
-            Log::Usize2("Loop entry", "shift", shift, "begin", begin),
-        );
-        begin -= shift;
-        s.gshctx
-            .logger
-            .trace("gsh", Log::Usize("Loop entry (new)", "begin", begin));
-        if begin > 0 {
-            match from_utf8(&buffer[0..begin]) {
-                Ok(x) => {
-                    s.gshctx.logger.trace(
-                        "gsh",
-                        Log::StaticDynamic(
-                            "Buffer contents from partial parse",
-                            "buffer",
-                            x.into(),
-                        ),
-                    );
+    thread::Builder::new()
+        .name("gsh/server/handler".to_string())
+        .spawn(move || {
+            let mut cmdmat = cmdmat::Mapping::default();
+            cmdmat.register_many(SPEC).unwrap();
+            let mut shell_clone = GameShell {
+                gshctx: GameShellContext {
+                    config_change: None,
+                    logger,
+                    keep_running,
+                    variables: HashMap::new(),
+                },
+                commands: Arc::new(cmdmat),
+            };
+            let result = connection_loop(&mut shell_clone, stream);
+            match result {
+                Ok(()) => {
+                    shell_clone
+                        .gshctx
+                        .logger
+                        .debug("gsh", Log::Static("Connection ended ok"));
                 }
                 Err(error) => {
-                    s.gshctx.logger.error(
+                    shell_clone.gshctx.logger.debug(
                         "gsh",
                         Log::StaticDynamic(
-                            "Shift buffer contains invalid UTF-8",
-                            "error",
-                            format!["{}", error],
+                            "Connection errored out",
+                            "reason",
+                            format!["{:?}", error],
                         ),
                     );
-                    break 'receiver;
                 }
             }
-        }
-        shift = 0;
-        if begin == BUFFER_SIZE - 1 {
-            s.gshctx.logger.warn(
-                "gsh",
-                Log::Usize(
-                    "Message exceeds maximum length, disconnecting to prevent further messages",
-                    "max",
-                    BUFFER_SIZE,
-                ),
-            );
-            write![stream, "Response: Message exceeds maximum length, disconnecting to prevent further messages, max={}", BUFFER_SIZE]?;
-            break 'receiver;
-        }
-        let count = stream.read(&mut buffer[begin..])?;
-        if count == 0 {
-            s.gshctx.logger.info(
-                "gsh",
-                Log::Static("Received empty message from farend, connection forfeit"),
-            );
-            break 'receiver;
-        }
-        s.gshctx
-            .logger
-            .trace("gsh", Log::Usize("Message from farend", "length", count));
-        for ch in buffer[begin..(begin + count)].iter() {
-            begin += 1;
-            match partial_parser.parse_increment(*ch) {
-                PartialParseOp::Ready => {
-                    shift = begin;
-                    let string = from_utf8(&buffer[(begin - shift)..begin]);
-                    if let Ok(string) = string {
-                        s.gshctx.logger.debug(
-                            "gsh",
-                            Log::StaticDynamic(
-                                "Converted farend message to UTF-8, calling interpret",
-                                "content",
-                                string.into(),
-                            ),
-                        );
-                        let result = s.interpret_single(string);
-                        if let Ok(result) = result {
-                            s.gshctx.logger.debug(
-                                "gsh",
-                                Log::Static(
-                                    "Message parsing succeeded and evaluated, sending response to client",
-                                ),
-                            );
-                            match result {
-                                EvalRes::Ok(res) => {
-                                    stream.write_all(format!["Ok: {}", res].as_bytes())?;
+        })
+        .unwrap()
+}
+
+// ---
+
+mod proc {
+    pub enum Consumption {
+        Consumed(usize),
+        Stop,
+    }
+    pub enum Validation {
+        Ready,
+        Unready,
+        Discard,
+    }
+    pub enum Process {
+        Continue,
+        Stop,
+    }
+    /// Incremental consumer of bytes
+    ///
+    /// Consume bytes until a complete set of bytes has been found, then, run a handler
+    /// function on just that set of bytes.
+    ///
+    /// This is used for accepting bytes from some external stream, note that we set a maximum
+    /// size on the buffer, so no external input can cause excessive memory usage.
+    /// Parsing must verify the legitimacy of the stream.
+    pub trait IncConsumer {
+        fn consume(&mut self, output: &mut [u8]) -> Consumption;
+        fn validate(&mut self, output: u8) -> Validation;
+        fn process(&mut self, input: &[u8]) -> Process;
+
+        fn run(&mut self, bufsize: usize) {
+            let mut buf = vec![b'\0'; bufsize];
+            let mut begin = 0;
+            let mut shift = 0;
+            loop {
+                match self.consume(&mut buf[begin..]) {
+                    Consumption::Consumed(amount) => {
+                        for ch in buf[begin..(begin + amount)].iter() {
+                            begin += 1;
+                            match self.validate(*ch) {
+                                Validation::Ready => {
+                                    match self.process(&buf[shift..begin]) {
+                                        Process::Continue => {}
+                                        Process::Stop => return,
+                                    }
+                                    shift = begin;
                                 }
-                                EvalRes::Err(res) => {
-                                    stream.write_all(format!["Err: {}", res].as_bytes())?;
-                                }
+                                Validation::Unready => {}
+                                Validation::Discard => shift = begin,
                             }
-                            stream.flush()?;
-                        } else {
-                            s.gshctx
-                                .logger
-                                .error("gsh", Log::Static("Message parsing failed"));
-                            stream.write_all(b"Unable to complete query (parse error)")?;
-                            stream.flush()?;
                         }
-                    } else {
-                        s.gshctx.logger
-                            .warn("gsh", Log::Static("Malformed UTF-8 received, this should never happen. Ending connection"));
-                        break 'receiver;
                     }
-                }
-                PartialParseOp::Unready => {
-                    // Do nothing
-                }
-                PartialParseOp::Discard => {
-                    // Set the shift register = begin, this means that all bytes so far will
-                    // not be used to interpret a command. They will instead be overwritten.
-                    shift = begin;
+                    Consumption::Stop => return,
                 }
             }
         }
     }
+}
+
+use self::proc::*;
+
+struct GshTcp<'a, 'b> {
+    pub gsh: &'a mut Gsh<'b>,
+    pub stream: TcpStream,
+    pub parser: PartialParse,
+}
+
+impl<'a, 'b> IncConsumer for GshTcp<'a, 'b> {
+    fn consume(&mut self, output: &mut [u8]) -> Consumption {
+        match self.stream.read(output) {
+            Ok(0) => Consumption::Stop,
+            Ok(count) => Consumption::Consumed(count),
+            Err(_) => Consumption::Stop,
+        }
+    }
+    fn validate(&mut self, input: u8) -> Validation {
+        match self.parser.parse_increment(input) {
+            PartialParseOp::Ready => Validation::Ready,
+            PartialParseOp::Unready => Validation::Unready,
+            PartialParseOp::Discard => Validation::Discard,
+        }
+    }
+    fn process(&mut self, input: &[u8]) -> Process {
+        let string = from_utf8(input);
+        if let Ok(string) = string {
+            self.gsh.gshctx.logger.debug(
+                "gsh",
+                Log::StaticDynamic(
+                    "Converted farend message to UTF-8, calling interpret",
+                    "content",
+                    string.into(),
+                ),
+            );
+            let result = self.gsh.interpret_single(string);
+            if let Ok(result) = result {
+                self.gsh.gshctx.logger.debug(
+                    "gsh",
+                    Log::Static(
+                        "Message parsing succeeded and evaluated, sending response to client",
+                    ),
+                );
+                match result {
+                    EvalRes::Ok(res) => {
+                        if self
+                            .stream
+                            .write_all(format!["Ok: {}", res].as_bytes())
+                            .is_err()
+                        {
+                            return Process::Stop;
+                        }
+                    }
+                    EvalRes::Err(res) => {
+                        if self
+                            .stream
+                            .write_all(format!["Err: {}", res].as_bytes())
+                            .is_err()
+                        {
+                            return Process::Stop;
+                        }
+                    }
+                }
+                if self.stream.flush().is_err() {
+                    return Process::Stop;
+                }
+            } else {
+                self.gsh
+                    .gshctx
+                    .logger
+                    .error("gsh", Log::Static("Message parsing failed"));
+                if self
+                    .stream
+                    .write_all(b"Unable to complete query (parse error)")
+                    .is_err()
+                {
+                    return Process::Stop;
+                }
+                if self.stream.flush().is_err() {
+                    return Process::Stop;
+                }
+            }
+            Process::Continue
+        } else {
+            self.gsh.gshctx.logger.warn(
+                "gsh",
+                Log::Static(
+                    "Malformed UTF-8 received, this should never happen. Ending connection",
+                ),
+            );
+            Process::Stop
+        }
+    }
+}
+
+// ---
+
+fn connection_loop(s: &mut Gsh, stream: TcpStream) -> io::Result<()> {
+    s.gshctx
+        .logger
+        .debug("gsh", Log::Static("Acquired new stream"));
+    let mut gshtcp = GshTcp {
+        gsh: s,
+        stream,
+        parser: PartialParse::default(),
+    };
+    gshtcp.run(2048);
     Ok(())
 }
 
-fn game_shell_thread(mut s: Gsh, mut listener: TcpListener) {
+fn game_shell_thread(mut s: Gsh, listener: TcpListener) {
     s.gshctx
         .logger
         .info("gsh", Log::Static("Started GameShell server"));
@@ -855,18 +902,20 @@ mod tests {
     use test::{black_box, Bencher};
 
     #[test]
-    fn change_log_level() -> io::Result<()> {
+    #[cfg(test_nondeterministic)]
+    fn nondeterministic_change_log_level() -> io::Result<()> {
         let (logger, logger_handle) = logger::Logger::spawn();
         assert_ne![123, logger.get_log_level()];
         let (_gsh, keep_running) = spawn(logger.clone()).unwrap();
+        let mut listener = TcpStream::connect("127.0.0.1:32931").unwrap();
         {
-            let mut listener = TcpStream::connect("127.0.0.1:32931")?;
             writeln![listener, "log global level 123"]?;
             listener.flush()?;
             listener.read(&mut [0u8; 256])?;
         }
         assert_eq![123, logger.get_log_level()];
         keep_running.store(false, Ordering::Release);
+        std::mem::drop(listener);
         std::mem::drop(logger);
         let listener = TcpStream::connect("127.0.0.1:32931")?;
         logger_handle.join().unwrap();
@@ -1166,7 +1215,8 @@ mod tests {
     }
 
     #[bench]
-    fn message_bandwidth_over_tcp(b: &mut Bencher) -> io::Result<()> {
+    #[cfg(test_nondeterministic)]
+    fn nondeterministic_message_bandwidth_over_tcp(b: &mut Bencher) -> io::Result<()> {
         let (mut logger, logger_handle) = logger::Logger::spawn();
         let (mut _gsh, keep_running) = spawn(logger.clone()).unwrap();
         logger.set_log_level(0);

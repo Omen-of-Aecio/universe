@@ -62,7 +62,7 @@ fn wait_for_threads_to_exit(s: glocals::Main) {
         x.store(false, Ordering::Relaxed);
     }
 
-    let tcp = TcpStream::connect("127.0.0.1:32931").unwrap();
+    let tcp = TcpStream::connect("127.0.0.1:32931");
     std::mem::drop(tcp);
 
     s.threads.game_shell.map(std::thread::JoinHandle::join);

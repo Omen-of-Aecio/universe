@@ -426,11 +426,10 @@ mod tests {
     fn single_mapping() {
         let mut mapping: Mapping<Accept, (), Context> = Mapping::default();
         mapping.register((&[("add-one", None)], add_one)).unwrap();
-        let mut output = SVec::<_>::new();
         let handler = mapping.lookup(&["add-one"]).unwrap();
         assert_eq![0, handler.1.len()];
         let mut ctx = 123;
-        handler.0(&mut ctx, &output).unwrap();
+        handler.0(&mut ctx, &handler.1).unwrap();
         assert_eq![124, ctx];
     }
 
@@ -579,7 +578,7 @@ mod tests {
     #[test]
     fn decider_of_many() {
         fn decide(input: &[&str], out: &mut SVec<i32>) -> Decision<()> {
-            for (idx, i) in input.iter().enumerate() {
+            for i in input.iter() {
                 let number = i.parse::<i32>();
                 if let Ok(number) = number {
                     out.push(number);

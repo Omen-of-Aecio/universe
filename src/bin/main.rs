@@ -31,9 +31,10 @@ fn run_client_or_server(mut s: glocals::Main) -> glocals::Main {
         let (mut logger, thread) = logger::Logger::spawn();
         s.threads.logger = Some(thread);
         logger.set_context_specific_log_level("benchmark", 0);
-        let game_shell = crate::mediators::game_shell::spawn(logger.clone());
-        s.threads.game_shell = Some(game_shell.0);
-        s.threads.game_shell_keep_running = Some(game_shell.1);
+        if let Some(game_shell) = crate::mediators::game_shell::spawn(logger.clone()) {
+            s.threads.game_shell = Some(game_shell.0);
+            s.threads.game_shell_keep_running = Some(game_shell.1);
+        }
         let mut client = Client {
             logger,
             should_exit: false,

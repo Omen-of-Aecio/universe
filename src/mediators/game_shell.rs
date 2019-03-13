@@ -487,28 +487,34 @@ pub fn make_new_gameshell(logger: Logger<Log>) -> Gsh<'static> {
 
 // ---
 
-pub fn spawn(logger: Logger<Log>) -> (JoinHandle<()>, Arc<AtomicBool>) {
+pub fn spawn(mut logger: Logger<Log>) -> Option<(JoinHandle<()>, Arc<AtomicBool>)> {
     let keep_running = Arc::new(AtomicBool::new(true));
     let keep_running_clone = keep_running.clone();
-    (
-        thread::Builder::new()
-            .name("gsh/server".to_string())
-            .spawn(move || {
-                let mut cmdmat = cmdmat::Mapping::default();
-                cmdmat.register_many(SPEC).unwrap();
-                game_shell_thread(GameShell {
-                    gshctx: GameShellContext {
-                        config_change: None,
-                        logger,
-                        keep_running,
-                        variables: HashMap::new(),
+    if let Ok(listener) = TcpListener::bind("127.0.0.1:32931") {
+        Some((
+            thread::Builder::new()
+                .name("gsh/server".to_string())
+                .spawn(move || {
+                    let mut cmdmat = cmdmat::Mapping::default();
+                    cmdmat.register_many(SPEC).unwrap();
+                    game_shell_thread(GameShell {
+                        gshctx: GameShellContext {
+                            config_change: None,
+                            logger,
+                            keep_running,
+                            variables: HashMap::new(),
+                        },
+                        commands: Arc::new(cmdmat),
                     },
-                    commands: Arc::new(cmdmat),
+                    listener)
                 })
-            })
-            .unwrap(),
-        keep_running_clone,
-    )
+                .unwrap(),
+            keep_running_clone,
+        ))
+    } else {
+        logger.info("gsh", Log::Static("Unable to bind to tcp port"));
+        None
+    }
 }
 
 // ---
@@ -675,48 +681,33 @@ fn connection_loop(s: &mut Gsh, mut stream: TcpStream) -> io::Result<()> {
     Ok(())
 }
 
-fn game_shell_thread(mut s: Gsh) {
-    let listener = TcpListener::bind("127.0.0.1:32931");
-    match listener {
-        Ok(listener) => {
-            s.gshctx
-                .logger
-                .info("gsh", Log::Static("Started GameShell server"));
-            'outer_loop: loop {
-                for stream in listener.incoming() {
-                    if !s.gshctx.keep_running.load(Ordering::Acquire) {
-                        s.gshctx
-                            .logger
-                            .info("gsh", Log::Static("Stopped GameShell server"));
-                        break 'outer_loop;
-                    }
-                    match stream {
-                        Ok(stream) => {
-                            clone_and_spawn_connection_handler(&s, stream);
-                        }
-                        Err(error) => {
-                            s.gshctx.logger.error(
-                                "gsh",
-                                Log::StaticDynamic(
-                                    "Got a stream but there was an error",
-                                    "reason",
-                                    format!["{:?}", error],
-                                ),
-                            );
-                        }
-                    }
+fn game_shell_thread(mut s: Gsh, mut listener: TcpListener) {
+    s.gshctx
+        .logger
+        .info("gsh", Log::Static("Started GameShell server"));
+    'outer_loop: loop {
+        for stream in listener.incoming() {
+            if !s.gshctx.keep_running.load(Ordering::Acquire) {
+                s.gshctx
+                    .logger
+                    .info("gsh", Log::Static("Stopped GameShell server"));
+                break 'outer_loop;
+            }
+            match stream {
+                Ok(stream) => {
+                    clone_and_spawn_connection_handler(&s, stream);
+                }
+                Err(error) => {
+                    s.gshctx.logger.error(
+                        "gsh",
+                        Log::StaticDynamic(
+                            "Got a stream but there was an error",
+                            "reason",
+                            format!["{:?}", error],
+                        ),
+                    );
                 }
             }
-        }
-        Err(error) => {
-            s.gshctx.logger.error(
-                "gsh",
-                Log::StaticDynamic(
-                    "Unable to start gameshell",
-                    "reason",
-                    format!["{:?}", error],
-                ),
-            );
         }
     }
 }
@@ -864,12 +855,10 @@ mod tests {
     use test::{black_box, Bencher};
 
     #[test]
-    #[cfg(test_nondeterministic)]
-    fn nondeterministic_change_log_level() -> io::Result<()> {
+    fn change_log_level() -> io::Result<()> {
         let (logger, logger_handle) = logger::Logger::spawn();
         assert_ne![123, logger.get_log_level()];
-        let (_gsh, keep_running) = spawn(logger.clone());
-        std::thread::sleep(std::time::Duration::new(0, 50_000_000));
+        let (_gsh, keep_running) = spawn(logger.clone()).unwrap();
         {
             let mut listener = TcpStream::connect("127.0.0.1:32931")?;
             writeln![listener, "log global level 123"]?;
@@ -1179,8 +1168,7 @@ mod tests {
     #[bench]
     fn message_bandwidth_over_tcp(b: &mut Bencher) -> io::Result<()> {
         let (mut logger, logger_handle) = logger::Logger::spawn();
-        let (mut _gsh, keep_running) = spawn(logger.clone());
-        std::thread::sleep(std::time::Duration::new(0, 50_000_000));
+        let (mut _gsh, keep_running) = spawn(logger.clone()).unwrap();
         logger.set_log_level(0);
         let mut listener = TcpStream::connect("127.0.0.1:32931")?;
         b.iter(|| -> io::Result<()> {

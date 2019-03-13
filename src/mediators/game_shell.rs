@@ -47,11 +47,15 @@ mod command_handlers {
     }
 
     pub fn add(_: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
-        let mut sum = 0;
+        let mut sum: i32 = 0;
         for cmd in commands {
             match cmd {
                 Input::I32(x) => {
-                    sum += x;
+                    sum = if let Some(num) = sum.checked_add(*x) {
+                        num
+                    } else {
+                        return Err("Addition overflow".into());
+                    };
                 }
                 _ => {
                     return Err("Expected i32".into());
@@ -66,7 +70,15 @@ mod command_handlers {
         if let Some(cmd) = commands.iter().next() {
             match cmd {
                 Input::I32(x) => {
-                    sum = if commands.len() == 1 { -*x } else { *x };
+                    sum = if commands.len() == 1 {
+                        if let Some(num) = x.checked_neg() {
+                            num
+                        } else {
+                            return Err("Subtraction overflow".into());
+                        }
+                    } else {
+                        *x
+                    };
                 }
                 _ => {
                     return Err("Expected i32".into());
@@ -76,7 +88,11 @@ mod command_handlers {
         for cmd in commands.iter().skip(1) {
             match cmd {
                 Input::I32(x) => {
-                    sum -= x;
+                    sum = if let Some(num) = sum.checked_sub(*x) {
+                        num
+                    } else {
+                        return Err("Subtraction overflow".into());
+                    };
                 }
                 _ => {
                     return Err("Expected i32".into());
@@ -87,11 +103,15 @@ mod command_handlers {
     }
 
     pub fn mul(_: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
-        let mut sum = 1;
+        let mut sum: i32 = 1;
         for cmd in commands {
             match cmd {
                 Input::I32(x) => {
-                    sum *= x;
+                    sum = if let Some(num) = sum.checked_mul(*x) {
+                        num
+                    } else {
+                        return Err("Multiplication overflow".into());
+                    };
                 }
                 _ => {
                     return Err("Expected i32".into());
@@ -102,7 +122,7 @@ mod command_handlers {
     }
 
     pub fn div(_: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
-        let mut sum = 0;
+        let mut sum: i32 = 0;
         if let Some(cmd) = commands.iter().next() {
             match cmd {
                 Input::I32(x) => {
@@ -116,7 +136,15 @@ mod command_handlers {
         for cmd in commands.iter().skip(1) {
             match cmd {
                 Input::I32(x) => {
-                    sum /= x;
+                    sum = if let Some(num) = sum.checked_div(*x) {
+                        num
+                    } else {
+                        if *x == 0 {
+                            return Err("Division by zero".into());
+                        } else {
+                            return Err("Division overflow".into());
+                        }
+                    };
                 }
                 _ => {
                     return Err("Expected i32".into());
@@ -141,7 +169,15 @@ mod command_handlers {
         for cmd in commands.iter().skip(1) {
             match cmd {
                 Input::I32(x) => {
-                    sum %= x;
+                    sum = if let Some(num) = sum.checked_rem(*x) {
+                        num
+                    } else {
+                        if *x == 0 {
+                            return Err("Modulo by zero".into());
+                        } else {
+                            return Err("Modulo overflow".into());
+                        }
+                    };
                 }
                 _ => {
                     return Err("Expected i32".into());
@@ -1125,6 +1161,78 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn check_integer_overflow() -> io::Result<()> {
+        let logger_handle = {
+            // given
+            let (mut logger, logger_handle) = logger::Logger::spawn();
+            logger.set_log_level(0);
+            let keep_running = Arc::new(AtomicBool::new(true));
+            let mut cmdmat = cmdmat::Mapping::default();
+            cmdmat.register_many(SPEC).unwrap();
+            let mut gsh = GameShell {
+                gshctx: GameShellContext {
+                    config_change: None,
+                    logger,
+                    keep_running,
+                    variables: HashMap::new(),
+                },
+                commands: Arc::new(cmdmat),
+            };
+
+            assert_eq![
+                EvalRes::Err("Addition overflow".into()),
+                gsh.interpret_single("+ 2147483647 1").unwrap()
+            ];
+
+            assert_eq![
+                EvalRes::Err("Addition overflow".into()),
+                gsh.interpret_single("+ -2147483648 -1").unwrap()
+            ];
+
+            assert_eq![
+                EvalRes::Err("Subtraction overflow".into()),
+                gsh.interpret_single("- -2147483648").unwrap()
+            ];
+
+            assert_eq![
+                EvalRes::Err("Subtraction overflow".into()),
+                gsh.interpret_single("- -2147483647 2").unwrap()
+            ];
+
+            assert_eq![
+                EvalRes::Err("Multiplication overflow".into()),
+                gsh.interpret_single("* 2147483647 2").unwrap()
+            ];
+
+            assert_eq![
+                EvalRes::Err("Division by zero".into()),
+                gsh.interpret_single("/ 1 0").unwrap()
+            ];
+
+            assert_eq![
+                EvalRes::Err("Division overflow".into()),
+                gsh.interpret_single("/ -2147483648 -1").unwrap()
+            ];
+
+            assert_eq![
+                EvalRes::Err("Modulo by zero".into()),
+                gsh.interpret_single("% 1 0").unwrap()
+            ];
+
+            assert_eq![
+                EvalRes::Err("Modulo overflow".into()),
+                gsh.interpret_single("% -2147483648 -1").unwrap()
+            ];
+
+            // then
+            logger_handle
+        };
+        logger_handle.join().unwrap();
+
+        // cleanup
+        Ok(())
+    }
     // ---
 
     #[bench]

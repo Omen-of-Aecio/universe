@@ -18,7 +18,7 @@ use std::thread::{self, JoinHandle};
 // ---
 
 #[rustfmt::skip]
-const SPEC: &[cmdmat::Spec<Input, String, GameShellContext>] = &[
+const SPEC: &[cmdmat::Spec<Input, GshDecision, GameShellContext>] = &[
     (&[("%", MANY_I32)], modulo),
     (&[("&", MANY_I32)], band),
     (&[("*", MANY_I32)], mul),
@@ -290,7 +290,7 @@ mod command_handlers {
         if let Some(string) = gsh.variables.get(&key) {
             Ok(string.clone())
         } else {
-            Err("Does not exist".into())
+            Err(format!["Variable not exist: {}", key])
         }
     }
 
@@ -313,7 +313,7 @@ mod command_handlers {
             }
         }
         gsh.variables.insert(key, value);
-        Ok("OK".into())
+        Ok("Ok".into())
     }
 
     pub fn create_string(_: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
@@ -330,7 +330,7 @@ mod command_handlers {
         match commands[0] {
             Input::U8(level) => {
                 s.logger.set_log_level(level);
-                Ok("OK: Changed log level".into())
+                Ok("Ok: Changed log level".into())
             }
             _ => Err("Usage: log level <u8>".into()),
         }
@@ -350,7 +350,7 @@ mod command_handlers {
             }
         }
         s.logger.trace("user", Log::Dynamic(sum));
-        Ok("OK".into())
+        Ok("Ok".into())
     }
 
     pub fn log_context(s: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
@@ -371,11 +371,16 @@ mod command_handlers {
         match commands[1] {
             Input::U8(level) => {
                 s.logger.set_context_specific_log_level(ctx, level);
-                Ok("OK: Changed log level".into())
+                Ok("Ok: Changed log level".into())
             }
             _ => Err("Usage: log context <atom> level <u8>".into()),
         }
     }
+}
+
+pub enum GshDecision {
+    Help(String),
+    Err(String),
 }
 
 mod predicates {
@@ -394,32 +399,35 @@ mod predicates {
         }};
     }
 
-    fn aslen(input: &[&str], input_l: usize) -> Result<(), Decision<String>> {
+    fn aslen(input: &[&str], input_l: usize) -> Result<(), Decision<GshDecision>> {
         if input.len() < input_l {
-            Err(Decision::Deny(format!["Too few elements: {:?}", input]))
+            Err(Decision::Deny(GshDecision::Err(format![
+                "Too few elements: {:?}",
+                input
+            ])))
         } else {
             Ok(())
         }
     }
 
-    fn any_atom_function(input: &[&str], out: &mut SVec<Input>) -> Decision<String> {
+    fn any_atom_function(input: &[&str], out: &mut SVec<Input>) -> Decision<GshDecision> {
         ret_if_err![aslen(input, 1)];
         for i in input[0].chars() {
             if i.is_whitespace() {
-                return Decision::Deny(input[0].into());
+                return Decision::Deny(GshDecision::Err(input[0].into()));
             }
         }
         out.push(Input::Atom(input[0].to_string()));
         Decision::Accept(1)
     }
 
-    fn any_string_function(input: &[&str], out: &mut SVec<Input>) -> Decision<String> {
+    fn any_string_function(input: &[&str], out: &mut SVec<Input>) -> Decision<GshDecision> {
         ret_if_err![aslen(input, 1)];
         out.push(Input::String(input[0].to_string()));
         Decision::Accept(1)
     }
 
-    fn many_string_function(input: &[&str], out: &mut SVec<Input>) -> Decision<String> {
+    fn many_string_function(input: &[&str], out: &mut SVec<Input>) -> Decision<GshDecision> {
         ret_if_err![aslen(input, input.len())];
         let mut cnt = 0;
         for (idx, i) in input.iter().enumerate() {
@@ -429,27 +437,30 @@ mod predicates {
         Decision::Accept(cnt)
     }
 
-    fn two_string_function(input: &[&str], out: &mut SVec<Input>) -> Decision<String> {
+    fn two_string_function(input: &[&str], out: &mut SVec<Input>) -> Decision<GshDecision> {
+        if input.len() == 1 {
+            return Decision::Deny(GshDecision::Help("<string>".into()));
+        }
         ret_if_err![aslen(input, 2)];
         out.push(Input::String(input[0].to_string()));
         out.push(Input::String(input[1].to_string()));
         Decision::Accept(2)
     }
 
-    fn any_u8_function(input: &[&str], out: &mut SVec<Input>) -> Decision<String> {
+    fn any_u8_function(input: &[&str], out: &mut SVec<Input>) -> Decision<GshDecision> {
         ret_if_err![aslen(input, 1)];
         match input[0].parse::<u8>().ok().map(Input::U8) {
             Some(num) => {
                 out.push(num);
             }
             None => {
-                return Decision::Deny(input[0].into());
+                return Decision::Deny(GshDecision::Err(input[0].into()));
             }
         }
         Decision::Accept(1)
     }
 
-    fn many_i32_function(input: &[&str], out: &mut SVec<Input>) -> Decision<String> {
+    fn many_i32_function(input: &[&str], out: &mut SVec<Input>) -> Decision<GshDecision> {
         let mut cnt = 0;
         for i in input.iter() {
             if let Some(num) = i.parse::<i32>().ok().map(Input::I32) {
@@ -463,11 +474,11 @@ mod predicates {
         Decision::Accept(cnt)
     }
 
-    fn ignore_all(input: &[&str], _: &mut SVec<Input>) -> Decision<String> {
+    fn ignore_all(input: &[&str], _: &mut SVec<Input>) -> Decision<GshDecision> {
         Decision::Accept(input.len())
     }
 
-    type SomeDec = Option<&'static Decider<Input, String>>;
+    type SomeDec = Option<&'static Decider<Input, GshDecision>>;
     pub const ANY_ATOM: SomeDec = Some(&Decider {
         description: "<atom>",
         decider: any_atom_function,
@@ -699,11 +710,11 @@ impl<'a, 'b> IncConsumer for GshTcp<'a, 'b> {
                 );
                 match result {
                     EvalRes::Ok(res) => {
-                        if self
-                            .stream
-                            .write_all(format!["Ok: {}", res].as_bytes())
-                            .is_err()
-                        {
+                        if !res.is_empty() {
+                            if self.stream.write_all(res.as_bytes()).is_err() {
+                                return Process::Stop;
+                            }
+                        } else if self.stream.write_all(b"Ok").is_err() {
                             return Process::Stop;
                         }
                     }
@@ -718,19 +729,17 @@ impl<'a, 'b> IncConsumer for GshTcp<'a, 'b> {
                     }
                     EvalRes::Help(res) => {
                         if !res.is_empty() {
-                            if self
-                                .stream
-                                .write_all(format!["{}", res].as_bytes())
-                                .is_err()
-                            {
+                            if self.stream.write_all(res.as_bytes()).is_err() {
                                 return Process::Stop;
                             }
-                        } else if self
-                            .stream
-                            .write_all(format!["Empty help message"].as_bytes())
-                            .is_err()
-                        {
-                            return Process::Stop;
+                        } else {
+                            self.gsh
+                                .gshctx
+                                .logger
+                                .warn("gsh", Log::Static("Sending empty help message"));
+                            if self.stream.write_all(b"Empty help message").is_err() {
+                                return Process::Stop;
+                            }
                         }
                     }
                 }
@@ -814,7 +823,7 @@ fn game_shell_thread(mut s: Gsh, listener: TcpListener) {
 
 // ---
 
-type Gsh<'a> = GameShell<Arc<cmdmat::Mapping<'a, Input, String, GameShellContext>>>;
+type Gsh<'a> = GameShell<Arc<cmdmat::Mapping<'a, Input, GshDecision, GameShellContext>>>;
 #[derive(Clone)]
 pub enum Input {
     U8(u8),
@@ -837,14 +846,23 @@ impl Default for EvalRes {
     }
 }
 
-fn lookerr_to_string(err: LookError<String>) -> String {
+fn lookerr_to_evalres(err: LookError<GshDecision>, allow_help: bool) -> EvalRes {
     match err {
-        LookError::DeciderAdvancedTooFar => "Decider advanced too far".into(),
-        LookError::DeciderDenied(desc, decider) => {
-            format!["Expected {} but got: {}", desc, decider]
+        LookError::DeciderAdvancedTooFar => EvalRes::Err("Decider advanced too far".into()),
+        LookError::DeciderDenied(desc, GshDecision::Err(decider)) => {
+            EvalRes::Err(format!["Expected {} but got: {}", desc, decider])
         }
-        LookError::FinalizerDoesNotExist => "Finalizer does not exist".into(),
-        LookError::UnknownMapping(token) => format!["Unrecognized mapping: {}", token],
+        LookError::DeciderDenied(desc, GshDecision::Help(help)) => {
+            if allow_help {
+                EvalRes::Help(help)
+            } else {
+                EvalRes::Err(format!["Expected {} but got denied: {}", desc, help])
+            }
+        }
+        LookError::FinalizerDoesNotExist => EvalRes::Err("Finalizer does not exist".into()),
+        LookError::UnknownMapping(token) => {
+            EvalRes::Err(format!["Unrecognized mapping: {}", token])
+        }
     }
 }
 
@@ -922,7 +940,7 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
                         return EvalRes::Ok(name.into());
                     }
                     Err(err) => {
-                        return EvalRes::Err(lookerr_to_string(err));
+                        return lookerr_to_evalres(err, true);
                     }
                 }
             }
@@ -937,7 +955,7 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
                     Err(res) => EvalRes::Err(res),
                 }
             }
-            Err(err) => EvalRes::Err(lookerr_to_string(err)),
+            Err(err) => lookerr_to_evalres(err, false),
         }
     }
 }
@@ -993,7 +1011,7 @@ mod tests {
             };
 
             assert_eq![
-                EvalRes::Ok("OK".into()),
+                EvalRes::Ok("Ok".into()),
                 gsh.interpret_single("set key some-value").unwrap()
             ];
             assert_eq![
@@ -1007,7 +1025,7 @@ mod tests {
             ];
 
             assert_eq![
-                EvalRes::Ok("OK".into()),
+                EvalRes::Ok("Ok".into()),
                 gsh.interpret_single("set a 123").unwrap()
             ];
             assert_eq![

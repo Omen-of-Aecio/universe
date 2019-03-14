@@ -691,6 +691,15 @@ mod tests {
         }
         assert_eq![PartialParseOp::Discard, part.parse_increment(b'\n')];
         assert_eq![PartialParseOp::Discard, part.parse_increment(b'a')];
+        assert_eq![PartialParseOp::Discard, part.parse_increment(b'(')];
+        assert_eq![PartialParseOp::Discard, part.parse_increment(b'\n')];
+        assert_eq![PartialParseOp::Discard, part.parse_increment(b'x')];
+        assert_eq![PartialParseOp::Discard, part.parse_increment(b'\n')];
+        assert_eq![PartialParseOp::Discard, part.parse_increment(b'd')];
+        assert_eq![PartialParseOp::Discard, part.parse_increment(b')')];
+        assert_eq![PartialParseOp::Discard, part.parse_increment(b')')];
+        assert_eq![PartialParseOp::Ready, part.parse_increment(b'\n')];
+        assert_eq![PartialParseOp::Unready, part.parse_increment(b'x')];
     }
 
     // ---

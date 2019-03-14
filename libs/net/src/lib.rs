@@ -52,11 +52,10 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
     /// A temporary (TODO) simple (but brute force) solution to the need of occasionally resending
     /// packets which haven't been acknowledged.
     pub fn update(&mut self) -> Result<(), Error> {
-        let socket = self.socket.try_clone()?; // because of aliasing
         for (addr, conn) in self.connections.iter_mut() {
             let to_resend = conn.get_resend_queue();
             for pkt in to_resend {
-                socket.send_to(&pkt, *addr)?;
+                self.socket.send_to(&pkt, *addr)?;
             }
         }
 

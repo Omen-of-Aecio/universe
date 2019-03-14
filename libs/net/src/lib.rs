@@ -86,13 +86,13 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
 
     /// Send reliable message
     pub fn send_reliably_to(&mut self, msg: T, dest: SocketAddr) -> Result<(), Error> {
-        // Need to clone it here because of aliasing :/
-        // IDEA: Could also let Connection::wrap_message take a clone of the UdpSocket and send the
-        // message itself. Connection could even know the UdpSocket and SocketAddr
-        let socket = self.socket.try_clone()?;
+        if self.connections.get(&dest).is_none() {
+            let conn = Connection::new(dest);
+            self.connections.insert(dest, conn);
+        }
+        let conn = self.connections.get_mut(&dest).unwrap();
 
-        let conn = self.get_connection_or_create(dest);
-        conn.send_message(msg, &socket)?;
+        conn.send_message(msg, &self.socket)?;
         Ok(())
     }
 

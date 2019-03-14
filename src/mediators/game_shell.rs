@@ -716,6 +716,23 @@ impl<'a, 'b> IncConsumer for GshTcp<'a, 'b> {
                             return Process::Stop;
                         }
                     }
+                    EvalRes::Help(res) => {
+                        if !res.is_empty() {
+                            if self
+                                .stream
+                                .write_all(format!["{}", res].as_bytes())
+                                .is_err()
+                            {
+                                return Process::Stop;
+                            }
+                        } else if self
+                            .stream
+                            .write_all(format!["Empty help message"].as_bytes())
+                            .is_err()
+                        {
+                            return Process::Stop;
+                        }
+                    }
                 }
                 if self.stream.flush().is_err() {
                     return Process::Stop;
@@ -809,8 +826,9 @@ pub enum Input {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum EvalRes {
-    Ok(String),
     Err(String),
+    Help(String),
+    Ok(String),
 }
 
 impl Default for EvalRes {
@@ -848,6 +866,9 @@ impl<'a> Gsh<'a> {
                         match res {
                             Ok(EvalRes::Ok(string)) => {
                                 content.push(string);
+                            }
+                            Ok(ref res @ EvalRes::Help(_)) => {
+                                return Err(res.clone());
                             }
                             Ok(ref res @ EvalRes::Err(_)) => {
                                 return Err(res.clone());

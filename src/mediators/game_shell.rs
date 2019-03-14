@@ -807,12 +807,6 @@ pub enum Input {
     Command(String),
 }
 
-impl Default for Input {
-    fn default() -> Input {
-        Input::U8(0)
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum EvalRes {
     Ok(String),

@@ -965,9 +965,7 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::{self, Read, Write};
-    use std::net::TcpStream;
-    use std::sync::atomic::Ordering;
+    use std::io::{self};
     use test::{black_box, Bencher};
 
     #[test]

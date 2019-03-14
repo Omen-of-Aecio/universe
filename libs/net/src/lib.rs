@@ -41,21 +41,12 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
     }
 
     pub fn new_with_random_port() -> Result<(Socket<T>, u16), Error> {
-        for port in 10000..65535 {
-            // TODO Needs to be inclusive
-            let socket =
-                UdpSocket::bind(("127.0.0.1:".to_string() + port.to_string().as_str()).as_str());
-            if socket.is_ok() {
-                return Ok((
-                    Socket {
-                        socket: socket.unwrap(),
-                        connections: HashMap::new(),
-                    },
-                    port,
-                ));
+        for port in 10000..=u16::max_value() {
+            if let Ok(sock) = Self::new(port) {
+                return Ok((sock, port));
             }
         }
-        bail!("Unable to find a port")
+        bail!["Unable to find a port"]
     }
 
     /// A temporary (TODO) simple (but brute force) solution to the need of occasionally resending

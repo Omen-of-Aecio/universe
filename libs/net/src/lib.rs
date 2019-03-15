@@ -194,6 +194,21 @@ mod tests {
     }
 
     #[test]
+    fn confirm_reliable_message_arrives_with_string() {
+        let (mut client, _client_port): (Socket<&str>, _) = Socket::new_with_random_port().unwrap();
+        let (mut server, server_port): (Socket<&str>, _) = Socket::new_with_random_port().unwrap();
+
+        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
+
+        client.send_reliably_to("Hello World", destination).unwrap();
+        let mut buffer = [0u8; 3000];
+        assert_eq!["Hello World", server.recv(&mut buffer).unwrap().1];
+        assert![client.get_connection_or_create(destination).send_window[0].is_some()];
+        assert![client.recv(&mut buffer).is_err()];
+        assert![client.get_connection_or_create(destination).send_window[0].is_none()];
+    }
+
+    #[test]
     fn confirm_u8_size_of_packet() {
         assert_eq![8, Packet::Unreliable { msg: 128 }.encode().unwrap().len()];
     }

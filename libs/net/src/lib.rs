@@ -115,9 +115,13 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
 
     fn recv_internal(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> {
         // Since we may just receive an Ack, we loop until we receive an actual message
-        let socket = self.socket.try_clone()?;
+        let socket = &self.socket;
         let (_, src) = socket.recv_from(buffer)?;
-        let conn = self.get_connection_or_create(src);
+        if self.connections.get(&src).is_none() {
+            let conn = Connection::new(src);
+            self.connections.insert(src, conn);
+        }
+        let conn = self.connections.get_mut(&src).unwrap();
         let packet: Packet<T> = Packet::decode(buffer)?;
         // let value = self.get_connection_or_create(src);
         let msg = conn.unwrap_message(packet, &socket)?;

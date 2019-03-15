@@ -17,7 +17,7 @@ pub enum Packet<T: Clone + Debug + Eq + PartialEq> {
     Unreliable { msg: T },
 }
 
-impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize + Eq + PartialEq> Packet<T> {
+impl<T: Clone + Debug + Serialize + Eq + PartialEq> Packet<T> {
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let r = bincode::serialize(self).map_err(|_| format_err!("failed to serialize"))?;
         if r.len() as u32 > Packet::<T>::max_payload_size() {
@@ -31,7 +31,7 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize + Eq + PartialEq> Packet
         }
     }
 
-    pub fn decode(data: &'a [u8]) -> Result<Packet<T>, Error> {
+    pub fn decode<'a>(data: &'a [u8]) -> Result<Packet<T>, Error> where T: Deserialize<'a> {
         bincode::deserialize(&data[..]).map_err(|_| format_err!("failed to deserialize"))
     }
 

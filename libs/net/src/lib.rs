@@ -16,7 +16,7 @@ use std::iter::Iterator;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use std::time::Duration;
 
-/// Provides an interface to encode and [reliably] send, decode and receive messages to/from any destination.
+/// Provides an interface to encode and relatively reliably send, decode and receive messages to/from any destination.
 
 // - maybe use concurrency for timing rather than polling
 

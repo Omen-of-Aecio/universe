@@ -933,8 +933,12 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
                                 s
                             })
                             .collect::<Vec<_>>();
-                        col.sort();
-                        return EvalRes::Ok(col.join(", "));
+                        if col.is_empty() {
+                            return EvalRes::Ok("No more handlers".into());
+                        } else {
+                            col.sort();
+                            return EvalRes::Ok(col.join(", "));
+                        }
                     }
                     Ok(Either::Right(name)) => {
                         return EvalRes::Ok(name.into());

@@ -84,16 +84,8 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Eq + Serialize + PartialEq> Connec
 
     /// Removes all None's that appear at the front of the send window queue
     fn update_send_window(&mut self) {
-        loop {
-            let remove = match self.send_window.front() {
-                Some(&None) => true,
-                _ => false,
-            };
-            if remove {
-                self.send_window.pop_front();
-            } else {
-                break;
-            }
+        while let Some(&None) = self.send_window.front() {
+            self.send_window.pop_front();
         }
     }
 

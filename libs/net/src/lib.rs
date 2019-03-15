@@ -7,8 +7,7 @@ mod pkt;
 use self::conn::Connection;
 use self::pkt::Packet;
 use failure::Error;
-
-use failure::{bail, err_msg};
+use failure::{bail, ensure, err_msg};
 use serde::{Deserialize, Serialize};
 use std;
 use std::collections::hash_map::HashMap;
@@ -58,19 +57,29 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
                 self.socket.send_to(&pkt, *addr)?;
             }
         }
-
         Ok(())
     }
 
     pub fn max_payload_size() -> u32 {
+        // const MIN_MTU_DATA_LINK_LAYER_SIZE: usize = 576;
+        // const IP_HEADER_SIZE: usize = 20;
+        // const UDP_HEADER_SIZE: usize = 8;
+        // const MAXIMUM_PAYLOAD_SIZE: usize = MIN_MTU_DATA_LINK_LAYER_SIZE - IP_HEADER_SIZE - UDP_HEADER_SIZE;
         Packet::<T>::max_payload_size() // because Packet should probably be private to the net module
     }
 
     /// Send unreliable message
     pub fn send_to(&mut self, msg: T, dest: SocketAddr) -> Result<(), Error> {
         let buffer = Packet::Unreliable { msg }.encode()?;
-        self.socket.send_to(&buffer, dest)?;
-
+        ensure![
+            buffer.len() <= u16::max_value() as usize,
+            "Packet too big to fit inside a UDP datagram"
+        ];
+        let size = self.socket.send_to(&buffer, dest)?;
+        ensure![
+            size == buffer.len(),
+            "Entire buffer not sent in a single packet"
+        ];
         Ok(())
     }
 
@@ -101,10 +110,10 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
     pub fn recv(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> {
         self.socket.set_nonblocking(false)?;
         self.socket.set_read_timeout(Some(Duration::new(3, 0)))?;
-        self._recv(buffer)
+        self.recv_internal(buffer)
     }
 
-    fn _recv(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> {
+    fn recv_internal(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> {
         // Since we may just receive an Ack, we loop until we receive an actual message
         let socket = self.socket.try_clone()?;
         let (_, src) = socket.recv_from(buffer)?;

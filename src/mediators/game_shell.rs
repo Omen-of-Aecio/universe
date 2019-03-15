@@ -633,10 +633,18 @@ mod proc {
     /// size on the buffer, so no external input can cause excessive memory usage.
     /// Parsing must verify the legitimacy of the stream.
     pub trait IncConsumer {
+        /// Consume bytes and place them on an output stack
         fn consume(&mut self, output: &mut [u8]) -> Consumption;
+        /// Validate part of the bytestream, as soon as we return `Validation::Ready`, `process`
+        /// will be run on the current accumulated bytes, after which these bytes will be deleted.
         fn validate(&mut self, output: u8) -> Validation;
+        /// Process do actual stuff with the bytes to affect the system.
+        ///
+        /// The sequence of bytes input here will have been verified by the `validate`
+        /// function.
         fn process(&mut self, input: &[u8]) -> Process;
 
+        /// Runs the incremental consumer until it is signalled to quit
         fn run(&mut self, bufsize: usize) {
             let mut buf = vec![b'\0'; bufsize];
             let mut begin = 0;

@@ -7,14 +7,13 @@ mod pkt;
 use self::conn::Connection;
 use self::pkt::Packet;
 use failure::Error;
-use failure::{bail, ensure, err_msg};
+use failure::{bail, ensure};
 use serde::{Deserialize, Serialize};
 use std;
 use std::collections::hash_map::HashMap;
 use std::fmt::Debug;
 use std::iter::Iterator;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
-use std::time::Duration;
 
 /// Provides an interface to encode and relatively reliably send, decode and receive messages to/from any destination.
 
@@ -95,21 +94,11 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
         Ok(())
     }
 
-    fn get_connection_or_create(&mut self, dest: SocketAddr) -> &mut Connection<T> {
-        if self.connections.get(&dest).is_none() {
-            let conn = Connection::new(dest);
-            self.connections.insert(dest, conn);
-        }
-        self.connections.get_mut(&dest).unwrap()
-    }
-
     // Should wait until the packet is acknowledged..:
     // pub fn send_reliable_to_and_wait(&self, msg: Message, dest: SocketAddr) -> Result<()>
 
     /// Blocking, with timeout (3 sec)
     pub fn recv(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> {
-        self.socket.set_nonblocking(false)?;
-        self.socket.set_read_timeout(Some(Duration::new(3, 0)))?;
         self.recv_internal(buffer)
     }
 
@@ -265,6 +254,34 @@ mod tests {
                 .send_to(black_box(vec![128; 10_000]), black_box(destination))
                 .unwrap();
             let mut buffer = [0u8; 20_000];
+            server.recv(black_box(&mut buffer)).unwrap();
+        });
+    }
+
+    #[bench]
+    fn time_on_realistic_load(b: &mut Bencher) {
+        #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+        struct PlayerUpdate {
+            x: i32,
+            y: i32,
+            health: Option<u32>,
+        }
+        let (mut client, _client_port): (Socket<PlayerUpdate>, _) =
+            Socket::new_with_random_port().unwrap();
+        let (mut server, server_port): (Socket<PlayerUpdate>, _) =
+            Socket::new_with_random_port().unwrap();
+
+        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
+        let player = PlayerUpdate {
+            x: 123490,
+            y: -319103,
+            health: Some(100),
+        };
+        b.iter(|| {
+            client
+                .send_to(black_box(player.clone()), black_box(destination))
+                .unwrap();
+            let mut buffer = [0u8; 2000];
             server.recv(black_box(&mut buffer)).unwrap();
         });
     }

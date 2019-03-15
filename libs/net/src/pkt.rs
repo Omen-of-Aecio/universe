@@ -1,7 +1,6 @@
 use failure::format_err;
 use failure::Error;
 use serde::{Deserialize, Serialize};
-use serde_derive::{Deserialize, Serialize};
 use std::fmt::Debug;
 
 use bincode;

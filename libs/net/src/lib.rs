@@ -128,7 +128,7 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
         if let Some(msg) = msg {
             Ok((src, msg))
         } else {
-            Err(err_msg("did not recv a message"))
+            bail!["Did not recv a message"]
         }
         // let conn = self.get_connection_or_create(src);
         // let msg = conn.unwrap_message(packet, &socket)?;

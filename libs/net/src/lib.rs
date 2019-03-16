@@ -169,7 +169,7 @@ mod tests {
 
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
         client.send_to(false, destination).unwrap();
-        let mut buffer = [0u8; 1000];
+        let mut buffer = [0u8; 5];
         server.recv(&mut buffer).unwrap();
     }
 
@@ -181,7 +181,7 @@ mod tests {
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
 
         client.send_reliably_to(true, destination).unwrap();
-        let mut buffer = [0u8; 3000];
+        let mut buffer = [0u8; 9];
         assert_eq![true, server.recv(&mut buffer).unwrap().1];
         assert![client.get_connection_or_create(destination).send_window[0].is_some()];
         assert![client.recv(&mut buffer).is_err()];
@@ -196,7 +196,7 @@ mod tests {
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
 
         client.send_reliably_to("Hello World", destination).unwrap();
-        let mut buffer = [0u8; 3000];
+        let mut buffer = [0u8; 27];
         assert_eq!["Hello World", server.recv(&mut buffer).unwrap().1];
         assert![client.get_connection_or_create(destination).send_window[0].is_some()];
         assert![client.recv(&mut buffer).is_err()];
@@ -220,7 +220,7 @@ mod tests {
             client
                 .send_to(black_box(128u8), black_box(destination))
                 .unwrap();
-            let mut buffer = [0u8; 8];
+            let mut buffer = [0u8; 5];
             server.recv(black_box(&mut buffer)).unwrap();
         });
     }
@@ -242,7 +242,7 @@ mod tests {
             client
                 .send_to(black_box(vec![128; 1000]), black_box(destination))
                 .unwrap();
-            let mut buffer = [0u8; 2000];
+            let mut buffer = [0u8; 1012];
             server.recv(black_box(&mut buffer)).unwrap();
         });
     }
@@ -289,7 +289,22 @@ mod tests {
             client
                 .send_to(black_box(player.clone()), black_box(destination))
                 .unwrap();
-            let mut buffer = [0u8; 2000];
+            let mut buffer = [0u8; 25];
+            server.recv(black_box(&mut buffer)).unwrap();
+        });
+    }
+
+    #[bench]
+    fn sending_tonnes_of_reliable_messages(b: &mut Bencher) {
+        let (mut client, _client_port): (Socket<i32>, _) =
+            Socket::new_with_random_port().unwrap();
+        let (mut server, server_port): (Socket<i32>, _) =
+            Socket::new_with_random_port().unwrap();
+
+        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
+        b.iter(|| {
+            client.send_reliably_to(black_box(1234567890), black_box(destination)).unwrap();
+            let mut buffer = [0u8; 12];
             server.recv(black_box(&mut buffer)).unwrap();
         });
     }

@@ -30,7 +30,8 @@ pub struct Socket<T: Clone + Debug + PartialEq> {
 
 impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
     pub fn new(port: u16) -> Result<Socket<T>, Error> {
-        let socket = UdpSocket::bind( ("127.0.0.1:".to_string() + port.to_string().as_str()).as_str(),)?;
+        let socket =
+            UdpSocket::bind(("127.0.0.1:".to_string() + port.to_string().as_str()).as_str())?;
         socket.set_nonblocking(true)?;
         Ok(Socket {
             socket,
@@ -55,10 +56,10 @@ impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
     {
         let mut seen = false;
         for (addr, conn) in self.connections.iter_mut() {
-           let seen_here =  conn.resend_fast(time, &self.socket)?;
-           if seen_here {
-               seen = true;
-           }
+            let seen_here = conn.resend_fast(time, &self.socket, *addr)?;
+            if seen_here {
+                seen = true;
+            }
         }
         Ok(seen)
     }
@@ -79,7 +80,7 @@ impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
 
     fn get_connection_or_create(&mut self, dest: SocketAddr) -> &mut Connection<T> {
         if self.connections.get(&dest).is_none() {
-            let conn = Connection::new(dest);
+            let conn = Connection::new();
             self.connections.insert(dest, conn);
         }
         self.connections.get_mut(&dest).unwrap()
@@ -91,12 +92,12 @@ impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
         T: Serialize,
     {
         if self.connections.get(&dest).is_none() {
-            let conn = Connection::new(dest);
+            let conn = Connection::new();
             self.connections.insert(dest, conn);
         }
         let conn = self.connections.get_mut(&dest).unwrap();
 
-        conn.send_message(msg, &self.socket, time)?;
+        conn.send_message(msg, time, &self.socket, dest)?;
         Ok(())
     }
 
@@ -119,13 +120,13 @@ impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
         let socket = &self.socket;
         let (_, src) = socket.recv_from(buffer)?;
         if self.connections.get(&src).is_none() {
-            let conn = Connection::new(src);
+            let conn = Connection::new();
             self.connections.insert(src, conn);
         }
         let conn = self.connections.get_mut(&src).unwrap();
         let packet: Packet<T> = Packet::decode(buffer)?;
         // let value = self.get_connection_or_create(src);
-        let msg = conn.unwrap_message(packet, &socket)?;
+        let msg = conn.unwrap_message(packet, &socket, src)?;
         if let Some(msg) = msg {
             Ok((src, msg))
         } else {
@@ -211,8 +212,10 @@ mod tests {
 
     #[test]
     fn resend_message_if_no_ack_received_within_some_time() {
-        let (mut client, _client_port): (Socket<String>, _) = Socket::new_with_random_port().unwrap();
-        let (mut server, server_port): (Socket<String>, _) = Socket::new_with_random_port().unwrap();
+        let (mut client, _client_port): (Socket<String>, _) =
+            Socket::new_with_random_port().unwrap();
+        let (mut server, server_port): (Socket<String>, _) =
+            Socket::new_with_random_port().unwrap();
 
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
         let now = precise_time_ns();

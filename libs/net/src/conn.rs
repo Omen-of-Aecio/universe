@@ -26,22 +26,24 @@ pub struct Connection<T: Clone + Debug + PartialEq> {
     /// The first entry should always be Some.
     /// Some means that it's not yet acknowledged
     pub send_window: VecDeque<Option<SentPacket<T>>>,
-
-    dest: SocketAddr,
 }
 const RESEND_INTERVAL_MS: u64 = 1000;
 
 impl<T: Clone + Debug + PartialEq> Connection<T> {
-    pub fn new(dest: SocketAddr) -> Connection<T> {
+    pub fn new() -> Connection<T> {
         Connection {
             seq: 0,
             send_window: VecDeque::new(),
-            dest,
         }
     }
 
     /// Returns Vec of encoded packets ready to be sent again
-    pub fn resend_fast(&mut self, time: u64, socket: &UdpSocket) -> Result<bool, Error>
+    pub fn resend_fast(
+        &mut self,
+        time: u64,
+        socket: &UdpSocket,
+        dest: SocketAddr,
+    ) -> Result<bool, Error>
     where
         T: Serialize,
     {
@@ -52,7 +54,7 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
             if let Some(ref mut sent_packet) = *sent_packet {
                 if now > sent_packet.time + RESEND_INTERVAL_MS * 1_000_000 {
                     sent_packet.time = now;
-                    socket.send_to(&sent_packet.packet.encode().unwrap()[..], self.dest)?;
+                    socket.send_to(&sent_packet.packet.encode().unwrap()[..], dest)?;
                     seen = true;
                 } else {
                     break;
@@ -99,8 +101,9 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
     pub fn send_message<'b>(
         &'b mut self,
         msg: T,
-        socket: &UdpSocket,
         time: u64,
+        socket: &UdpSocket,
+        dest: SocketAddr,
     ) -> Result<u32, Error>
     where
         T: Serialize,
@@ -115,7 +118,7 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
         }));
 
         self.seq += 1;
-        socket.send_to(&pkt_bytes, self.dest)?;
+        socket.send_to(&pkt_bytes, dest)?;
         Ok(self.seq - 1)
     }
 
@@ -127,6 +130,7 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
         &mut self,
         packet: Packet<T>,
         socket: &UdpSocket,
+        dest: SocketAddr,
     ) -> Result<Option<T>, Error>
     where
         T: Serialize,
@@ -136,7 +140,7 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
             Packet::Reliable { seq, msg } => {
                 // ack_reply = Some(Packet::Ack {ack: seq});
                 let packet: Packet<T> = Packet::Ack { ack: seq };
-                socket.send_to(&packet.encode()?, self.dest)?;
+                socket.send_to(&packet.encode()?, dest)?;
                 Ok(Some(msg))
             }
             Packet::Ack { ack } => {

@@ -32,7 +32,7 @@ pub struct Connection<T: Clone + Debug + Eq + PartialEq> {
 }
 const RESEND_INTERVAL_MS: u64 = 1000;
 
-impl<'a, T: Clone + Debug + Deserialize<'a> + Eq + Serialize + PartialEq> Connection<T> {
+impl<T: Clone + Debug + Eq + Serialize + PartialEq> Connection<T> {
     pub fn new(dest: SocketAddr) -> Connection<T> {
         Connection {
             seq: 0,
@@ -114,21 +114,20 @@ impl<'a, T: Clone + Debug + Deserialize<'a> + Eq + Serialize + PartialEq> Connec
         packet: Packet<T>,
         socket: &UdpSocket,
     ) -> Result<Option<T>, Error> {
-        let mut received_msg = None;
         match packet {
             Packet::Unreliable { msg } => {
-                received_msg = Some(msg);
+                Ok(Some(msg))
             }
             Packet::Reliable { seq, msg } => {
-                received_msg = Some(msg);
                 // ack_reply = Some(Packet::Ack {ack: seq});
                 let packet: Packet<T> = Packet::Ack { ack: seq };
                 socket.send_to(&packet.encode()?, self.dest)?;
+                Ok(Some(msg))
             }
             Packet::Ack { ack } => {
                 self.acknowledge(ack)?;
+                Ok(None)
             }
-        };
-        Ok(received_msg)
+        }
     }
 }

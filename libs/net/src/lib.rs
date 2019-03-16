@@ -28,7 +28,7 @@ pub struct Socket<T: Clone + Debug + Eq + PartialEq> {
     connections: HashMap<SocketAddr, Connection<T>>,
 }
 
-impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + PartialEq> Socket<T> {
+impl<T: Clone + Debug + Default + Eq + Serialize + PartialEq> Socket<T> {
     pub fn new(port: u16) -> Result<Socket<T>, Error> {
         Ok(Socket {
             socket: UdpSocket::bind(
@@ -82,6 +82,15 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
         Ok(())
     }
 
+    fn get_connection_or_create(&mut self, dest: SocketAddr) -> &mut Connection<T> {
+        if self.connections.get(&dest).is_none() {
+            let conn = Connection::new(dest);
+            self.connections.insert(dest, conn);
+        }
+        self.connections.get_mut(&dest).unwrap()
+    }
+
+
     /// Send reliable message
     pub fn send_reliably_to(&mut self, msg: T, dest: SocketAddr) -> Result<(), Error> {
         if self.connections.get(&dest).is_none() {
@@ -98,11 +107,11 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
     // pub fn send_reliable_to_and_wait(&self, msg: Message, dest: SocketAddr) -> Result<()>
 
     /// Blocking, with timeout (3 sec)
-    pub fn recv(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> {
+    pub fn recv<'a>(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> where T: Deserialize<'a> {
         self.recv_internal(buffer)
     }
 
-    fn recv_internal(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> {
+    fn recv_internal<'a>(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> where T: Deserialize<'a> {
         // Since we may just receive an Ack, we loop until we receive an actual message
         let socket = &self.socket;
         let (_, src) = socket.recv_from(buffer)?;
@@ -117,7 +126,7 @@ impl<'a, T: Clone + Debug + Default + Deserialize<'a> + Eq + Serialize + Partial
         if let Some(msg) = msg {
             Ok((src, msg))
         } else {
-            bail!["Did not recv a message"]
+            bail!["Ack received"]
         }
         // let conn = self.get_connection_or_create(src);
         // let msg = conn.unwrap_message(packet, &socket)?;

@@ -1,5 +1,5 @@
 use bincode;
-use failure::{format_err, Error};
+use failure::{bail, format_err, Error};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -19,15 +19,15 @@ impl<T: Clone + Debug + PartialEq> Packet<T> {
     where
         T: Serialize,
     {
-        let r = bincode::serialize(self).map_err(|_| format_err!("Failed to serialize"))?;
-        if r.len() > Packet::<T>::max_payload_size() {
-            // TODO is it possible to somehow break the package up?
-            Err(format_err!(
-                "Tried to send too big Packet of size {}.",
-                r.len()
-            ))
+        let ser = bincode::serialize(self).map_err(|_| format_err!("Failed to serialize"))?;
+        if ser.len() > Self::max_payload_size() {
+            bail![
+                "Packet exceeds maximum size: {} > {}",
+                ser.len(),
+                Self::max_payload_size()
+            ];
         } else {
-            Ok(r)
+            Ok(ser)
         }
     }
 

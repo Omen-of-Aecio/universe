@@ -35,6 +35,13 @@ impl<T: Clone + Debug + PartialEq> Packet<T> {
     where
         T: Deserialize<'a>,
     {
+        if data.len() > Self::max_payload_size() {
+            bail![
+                "Payload exceeded size limit: {} > {}",
+                data.len(),
+                Self::max_payload_size()
+            ];
+        }
         bincode::deserialize(&data[..]).map_err(|_| format_err!("Failed to deserialize"))
     }
 

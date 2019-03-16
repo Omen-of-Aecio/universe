@@ -82,7 +82,7 @@ impl<T: Clone + Debug + Default + Eq + PartialEq> Socket<T> {
         Ok(())
     }
 
-    fn get_connection_or_create(&mut self, dest: SocketAddr) -> &mut Connection<T> where T: Serialize {
+    fn get_connection_or_create(&mut self, dest: SocketAddr) -> &mut Connection<T> {
         if self.connections.get(&dest).is_none() {
             let conn = Connection::new(dest);
             self.connections.insert(dest, conn);

@@ -32,7 +32,7 @@ pub struct Connection<T: Clone + Debug + Eq + PartialEq> {
 }
 const RESEND_INTERVAL_MS: u64 = 1000;
 
-impl<T: Clone + Debug + Eq + Serialize + PartialEq> Connection<T> {
+impl<T: Clone + Debug + Eq + PartialEq> Connection<T> {
     pub fn new(dest: SocketAddr) -> Connection<T> {
         Connection {
             seq: 0,
@@ -42,7 +42,7 @@ impl<T: Clone + Debug + Eq + Serialize + PartialEq> Connection<T> {
     }
 
     /// Returns Vec of encoded packets ready to be sent again
-    pub fn get_resend_queue(&mut self) -> Vec<Vec<u8>> {
+    pub fn get_resend_queue(&mut self) -> Vec<Vec<u8>> where T: Serialize {
         let now = precise_time_ns();
         self.update_send_window();
         let mut result = Vec::new();
@@ -91,7 +91,7 @@ impl<T: Clone + Debug + Eq + Serialize + PartialEq> Connection<T> {
 
     /// Wraps in a packet, encodes, and adds the packet to the send window queue. Returns the data
     /// enqueued.
-    pub fn send_message<'b>(&'b mut self, msg: T, socket: &UdpSocket) -> Result<u32, Error> {
+    pub fn send_message<'b>(&'b mut self, msg: T, socket: &UdpSocket) -> Result<u32, Error> where T: Serialize {
         let packet = Packet::Reliable { seq: self.seq, msg };
         // debug!("Send"; "seq" => self.seq, "ack" => self.received+1);
         self.send_window.push_back(Some(SentPacket {
@@ -113,7 +113,7 @@ impl<T: Clone + Debug + Eq + Serialize + PartialEq> Connection<T> {
         &mut self,
         packet: Packet<T>,
         socket: &UdpSocket,
-    ) -> Result<Option<T>, Error> {
+    ) -> Result<Option<T>, Error> where T: Serialize {
         match packet {
             Packet::Unreliable { msg } => {
                 Ok(Some(msg))

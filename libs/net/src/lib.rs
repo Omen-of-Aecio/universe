@@ -23,12 +23,12 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 // Socket //
 ////////////
 
-pub struct Socket<T: Clone + Debug + Eq + PartialEq> {
+pub struct Socket<T: Clone + Debug + PartialEq> {
     socket: UdpSocket,
     connections: HashMap<SocketAddr, Connection<T>>,
 }
 
-impl<T: Clone + Debug + Default + Eq + PartialEq> Socket<T> {
+impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
     pub fn new(port: u16) -> Result<Socket<T>, Error> {
         Ok(Socket {
             socket: UdpSocket::bind(
@@ -49,7 +49,10 @@ impl<T: Clone + Debug + Default + Eq + PartialEq> Socket<T> {
 
     /// A temporary (TODO) simple (but brute force) solution to the need of occasionally resending
     /// packets which haven't been acknowledged.
-    pub fn update(&mut self) -> Result<(), Error> where T: Serialize {
+    pub fn update(&mut self) -> Result<(), Error>
+    where
+        T: Serialize,
+    {
         for (addr, conn) in self.connections.iter_mut() {
             let to_resend = conn.get_resend_queue();
             for pkt in to_resend {
@@ -59,7 +62,10 @@ impl<T: Clone + Debug + Default + Eq + PartialEq> Socket<T> {
         Ok(())
     }
 
-    pub fn max_payload_size() -> u32 where T: Serialize {
+    pub fn max_payload_size() -> u32
+    where
+        T: Serialize,
+    {
         // const MIN_MTU_DATA_LINK_LAYER_SIZE: usize = 576;
         // const IP_HEADER_SIZE: usize = 20;
         // const UDP_HEADER_SIZE: usize = 8;
@@ -68,7 +74,10 @@ impl<T: Clone + Debug + Default + Eq + PartialEq> Socket<T> {
     }
 
     /// Send unreliable message
-    pub fn send_to(&mut self, msg: T, dest: SocketAddr) -> Result<(), Error> where T: Serialize {
+    pub fn send_to(&mut self, msg: T, dest: SocketAddr) -> Result<(), Error>
+    where
+        T: Serialize,
+    {
         let buffer = Packet::Unreliable { msg }.encode()?;
         ensure![
             buffer.len() <= u16::max_value() as usize,
@@ -90,9 +99,11 @@ impl<T: Clone + Debug + Default + Eq + PartialEq> Socket<T> {
         self.connections.get_mut(&dest).unwrap()
     }
 
-
     /// Send reliable message
-    pub fn send_reliably_to(&mut self, msg: T, dest: SocketAddr) -> Result<(), Error> where T: Serialize {
+    pub fn send_reliably_to(&mut self, msg: T, dest: SocketAddr) -> Result<(), Error>
+    where
+        T: Serialize,
+    {
         if self.connections.get(&dest).is_none() {
             let conn = Connection::new(dest);
             self.connections.insert(dest, conn);
@@ -107,11 +118,17 @@ impl<T: Clone + Debug + Default + Eq + PartialEq> Socket<T> {
     // pub fn send_reliable_to_and_wait(&self, msg: Message, dest: SocketAddr) -> Result<()>
 
     /// Blocking, with timeout (3 sec)
-    pub fn recv<'a>(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> where T: Deserialize<'a> + Serialize {
+    pub fn recv<'a>(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error>
+    where
+        T: Deserialize<'a> + Serialize,
+    {
         self.recv_internal(buffer)
     }
 
-    fn recv_internal<'a>(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> where T: Deserialize<'a> + Serialize {
+    fn recv_internal<'a>(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error>
+    where
+        T: Deserialize<'a> + Serialize,
+    {
         // Since we may just receive an Ack, we loop until we receive an actual message
         let socket = &self.socket;
         let (_, src) = socket.recv_from(buffer)?;
@@ -128,11 +145,6 @@ impl<T: Clone + Debug + Default + Eq + PartialEq> Socket<T> {
         } else {
             bail!["Ack received"]
         }
-        // let conn = self.get_connection_or_create(src);
-        // let msg = conn.unwrap_message(packet, &socket)?;
-        // if let Some(msg) = msg {
-        //     break (src, msg);
-        // }
     }
 }
 
@@ -269,10 +281,11 @@ mod tests {
 
     #[bench]
     fn time_on_realistic_load(b: &mut Bencher) {
-        #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+        #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
         struct PlayerUpdate {
             x: i32,
             y: i32,
+            z: f64,
             health: Option<u32>,
         }
         let (mut client, _client_port): (Socket<PlayerUpdate>, _) =
@@ -284,6 +297,7 @@ mod tests {
         let player = PlayerUpdate {
             x: 123490,
             y: -319103,
+            z: 0.341,
             health: Some(100),
         };
         b.iter(|| {

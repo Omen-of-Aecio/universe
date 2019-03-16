@@ -7,7 +7,6 @@ use std::{
     fmt::Debug,
     net::{SocketAddr, UdpSocket},
 };
-use time::precise_time_ns;
 
 pub struct SentPacket<T: Clone + Debug + PartialEq> {
     pub time: u64,
@@ -42,11 +41,11 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
     }
 
     /// Returns Vec of encoded packets ready to be sent again
-    pub fn get_resend_queue(&mut self) -> Vec<Vec<u8>>
+    pub fn get_resend_queue(&mut self, time: u64) -> Vec<Vec<u8>>
     where
         T: Serialize,
     {
-        let now = precise_time_ns();
+        let now = time;
         self.update_send_window();
         let mut result = Vec::new();
         for sent_packet in self.send_window.iter_mut() {
@@ -94,7 +93,12 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
 
     /// Wraps in a packet, encodes, and adds the packet to the send window queue. Returns the data
     /// enqueued.
-    pub fn send_message<'b>(&'b mut self, msg: T, socket: &UdpSocket) -> Result<u32, Error>
+    pub fn send_message<'b>(
+        &'b mut self,
+        msg: T,
+        socket: &UdpSocket,
+        time: u64,
+    ) -> Result<u32, Error>
     where
         T: Serialize,
     {
@@ -102,7 +106,7 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
         let pkt_bytes = packet.encode()?;
         // debug!("Send"; "seq" => self.seq, "ack" => self.received+1);
         self.send_window.push_back(Some(SentPacket {
-            time: precise_time_ns(),
+            time,
             seq: self.seq,
             packet: packet.clone(),
         }));

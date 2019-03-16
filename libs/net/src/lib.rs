@@ -28,7 +28,7 @@ pub struct Socket<T: Clone + Debug + Eq + PartialEq> {
     connections: HashMap<SocketAddr, Connection<T>>,
 }
 
-impl<T: Clone + Debug + Default + Eq + Serialize + PartialEq> Socket<T> {
+impl<T: Clone + Debug + Default + Eq + PartialEq> Socket<T> {
     pub fn new(port: u16) -> Result<Socket<T>, Error> {
         Ok(Socket {
             socket: UdpSocket::bind(
@@ -49,7 +49,7 @@ impl<T: Clone + Debug + Default + Eq + Serialize + PartialEq> Socket<T> {
 
     /// A temporary (TODO) simple (but brute force) solution to the need of occasionally resending
     /// packets which haven't been acknowledged.
-    pub fn update(&mut self) -> Result<(), Error> {
+    pub fn update(&mut self) -> Result<(), Error> where T: Serialize {
         for (addr, conn) in self.connections.iter_mut() {
             let to_resend = conn.get_resend_queue();
             for pkt in to_resend {
@@ -59,7 +59,7 @@ impl<T: Clone + Debug + Default + Eq + Serialize + PartialEq> Socket<T> {
         Ok(())
     }
 
-    pub fn max_payload_size() -> u32 {
+    pub fn max_payload_size() -> u32 where T: Serialize {
         // const MIN_MTU_DATA_LINK_LAYER_SIZE: usize = 576;
         // const IP_HEADER_SIZE: usize = 20;
         // const UDP_HEADER_SIZE: usize = 8;
@@ -68,7 +68,7 @@ impl<T: Clone + Debug + Default + Eq + Serialize + PartialEq> Socket<T> {
     }
 
     /// Send unreliable message
-    pub fn send_to(&mut self, msg: T, dest: SocketAddr) -> Result<(), Error> {
+    pub fn send_to(&mut self, msg: T, dest: SocketAddr) -> Result<(), Error> where T: Serialize {
         let buffer = Packet::Unreliable { msg }.encode()?;
         ensure![
             buffer.len() <= u16::max_value() as usize,
@@ -82,7 +82,7 @@ impl<T: Clone + Debug + Default + Eq + Serialize + PartialEq> Socket<T> {
         Ok(())
     }
 
-    fn get_connection_or_create(&mut self, dest: SocketAddr) -> &mut Connection<T> {
+    fn get_connection_or_create(&mut self, dest: SocketAddr) -> &mut Connection<T> where T: Serialize {
         if self.connections.get(&dest).is_none() {
             let conn = Connection::new(dest);
             self.connections.insert(dest, conn);
@@ -92,7 +92,7 @@ impl<T: Clone + Debug + Default + Eq + Serialize + PartialEq> Socket<T> {
 
 
     /// Send reliable message
-    pub fn send_reliably_to(&mut self, msg: T, dest: SocketAddr) -> Result<(), Error> {
+    pub fn send_reliably_to(&mut self, msg: T, dest: SocketAddr) -> Result<(), Error> where T: Serialize {
         if self.connections.get(&dest).is_none() {
             let conn = Connection::new(dest);
             self.connections.insert(dest, conn);
@@ -107,11 +107,11 @@ impl<T: Clone + Debug + Default + Eq + Serialize + PartialEq> Socket<T> {
     // pub fn send_reliable_to_and_wait(&self, msg: Message, dest: SocketAddr) -> Result<()>
 
     /// Blocking, with timeout (3 sec)
-    pub fn recv<'a>(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> where T: Deserialize<'a> {
+    pub fn recv<'a>(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> where T: Deserialize<'a> + Serialize {
         self.recv_internal(buffer)
     }
 
-    fn recv_internal<'a>(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> where T: Deserialize<'a> {
+    fn recv_internal<'a>(&mut self, buffer: &'a mut [u8]) -> Result<(SocketAddr, T), Error> where T: Deserialize<'a> + Serialize {
         // Since we may just receive an Ack, we loop until we receive an actual message
         let socket = &self.socket;
         let (_, src) = socket.recv_from(buffer)?;

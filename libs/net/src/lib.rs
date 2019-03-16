@@ -30,10 +30,10 @@ pub struct Socket<T: Clone + Debug + PartialEq> {
 
 impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
     pub fn new(port: u16) -> Result<Socket<T>, Error> {
+        let socket = UdpSocket::bind( ("127.0.0.1:".to_string() + port.to_string().as_str()).as_str(),)?;
+        socket.set_nonblocking(true)?;
         Ok(Socket {
-            socket: UdpSocket::bind(
-                ("127.0.0.1:".to_string() + port.to_string().as_str()).as_str(),
-            )?,
+            socket,
             connections: HashMap::new(),
         })
     }
@@ -55,11 +55,10 @@ impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
     {
         let mut seen = false;
         for (addr, conn) in self.connections.iter_mut() {
-            let to_resend = conn.get_resend_queue(time);
-            for pkt in to_resend {
-                self.socket.send_to(&pkt, *addr)?;
-                seen = true;
-            }
+           let seen_here =  conn.resend_fast(time, &self.socket)?;
+           if seen_here {
+               seen = true;
+           }
         }
         Ok(seen)
     }
@@ -211,6 +210,29 @@ mod tests {
     }
 
     #[test]
+    fn resend_message_if_no_ack_received_within_some_time() {
+        let (mut client, _client_port): (Socket<String>, _) = Socket::new_with_random_port().unwrap();
+        let (mut server, server_port): (Socket<String>, _) = Socket::new_with_random_port().unwrap();
+
+        let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
+        let now = precise_time_ns();
+
+        client
+            .send_reliably_to("Hello World".into(), destination, now)
+            .unwrap();
+        let mut buffer = [0u8; 27];
+        assert_eq![false, client.update(now).unwrap()];
+        assert_eq![false, client.update(now + 1_000_000_000).unwrap()];
+        assert_eq![true, client.update(now + 1_000_000_001).unwrap()];
+        assert_eq!["Hello World", server.recv(&mut buffer).unwrap().1];
+        assert_eq!["Hello World", server.recv(&mut buffer).unwrap().1];
+        assert_eq![true, server.recv(&mut buffer).is_err()];
+        assert![client.get_connection_or_create(destination).send_window[0].is_some()];
+        assert![client.recv(&mut buffer).is_err()];
+        assert![client.get_connection_or_create(destination).send_window[0].is_none()];
+    }
+
+    #[test]
     fn confirm_u8_size_of_packet() {
         assert_eq![8, Packet::Unreliable { msg: 128 }.encode().unwrap().len()];
     }
@@ -228,7 +250,7 @@ mod tests {
                 .send_to(black_box(128u8), black_box(destination))
                 .unwrap();
             let mut buffer = [0u8; 5];
-            server.recv(black_box(&mut buffer)).unwrap();
+            black_box(server.recv(black_box(&mut buffer)));
         });
     }
 
@@ -250,7 +272,7 @@ mod tests {
                 .send_to(black_box(vec![128; 1000]), black_box(destination))
                 .unwrap();
             let mut buffer = [0u8; 1012];
-            server.recv(black_box(&mut buffer)).unwrap();
+            black_box(server.recv(black_box(&mut buffer)));
         });
     }
 
@@ -267,7 +289,7 @@ mod tests {
                 .send_to(black_box(vec![128; 10_000]), black_box(destination))
                 .unwrap();
             let mut buffer = [0u8; 20_000];
-            server.recv(black_box(&mut buffer)).unwrap();
+            black_box(server.recv(black_box(&mut buffer)));
         });
     }
 
@@ -297,7 +319,7 @@ mod tests {
                 .send_to(black_box(player.clone()), black_box(destination))
                 .unwrap();
             let mut buffer = [0u8; 25];
-            server.recv(black_box(&mut buffer)).unwrap();
+            black_box(server.recv(black_box(&mut buffer)));
         });
     }
 
@@ -313,8 +335,9 @@ mod tests {
                 .send_reliably_to(black_box(1234567890), black_box(destination), now)
                 .unwrap();
             let mut buffer = [0u8; 12];
-            server.recv(black_box(&mut buffer)).unwrap();
-            assert_eq![false, client.update(now).unwrap()];
+            black_box(server.recv(black_box(&mut buffer)));
+            black_box(server.recv(black_box(&mut buffer)));
+            client.update(now).unwrap();
         });
     }
 }

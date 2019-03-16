@@ -41,22 +41,25 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
     }
 
     /// Returns Vec of encoded packets ready to be sent again
-    pub fn get_resend_queue(&mut self, time: u64) -> Vec<Vec<u8>>
+    pub fn resend_fast(&mut self, time: u64, socket: &UdpSocket) -> Result<bool, Error>
     where
         T: Serialize,
     {
         let now = time;
         self.update_send_window();
-        let mut result = Vec::new();
+        let mut seen = false;
         for sent_packet in self.send_window.iter_mut() {
             if let Some(ref mut sent_packet) = *sent_packet {
                 if now > sent_packet.time + RESEND_INTERVAL_MS * 1_000_000 {
                     sent_packet.time = now;
-                    result.push(sent_packet.packet.encode().unwrap());
+                    socket.send_to(&sent_packet.packet.encode().unwrap()[..], self.dest)?;
+                    seen = true;
+                } else {
+                    break;
                 }
             }
         }
-        result
+        Ok(seen)
     }
 
     pub fn acknowledge(&mut self, acked: u32) -> Result<(), Error> {

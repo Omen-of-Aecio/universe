@@ -22,13 +22,12 @@ impl<T: Clone + Debug + PartialEq> Packet<T> {
         let ser = bincode::serialize(self).map_err(|_| format_err!("Failed to serialize"))?;
         if ser.len() > Self::max_payload_size() {
             bail![
-                "Packet exceeds maximum size: {} > {}",
+                "Payload exceeded size limit: {} > {}",
                 ser.len(),
                 Self::max_payload_size()
             ];
-        } else {
-            Ok(ser)
         }
+        Ok(ser)
     }
 
     /// Decode a raw byte slice and return a `Packet`
@@ -40,6 +39,10 @@ impl<T: Clone + Debug + PartialEq> Packet<T> {
     }
 
     pub fn max_payload_size() -> usize {
+        // const MIN_MTU_DATA_LINK_LAYER_SIZE: usize = 576;
+        // const IP_HEADER_SIZE: usize = 20;
+        // const UDP_HEADER_SIZE: usize = 8;
+        // const MAXIMUM_PAYLOAD_SIZE: usize = MIN_MTU_DATA_LINK_LAYER_SIZE - IP_HEADER_SIZE - UDP_HEADER_SIZE;
         4 * 1000 * 1000
     }
 }

@@ -62,27 +62,12 @@ impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
         Ok(())
     }
 
-    pub fn max_payload_size() -> usize
-    where
-        T: Serialize,
-    {
-        // const MIN_MTU_DATA_LINK_LAYER_SIZE: usize = 576;
-        // const IP_HEADER_SIZE: usize = 20;
-        // const UDP_HEADER_SIZE: usize = 8;
-        // const MAXIMUM_PAYLOAD_SIZE: usize = MIN_MTU_DATA_LINK_LAYER_SIZE - IP_HEADER_SIZE - UDP_HEADER_SIZE;
-        Packet::<T>::max_payload_size() // because Packet should probably be private to the net module
-    }
-
     /// Send unreliable message
     pub fn send_to(&mut self, msg: T, dest: SocketAddr) -> Result<(), Error>
     where
         T: Serialize,
     {
         let buffer = Packet::Unreliable { msg }.encode()?;
-        ensure![
-            buffer.len() <= Self::max_payload_size(),
-            "Packet too big to fit inside a UDP datagram"
-        ];
         let size = self.socket.send_to(&buffer, dest)?;
         ensure![
             size == buffer.len(),

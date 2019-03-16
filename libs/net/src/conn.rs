@@ -99,6 +99,7 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
         T: Serialize,
     {
         let packet = Packet::Reliable { seq: self.seq, msg };
+        let pkt_bytes = packet.encode()?;
         // debug!("Send"; "seq" => self.seq, "ack" => self.received+1);
         self.send_window.push_back(Some(SentPacket {
             time: precise_time_ns(),
@@ -107,7 +108,7 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
         }));
 
         self.seq += 1;
-        socket.send_to(&packet.encode().unwrap(), self.dest)?;
+        socket.send_to(&pkt_bytes, self.dest)?;
         Ok(self.seq - 1)
     }
 

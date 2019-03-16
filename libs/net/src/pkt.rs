@@ -3,9 +3,7 @@ use failure::{format_err, Error};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
-////////////
-// Packet //
-////////////
+// ---
 
 /// `Packet` struct wraps a message in protocol-specific data.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -15,10 +13,14 @@ pub enum Packet<T: Clone + Debug + PartialEq> {
     Unreliable { msg: T },
 }
 
-impl<T: Clone + Debug + Serialize + PartialEq> Packet<T> {
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
-        let r = bincode::serialize(self).map_err(|_| format_err!("failed to serialize"))?;
-        if r.len() as u32 > Packet::<T>::max_payload_size() {
+impl<T: Clone + Debug + PartialEq> Packet<T> {
+    /// Encode this structure and give us a byte representation of it
+    pub fn encode(&self) -> Result<Vec<u8>, Error>
+    where
+        T: Serialize,
+    {
+        let r = bincode::serialize(self).map_err(|_| format_err!("Failed to serialize"))?;
+        if r.len() > Packet::<T>::max_payload_size() {
             // TODO is it possible to somehow break the package up?
             Err(format_err!(
                 "Tried to send too big Packet of size {}.",
@@ -29,18 +31,20 @@ impl<T: Clone + Debug + Serialize + PartialEq> Packet<T> {
         }
     }
 
+    /// Decode a raw byte slice and return a `Packet`
     pub fn decode<'a>(data: &'a [u8]) -> Result<Packet<T>, Error>
     where
         T: Deserialize<'a>,
     {
-        bincode::deserialize(&data[..]).map_err(|_| format_err!("failed to deserialize"))
+        bincode::deserialize(&data[..]).map_err(|_| format_err!("Failed to deserialize"))
     }
 
-    pub fn max_payload_size() -> u32 {
-        // 4 * 1024 // 4 KB
+    pub fn max_payload_size() -> usize {
         4 * 1000 * 1000
     }
 }
+
+// ---
 
 #[cfg(test)]
 mod tests {

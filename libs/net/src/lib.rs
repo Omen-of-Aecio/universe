@@ -62,7 +62,7 @@ impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
         Ok(())
     }
 
-    pub fn max_payload_size() -> u32
+    pub fn max_payload_size() -> usize
     where
         T: Serialize,
     {
@@ -80,7 +80,7 @@ impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
     {
         let buffer = Packet::Unreliable { msg }.encode()?;
         ensure![
-            buffer.len() <= u16::max_value() as usize,
+            buffer.len() <= Self::max_payload_size(),
             "Packet too big to fit inside a UDP datagram"
         ];
         let size = self.socket.send_to(&buffer, dest)?;

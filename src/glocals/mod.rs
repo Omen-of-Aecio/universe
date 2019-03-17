@@ -1,16 +1,16 @@
 use benchmarker::Benchmarker;
-use geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
-use input;
-use logger::Logger;
-
 use clap;
+use geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
 pub use glium::uniforms::{MagnifySamplerFilter, MinifySamplerFilter};
 use glium::{implement_vertex, texture::Texture2d};
+use input;
+use logger::Logger;
+use priority_queue::PriorityQueue;
 use rodio;
 use serde_derive::Deserialize;
 use std::{
     collections::HashMap,
-    net::SocketAddr,
+    hash::{Hash, Hasher},
     sync::{atomic::AtomicBool, mpsc, Arc},
     time::Duration,
     vec::Vec,
@@ -20,12 +20,50 @@ pub mod config;
 
 pub type Error = failure::Error;
 
-#[derive(Default)]
+pub struct NamedFn {
+    pub name: &'static str,
+    pub func: fn(&mut Main),
+}
+impl Default for NamedFn {
+    fn default() -> Self {
+        Self {
+            name: "",
+            func: |&mut _| {},
+        }
+    }
+}
+impl PartialEq for NamedFn {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+impl Eq for NamedFn {}
+impl Hash for NamedFn {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+    }
+}
+
 pub struct Main<'a> {
-    pub config_change_recv: Option<mpsc::Receiver<fn(&mut Config)>>,
-    pub config: Config,
     pub commandline: clap::ArgMatches<'a>,
+    pub config: Config,
+    pub config_change_recv: Option<mpsc::Receiver<fn(&mut Config)>>,
+    // pub network: Option<neter::Socket<i32>>,
     pub threads: Threads,
+    pub timers: PriorityQueue<NamedFn, std::time::Instant>,
+}
+
+impl<'a> Default for Main<'a> {
+    fn default() -> Self {
+        Self {
+            config_change_recv: None,
+            config: Config::default(),
+            commandline: clap::ArgMatches::default(),
+            threads: Threads::default(),
+            // network: None,
+            timers: PriorityQueue::new(),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -121,7 +159,7 @@ pub struct Client<'a> {
 pub struct Server<'a> {
     pub main: Main<'a>,
     pub game: ServerGame,
-    pub connections: HashMap<SocketAddr, Connection>,
+    pub connections: HashMap<std::net::SocketAddr, Connection>,
 
     /// Frame duration in seconds (used only for how long to sleep. FPS is in GameConfig)
     pub tick_duration: Duration,

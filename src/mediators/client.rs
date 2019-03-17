@@ -349,84 +349,91 @@ pub fn entry_point_client(s: &mut Client) {
         .push(render_polygon::create_render_polygon(&s.display));
 
     s.logger.set_log_level(196);
-
     loop {
-        let xform = if let Some(ref mut rx) = s.main.config_change_recv {
-            match rx.try_recv() {
-                Ok(msg) => Some(msg),
-                Err(_) => None,
-            }
-        } else {
-            None
-        };
-        if let Some(xform) = xform {
-            xform(&mut s.main.config);
-        }
-        // ---
-        s.logic_benchmarker.start();
-        // ---
-
-        collect_input(s);
+        client_tick(s);
+        run_timers(&mut s.main);
         if s.should_exit {
             break;
         }
-        toggle_camera_mode(s);
-        let movement = move_player_according_to_input(&s.input);
-        check_for_collision_and_move_players_according_to_movement_vector(
-            &s.game.grid,
-            &mut s.game.players,
-            movement,
-        );
-        move_camera_according_to_input(s);
-        set_camera(s);
-        set_gravity(s);
-        set_smooth(s);
-        apply_gravity_to_players(s);
-        maybe_fire_bullets(s);
-        update_bullets(&mut s.game.bullets);
-        remove_bullets_outside_camera(&mut s.logger, &mut s.game.bullets, &s.game.cam);
+    }
+}
 
-        // ---
-        stop_benchmark(
-            &mut s.logic_benchmarker,
-            &mut s.logger,
-            "Logic time spent (100-frame average)",
-        );
-        // ---
+fn run_timers(_: &mut Main) {
+}
 
-        let mut frame = s.display.draw();
-        frame.clear_color(0.0, 0.0, 1.0, 1.0);
+fn client_tick(s: &mut Client) {
+    let xform = if let Some(ref mut rx) = s.main.config_change_recv {
+        match rx.try_recv() {
+            Ok(msg) => Some(msg),
+            Err(_) => None,
+        }
+    } else {
+        None
+    };
+    if let Some(xform) = xform {
+        xform(&mut s.main.config);
+    }
+    // ---
+    s.logic_benchmarker.start();
+    // ---
 
-        // ---
-        s.drawing_benchmarker.start();
-        // ---
+    collect_input(s);
+    toggle_camera_mode(s);
+    let movement = move_player_according_to_input(&s.input);
+    check_for_collision_and_move_players_according_to_movement_vector(
+        &s.game.grid,
+        &mut s.game.players,
+        movement,
+    );
+    move_camera_according_to_input(s);
+    set_camera(s);
+    set_gravity(s);
+    set_smooth(s);
+    apply_gravity_to_players(s);
+    maybe_fire_bullets(s);
+    update_bullets(&mut s.game.bullets);
+    remove_bullets_outside_camera(&mut s.logger, &mut s.game.bullets, &s.game.cam);
 
-        render_the_grid(&mut s.game.grid_render, &mut frame, &s.game.cam);
-        render_players(&mut s.game.players, &mut frame, &s.game.cam);
-        render_bullets(&s.game.bullets, &mut frame, &s.game.cam);
+    // ---
+    stop_benchmark(
+        &mut s.logic_benchmarker,
+        &mut s.logger,
+        "Logic time spent (100-frame average)",
+    );
+    // ---
 
-        // ---
-        stop_benchmark(
-            &mut s.drawing_benchmarker,
-            &mut s.logger,
-            "Drawing time spent (100-frame average)",
-        );
-        // ---
+    let mut frame = s.display.draw();
+    frame.clear_color(0.0, 0.0, 1.0, 1.0);
 
-        match frame.finish() {
-            Ok(()) => {}
-            Err(glium::SwapBuffersError::ContextLost) => {
-                s.logger.error(
-                    "cli",
-                    Log::Static("Context was lost while trying to swap buffers"),
-                );
-            }
-            Err(glium::SwapBuffersError::AlreadySwapped) => {
-                s.logger.error(
-                    "cli",
-                    Log::Static("OpenGL context has already been swapped"),
-                );
-            }
+    // ---
+    s.drawing_benchmarker.start();
+    // ---
+
+    render_the_grid(&mut s.game.grid_render, &mut frame, &s.game.cam);
+    render_players(&mut s.game.players, &mut frame, &s.game.cam);
+    render_bullets(&s.game.bullets, &mut frame, &s.game.cam);
+
+    // ---
+    stop_benchmark(
+        &mut s.drawing_benchmarker,
+        &mut s.logger,
+        "Drawing time spent (100-frame average)",
+    );
+    // ---
+
+    match frame.finish() {
+        Ok(()) => {}
+        Err(glium::SwapBuffersError::ContextLost) => {
+            s.logger.error(
+                "cli",
+                Log::Static("Context was lost while trying to swap buffers"),
+            );
+        }
+        Err(glium::SwapBuffersError::AlreadySwapped) => {
+            s.logger.error(
+                "cli",
+                Log::Static("OpenGL context has already been swapped"),
+            );
         }
     }
 }

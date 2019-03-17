@@ -977,7 +977,7 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::{self};
+    use std::io;
     use test::{black_box, Bencher};
 
     #[test]

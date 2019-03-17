@@ -138,12 +138,10 @@ mod command_handlers {
                 Input::I32(x) => {
                     sum = if let Some(num) = sum.checked_div(*x) {
                         num
+                    } else if *x == 0 {
+                        return Err("Division by zero".into());
                     } else {
-                        if *x == 0 {
-                            return Err("Division by zero".into());
-                        } else {
-                            return Err("Division overflow".into());
-                        }
+                        return Err("Division overflow".into());
                     };
                 }
                 _ => {
@@ -171,12 +169,10 @@ mod command_handlers {
                 Input::I32(x) => {
                     sum = if let Some(num) = sum.checked_rem(*x) {
                         num
+                    } else if *x == 0 {
+                        return Err("Modulo by zero".into());
                     } else {
-                        if *x == 0 {
-                            return Err("Modulo by zero".into());
-                        } else {
-                            return Err("Modulo overflow".into());
-                        }
+                        return Err("Modulo overflow".into());
                     };
                 }
                 _ => {

@@ -6,7 +6,6 @@ use glium::{implement_vertex, texture::Texture2d};
 use input;
 use ketimer::WeakTimer;
 use logger::Logger;
-use priority_queue::PriorityQueue;
 use rodio;
 use serde_derive::Deserialize;
 use std::{
@@ -65,7 +64,7 @@ impl<'a> Default for Timers {
     fn default() -> Self {
         let now = Instant::now();
         Self {
-            network_timer: WeakTimer::new(|x, i| x.update(i), Duration::new(1, 0), now),
+            network_timer: WeakTimer::new(Socket::update, Duration::new(1, 0), now),
             time: now,
         }
     }

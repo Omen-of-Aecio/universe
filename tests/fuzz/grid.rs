@@ -1,12 +1,11 @@
+use geometry::{grid2d::Grid, vec::Vec2};
 use honggfuzz::fuzz;
-use universe::{
-    libs::geometry::{grid2d::Grid, vec::Vec2},
-    mediators::does_line_collide_with_grid::does_line_collide_with_grid,
-};
+use universe::mediators::does_line_collide_with_grid::does_line_collide_with_grid;
 
 fn bytes_to_f32(x: [u8; 4]) -> f32 {
     unsafe { std::mem::transmute::<[u8; 4], f32>(x) }
 }
+
 fn main() {
     loop {
         fuzz!(|data: &[u8]| {

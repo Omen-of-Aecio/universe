@@ -1,5 +1,5 @@
-use honggfuzz::fuzz;
 use geometry::{grid2d::Grid, vec::Vec2};
+use honggfuzz::fuzz;
 use universe::mediators::does_line_collide_with_grid::does_line_collide_with_grid;
 
 fn bytes_to_f32(x: [u8; 4]) -> f32 {

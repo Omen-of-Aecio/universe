@@ -9,9 +9,9 @@ use glium::{
     glutin::{self, MouseScrollDelta, VirtualKeyCode as Key},
     Surface,
 };
-use std::time::Instant;
 use input::Input;
 use logger::Logger;
+use std::time::Instant;
 
 fn initialize_grid(s: &mut Grid<u8>) {
     s.resize(1000, 1000);

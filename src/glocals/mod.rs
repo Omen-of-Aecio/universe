@@ -58,20 +58,14 @@ pub struct Main<'a> {
 
 pub struct Timers {
     pub time: Instant,
-    pub network_timer: WeakTimer<Socket<i32>>,
+    pub network_timer: WeakTimer<Socket<i32>, Result<bool, Error>>,
 }
 
 impl<'a> Default for Timers {
     fn default() -> Self {
         let now = Instant::now();
         Self {
-            network_timer: WeakTimer::new(
-                |x, i| {
-                    x.update(i);
-                },
-                Duration::new(1, 0),
-                now,
-            ),
+            network_timer: WeakTimer::new(|x, i| x.update(i), Duration::new(1, 0), now),
             time: now,
         }
     }

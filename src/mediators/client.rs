@@ -9,6 +9,7 @@ use glium::{
     glutin::{self, MouseScrollDelta, VirtualKeyCode as Key},
     Surface,
 };
+use std::time::Instant;
 use input::Input;
 use logger::Logger;
 
@@ -350,6 +351,7 @@ pub fn entry_point_client(s: &mut Client) {
 
     s.logger.set_log_level(196);
     loop {
+        s.main.timers.time = Instant::now();
         client_tick(s);
         run_timers(&mut s.main);
         if s.should_exit {
@@ -358,7 +360,11 @@ pub fn entry_point_client(s: &mut Client) {
     }
 }
 
-fn run_timers(_: &mut Main) {}
+fn run_timers(s: &mut Main) {
+    if let Some(ref mut network) = s.network {
+        s.timers.network_timer.update(s.timers.time, network);
+    }
+}
 
 fn client_tick(s: &mut Client) {
     let xform = if let Some(ref mut rx) = s.main.config_change_recv {

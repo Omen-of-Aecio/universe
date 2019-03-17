@@ -116,7 +116,7 @@ mod tests {
     #[bench]
     fn overhead_of_calling(b: &mut Bencher) {
         let mut now = Instant::now();
-        let mut timer = black_box(WeakTimer::new(|_, _| { }, Duration::new(1, 0), now));
+        let mut timer = black_box(WeakTimer::new(|_, _| {}, Duration::new(1, 0), now));
         b.iter(|| {
             now += Duration::new(1, 0);
             assert_eq![Some(()), timer.update(black_box(now), black_box(&mut ()))];

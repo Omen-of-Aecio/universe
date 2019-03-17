@@ -9,7 +9,6 @@ use self::pkt::Packet;
 use failure::Error;
 use failure::{bail, ensure};
 use serde::{Deserialize, Serialize};
-use std;
 use std::collections::hash_map::HashMap;
 use std::fmt::Debug;
 use std::iter::Iterator;

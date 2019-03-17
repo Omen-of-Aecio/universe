@@ -15,6 +15,7 @@ use std::{
     time::Duration,
     vec::Vec,
 };
+use udp_ack::Socket;
 
 pub mod config;
 
@@ -48,7 +49,7 @@ pub struct Main<'a> {
     pub commandline: clap::ArgMatches<'a>,
     pub config: Config,
     pub config_change_recv: Option<mpsc::Receiver<fn(&mut Config)>>,
-    // pub network: Option<neter::Socket<i32>>,
+    pub network: Option<Socket<i32>>,
     pub threads: Threads,
     pub timers: PriorityQueue<NamedFn, std::time::Instant>,
 }
@@ -60,7 +61,7 @@ impl<'a> Default for Main<'a> {
             config: Config::default(),
             commandline: clap::ArgMatches::default(),
             threads: Threads::default(),
-            // network: None,
+            network: None,
             timers: PriorityQueue::new(),
         }
     }

@@ -888,7 +888,7 @@ impl<'a> Gsh<'a> {
                     content.push((*string).into());
                 }
                 Data::Command(string) => {
-                    if !string.is_empty() && &(*string)[0..1] == "#" {
+                    if let Some('#') = string.chars().next() {
                         content.push((string[1..]).into());
                     } else {
                         let res = self.interpret_single(string);
@@ -1015,6 +1015,37 @@ mod tests {
         std::mem::drop(logger);
         let _ = TcpStream::connect("127.0.0.1:".to_string() + port.to_string().as_ref())?;
         logger_handle.join().unwrap();
+        Ok(())
+    }
+
+    #[test]
+    fn fuzzing_result_does_not_crash() -> io::Result<()> {
+        let logger_handle = {
+            // given
+            let (mut logger, logger_handle) = logger::Logger::spawn();
+            logger.set_log_level(0);
+            let keep_running = Arc::new(AtomicBool::new(true));
+            let mut cmdmat = cmdmat::Mapping::default();
+            cmdmat.register_many(SPEC).unwrap();
+            let mut gsh = GameShell {
+                gshctx: GameShellContext {
+                    config_change: None,
+                    logger,
+                    keep_running,
+                    variables: HashMap::new(),
+                },
+                commands: Arc::new(cmdmat),
+            };
+            let input = "y\u{000b}1111-31492546713013106(\u{00cc}\u{00a7}121B)1\u{00f0}\u{0094}\u{00a0}\u{0080}02291\0";
+            assert_eq![
+                EvalRes::Err("Unrecognized mapping: Ì§121B".into()),
+                gsh.interpret_single(input).unwrap()
+            ];
+            logger_handle
+        };
+        logger_handle.join().unwrap();
+
+        // cleanup
         Ok(())
     }
 

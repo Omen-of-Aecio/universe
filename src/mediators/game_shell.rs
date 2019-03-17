@@ -530,32 +530,39 @@ pub fn make_new_gameshell(logger: Logger<Log>) -> Gsh<'static> {
 
 // ---
 
-pub fn spawn(mut logger: Logger<Log>) -> Option<(JoinHandle<()>, Arc<AtomicBool>)> {
+fn spawn_with_listener(
+    logger: Logger<Log>,
+    listener: TcpListener,
+) -> (JoinHandle<()>, Arc<AtomicBool>) {
     let keep_running = Arc::new(AtomicBool::new(true));
     let keep_running_clone = keep_running.clone();
-    if let Ok(listener) = TcpListener::bind("127.0.0.1:32931") {
-        Some((
-            thread::Builder::new()
-                .name("gsh/server".to_string())
-                .spawn(move || {
-                    let mut cmdmat = cmdmat::Mapping::default();
-                    cmdmat.register_many(SPEC).unwrap();
-                    game_shell_thread(
-                        GameShell {
-                            gshctx: GameShellContext {
-                                config_change: None,
-                                logger,
-                                keep_running,
-                                variables: HashMap::new(),
-                            },
-                            commands: Arc::new(cmdmat),
+    (
+        thread::Builder::new()
+            .name("gsh/server".to_string())
+            .spawn(move || {
+                let mut cmdmat = cmdmat::Mapping::default();
+                cmdmat.register_many(SPEC).unwrap();
+                game_shell_thread(
+                    GameShell {
+                        gshctx: GameShellContext {
+                            config_change: None,
+                            logger,
+                            keep_running,
+                            variables: HashMap::new(),
                         },
-                        listener,
-                    )
-                })
-                .unwrap(),
-            keep_running_clone,
-        ))
+                        commands: Arc::new(cmdmat),
+                    },
+                    listener,
+                )
+            })
+            .unwrap(),
+        keep_running_clone,
+    )
+}
+
+pub fn spawn(mut logger: Logger<Log>) -> Option<(JoinHandle<()>, Arc<AtomicBool>)> {
+    if let Ok(listener) = TcpListener::bind("127.0.0.1:32931") {
+        Some(spawn_with_listener(logger, listener))
     } else {
         logger.info("gsh", Log::Static("Unable to bind to tcp port"));
         None
@@ -976,13 +983,27 @@ mod tests {
     use std::io;
     use test::{black_box, Bencher};
 
+    fn bind_to_any_tcp_port() -> (TcpListener, u16) {
+        for i in 10000..=u16::max_value() {
+            if let Ok(listener) =
+                TcpListener::bind("127.0.0.1:".to_string() + i.to_string().as_ref())
+            {
+                return (listener, i);
+            }
+        }
+        panic!["Unable to find an available port"];
+    }
+
+    // ---
+
     #[test]
-    #[cfg(test_nondeterministic)]
-    fn nondeterministic_change_log_level() -> io::Result<()> {
+    fn change_log_level() -> io::Result<()> {
         let (logger, logger_handle) = logger::Logger::spawn();
         assert_ne![123, logger.get_log_level()];
-        let (_gsh, keep_running) = spawn(logger.clone()).unwrap();
-        let mut listener = TcpStream::connect("127.0.0.1:32931").unwrap();
+        let (listener, port) = bind_to_any_tcp_port();
+        let (_gsh, keep_running) = spawn_with_listener(logger.clone(), listener);
+        let mut listener =
+            TcpStream::connect("127.0.0.1:".to_string() + port.to_string().as_ref()).unwrap();
         {
             writeln![listener, "log global level 123"]?;
             listener.flush()?;
@@ -992,7 +1013,7 @@ mod tests {
         keep_running.store(false, Ordering::Release);
         std::mem::drop(listener);
         std::mem::drop(logger);
-        let listener = TcpStream::connect("127.0.0.1:32931")?;
+        let _ = TcpStream::connect("127.0.0.1:".to_string() + port.to_string().as_ref())?;
         logger_handle.join().unwrap();
         Ok(())
     }
@@ -1362,12 +1383,13 @@ mod tests {
     }
 
     #[bench]
-    #[cfg(test_nondeterministic)]
-    fn nondeterministic_message_bandwidth_over_tcp(b: &mut Bencher) -> io::Result<()> {
+    fn message_bandwidth_over_tcp(b: &mut Bencher) -> io::Result<()> {
         let (mut logger, logger_handle) = logger::Logger::spawn();
-        let (mut _gsh, keep_running) = spawn(logger.clone()).unwrap();
+        let (listener, port) = bind_to_any_tcp_port();
+        let (mut _gsh, keep_running) = spawn_with_listener(logger.clone(), listener);
         logger.set_log_level(0);
-        let mut listener = TcpStream::connect("127.0.0.1:32931")?;
+        let mut listener =
+            TcpStream::connect("127.0.0.1:".to_string() + port.to_string().as_ref())?;
         b.iter(|| -> io::Result<()> {
             writeln![listener, "log global level 0"]?;
             listener.flush()?;
@@ -1377,7 +1399,7 @@ mod tests {
         keep_running.store(false, Ordering::Release);
         std::mem::drop(listener);
         std::mem::drop(logger);
-        let _ = TcpStream::connect("127.0.0.1:32931")?;
+        let _ = TcpStream::connect("127.0.0.1:".to_string() + port.to_string().as_ref())?;
         let _ = logger_handle.join().unwrap();
         Ok(())
     }

@@ -6,17 +6,18 @@ use std::{
     collections::VecDeque,
     fmt::Debug,
     net::{SocketAddr, UdpSocket},
+    time::{Duration, Instant},
 };
 
 pub struct SentPacket<T: Clone + Debug + PartialEq> {
-    pub time: u64,
+    pub time: Instant,
     pub seq: u32,
     pub packet: Packet<T>,
 }
 
 impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize + PartialEq> Debug for SentPacket<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "SentPacket; time = {}, seq = {}", self.time, self.seq)
+        write!(f, "SentPacket; time = {:?}, seq = {}", self.time, self.seq)
     }
 }
 
@@ -27,7 +28,6 @@ pub struct Connection<T: Clone + Debug + PartialEq> {
     /// Some means that it's not yet acknowledged
     pub send_window: VecDeque<Option<SentPacket<T>>>,
 }
-const RESEND_INTERVAL_MS: u64 = 1000;
 
 impl<T: Clone + Debug + PartialEq> Connection<T> {
     pub fn new() -> Connection<T> {
@@ -40,7 +40,7 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
     /// Returns Vec of encoded packets ready to be sent again
     pub fn resend_fast(
         &mut self,
-        time: u64,
+        time: Instant,
         socket: &UdpSocket,
         dest: SocketAddr,
     ) -> Result<bool, Error>
@@ -52,7 +52,7 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
         let mut seen = false;
         for sent_packet in self.send_window.iter_mut() {
             if let Some(ref mut sent_packet) = *sent_packet {
-                if now > sent_packet.time + RESEND_INTERVAL_MS * 1_000_000 {
+                if now - sent_packet.time >= Duration::new(1, 0) {
                     sent_packet.time = now;
                     socket.send_to(&sent_packet.packet.encode().unwrap()[..], dest)?;
                     seen = true;
@@ -101,7 +101,7 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
     pub fn send_message<'b>(
         &'b mut self,
         msg: T,
-        time: u64,
+        time: Instant,
         socket: &UdpSocket,
         dest: SocketAddr,
     ) -> Result<u32, Error>

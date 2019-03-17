@@ -13,6 +13,7 @@ use std::collections::hash_map::HashMap;
 use std::fmt::Debug;
 use std::iter::Iterator;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
+use std::time::Instant;
 
 /// Provides an interface to encode and relatively reliably send, decode and receive messages to/from any destination.
 
@@ -49,13 +50,13 @@ impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
 
     /// A temporary (TODO) simple (but brute force) solution to the need of occasionally resending
     /// packets which haven't been acknowledged.
-    pub fn update(&mut self, time: u64) -> Result<bool, Error>
+    pub fn update(&mut self, instant: Instant) -> Result<bool, Error>
     where
         T: Serialize,
     {
         let mut seen = false;
         for (addr, conn) in self.connections.iter_mut() {
-            let seen_here = conn.resend_fast(time, &self.socket, *addr)?;
+            let seen_here = conn.resend_fast(instant, &self.socket, *addr)?;
             if seen_here {
                 seen = true;
             }
@@ -86,7 +87,7 @@ impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
     }
 
     /// Send reliable message
-    pub fn send_reliably_to(&mut self, msg: T, dest: SocketAddr, time: u64) -> Result<(), Error>
+    pub fn send_reliably_to(&mut self, msg: T, dest: SocketAddr, time: Instant) -> Result<(), Error>
     where
         T: Serialize,
     {
@@ -161,8 +162,8 @@ pub fn to_socket_addr(addr: &str) -> Result<SocketAddr, Error> {
 mod tests {
     use super::*;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use std::time::{Duration, Instant};
     use test::{black_box, Bencher};
-    use time::precise_time_ns;
 
     #[test]
     fn confirm_message_arrives() {
@@ -181,7 +182,7 @@ mod tests {
         let (mut server, server_port): (Socket<bool>, _) = Socket::new_with_random_port().unwrap();
 
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
-        let now = precise_time_ns();
+        let now = Instant::now();
 
         client.send_reliably_to(true, destination, now).unwrap();
         let mut buffer = [0u8; 9];
@@ -197,7 +198,7 @@ mod tests {
         let (mut server, server_port): (Socket<&str>, _) = Socket::new_with_random_port().unwrap();
 
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
-        let now = precise_time_ns();
+        let now = Instant::now();
 
         client
             .send_reliably_to("Hello World", destination, now)
@@ -217,15 +218,18 @@ mod tests {
             Socket::new_with_random_port().unwrap();
 
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
-        let now = precise_time_ns();
+        let now = Instant::now();
 
         client
             .send_reliably_to("Hello World".into(), destination, now)
             .unwrap();
         let mut buffer = [0u8; 27];
         assert_eq![false, client.update(now).unwrap()];
-        assert_eq![false, client.update(now + 1_000_000_000).unwrap()];
-        assert_eq![true, client.update(now + 1_000_000_001).unwrap()];
+        assert_eq![
+            false,
+            client.update(now + Duration::new(0, 999_999_999)).unwrap()
+        ];
+        assert_eq![true, client.update(now + Duration::new(1, 0)).unwrap()];
         assert_eq!["Hello World", server.recv(&mut buffer).unwrap().1];
         assert_eq!["Hello World", server.recv(&mut buffer).unwrap().1];
         assert_eq![true, server.recv(&mut buffer).is_err()];
@@ -331,7 +335,7 @@ mod tests {
         let (mut server, server_port): (Socket<i32>, _) = Socket::new_with_random_port().unwrap();
 
         let destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), server_port);
-        let now = precise_time_ns();
+        let now = Instant::now();
         b.iter(|| {
             client
                 .send_reliably_to(black_box(1234567890), black_box(destination), now)

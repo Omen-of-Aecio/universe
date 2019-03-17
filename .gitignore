@@ -5,6 +5,7 @@
 !README.md
 !assets/
 !benches/
+!libs/
 !rustfmt.toml
 !scripts/
 !shaders/

@@ -4,6 +4,7 @@ use geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
 pub use glium::uniforms::{MagnifySamplerFilter, MinifySamplerFilter};
 use glium::{implement_vertex, texture::Texture2d};
 use input;
+use ketimer::WeakTimer;
 use logger::Logger;
 use priority_queue::PriorityQueue;
 use rodio;
@@ -12,7 +13,7 @@ use std::{
     collections::HashMap,
     hash::{Hash, Hasher},
     sync::{atomic::AtomicBool, mpsc, Arc},
-    time::Duration,
+    time::{Duration, Instant},
     vec::Vec,
 };
 use udp_ack::Socket;
@@ -45,24 +46,30 @@ impl Hash for NamedFn {
     }
 }
 
+#[derive(Default)]
 pub struct Main<'a> {
     pub commandline: clap::ArgMatches<'a>,
     pub config: Config,
     pub config_change_recv: Option<mpsc::Receiver<fn(&mut Config)>>,
     pub network: Option<Socket<i32>>,
     pub threads: Threads,
-    pub timers: PriorityQueue<NamedFn, std::time::Instant>,
+    pub timers: Timers,
 }
 
-impl<'a> Default for Main<'a> {
+pub struct Timers {
+    pub network_timer: WeakTimer<Socket<i32>>,
+}
+
+impl<'a> Default for Timers {
     fn default() -> Self {
         Self {
-            config_change_recv: None,
-            config: Config::default(),
-            commandline: clap::ArgMatches::default(),
-            threads: Threads::default(),
-            network: None,
-            timers: PriorityQueue::new(),
+            network_timer: WeakTimer::new(
+                |x, i| {
+                    x.update(i);
+                },
+                Duration::new(1, 0),
+                Instant::now(),
+            ),
         }
     }
 }

@@ -358,8 +358,7 @@ pub fn entry_point_client(s: &mut Client) {
     }
 }
 
-fn run_timers(_: &mut Main) {
-}
+fn run_timers(_: &mut Main) {}
 
 fn client_tick(s: &mut Client) {
     let xform = if let Some(ref mut rx) = s.main.config_change_recv {

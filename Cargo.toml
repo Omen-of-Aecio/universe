@@ -36,6 +36,7 @@ udp_ack =       {path = "libs/udp_ack"}
 geometry =  {path = "libs/geometry"}
 input =     {path = "libs/input"}
 config =    {path = "libs/config"}
+ketimer = { path = "libs/ketimer" }
 
 logger =    {path = "libs/logger"}
 benchmarker = {path = "libs/benchmarker"}

@@ -73,12 +73,6 @@ fn wait_for_threads_to_exit(s: glocals::Main) {
 
 fn main() {
     let mut s = glocals::Main::default();
-    s.timers.push(
-        glocals::NamedFn {
-            name: "network-resend", func: |x| { }
-        },
-        std::time::Instant::now(),
-    );
     parse_command_line_arguments(&mut s.commandline);
     s = run_client_or_server(s);
     wait_for_threads_to_exit(s);

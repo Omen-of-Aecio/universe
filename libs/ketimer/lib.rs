@@ -1,3 +1,6 @@
+#![feature(test)]
+extern crate test;
+
 use std::time::{Duration, Instant};
 
 /// A timer that runs after a given interval
@@ -37,6 +40,7 @@ impl<T, R> WeakTimer<T, R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test::{black_box, Bencher};
 
     #[test]
     fn test_weaktimer() {
@@ -105,5 +109,17 @@ mod tests {
 
         // then
         assert_eq![Duration::new(11, 0), arg.0];
+    }
+
+    // ---
+
+    #[bench]
+    fn overhead_of_calling(b: &mut Bencher) {
+        let mut now = Instant::now();
+        let mut timer = black_box(WeakTimer::new(|_, _| { }, Duration::new(1, 0), now));
+        b.iter(|| {
+            now += Duration::new(1, 0);
+            assert_eq![Some(()), timer.update(black_box(now), black_box(&mut ()))];
+        });
     }
 }

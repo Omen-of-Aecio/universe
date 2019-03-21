@@ -42,6 +42,29 @@ mod tests {
     use super::*;
     use test::{black_box, Bencher};
 
+    // ---
+
+    #[quickcheck_macros::quickcheck]
+    fn timer_triggers_only_after_elapsing(interval: Duration, elapsed: Duration) -> bool {
+        let now = Instant::now();
+        let mut timer = WeakTimer::new(
+            |x, _| {
+                *x += 1;
+            },
+            interval,
+            now,
+        );
+        let mut ctx = 0;
+        timer.update(now + elapsed, &mut ctx);
+        if interval > elapsed {
+            ctx == 0
+        } else {
+            ctx == 1
+        }
+    }
+
+    // ---
+
     #[test]
     fn test_weaktimer() {
         let now = Instant::now();

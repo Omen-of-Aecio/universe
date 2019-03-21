@@ -736,6 +736,28 @@ mod tests {
 
     // ---
 
+    #[quickcheck_macros::quickcheck]
+    fn default_contains_no_elements(strings: Vec<String>) -> bool {
+        type Accept = ();
+        type Deny = ();
+        type Context = ();
+        let strings_ref = strings.iter().map(|s| &s[..]).collect::<Vec<_>>();
+        let mapping: Mapping<Accept, Deny, Context> = Mapping::default();
+        match mapping.lookup(&strings_ref[..]) {
+            Err(LookError::UnknownMapping(string)) => {
+                string == strings[0]
+            }
+            Err(LookError::FinalizerDoesNotExist) => {
+                strings.is_empty()
+            }
+            _ => {
+                false
+            }
+        }
+    }
+
+    // ---
+
     #[bench]
     fn lookup_speed(b: &mut Bencher) {
         let mut mapping: Mapping<Accept, (), Context> = Mapping::default();

@@ -10,6 +10,3 @@ path = "lib.rs"
 
 [dependencies]
 glium = "0.16.0"
-
-# Local crates:
-geometry = {path = "../geometry"}

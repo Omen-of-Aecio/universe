@@ -264,9 +264,9 @@ fn toggle_camera_mode(s: &mut Client) {
 fn maybe_fire_bullets(s: &mut Client) {
     if s.input.is_left_mouse_button_down() {
         let mouse = s.input.get_mouse_pos();
-        let world = s.game.cam.screen_to_world(mouse);
-        s.logger.trace("cli", Log::Coordinates(world, mouse));
-        let target = s.game.cam.screen_to_world(s.input.get_mouse_pos());
+        let world = s.game.cam.screen_to_world(mouse.into());
+        s.logger.trace("cli", Log::Coordinates(world.into(), mouse.into()));
+        let target = s.game.cam.screen_to_world(s.input.get_mouse_pos().into());
         let origin = s.game.players[0].position + Vec2 { x: 5.0, y: 5.0 };
         let length = (target - origin).length_squared();
         if length > 0.1 {

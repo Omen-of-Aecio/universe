@@ -147,6 +147,17 @@ impl Div<f32> for Vec2 {
 
 // ---
 
+impl From<(f32, f32)> for Vec2 {
+    fn from(point: (f32, f32)) -> Self {
+        Vec2 {
+            x: point.0,
+            y: point.1,
+        }
+    }
+}
+
+// ---
+
 #[cfg(test)]
 mod tests {
     use super::*;

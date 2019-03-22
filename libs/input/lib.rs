@@ -1,4 +1,3 @@
-use geometry::vec::Vec2;
 use glium::glutin;
 use glium::glutin::Event::KeyboardInput;
 use glium::glutin::{ElementState, MouseButton, VirtualKeyCode as KeyCode};
@@ -77,16 +76,16 @@ impl Input {
         self.is_key_down(keycode) && self.is_key_toggled(keycode)
     }
 
-    pub fn get_mouse_pos(&self) -> Vec2 {
-        Vec2::new(self.mouse.0 as f32, self.mouse.1 as f32)
+    pub fn get_mouse_pos(&self) -> (f32, f32) {
+        (self.mouse.0 as f32, self.mouse.1 as f32)
     }
 
     pub fn is_left_mouse_button_down(&self) -> bool {
         self.left_mouse_button
     }
 
-    pub fn get_mouse_moved(&self) -> Vec2 {
-        Vec2::new(
+    pub fn get_mouse_moved(&self) -> (f32, f32) {
+        (
             (self.mouse.0 - self.mouse_in_previous_frame.0) as f32,
             (self.mouse.1 - self.mouse_in_previous_frame.1) as f32,
         )

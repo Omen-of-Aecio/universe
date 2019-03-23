@@ -345,7 +345,7 @@ impl<C: 'static + Display + Send + From<String>> LoggerV2Async<C> {
         Writer {
             logger: self,
             ctx,
-            level
+            level,
         }
     }
 }
@@ -548,6 +548,18 @@ mod tests {
     }
 
     // ---
+
+    #[test]
+    fn send_simple_string() {
+        use std::fmt::Write;
+        let (mut logger, thread) = Logger::<String>::spawn();
+        assert_eq![true, logger.info("tst", "Message".into())];
+        let mut writer = logger.make_writer("tst*", 128);
+        write![writer, "Message 2"].unwrap();
+        std::mem::drop(writer);
+        std::mem::drop(logger);
+        thread.join().unwrap();
+    }
 
     #[test]
     fn send_successful_message() {
@@ -828,7 +840,10 @@ mod tests {
         let writer = Void {};
         let (mut logger, thread) = Logger::<String>::spawn_with_writer(writer);
         b.iter(|| {
-            black_box(logger.info("tst", black_box(format!["Message {} {:?}", 3.14, &[1, 2, 3]])));
+            black_box(logger.info(
+                "tst",
+                black_box(format!["Message {} {:?}", 3.14, &[1, 2, 3]]),
+            ));
         });
         std::mem::drop(logger);
         thread.join().unwrap();

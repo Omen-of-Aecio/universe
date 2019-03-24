@@ -265,7 +265,7 @@ fn maybe_fire_bullets(s: &mut Client) {
     if s.input.is_left_mouse_button_down() {
         let mouse = s.input.get_mouse_pos();
         let world = s.game.cam.screen_to_world(mouse.into());
-        s.logger.trace("cli", Log::Coordinates(world.into(), mouse.into()));
+        s.logger.trace("cli", Log::Coordinates(world, mouse.into()));
         let target = s.game.cam.screen_to_world(s.input.get_mouse_pos().into());
         let origin = s.game.players[0].position + Vec2 { x: 5.0, y: 5.0 };
         let length = (target - origin).length_squared();
@@ -328,7 +328,7 @@ fn stop_benchmark(benchmarker: &mut Benchmarker, logger: &mut Logger<Log>, msg: 
 
 pub fn entry_point_client(s: &mut Client) {
     // play_song(s);
-    s.logger.info("cli", Log::Static("Creating grid"));
+    s.logger.info("cli", "Creating grid");
     initialize_grid(&mut s.game.grid);
     s.game.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
     random_map_generator::proc1(&mut s.game.grid, &s.display);
@@ -429,16 +429,12 @@ fn client_tick(s: &mut Client) {
     match frame.finish() {
         Ok(()) => {}
         Err(glium::SwapBuffersError::ContextLost) => {
-            s.logger.error(
-                "cli",
-                Log::Static("Context was lost while trying to swap buffers"),
-            );
+            s.logger
+                .error("cli", "Context was lost while trying to swap buffers");
         }
         Err(glium::SwapBuffersError::AlreadySwapped) => {
-            s.logger.error(
-                "cli",
-                Log::Static("OpenGL context has already been swapped"),
-            );
+            s.logger
+                .error("cli", "OpenGL context has already been swapped");
         }
     }
 }

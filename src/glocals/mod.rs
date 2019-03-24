@@ -111,6 +111,12 @@ pub enum Log {
     Usize2(&'static str, &'static str, usize, &'static str, usize),
 }
 
+impl From<&'static str> for Log {
+    fn from(data: &'static str) -> Self {
+        Log::Static(data)
+    }
+}
+
 impl std::fmt::Display for Log {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {

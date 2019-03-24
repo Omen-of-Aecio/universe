@@ -564,7 +564,7 @@ pub fn spawn(mut logger: Logger<Log>) -> Option<(JoinHandle<()>, Arc<AtomicBool>
     if let Ok(listener) = TcpListener::bind("127.0.0.1:32931") {
         Some(spawn_with_listener(logger, listener))
     } else {
-        logger.info("gsh", Log::Static("Unable to bind to tcp port"));
+        logger.info("gsh", "Unable to bind to tcp port");
         None
     }
 }
@@ -594,7 +594,7 @@ fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<
                     shell_clone
                         .gshctx
                         .logger
-                        .debug("gsh", Log::Static("Connection ended ok"));
+                        .debug("gsh", "Connection ended ok");
                 }
                 Err(error) => {
                     shell_clone.gshctx.logger.debug(
@@ -715,9 +715,7 @@ impl<'a, 'b> IncConsumer for GshTcp<'a, 'b> {
             if let Ok(result) = result {
                 self.gsh.gshctx.logger.debug(
                     "gsh",
-                    Log::Static(
-                        "Message parsing succeeded and evaluated, sending response to client",
-                    ),
+                    "Message parsing succeeded and evaluated, sending response to client",
                 );
                 match result {
                     EvalRes::Ok(res) => {
@@ -747,7 +745,7 @@ impl<'a, 'b> IncConsumer for GshTcp<'a, 'b> {
                             self.gsh
                                 .gshctx
                                 .logger
-                                .warn("gsh", Log::Static("Sending empty help message"));
+                                .warn("gsh", "Sending empty help message");
                             if self.stream.write_all(b"Empty help message").is_err() {
                                 return Process::Stop;
                             }
@@ -761,7 +759,7 @@ impl<'a, 'b> IncConsumer for GshTcp<'a, 'b> {
                 self.gsh
                     .gshctx
                     .logger
-                    .error("gsh", Log::Static("Message parsing failed"));
+                    .error("gsh", "Message parsing failed");
                 if self
                     .stream
                     .write_all(b"Unable to complete query (parse error)")
@@ -777,9 +775,7 @@ impl<'a, 'b> IncConsumer for GshTcp<'a, 'b> {
         } else {
             self.gsh.gshctx.logger.warn(
                 "gsh",
-                Log::Static(
-                    "Malformed UTF-8 received, this should never happen. Ending connection",
-                ),
+                "Malformed UTF-8 received, this should never happen. Ending connection",
             );
             Process::Stop
         }
@@ -789,9 +785,7 @@ impl<'a, 'b> IncConsumer for GshTcp<'a, 'b> {
 // ---
 
 fn connection_loop(s: &mut Gsh, stream: TcpStream) -> io::Result<()> {
-    s.gshctx
-        .logger
-        .debug("gsh", Log::Static("Acquired new stream"));
+    s.gshctx.logger.debug("gsh", "Acquired new stream");
     let mut gshtcp = GshTcp {
         gsh: s,
         stream,
@@ -802,15 +796,11 @@ fn connection_loop(s: &mut Gsh, stream: TcpStream) -> io::Result<()> {
 }
 
 fn game_shell_thread(mut s: Gsh, listener: TcpListener) {
-    s.gshctx
-        .logger
-        .info("gsh", Log::Static("Started GameShell server"));
+    s.gshctx.logger.info("gsh", "Started GameShell server");
     'outer_loop: loop {
         for stream in listener.incoming() {
             if !s.gshctx.keep_running.load(Ordering::Acquire) {
-                s.gshctx
-                    .logger
-                    .info("gsh", Log::Static("Stopped GameShell server"));
+                s.gshctx.logger.info("gsh", "Stopped GameShell server");
                 break 'outer_loop;
             }
             match stream {

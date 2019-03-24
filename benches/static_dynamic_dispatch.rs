@@ -11,11 +11,17 @@ trait T {
 
 struct C {}
 impl T for C {
-    fn call(&self) -> Option<()> { Some(()) }
+    fn call(&self) -> Option<()> {
+        Some(())
+    }
 }
 
-fn static_call(obj: &C) -> Option<()> { obj.call() }
-fn dynamic_call(obj: &T) -> Option<()> { obj.call() }
+fn static_call(obj: &C) -> Option<()> {
+    obj.call()
+}
+fn dynamic_call(obj: &T) -> Option<()> {
+    obj.call()
+}
 
 #[bench]
 fn static_dispatch(b: &mut Bencher) {

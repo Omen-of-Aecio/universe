@@ -16,7 +16,7 @@ for SCRIPT in "$DIR"/*; do
     fi
     echo "Running: $SCRIPT"
     set +e
-    ./"$SCRIPT" |& sed 's/^/\t/g'
+    time ./"$SCRIPT" |& sed 's/^/\t/g'
     if [ "$?" -ne 0 ]; then
         failures="$((failures + 1))"
     fi

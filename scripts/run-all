@@ -9,10 +9,21 @@ cd "$DIR.."
 DIR="${DIR%/*}"
 DIR="${DIR##*/}"
 
+if [ $# -gt 0 ] && [ "$1" = "no-bench" ]; then
+    no_bench=1
+else
+    no_bench=0
+fi
+
 failures=0
 for SCRIPT in "$DIR"/*; do
     if [ "$SCRIPT" = "$DIR/$FILE" ]; then
         continue
+    fi
+    if [ "$no_bench" -eq 1 ]; then
+        if echo "$SCRIPT" | grep "bench" >& /dev/null; then
+            continue
+        fi
     fi
     echo "Running: $SCRIPT"
     set +e

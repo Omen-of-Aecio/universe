@@ -11,4 +11,4 @@ rust:
     - nightly
 script:
   - export PATH="$PATH:/usr/bin"
-  - ./scripts/run-all
+  - ./scripts/run-all no-bench

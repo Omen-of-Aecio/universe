@@ -2,11 +2,24 @@
 
 set -Eeuo pipefail
 
-cargo install --force honggfuzz
+FILE="$(basename $0)"
+DIR="${0%$FILE}"
 
-if [ -d hfuzz_workspace/ ]; then
-    rm -r hfuzz_workspace/
+cd "$DIR.."
+DIR="${DIR%/*}"
+DIR="${DIR##*/}"
+
+
+export CARGO_TARGET_DIR=_build/hfuzz/hfuzz_target
+export HFUZZ_WORKSPACE=_build/hfuzz/hfuzz_workspace
+
+if [ -d _build/hfuzz ]; then
+    rm -r _build/hfuzz
 fi
+
+mkdir -p _build/hfuzz
+
+cargo install --force honggfuzz >& "_build/hfuzz/install"
 
 builderr=0
 for TARGET in tests/fuzz/*; do
@@ -21,7 +34,7 @@ for TARGET in tests/fuzz/*; do
     set +e
     HFUZZ_BUILD_ARGS="" \
     HFUZZ_RUN_ARGS="-N1000000 --exit_upon_crash ${HFUZZ_INPUT_ARGS:+-v} ${HFUZZ_INPUT_ARGS:-}" \
-    cargo hfuzz run "$FILE"
+    cargo hfuzz run "$FILE" >& _build/hfuzz/"$FILE"
     if [ "$?" -ne 0 ]; then
         builderr="$((builderr + 1))"
     fi
@@ -49,9 +62,10 @@ done
 
 if [ "$found" -gt 0 ]; then
     echo "$found fuzzing tests found errors"
+    exit 1
 fi
 
-if [ "$builderr" -gt 0 ] || [ "$found" -gt 0 ]; then
+if [ "$builderr" -gt 0 ]; then
     exit 1
 fi
 

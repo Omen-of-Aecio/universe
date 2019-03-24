@@ -14,26 +14,26 @@ mkdir -p _build/libs
 has_failed=0
 
 set +e
-cargo test --verbose --all >& _build/main.test_result
+cargo bench --verbose --all >& _build/main.bench_result
 if [ "$?" -ne 0 ]; then
-    echo "FAIL: main"
-    cat ../../_build/main.test_result
+    echo "FAIL: main (bench)"
+    cat ../../_build/main.bench_result
     has_failed=1
 else
-    echo "PASS: main"
+    echo "PASS: main (bench)"
 fi
 set -e
 
 for library in libs/*; do
     cd "$library"
     set +e
-    cargo test --verbose --all >& ../../_build/"$library.test_result"
+    cargo bench >& ../../_build/"$library.bench_result"
     if [ "$?" -ne 0 ]; then
-        echo "FAIL: $library"
-        cat ../../_build/"$library.test_result"
+        echo "FAIL: $library (bench)"
+        cat ../../_build/"$library.bench_result"
         has_failed=1
     else
-        echo "PASS: $library"
+        echo "PASS: $library (bench)"
     fi
     set -e
     cd ../..

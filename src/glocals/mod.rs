@@ -47,6 +47,7 @@ impl Hash for NamedFn {
 
 #[derive(Default)]
 pub struct Main<'a> {
+    pub client: Option<Client>,
     pub commandline: clap::ArgMatches<'a>,
     pub config: Config,
     pub config_change_recv: Option<mpsc::Receiver<fn(&mut Config)>>,
@@ -151,10 +152,9 @@ impl std::fmt::Display for Log {
     }
 }
 
-pub struct Client<'a> {
+pub struct Client {
     pub logger: Logger<Log>,
     pub should_exit: bool,
-    pub main: Main<'a>,
     pub game: Game,
     pub input: input::Input,
     pub display: glium::Display,

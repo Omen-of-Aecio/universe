@@ -25,7 +25,7 @@ fn parse_command_line_arguments<'a>(s: &mut clap::ArgMatches<'a>) {
     };
 }
 
-fn run_client_or_server(mut s: glocals::Main) -> glocals::Main {
+fn run_client_or_server(s: &mut glocals::Main) {
     let commandline = s.commandline.clone();
     if let Some(_connect) = commandline.value_of("connect") {
         let (mut logger, thread) = logger::Logger::spawn();
@@ -38,7 +38,6 @@ fn run_client_or_server(mut s: glocals::Main) -> glocals::Main {
         let mut client = Client {
             logger,
             should_exit: false,
-            main: s,
             game: Game::default(),
             display: glutin::WindowBuilder::new()
                 .with_dimensions(1024, 768)
@@ -50,10 +49,8 @@ fn run_client_or_server(mut s: glocals::Main) -> glocals::Main {
             logic_benchmarker: Benchmarker::new(99),
             drawing_benchmarker: Benchmarker::new(99),
         };
-        mediators::client::entry_point_client(&mut client);
-        client.main
-    } else {
-        s
+        s.client = Some(client);
+        mediators::client::entry_point_client(s);
     }
 }
 
@@ -74,6 +71,6 @@ fn wait_for_threads_to_exit(s: glocals::Main) {
 fn main() {
     let mut s = glocals::Main::default();
     parse_command_line_arguments(&mut s.commandline);
-    s = run_client_or_server(s);
+    run_client_or_server(&mut s);
     wait_for_threads_to_exit(s);
 }

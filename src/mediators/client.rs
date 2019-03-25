@@ -326,58 +326,56 @@ fn stop_benchmark(benchmarker: &mut Benchmarker, logger: &mut Logger<Log>, msg: 
     }
 }
 
-pub fn entry_point_client(s: &mut Client) {
+pub fn entry_point_client(s: &mut Main) {
     // play_song(s);
-    s.logger.info("cli", "Creating grid");
-    initialize_grid(&mut s.game.grid);
-    s.game.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
-    random_map_generator::proc1(&mut s.game.grid, &s.display);
-    create_black_square_around_player(&mut s.game.grid);
-    // let size = s.game.grid.get_size();
-    // for i in 0 .. size.0 {
-    //     *s.game.grid.get_mut(i, 800).unwrap() = 255;
-    //     *s.game.grid.get_mut(i, 0).unwrap() = 255;
-    //     *s.game.grid.get_mut(40, i).unwrap() = 255;
-    //     *s.game.grid.get_mut(600, i).unwrap() = 255;
-    // }
-    // *s.game.grid.get_mut(100, 1).unwrap() = 255;
-    s.game.grid_render = Some(render_grid::create_grid_u8_render_data(
-        &s.display,
-        &s.game.grid,
-    ));
-    s.game
-        .players
-        .push(render_polygon::create_render_polygon(&s.display));
+    if let Some(ref mut client) = s.client {
+        client.logger.info("cli", "Creating grid");
+        initialize_grid(&mut client.game.grid);
+        client.game.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
+        random_map_generator::proc1(&mut client.game.grid, &client.display);
+        create_black_square_around_player(&mut client.game.grid);
+        // let size = s.game.grid.get_size();
+        // for i in 0 .. size.0 {
+        //     *s.game.grid.get_mut(i, 800).unwrap() = 255;
+        //     *s.game.grid.get_mut(i, 0).unwrap() = 255;
+        //     *s.game.grid.get_mut(40, i).unwrap() = 255;
+        //     *s.game.grid.get_mut(600, i).unwrap() = 255;
+        // }
+        // *s.game.grid.get_mut(100, 1).unwrap() = 255;
+        client.game.grid_render = Some(render_grid::create_grid_u8_render_data(
+            &client.display,
+            &client.game.grid,
+        ));
+        client.game
+            .players
+            .push(render_polygon::create_render_polygon(&client.display));
 
-    s.logger.set_log_level(196);
-    loop {
-        s.main.timers.time = Instant::now();
-        client_tick(s);
-        run_timers(&mut s.main);
-        if s.should_exit {
-            break;
+        client.logger.set_log_level(196);
+        loop {
+            s.timers.time = Instant::now();
+            let xform = if let Some(ref mut rx) = s.config_change_recv {
+                match rx.try_recv() {
+                    Ok(msg) => Some(msg),
+                    Err(_) => None,
+                }
+            } else {
+                None
+            };
+            if let Some(xform) = xform {
+                xform(&mut s.config);
+            }
+            client_tick(client);
+            if let Some(ref mut network) = s.network {
+                s.timers.network_timer.update(s.timers.time, network);
+            }
+            if client.should_exit {
+                break;
+            }
         }
-    }
-}
-
-fn run_timers(s: &mut Main) {
-    if let Some(ref mut network) = s.network {
-        s.timers.network_timer.update(s.timers.time, network);
     }
 }
 
 fn client_tick(s: &mut Client) {
-    let xform = if let Some(ref mut rx) = s.main.config_change_recv {
-        match rx.try_recv() {
-            Ok(msg) => Some(msg),
-            Err(_) => None,
-        }
-    } else {
-        None
-    };
-    if let Some(xform) = xform {
-        xform(&mut s.main.config);
-    }
     // ---
     s.logic_benchmarker.start();
     // ---

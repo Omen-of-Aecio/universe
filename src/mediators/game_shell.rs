@@ -988,7 +988,7 @@ mod tests {
 
     #[test]
     fn change_log_level() -> io::Result<()> {
-        let (logger, logger_handle) = logger::Logger::spawn();
+        let logger = logger::Logger::spawn();
         assert_ne![123, logger.get_log_level()];
         let (listener, port) = bind_to_any_tcp_port();
         let (_gsh, keep_running) = spawn_with_listener(logger.clone(), listener);
@@ -1002,38 +1002,33 @@ mod tests {
         assert_eq![123, logger.get_log_level()];
         keep_running.store(false, Ordering::Release);
         std::mem::drop(listener);
-        std::mem::drop(logger);
         let _ = TcpStream::connect("127.0.0.1:".to_string() + port.to_string().as_ref())?;
-        logger_handle.join().unwrap();
+
         Ok(())
     }
 
     #[test]
     fn fuzzing_result_does_not_crash() -> io::Result<()> {
-        let logger_handle = {
-            // given
-            let (mut logger, logger_handle) = logger::Logger::spawn();
-            logger.set_log_level(0);
-            let keep_running = Arc::new(AtomicBool::new(true));
-            let mut cmdmat = cmdmat::Mapping::default();
-            cmdmat.register_many(SPEC).unwrap();
-            let mut gsh = GameShell {
-                gshctx: GameShellContext {
-                    config_change: None,
-                    logger,
-                    keep_running,
-                    variables: HashMap::new(),
-                },
-                commands: Arc::new(cmdmat),
-            };
-            let input = "y\u{000b}1111-31492546713013106(\u{00cc}\u{00a7}121B)1\u{00f0}\u{0094}\u{00a0}\u{0080}02291\0";
-            assert_eq![
-                EvalRes::Err("Unrecognized mapping: Ì§121B".into()),
-                gsh.interpret_single(input).unwrap()
-            ];
-            logger_handle
+        // given
+        let mut logger = logger::Logger::spawn();
+        logger.set_log_level(0);
+        let keep_running = Arc::new(AtomicBool::new(true));
+        let mut cmdmat = cmdmat::Mapping::default();
+        cmdmat.register_many(SPEC).unwrap();
+        let mut gsh = GameShell {
+            gshctx: GameShellContext {
+                config_change: None,
+                logger,
+                keep_running,
+                variables: HashMap::new(),
+            },
+            commands: Arc::new(cmdmat),
         };
-        logger_handle.join().unwrap();
+        let input = "y\u{000b}1111-31492546713013106(\u{00cc}\u{00a7}121B)1\u{00f0}\u{0094}\u{00a0}\u{0080}02291\0";
+        assert_eq![
+            EvalRes::Err("Unrecognized mapping: Ì§121B".into()),
+            gsh.interpret_single(input).unwrap()
+        ];
 
         // cleanup
         Ok(())
@@ -1041,49 +1036,44 @@ mod tests {
 
     #[test]
     fn check_variable_statements() -> io::Result<()> {
-        let logger_handle = {
-            // given
-            let (mut logger, logger_handle) = logger::Logger::spawn();
-            logger.set_log_level(0);
-            let keep_running = Arc::new(AtomicBool::new(true));
-            let mut cmdmat = cmdmat::Mapping::default();
-            cmdmat.register_many(SPEC).unwrap();
-            let mut gsh = GameShell {
-                gshctx: GameShellContext {
-                    config_change: None,
-                    logger,
-                    keep_running,
-                    variables: HashMap::new(),
-                },
-                commands: Arc::new(cmdmat),
-            };
-
-            assert_eq![
-                EvalRes::Ok("Ok".into()),
-                gsh.interpret_single("set key some-value").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("some-value".into()),
-                gsh.interpret_single("get key").unwrap()
-            ];
-
-            assert_eq![
-                EvalRes::Err("Unrecognized mapping: extra".into()),
-                gsh.interpret_single("set key some-value extra").unwrap()
-            ];
-
-            assert_eq![
-                EvalRes::Ok("Ok".into()),
-                gsh.interpret_single("set a 123").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("130".into()),
-                gsh.interpret_single("+ 7 (get a)").unwrap()
-            ];
-
-            logger_handle
+        // given
+        let mut logger = logger::Logger::spawn();
+        logger.set_log_level(0);
+        let keep_running = Arc::new(AtomicBool::new(true));
+        let mut cmdmat = cmdmat::Mapping::default();
+        cmdmat.register_many(SPEC).unwrap();
+        let mut gsh = GameShell {
+            gshctx: GameShellContext {
+                config_change: None,
+                logger,
+                keep_running,
+                variables: HashMap::new(),
+            },
+            commands: Arc::new(cmdmat),
         };
-        logger_handle.join().unwrap();
+
+        assert_eq![
+            EvalRes::Ok("Ok".into()),
+            gsh.interpret_single("set key some-value").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("some-value".into()),
+            gsh.interpret_single("get key").unwrap()
+        ];
+
+        assert_eq![
+            EvalRes::Err("Unrecognized mapping: extra".into()),
+            gsh.interpret_single("set key some-value extra").unwrap()
+        ];
+
+        assert_eq![
+            EvalRes::Ok("Ok".into()),
+            gsh.interpret_single("set a 123").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("130".into()),
+            gsh.interpret_single("+ 7 (get a)").unwrap()
+        ];
 
         // cleanup
         Ok(())
@@ -1091,152 +1081,146 @@ mod tests {
 
     #[test]
     fn check_idempotent_statements_work() -> io::Result<()> {
-        let logger_handle = {
-            // given
-            let (mut logger, logger_handle) = logger::Logger::spawn();
-            logger.set_log_level(0);
-            let keep_running = Arc::new(AtomicBool::new(true));
-            let mut cmdmat = cmdmat::Mapping::default();
-            cmdmat.register_many(SPEC).unwrap();
-            let mut gsh = GameShell {
-                gshctx: GameShellContext {
-                    config_change: None,
-                    logger,
-                    keep_running,
-                    variables: HashMap::new(),
-                },
-                commands: Arc::new(cmdmat),
-            };
-
-            assert_eq![
-                EvalRes::Err("Unrecognized mapping: hello".into()),
-                gsh.interpret_single("hello world").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("some thing\n new ".into()),
-                gsh.interpret_single("str (#some thing\n new )").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("6".into()),
-                gsh.interpret_single("+ 1 2 3").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("21".into()),
-                gsh.interpret_single("+ 1 (+ 8 9) 3").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("21".into()),
-                gsh.interpret_single("+ 1 (+ 8 (+) 9) 3").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("22".into()),
-                gsh.interpret_single("+ 1 (+ 8 (+ 1) 9) 3").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("".into()),
-                gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 9) 3\nvoid").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Err("Unrecognized mapping: 0.6".into()),
-                gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 0.6 9) (+ 3\n1\n)")
-                    .unwrap()
-            ];
-            assert_eq![
-                EvalRes::Err("Unrecognized mapping: undefined".into()),
-                gsh.interpret_single("+ (undefined)").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("1".into()),
-                gsh.interpret_single("+ (+ 1)").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("2".into()),
-                gsh.interpret_single("+ (+ 1 0 0 0 0 0 0 0 0 1)").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("-3".into()),
-                gsh.interpret_single("- 3").unwrap()
-            ];
-            assert_eq![EvalRes::Ok("0".into()), gsh.interpret_single("-").unwrap()];
-            assert_eq![
-                EvalRes::Ok("3".into()),
-                gsh.interpret_single("- 3 0").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("6".into()),
-                gsh.interpret_single("* 3 2").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("1".into()),
-                gsh.interpret_single("/ 3 2").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("1".into()),
-                gsh.interpret_single("% 7 2").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("3".into()),
-                gsh.interpret_single("^ 1 2").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("0".into()),
-                gsh.interpret_single("& 1 2").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("6".into()),
-                gsh.interpret_single("| 4 2").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("<atom>".into()),
-                gsh.interpret_single("autocomplete log context").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("<u8>".into()),
-                gsh.interpret_single("autocomplete log context gsh level ")
-                    .unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("context <atom>, global, trace <string> (final)".into()),
-                gsh.interpret_single("autocomplete log").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("<string> <string>".into()),
-                gsh.interpret_single("autocomplete set").unwrap()
-            ];
-
-            assert_eq![
-                EvalRes::Err("Finalizer does not exist".into()),
-                gsh.interpret_single("log").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Err("Expected <u8> but got: -1".into()),
-                gsh.interpret_single("log context gsh level -1").unwrap()
-            ];
-            assert_eq![
-                EvalRes::Err("Expected <u8> but got: -1".into()),
-                gsh.interpret_single("log context gsh level (+ 1 2 -4)")
-                    .unwrap()
-            ];
-            assert_eq![
-                EvalRes::Err("Unrecognized mapping: xyz".into()),
-                gsh.interpret_single("log context gsh level (+ xyz)")
-                    .unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("alphabetagammayotta6Hello World".into()),
-                gsh.interpret_single("cat alpha beta (cat gamma yotta) (+ 1 2 3) (#Hello World)")
-                    .unwrap()
-            ];
-            assert_eq![
-                EvalRes::Ok("".into()),
-                gsh.interpret_single("void alpha beta (cat gamma yotta) (+ 1 2 3) (#Hello World)")
-                    .unwrap()
-            ];
-
-            // then
-            logger_handle
+        // given
+        let mut logger = logger::Logger::spawn();
+        logger.set_log_level(0);
+        let keep_running = Arc::new(AtomicBool::new(true));
+        let mut cmdmat = cmdmat::Mapping::default();
+        cmdmat.register_many(SPEC).unwrap();
+        let mut gsh = GameShell {
+            gshctx: GameShellContext {
+                config_change: None,
+                logger,
+                keep_running,
+                variables: HashMap::new(),
+            },
+            commands: Arc::new(cmdmat),
         };
-        logger_handle.join().unwrap();
+
+        assert_eq![
+            EvalRes::Err("Unrecognized mapping: hello".into()),
+            gsh.interpret_single("hello world").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("some thing\n new ".into()),
+            gsh.interpret_single("str (#some thing\n new )").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("6".into()),
+            gsh.interpret_single("+ 1 2 3").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("21".into()),
+            gsh.interpret_single("+ 1 (+ 8 9) 3").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("21".into()),
+            gsh.interpret_single("+ 1 (+ 8 (+) 9) 3").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("22".into()),
+            gsh.interpret_single("+ 1 (+ 8 (+ 1) 9) 3").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("".into()),
+            gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 9) 3\nvoid").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Err("Unrecognized mapping: 0.6".into()),
+            gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 0.6 9) (+ 3\n1\n)")
+                .unwrap()
+        ];
+        assert_eq![
+            EvalRes::Err("Unrecognized mapping: undefined".into()),
+            gsh.interpret_single("+ (undefined)").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("1".into()),
+            gsh.interpret_single("+ (+ 1)").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("2".into()),
+            gsh.interpret_single("+ (+ 1 0 0 0 0 0 0 0 0 1)").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("-3".into()),
+            gsh.interpret_single("- 3").unwrap()
+        ];
+        assert_eq![EvalRes::Ok("0".into()), gsh.interpret_single("-").unwrap()];
+        assert_eq![
+            EvalRes::Ok("3".into()),
+            gsh.interpret_single("- 3 0").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("6".into()),
+            gsh.interpret_single("* 3 2").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("1".into()),
+            gsh.interpret_single("/ 3 2").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("1".into()),
+            gsh.interpret_single("% 7 2").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("3".into()),
+            gsh.interpret_single("^ 1 2").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("0".into()),
+            gsh.interpret_single("& 1 2").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("6".into()),
+            gsh.interpret_single("| 4 2").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("<atom>".into()),
+            gsh.interpret_single("autocomplete log context").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("<u8>".into()),
+            gsh.interpret_single("autocomplete log context gsh level ")
+                .unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("context <atom>, global, trace <string> (final)".into()),
+            gsh.interpret_single("autocomplete log").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("<string> <string>".into()),
+            gsh.interpret_single("autocomplete set").unwrap()
+        ];
+
+        assert_eq![
+            EvalRes::Err("Finalizer does not exist".into()),
+            gsh.interpret_single("log").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Err("Expected <u8> but got: -1".into()),
+            gsh.interpret_single("log context gsh level -1").unwrap()
+        ];
+        assert_eq![
+            EvalRes::Err("Expected <u8> but got: -1".into()),
+            gsh.interpret_single("log context gsh level (+ 1 2 -4)")
+                .unwrap()
+        ];
+        assert_eq![
+            EvalRes::Err("Unrecognized mapping: xyz".into()),
+            gsh.interpret_single("log context gsh level (+ xyz)")
+                .unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("alphabetagammayotta6Hello World".into()),
+            gsh.interpret_single("cat alpha beta (cat gamma yotta) (+ 1 2 3) (#Hello World)")
+                .unwrap()
+        ];
+        assert_eq![
+            EvalRes::Ok("".into()),
+            gsh.interpret_single("void alpha beta (cat gamma yotta) (+ 1 2 3) (#Hello World)")
+                .unwrap()
+        ];
 
         // cleanup
         Ok(())
@@ -1244,102 +1228,93 @@ mod tests {
 
     #[test]
     fn check_integer_overflow() -> io::Result<()> {
-        let logger_handle = {
-            // given
-            let (mut logger, logger_handle) = logger::Logger::spawn();
-            logger.set_log_level(0);
-            let keep_running = Arc::new(AtomicBool::new(true));
-            let mut cmdmat = cmdmat::Mapping::default();
-            cmdmat.register_many(SPEC).unwrap();
-            let mut gsh = GameShell {
-                gshctx: GameShellContext {
-                    config_change: None,
-                    logger,
-                    keep_running,
-                    variables: HashMap::new(),
-                },
-                commands: Arc::new(cmdmat),
-            };
-
-            assert_eq![
-                EvalRes::Err("Addition overflow".into()),
-                gsh.interpret_single("+ 2147483647 1").unwrap()
-            ];
-
-            assert_eq![
-                EvalRes::Err("Addition overflow".into()),
-                gsh.interpret_single("+ -2147483648 -1").unwrap()
-            ];
-
-            assert_eq![
-                EvalRes::Err("Subtraction overflow".into()),
-                gsh.interpret_single("- -2147483648").unwrap()
-            ];
-
-            assert_eq![
-                EvalRes::Err("Subtraction overflow".into()),
-                gsh.interpret_single("- -2147483647 2").unwrap()
-            ];
-
-            assert_eq![
-                EvalRes::Err("Multiplication overflow".into()),
-                gsh.interpret_single("* 2147483647 2").unwrap()
-            ];
-
-            assert_eq![
-                EvalRes::Err("Division by zero".into()),
-                gsh.interpret_single("/ 1 0").unwrap()
-            ];
-
-            assert_eq![
-                EvalRes::Err("Division overflow".into()),
-                gsh.interpret_single("/ -2147483648 -1").unwrap()
-            ];
-
-            assert_eq![
-                EvalRes::Err("Modulo by zero".into()),
-                gsh.interpret_single("% 1 0").unwrap()
-            ];
-
-            assert_eq![
-                EvalRes::Err("Modulo overflow".into()),
-                gsh.interpret_single("% -2147483648 -1").unwrap()
-            ];
-
-            // then
-            logger_handle
+        // given
+        let mut logger = logger::Logger::spawn();
+        logger.set_log_level(0);
+        let keep_running = Arc::new(AtomicBool::new(true));
+        let mut cmdmat = cmdmat::Mapping::default();
+        cmdmat.register_many(SPEC).unwrap();
+        let mut gsh = GameShell {
+            gshctx: GameShellContext {
+                config_change: None,
+                logger,
+                keep_running,
+                variables: HashMap::new(),
+            },
+            commands: Arc::new(cmdmat),
         };
-        logger_handle.join().unwrap();
+
+        assert_eq![
+            EvalRes::Err("Addition overflow".into()),
+            gsh.interpret_single("+ 2147483647 1").unwrap()
+        ];
+
+        assert_eq![
+            EvalRes::Err("Addition overflow".into()),
+            gsh.interpret_single("+ -2147483648 -1").unwrap()
+        ];
+
+        assert_eq![
+            EvalRes::Err("Subtraction overflow".into()),
+            gsh.interpret_single("- -2147483648").unwrap()
+        ];
+
+        assert_eq![
+            EvalRes::Err("Subtraction overflow".into()),
+            gsh.interpret_single("- -2147483647 2").unwrap()
+        ];
+
+        assert_eq![
+            EvalRes::Err("Multiplication overflow".into()),
+            gsh.interpret_single("* 2147483647 2").unwrap()
+        ];
+
+        assert_eq![
+            EvalRes::Err("Division by zero".into()),
+            gsh.interpret_single("/ 1 0").unwrap()
+        ];
+
+        assert_eq![
+            EvalRes::Err("Division overflow".into()),
+            gsh.interpret_single("/ -2147483648 -1").unwrap()
+        ];
+
+        assert_eq![
+            EvalRes::Err("Modulo by zero".into()),
+            gsh.interpret_single("% 1 0").unwrap()
+        ];
+
+        assert_eq![
+            EvalRes::Err("Modulo overflow".into()),
+            gsh.interpret_single("% -2147483648 -1").unwrap()
+        ];
 
         // cleanup
         Ok(())
     }
+
     // ---
 
     #[bench]
     fn speed_of_interpreting_a_raw_command(b: &mut Bencher) -> io::Result<()> {
-        let logger_handle = {
-            // given
-            let (mut logger, logger_handle) = logger::Logger::spawn();
-            logger.set_log_level(0);
-            let keep_running = Arc::new(AtomicBool::new(true));
-            let mut cmdmat = cmdmat::Mapping::default();
-            cmdmat.register_many(SPEC).unwrap();
-            let mut gsh = GameShell {
-                gshctx: GameShellContext {
-                    config_change: None,
-                    logger,
-                    keep_running,
-                    variables: HashMap::new(),
-                },
-                commands: Arc::new(cmdmat),
-            };
-
-            // then
-            b.iter(|| black_box(gsh.interpret_single(black_box("void"))));
-            logger_handle
+        // given
+        let mut logger = logger::Logger::spawn();
+        logger.set_log_level(0);
+        let keep_running = Arc::new(AtomicBool::new(true));
+        let mut cmdmat = cmdmat::Mapping::default();
+        cmdmat.register_many(SPEC).unwrap();
+        let mut gsh = GameShell {
+            gshctx: GameShellContext {
+                config_change: None,
+                logger,
+                keep_running,
+                variables: HashMap::new(),
+            },
+            commands: Arc::new(cmdmat),
         };
-        logger_handle.join().unwrap();
+
+        // then
+        b.iter(|| black_box(gsh.interpret_single(black_box("void"))));
 
         // cleanup
         Ok(())
@@ -1347,28 +1322,24 @@ mod tests {
 
     #[bench]
     fn speed_of_interpreting_a_nested_command_with_parameters(b: &mut Bencher) -> io::Result<()> {
-        let logger_handle = {
-            // given
-            let (mut logger, logger_handle) = logger::Logger::spawn();
-            logger.set_log_level(0);
-            let keep_running = Arc::new(AtomicBool::new(true));
-            let mut cmdmat = cmdmat::Mapping::default();
-            cmdmat.register_many(SPEC).unwrap();
-            let mut gsh = GameShell {
-                gshctx: GameShellContext {
-                    config_change: None,
-                    logger,
-                    keep_running,
-                    variables: HashMap::new(),
-                },
-                commands: Arc::new(cmdmat),
-            };
-
-            // then
-            b.iter(|| black_box(gsh.interpret_single(black_box("void (void 123) abc"))));
-            logger_handle
+        // given
+        let mut logger = logger::Logger::spawn();
+        logger.set_log_level(0);
+        let keep_running = Arc::new(AtomicBool::new(true));
+        let mut cmdmat = cmdmat::Mapping::default();
+        cmdmat.register_many(SPEC).unwrap();
+        let mut gsh = GameShell {
+            gshctx: GameShellContext {
+                config_change: None,
+                logger,
+                keep_running,
+                variables: HashMap::new(),
+            },
+            commands: Arc::new(cmdmat),
         };
-        logger_handle.join().unwrap();
+
+        // then
+        b.iter(|| black_box(gsh.interpret_single(black_box("void (void 123) abc"))));
 
         // cleanup
         Ok(())
@@ -1376,28 +1347,24 @@ mod tests {
 
     #[bench]
     fn speed_of_adding_a_bunch_of_numbers(b: &mut Bencher) -> io::Result<()> {
-        let logger_handle = {
-            // given
-            let (mut logger, logger_handle) = logger::Logger::spawn();
-            logger.set_log_level(0);
-            let keep_running = Arc::new(AtomicBool::new(true));
-            let mut cmdmat = cmdmat::Mapping::default();
-            cmdmat.register_many(SPEC).unwrap();
-            let mut gsh = GameShell {
-                gshctx: GameShellContext {
-                    config_change: None,
-                    logger,
-                    keep_running,
-                    variables: HashMap::new(),
-                },
-                commands: Arc::new(cmdmat),
-            };
-
-            // then
-            b.iter(|| black_box(gsh.interpret_single(black_box("+ 1 2 3 (- 4 5 6) (* 9 9)"))));
-            logger_handle
+        // given
+        let mut logger = logger::Logger::spawn();
+        logger.set_log_level(0);
+        let keep_running = Arc::new(AtomicBool::new(true));
+        let mut cmdmat = cmdmat::Mapping::default();
+        cmdmat.register_many(SPEC).unwrap();
+        let mut gsh = GameShell {
+            gshctx: GameShellContext {
+                config_change: None,
+                logger,
+                keep_running,
+                variables: HashMap::new(),
+            },
+            commands: Arc::new(cmdmat),
         };
-        logger_handle.join().unwrap();
+
+        // then
+        b.iter(|| black_box(gsh.interpret_single(black_box("+ 1 2 3 (- 4 5 6) (* 9 9)"))));
 
         // cleanup
         Ok(())
@@ -1405,7 +1372,7 @@ mod tests {
 
     #[bench]
     fn message_bandwidth_over_tcp(b: &mut Bencher) -> io::Result<()> {
-        let (mut logger, logger_handle) = logger::Logger::spawn();
+        let mut logger = logger::Logger::spawn();
         let (listener, port) = bind_to_any_tcp_port();
         let (mut _gsh, keep_running) = spawn_with_listener(logger.clone(), listener);
         logger.set_log_level(0);
@@ -1421,7 +1388,6 @@ mod tests {
         std::mem::drop(listener);
         std::mem::drop(logger);
         let _ = TcpStream::connect("127.0.0.1:".to_string() + port.to_string().as_ref())?;
-        let _ = logger_handle.join().unwrap();
         Ok(())
     }
 }

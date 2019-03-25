@@ -34,8 +34,7 @@ fn parse_command_line_arguments<'a>(s: &mut clap::ArgMatches<'a>) {
 fn run_client_or_server(s: &mut glocals::Main) {
     let commandline = s.commandline.clone();
     if let Some(_connect) = commandline.value_of("connect") {
-        let (mut logger, thread) = logger::Logger::spawn();
-        s.threads.logger = Some(thread);
+        let mut logger = logger::Logger::spawn();
         logger.set_context_specific_log_level("benchmark", 0);
         if let Some(game_shell) = crate::mediators::game_shell::spawn(logger.clone()) {
             s.threads.game_shell = Some(game_shell.0);
@@ -71,7 +70,6 @@ fn wait_for_threads_to_exit(s: glocals::Main) {
     std::mem::drop(tcp);
 
     s.threads.game_shell.map(std::thread::JoinHandle::join);
-    s.threads.logger.map(std::thread::JoinHandle::join);
 }
 
 // ---

@@ -74,7 +74,6 @@ impl<'a> Default for Timers {
 
 #[derive(Default)]
 pub struct Threads {
-    pub logger: Option<std::thread::JoinHandle<()>>,
     pub game_shell: Option<std::thread::JoinHandle<()>>,
     pub game_shell_keep_running: Option<Arc<AtomicBool>>,
 }

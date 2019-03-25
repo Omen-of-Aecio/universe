@@ -1,12 +1,12 @@
 # Project setup #
 
 *mediators/:*
-	Our "top-level" business-logic. Just functions, no data structures (important!)
+	Our "top-level" business-logic. Just functions, no data structures (important!), may contain helper data structures
 
 	Depends on mediators/, glocals/, libs/ and other crates
 
 *glocals/:*
-	Just dumb data structures
+	Just dumb data structures, should be default-constructible
 
 	Depends on glocals/, libs/ and other crates
 

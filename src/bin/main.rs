@@ -21,6 +21,12 @@ fn parse_command_line_arguments<'a>(s: &mut clap::ArgMatches<'a>) {
                     .help("Run client and connect to specified server of form `ipaddress:port`")
                     .takes_value(true),
             )
+            .arg(
+                Arg::with_name("host")
+                    .short("h")
+                    .help("Host a server on a port")
+                    .takes_value(true),
+            )
             .get_matches()
     };
 }
@@ -35,7 +41,7 @@ fn run_client_or_server(s: &mut glocals::Main) {
             s.threads.game_shell = Some(game_shell.0);
             s.threads.game_shell_keep_running = Some(game_shell.1);
         }
-        let mut client = Client {
+        let client = Client {
             logger,
             should_exit: false,
             game: Game::default(),
@@ -51,6 +57,8 @@ fn run_client_or_server(s: &mut glocals::Main) {
         };
         s.client = Some(client);
         mediators::client::entry_point_client(s);
+    } else if let Some(_port) = commandline.value_of("host") {
+        s.server = Some(Server::default());
     }
 }
 

@@ -346,7 +346,8 @@ pub fn entry_point_client(s: &mut Main) {
             &client.display,
             &client.game.grid,
         ));
-        client.game
+        client
+            .game
             .players
             .push(render_polygon::create_render_polygon(&client.display));
 

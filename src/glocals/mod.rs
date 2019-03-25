@@ -52,6 +52,7 @@ pub struct Main<'a> {
     pub config: Config,
     pub config_change_recv: Option<mpsc::Receiver<fn(&mut Config)>>,
     pub network: Option<Socket<i32>>,
+    pub server: Option<Server>,
     pub threads: Threads,
     pub timers: Timers,
 }
@@ -166,8 +167,7 @@ pub struct Client {
 }
 
 #[derive(Default)]
-pub struct Server<'a> {
-    pub main: Main<'a>,
+pub struct Server {
     pub game: ServerGame,
     pub connections: HashMap<std::net::SocketAddr, Connection>,
 

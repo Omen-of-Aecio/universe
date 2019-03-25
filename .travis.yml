@@ -11,4 +11,4 @@ rust:
     - nightly
 script:
   - export PATH="$PATH:/usr/bin"
-  - ./scripts/run-all no-bench
+  - travis_wait ./scripts/run-all no-bench

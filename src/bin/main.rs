@@ -58,6 +58,7 @@ fn run_client_or_server(s: &mut glocals::Main) {
         mediators::client::entry_point_client(s);
     } else if let Some(_port) = commandline.value_of("host") {
         s.server = Some(Server::default());
+        mediators::server::entry_point_server(s);
     }
 }
 

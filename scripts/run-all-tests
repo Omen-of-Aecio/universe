@@ -25,6 +25,10 @@ fi
 set -e
 
 for library in libs/*; do
+    if [ -f "$library"/.test-ignore ]; then
+        echo "IGNORE: $library"
+        continue
+    fi
     cd "$library"
     set +e
     cargo test --verbose --all >& ../../_build/"$library.test_result"

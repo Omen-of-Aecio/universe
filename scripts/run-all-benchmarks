@@ -25,6 +25,10 @@ fi
 set -e
 
 for library in libs/*; do
+    if [ -f "$library"/.benchmark-ignore ]; then
+        echo "IGNORE: $library"
+        continue
+    fi
     cd "$library"
     set +e
     cargo bench >& ../../_build/"$library.bench_result"

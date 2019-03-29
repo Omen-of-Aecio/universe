@@ -96,7 +96,7 @@ pub struct GameShellContext {
 
 // ---
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum Log {
     Bool(&'static str, &'static str, bool),
     Char(&'static str, &'static str, char),
@@ -110,6 +110,13 @@ pub enum Log {
     U8(&'static str, &'static str, u8),
     Usize(&'static str, &'static str, usize),
     Usize2(&'static str, &'static str, usize, &'static str, usize),
+    Generic(logger::Generic),
+}
+
+impl From<logger::Generic> for Log {
+    fn from(data: logger::Generic) -> Self {
+        Log::Generic(data)
+    }
 }
 
 impl From<&'static str> for Log {
@@ -127,6 +134,7 @@ impl std::fmt::Display for Log {
                 write![f, "Mouse on screen, world={:?}, mouse={:?}", world, mouse]
             }
             Log::Dynamic(str) => write![f, "{}", str],
+            Log::Generic(handle) => handle.fmt(f),
             Log::I64(msg, key, value) => write![f, "{}, {}={}", msg, key, value],
             Log::Static(str) => write![f, "{}", str],
             Log::StaticDynamic(msg, key, value) => write![f, "{}, {}={}", msg, key, value],

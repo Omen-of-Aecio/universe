@@ -227,10 +227,8 @@ fn set_smooth(s: &mut Client) {
     if s.input.is_key_toggled_down(Key::R) {
         if let Some(ref mut gridrenderdata) = s.game.grid_render {
             render_grid::toggle_smooth(gridrenderdata);
-            s.logger.info(
-                "cli",
-                Log::Bool("Toggling grid smoothing", "smooth", gridrenderdata.smooth),
-            );
+            let smooth = gridrenderdata.smooth;
+            logger::info!(s.logger, "cli", "Toggling grid smoothing"; "smooth" => smooth);
         }
     }
 }

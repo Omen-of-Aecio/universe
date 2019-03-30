@@ -121,10 +121,8 @@ pub struct Server {
 
 #[derive(Clone, Default)]
 pub struct Connection {
-    /// Unique id in the ECS
-    pub ecs_id: u32,
     pub last_snapshot: u32, // frame#
-    pub snapshot_rate: f32,
+    pub snapshot_rate: u64,
 }
 
 #[derive(Default)]

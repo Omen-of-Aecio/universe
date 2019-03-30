@@ -1,6 +1,7 @@
+use geometry::vec::Vec2;
 use logger::Generic;
-use geometry::{vec::Vec2};
 
+///
 #[derive(Clone)]
 pub enum Log {
     Bool(&'static str, &'static str, bool),
@@ -64,4 +65,3 @@ impl std::fmt::Display for Log {
         }
     }
 }
-

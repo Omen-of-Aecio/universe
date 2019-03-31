@@ -971,17 +971,18 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
 mod tests {
     use super::*;
     use std::io;
+    use std::net::{Ipv4Addr, SocketAddrV4};
     use test::{black_box, Bencher};
 
     fn bind_to_any_tcp_port() -> (TcpListener, u16) {
-        for i in 10000..=u16::max_value() {
-            if let Ok(listener) =
-                TcpListener::bind("127.0.0.1:".to_string() + i.to_string().as_ref())
-            {
-                return (listener, i);
-            }
-        }
-        panic!["Unable to find an available port"];
+        let loopback = Ipv4Addr::new(127, 0, 0, 1);
+        let socket = SocketAddrV4::new(loopback, 0);
+        let listener = TcpListener::bind(socket).expect("Unable to find an available port");
+        let port = listener
+            .local_addr()
+            .expect("Listener has no local address")
+            .port();
+        (listener, port)
     }
 
     // ---

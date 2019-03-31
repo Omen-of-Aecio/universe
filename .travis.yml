@@ -2,13 +2,18 @@ addons:
     apt:
         sources:
             - devian-sid
-sudo: required
+sudo: false
 before_script:
     - sudo apt update
     - sudo apt install binutils-dev libasound2-dev libunwind8-dev g++
 language: rust
 rust:
     - nightly
+cache:
+    directories:
+    - $HOME/.cargo
+before-cache:
+    - rm -rf $HOME/.cargo/registry
 script:
   - export PATH="$PATH:/usr/bin"
   - travis_wait 50 ./scripts/run-all no-bench

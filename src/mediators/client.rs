@@ -351,7 +351,7 @@ pub fn entry_point_client(s: &mut Main) {
 
         client.logger.set_log_level(196);
         loop {
-            s.timers.time = Instant::now();
+            s.time = Instant::now();
             let xform = if let Some(ref mut rx) = s.config_change_recv {
                 match rx.try_recv() {
                     Ok(msg) => Some(msg),
@@ -365,7 +365,7 @@ pub fn entry_point_client(s: &mut Main) {
             }
             client_tick(client);
             if let Some(ref mut network) = s.network {
-                s.timers.network_timer.update(s.timers.time, network);
+                s.timers.network_timer.update(s.time, network);
             }
             if client.should_exit {
                 break;

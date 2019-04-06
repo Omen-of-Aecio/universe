@@ -48,7 +48,6 @@ impl Hash for NamedFn {
     }
 }
 
-#[derive(Default)]
 pub struct Main<'a> {
     pub client: Option<Client>,
     pub commandline: clap::ArgMatches<'a>,
@@ -57,11 +56,27 @@ pub struct Main<'a> {
     pub network: Option<Socket<i32>>,
     pub server: Option<Server>,
     pub threads: Threads,
+    pub time: Instant,
     pub timers: Timers,
 }
 
+impl Default for Main<'_> {
+    fn default() -> Self {
+        Self {
+            client: None,
+            commandline: clap::ArgMatches::default(),
+            config: Config::default(),
+            config_change_recv: None,
+            network: None,
+            server: None,
+            threads: Threads::default(),
+            time: Instant::now(),
+            timers: Timers::default(),
+        }
+    }
+}
+
 pub struct Timers {
-    pub time: Instant,
     pub network_timer: WeakTimer<Socket<i32>, Result<bool, Error>>,
 }
 
@@ -70,7 +85,6 @@ impl<'a> Default for Timers {
         let now = Instant::now();
         Self {
             network_timer: WeakTimer::new(Socket::update, Duration::new(1, 0), now),
-            time: now,
         }
     }
 }

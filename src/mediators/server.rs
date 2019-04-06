@@ -2,7 +2,7 @@ use crate::glocals::*;
 
 pub fn entry_point_server(s: &mut Main) {
     loop {
-        s.timers.time = std::time::Instant::now();
+        s.time = std::time::Instant::now();
         server_tick(s);
         if s.server.is_none() {
             break;

@@ -17,7 +17,7 @@ set +e
 cargo bench --verbose --all >& _build/main.bench_result
 if [ "$?" -ne 0 ]; then
     echo "FAIL: main (bench)"
-    cat ../../_build/main.bench_result
+    cat _build/main.bench_result
     has_failed=1
 else
     echo "PASS: main (bench)"

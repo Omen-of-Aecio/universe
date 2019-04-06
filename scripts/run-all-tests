@@ -17,7 +17,7 @@ set +e
 cargo test --verbose --all >& _build/main.test_result
 if [ "$?" -ne 0 ]; then
     echo "FAIL: main"
-    cat ../../_build/main.test_result
+    cat _build/main.test_result
     has_failed=1
 else
     echo "PASS: main"

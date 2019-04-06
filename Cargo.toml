@@ -65,6 +65,7 @@ dx12 = ["gfx-backend-dx12"]
 gl = ["gfx-backend-gl"]
 metal = ["gfx-backend-metal"]
 vulkan = ["gfx-backend-vulkan"]
+gfx_tests = []
 
 [profile.release]
 debug = true

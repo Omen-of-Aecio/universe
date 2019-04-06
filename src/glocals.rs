@@ -1,6 +1,15 @@
 use benchmarker::Benchmarker;
 use clap;
 use geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
+#[cfg(feature = "dx12")]
+use gfx_backend_dx12 as back;
+#[cfg(feature = "gl")]
+use gfx_backend_gl as back;
+#[cfg(feature = "metal")]
+use gfx_backend_metal as back;
+#[cfg(feature = "vulkan")]
+use gfx_backend_vulkan as back;
+use gfx_hal::Backend;
 pub use glium::uniforms::{MagnifySamplerFilter, MinifySamplerFilter};
 use glium::{implement_vertex, texture::Texture2d};
 use input;
@@ -58,6 +67,7 @@ pub struct Main<'a> {
     pub threads: Threads,
     pub time: Instant,
     pub timers: Timers,
+    pub windowing: Option<Windowing>,
 }
 
 impl Default for Main<'_> {
@@ -72,8 +82,16 @@ impl Default for Main<'_> {
             threads: Threads::default(),
             time: Instant::now(),
             timers: Timers::default(),
+            windowing: None,
         }
     }
+}
+
+pub struct Windowing {
+    pub surf: <back::Backend as Backend>::Surface,
+    pub vk_inst: back::Instance,
+    pub events_loop: winit::EventsLoop,
+    pub window: winit::Window,
 }
 
 pub struct Timers {

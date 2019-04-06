@@ -35,6 +35,7 @@ serde = "1.0"
 serde_derive = "1.0"
 time = "0.1.40"
 toml = "0.4.9"
+winit = "0.18"
 
 # Local libraries
 benchmarker = { path = "libs/benchmarker" }
@@ -74,6 +75,6 @@ codegen-units = 4
 
 [profile.bench]
 debug = true
+lto = true
 opt-level = 3
 overflow-checks = false
-lto = true

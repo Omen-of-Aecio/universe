@@ -8,6 +8,7 @@ use gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 use gfx_backend_vulkan as back;
 // use gfx_hal::format::{AsFormat, ChannelType, Rgba8Srgb as ColorFormat, Swizzle};
+use ::image as load_image;
 use arrayvec::ArrayVec;
 use cgmath::prelude::*;
 use cgmath::{Matrix4, Vector3};
@@ -373,7 +374,8 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
                 .create_descriptor_set_layout(bindings, immutable_samplers)
                 .expect("Couldn't make a DescriptorSetLayout")
         }];
-    let push_constants = Vec::<(ShaderStageFlags, core::ops::Range<u32>)>::new();
+    let mut push_constants = Vec::<(ShaderStageFlags, core::ops::Range<u32>)>::new();
+    push_constants.push((ShaderStageFlags::VERTEX, 0..16));
     let triangle_pipeline_layout = unsafe {
         device
             .create_pipeline_layout(&descriptor_set_layouts, push_constants)
@@ -446,8 +448,9 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         let mut data_target = device
             .acquire_mapping_writer(&texture_vertex_memory, 0..requirements.size)
             .expect("Failed to acquire a memory writer!");
-        data_target[..12].copy_from_slice(&[-1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0,
-                                             1.0,    -1.0, -1.0, 1.0, 1.0,  1.0]);
+        data_target[..12].copy_from_slice(&[
+            -1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
+        ]);
         device
             .release_mapping_writer(data_target)
             .expect("Couldn't release the mapping writer!");
@@ -486,8 +489,9 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         let mut data_target = device
             .acquire_mapping_writer(&texture_uv_memory, 0..requirements.size)
             .expect("Failed to acquire a memory writer!");
-        data_target[..12].copy_from_slice(&[-1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0,
-                                             1.0,    -1.0, -1.0, 1.0, 1.0,  1.0]);
+        data_target[..12].copy_from_slice(&[
+            -1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
+        ]);
         device
             .release_mapping_writer(data_target)
             .expect("Couldn't release the mapping writer!");
@@ -522,28 +526,46 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
     void main() {
         target0 = texture(sampler2D(u_texture, u_sampler), v_uv);
     }";
-    let set_layout = unsafe {
-        device.create_descriptor_set_layout(
-            &[
-                pso::DescriptorSetLayoutBinding {
-                    binding: 0,
-                    ty: pso::DescriptorType::SampledImage,
-                    count: 1,
-                    stage_flags: ShaderStageFlags::FRAGMENT,
-                    immutable_samplers: false,
-                },
-                pso::DescriptorSetLayoutBinding {
-                    binding: 1,
-                    ty: pso::DescriptorType::Sampler,
-                    count: 1,
-                    stage_flags: ShaderStageFlags::FRAGMENT,
-                    immutable_samplers: false,
-                },
-            ],
-            &[],
-        )
-    }
-    .expect("Can't create descriptor set layout");
+
+    // let img_data = include_bytes!["../../assets/images/logo.png"];
+    // let img = load_image::load_from_memory_with_format(&img_data[..], load_image::PNG)
+    //     .unwrap()
+    //     .to_rgba();
+    // let (img_width, img_height) = img.dimensions();
+    // let kind = image::Kind::D2(img_width as image::Size, img_height as image::Size, 1, 1);
+    // let limits = adapter.physical_device.limits();
+    // let row_alignment_mask = limits.min_buffer_copy_pitch_alignment as u32 - 1;
+    // let image_stride = 4usize;
+    // let row_pitch = (img_width * image_stride as u32 + row_alignment_mask) & !row_alignment_mask;
+    // let upload_size = (img_height * row_pitch) as u64;
+    // // debug_assert!(row_pitch as usize >= row_size);
+
+    // let mut image_upload_buffer =
+    //     unsafe { device.create_buffer(upload_size, gfx_hal::buffer::Usage::TRANSFER_SRC) }.unwrap();
+    // let image_mem_reqs = unsafe { device.get_buffer_requirements(&image_upload_buffer) };
+    // use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
+    // let memory_type_id = adapter
+    //     .physical_device
+    //     .memory_properties()
+    //     .memory_types
+    //     .iter()
+    //     .enumerate()
+    //     .find(|&(id, memory_type)| {
+    //         requirements.type_mask & (1 << id) != 0
+    //             && memory_type.properties.contains(Properties::CPU_VISIBLE)
+    //     })
+    //     .map(|(id, _)| MemoryTypeId(id))
+    //     .unwrap();
+    // let image_upload_memory =
+    //     unsafe { device.allocate_memory(memory_type_id, image_mem_reqs.size) }.unwrap();
+    // unsafe { device.bind_buffer_memory(&image_upload_memory, 0, &mut image_upload_buffer) }
+    //     .unwrap();
+
+    // 1. make a staging buffer with enough memory for the image, and a
+    //    transfer_src usage
+    // let required_bytes = row_pitch * img.height() as usize;
+    // let staging_bundle =
+    //     BufferBundle::new(&adapter, device, required_bytes, BufferUsage::TRANSFER_SRC).unwrap();
 
     Windowing {
         adapter,
@@ -568,6 +590,8 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         },
         texture_vertex_buffer: ManuallyDrop::new(texture_vertex_buffer),
         texture_vertex_memory: ManuallyDrop::new(texture_vertex_memory),
+        texture_uv_buffer: ManuallyDrop::new(texture_uv_buffer),
+        texture_uv_memory: ManuallyDrop::new(texture_uv_memory),
         triangle_buffers: vec![],
         triangle_memory: vec![],
         triangle_render_pass: ManuallyDrop::new(triangle_render_pass),
@@ -677,13 +701,13 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &cgmath::Matri
                 );
                 let ptr = view.as_ptr();
 
+                enc.bind_graphics_pipeline(&s.triangle_pipeline);
                 enc.push_graphics_constants(
                     &s.triangle_pipeline_layout,
                     ShaderStageFlags::VERTEX,
                     0,
                     transmute::<*const f32, &[u32; 16]>(ptr),
                 );
-                enc.bind_graphics_pipeline(&s.triangle_pipeline);
                 for buffer_ref in &s.triangle_buffers {
                     let buffers: ArrayVec<[_; 1]> = [(buffer_ref, 0)].into();
                     enc.bind_vertex_buffers(0, buffers);
@@ -723,6 +747,12 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &cgmath::Matri
 mod tests {
     use super::*;
     use test::{black_box, Bencher};
+
+    #[test]
+    fn setup_and_teardown() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger);
+    }
 
     #[test]
     fn init_window_and_get_input() {

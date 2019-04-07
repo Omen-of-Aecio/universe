@@ -103,6 +103,8 @@ pub struct Windowing {
     //
     pub texture_vertex_buffer: ManuallyDrop<<back::Backend as Backend>::Buffer>,
     pub texture_vertex_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
+    pub texture_uv_buffer: ManuallyDrop<<back::Backend as Backend>::Buffer>,
+    pub texture_uv_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
     // pub texture_image: ManuallyDrop<<back::Backend as Backend>::Image>,
     // pub texture_image_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
     // pub texture_image_view: ManuallyDrop<<back::Backend as Backend>::ImageView>,
@@ -191,6 +193,14 @@ impl Drop for Windowing {
                 .destroy_pipeline_layout(ManuallyDrop::into_inner(read(
                     &self.triangle_pipeline_layout,
                 )));
+            self.device
+                .destroy_buffer(ManuallyDrop::into_inner(read(&self.texture_vertex_buffer)));
+            self.device
+                .free_memory(ManuallyDrop::into_inner(read(&self.texture_vertex_memory)));
+            self.device
+                .destroy_buffer(ManuallyDrop::into_inner(read(&self.texture_uv_buffer)));
+            self.device
+                .free_memory(ManuallyDrop::into_inner(read(&self.texture_uv_memory)));
             for dsl in self.triangle_descriptor_set_layouts.drain(..) {
                 self.device.destroy_descriptor_set_layout(dsl);
             }

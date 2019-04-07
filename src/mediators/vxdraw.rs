@@ -230,7 +230,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
     layout(location = 0) out vec4 color;
     void main()
     {
-      color = vec4(1.0);
+        color = vec4(1.0);
     }";
 
     let vs_module = {
@@ -298,14 +298,6 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
             resolves: &[],
             preserves: &[],
         };
-
-        // let dependency = pass::SubpassDependency {
-        //     passes: pass::SubpassRef::External..pass::SubpassRef::Pass(0),
-        //     stages: PipelineStage::COLOR_ATTACHMENT_OUTPUT
-        //         ..PipelineStage::COLOR_ATTACHMENT_OUTPUT,
-        //     accesses: i::Access::empty()
-        //         ..(i::Access::COLOR_ATTACHMENT_READ | i::Access::COLOR_ATTACHMENT_WRITE),
-        // };
 
         unsafe { device.create_render_pass(&[attachment], &[subpass], &[]) }
             .expect("Can't create render pass")
@@ -454,7 +446,7 @@ let pipeline_desc = GraphicsPipelineDesc {
     }
 }
 
-pub fn add_triangle(s: &mut Windowing) {
+pub fn add_triangle(s: &mut Windowing, triangle: &[f32; 6]) {
     let (buffer, memory, requirements) = unsafe {
         const F32_XY_TRIANGLE: u64 = (std::mem::size_of::<f32>() * 2 * 3) as u64;
         use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
@@ -492,7 +484,7 @@ pub fn add_triangle(s: &mut Windowing) {
             .device
             .acquire_mapping_writer(&memory, 0..requirements.size)
             .expect("Failed to acquire a memory writer!");
-        data_target[..6].copy_from_slice(&[0.0f32, 0.0, 1.0, 1.0, 1.0, 0.0]);
+        data_target[..6].copy_from_slice(triangle);
         s.device
             .release_mapping_writer(data_target)
             .expect("Couldn't release the mapping writer!");
@@ -596,7 +588,8 @@ mod tests {
         logger.set_colorize(true);
         let mut windowing = init_window_with_vulkan(&mut logger);
         collect_input(&mut windowing);
-        add_triangle(&mut windowing);
+        add_triangle(&mut windowing, &[0.0f32, 0.0, 1.0, 1.0, 1.0, 0.0]);
+        add_triangle(&mut windowing, &[-0.5f32, 0.5, 0.2, 0.2, 0.3, 0.3]);
         for _ in 0..300 {
             draw_frame(&mut windowing, &mut logger);
             std::thread::sleep(std::time::Duration::new(0, 8_000_000));

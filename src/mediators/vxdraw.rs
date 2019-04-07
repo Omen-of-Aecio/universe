@@ -764,4 +764,21 @@ mod tests {
             draw_frame(&mut windowing, &mut logger, &mat4);
         });
     }
+
+    #[bench]
+    fn noninstanced_1k_triangles(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        logger.set_colorize(true);
+        let mut windowing = init_window_with_vulkan(&mut logger);
+        let mat4 = Matrix4::new(
+            1.0f32, 0.0, 0.0, 0.0, 0.0f32, 1.0, 0.0, 0.0, 0.0f32, 0.0, 1.0, 0.0, 0.0f32, 0.0, 0.0,
+            1.0,
+        );
+        for _ in 0..1000 {
+            add_triangle(&mut windowing, &[0.0f32, 0.0, 1.0, 1.0, 1.0, 0.0]);
+        }
+        b.iter(|| {
+            draw_frame(&mut windowing, &mut logger, &mat4);
+        });
+    }
 }

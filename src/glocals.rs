@@ -1,5 +1,6 @@
 use benchmarker::Benchmarker;
 use clap;
+use core::ptr::read;
 use geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
@@ -9,7 +10,14 @@ use gfx_backend_gl as back;
 use gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 use gfx_backend_vulkan as back;
-use gfx_hal::Backend;
+use gfx_hal::{
+    command,
+    device::Device,
+    format::{self, ChannelType, Swizzle},
+    image, pass, pool,
+    window::{Extent2D, PresentMode::*, Surface, Swapchain},
+    Adapter, Backbuffer, Backend, FrameSync, Instance, SwapchainConfig,
+};
 pub use glium::uniforms::{MagnifySamplerFilter, MinifySamplerFilter};
 use glium::{implement_vertex, texture::Texture2d};
 use input;
@@ -20,6 +28,7 @@ use serde_derive::Deserialize;
 use std::{
     collections::HashMap,
     hash::{Hash, Hasher},
+    mem::ManuallyDrop,
     sync::{atomic::AtomicBool, mpsc, Arc},
     time::{Duration, Instant},
     vec::Vec,
@@ -88,10 +97,91 @@ impl Default for Main<'_> {
 }
 
 pub struct Windowing {
-    pub surf: <back::Backend as Backend>::Surface,
-    pub vk_inst: back::Instance,
-    pub events_loop: winit::EventsLoop,
     pub window: winit::Window,
+    pub events_loop: winit::EventsLoop,
+
+    pub current_frame: usize,
+    pub image_count: usize,
+    pub render_area: gfx_hal::pso::Rect,
+
+    pub frame_render_fences: Vec<<back::Backend as Backend>::Fence>,
+    pub frame_fences: Vec<<back::Backend as Backend>::Fence>,
+    pub acquire_image_semaphores: Vec<<back::Backend as Backend>::Semaphore>,
+    pub present_wait_semaphores: Vec<<back::Backend as Backend>::Semaphore>,
+    pub command_pool: ManuallyDrop<gfx_hal::pool::CommandPool<back::Backend, gfx_hal::Graphics>>,
+    pub framebuffers: Vec<<back::Backend as Backend>::Framebuffer>,
+    pub command_buffers: Vec<
+        gfx_hal::command::CommandBuffer<
+            back::Backend,
+            gfx_hal::Graphics,
+            gfx_hal::command::MultiShot,
+            gfx_hal::command::Primary,
+        >,
+    >,
+    pub image_views: Vec<<back::Backend as Backend>::ImageView>,
+    pub render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
+    pub queue_group: ManuallyDrop<gfx_hal::QueueGroup<back::Backend, gfx_hal::Graphics>>,
+    pub swapchain: ManuallyDrop<<back::Backend as Backend>::Swapchain>,
+    pub device: ManuallyDrop<back::Device>,
+    pub adapter: Adapter<back::Backend>,
+    pub surf: <back::Backend as Backend>::Surface,
+
+    pub vk_inst: ManuallyDrop<back::Instance>,
+}
+
+impl Drop for Windowing {
+    fn drop(&mut self) {
+        let _ = self.device.wait_idle();
+
+        for fence in self.frame_fences.drain(..) {
+            unsafe {
+                self.device.destroy_fence(fence);
+            }
+        }
+
+        for fence in self.frame_render_fences.drain(..) {
+            unsafe {
+                self.device.destroy_fence(fence);
+            }
+        }
+
+        for sema in self.acquire_image_semaphores.drain(..) {
+            unsafe {
+                self.device.destroy_semaphore(sema);
+            }
+        }
+
+        for sema in self.present_wait_semaphores.drain(..) {
+            unsafe {
+                self.device.destroy_semaphore(sema);
+            }
+        }
+
+        for fb in self.framebuffers.drain(..) {
+            unsafe {
+                self.device.destroy_framebuffer(fb);
+            }
+        }
+
+        for iv in self.image_views.drain(..) {
+            unsafe {
+                self.device.destroy_image_view(iv);
+            }
+        }
+
+        unsafe {
+            self.device.destroy_command_pool(
+                ManuallyDrop::into_inner(read(&self.command_pool)).into_raw(),
+            );
+            self.device
+                .destroy_render_pass(ManuallyDrop::into_inner(read(&self.render_pass)));
+            self.device
+                .destroy_swapchain(ManuallyDrop::into_inner(read(&self.swapchain)));
+            ManuallyDrop::drop(&mut self.queue_group);
+            ManuallyDrop::drop(&mut self.device);
+            ManuallyDrop::drop(&mut self.vk_inst);
+        }
+    }
 }
 
 pub struct Timers {

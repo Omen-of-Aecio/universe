@@ -16,13 +16,11 @@ use gfx_hal::{
     format::{self, ChannelType, Swizzle},
     image, pass, pool,
     pso::{
-        PipelineCreationFlags,
-        BasePipeline,
-        GraphicsPipelineDesc,
-        self, AttributeDesc, BakedStates, BlendDesc, BlendOp, BlendState, ColorBlendDesc,
-        ColorMask, DepthStencilDesc, DepthTest, DescriptorSetLayoutBinding, Element, Face, Factor,
-        FrontFace, InputAssemblerDesc, LogicOp, PipelineStage, PolygonMode, Rasterizer, Rect,
-        ShaderStageFlags, StencilTest, VertexBufferDesc, Viewport,
+        self, AttributeDesc, BakedStates, BasePipeline, BlendDesc, BlendOp, BlendState,
+        ColorBlendDesc, ColorMask, DepthStencilDesc, DepthTest, DescriptorSetLayoutBinding,
+        Element, Face, Factor, FrontFace, GraphicsPipelineDesc, InputAssemblerDesc, LogicOp,
+        PipelineCreationFlags, PipelineStage, PolygonMode, Rasterizer, Rect, ShaderStageFlags,
+        StencilTest, VertexBufferDesc, Viewport,
     },
     queue::Submission,
     window::{Extent2D, PresentMode::*, Surface, Swapchain},
@@ -238,7 +236,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
             .unwrap()
             .bytes()
-            .map(|b| b.unwrap())
+            .map(Result::unwrap)
             .collect();
         unsafe { device.create_shader_module(&spirv) }.unwrap()
     };
@@ -247,7 +245,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Fragment)
             .unwrap()
             .bytes()
-            .map(|b| b.unwrap())
+            .map(Result::unwrap)
             .collect();
         unsafe { device.create_shader_module(&spirv) }.unwrap()
     };
@@ -258,10 +256,6 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         pso::EntryPoint {
             entry: ENTRY_NAME,
             module: &vs_module,
-            // specialization: pso::Specialization {
-            //     constants: &[pso::SpecializationConstant { id: 0, range: 0..4 }],
-            //     data: unsafe { std::mem::transmute::<&f32, &[u8; 4]>(&0.8f32) },
-            // },
             specialization: pso::Specialization::default(),
         },
         pso::EntryPoint {
@@ -381,24 +375,24 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
             .expect("Couldn't create a pipeline layout")
     };
     // Describe the pipeline (rasterization, triangle interpretation)
-let pipeline_desc = GraphicsPipelineDesc {
-          shaders: shader_entries,
-          rasterizer,
-          vertex_buffers,
-          attributes,
-          input_assembler,
-          blender,
-          depth_stencil,
-          multisampling: None,
-          baked_states,
-          layout: &triangle_pipeline_layout,
-          subpass: pass::Subpass {
+    let pipeline_desc = GraphicsPipelineDesc {
+        shaders: shader_entries,
+        rasterizer,
+        vertex_buffers,
+        attributes,
+        input_assembler,
+        blender,
+        depth_stencil,
+        multisampling: None,
+        baked_states,
+        layout: &triangle_pipeline_layout,
+        subpass: pass::Subpass {
             index: 0,
             main_pass: &triangle_render_pass,
-          },
-          flags: PipelineCreationFlags::empty(),
-          parent: BasePipeline::None,
-        };
+        },
+        flags: PipelineCreationFlags::empty(),
+        parent: BasePipeline::None,
+    };
 
     let triangle_pipeline = unsafe {
         device
@@ -542,7 +536,6 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>) {
                 );
                 enc.bind_graphics_pipeline(&s.triangle_pipeline);
                 for buffer_ref in &s.triangle_buffers {
-                    warn![log, "vxdraw", "Drawing buffer ref"];
                     let buffers: ArrayVec<[_; 1]> = [(buffer_ref, 0)].into();
                     enc.bind_vertex_buffers(0, buffers);
                     enc.draw(0..3, 0..1);
@@ -599,6 +592,7 @@ mod tests {
     #[bench]
     fn clears_per_second(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
+        logger.set_colorize(true);
         let mut windowing = init_window_with_vulkan(&mut logger);
         b.iter(|| {
             draw_frame(&mut windowing, &mut logger);

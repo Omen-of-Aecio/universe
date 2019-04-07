@@ -139,33 +139,27 @@ impl Drop for Windowing {
     fn drop(&mut self) {
         let _ = self.device.wait_idle();
 
-        for fence in self.frame_render_fences.drain(..) {
-            unsafe {
+        unsafe {
+            for fence in self.frame_render_fences.drain(..) {
                 self.device.destroy_fence(fence);
             }
-        }
-
-        for sema in self.acquire_image_semaphores.drain(..) {
-            unsafe {
+            for sema in self.acquire_image_semaphores.drain(..) {
                 self.device.destroy_semaphore(sema);
             }
-        }
-
-        for sema in self.present_wait_semaphores.drain(..) {
-            unsafe {
+            for sema in self.present_wait_semaphores.drain(..) {
                 self.device.destroy_semaphore(sema);
             }
-        }
-
-        for fb in self.framebuffers.drain(..) {
-            unsafe {
+            for fb in self.framebuffers.drain(..) {
                 self.device.destroy_framebuffer(fb);
             }
-        }
-
-        for iv in self.image_views.drain(..) {
-            unsafe {
+            for iv in self.image_views.drain(..) {
                 self.device.destroy_image_view(iv);
+            }
+            for buff in self.triangle_buffers.drain(..) {
+                self.device.destroy_buffer(buff);
+            }
+            for mem in self.triangle_memory.drain(..) {
+                self.device.free_memory(mem);
             }
         }
 

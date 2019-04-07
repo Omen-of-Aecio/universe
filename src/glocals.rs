@@ -100,6 +100,13 @@ pub struct Windowing {
     pub window: winit::Window,
     pub events_loop: winit::EventsLoop,
 
+    //
+    pub triangle_buffers: Vec<<back::Backend as Backend>::Buffer>,
+    pub triangle_memory: Vec<<back::Backend as Backend>::Memory>,
+    pub triangle_render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
+    pub triangle_pipeline: ManuallyDrop<<back::Backend as Backend>::GraphicsPipeline>,
+    pub triangle_pipeline_layout: ManuallyDrop<<back::Backend as Backend>::PipelineLayout>,
+    //
     pub current_frame: usize,
     pub image_count: usize,
     pub render_area: gfx_hal::pso::Rect,
@@ -170,6 +177,16 @@ impl Drop for Windowing {
                 .destroy_render_pass(ManuallyDrop::into_inner(read(&self.render_pass)));
             self.device
                 .destroy_swapchain(ManuallyDrop::into_inner(read(&self.swapchain)));
+
+            self.device
+                .destroy_render_pass(ManuallyDrop::into_inner(read(&self.triangle_render_pass)));
+            self.device
+                .destroy_graphics_pipeline(ManuallyDrop::into_inner(read(&self.triangle_pipeline)));
+            self.device
+                .destroy_pipeline_layout(ManuallyDrop::into_inner(read(
+                    &self.triangle_pipeline_layout,
+                )));
+
             ManuallyDrop::drop(&mut self.queue_group);
             ManuallyDrop::drop(&mut self.device);
             ManuallyDrop::drop(&mut self.vk_inst);

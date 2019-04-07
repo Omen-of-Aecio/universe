@@ -10,17 +10,27 @@ use gfx_backend_vulkan as back;
 // use gfx_hal::format::{AsFormat, ChannelType, Rgba8Srgb as ColorFormat, Swizzle};
 use arrayvec::ArrayVec;
 use gfx_hal::{
+    adapter::PhysicalDevice,
     command::{self, ClearColor, ClearValue},
     device::Device,
     format::{self, ChannelType, Swizzle},
     image, pass, pool,
-    pso::{PipelineStage, Rect},
+    pso::{
+        PipelineCreationFlags,
+        BasePipeline,
+        GraphicsPipelineDesc,
+        self, AttributeDesc, BakedStates, BlendDesc, BlendOp, BlendState, ColorBlendDesc,
+        ColorMask, DepthStencilDesc, DepthTest, DescriptorSetLayoutBinding, Element, Face, Factor,
+        FrontFace, InputAssemblerDesc, LogicOp, PipelineStage, PolygonMode, Rasterizer, Rect,
+        ShaderStageFlags, StencilTest, VertexBufferDesc, Viewport,
+    },
     queue::Submission,
     window::{Extent2D, PresentMode::*, Surface, Swapchain},
-    Backbuffer, Backend, FrameSync, Instance, SwapchainConfig,
+    Backbuffer, Backend, FrameSync, Instance, Primitive, SwapchainConfig,
 };
-use logger::{info, InDebug, InDebugPretty, Logger};
-use std::mem::ManuallyDrop;
+use logger::{info, warn, InDebug, InDebugPretty, Logger};
+use std::io::Read;
+use std::mem::{size_of, ManuallyDrop};
 use winit::{Event, EventsLoop, Window};
 
 // ---
@@ -130,6 +140,11 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         Backbuffer::Framebuffer(_) => unimplemented!("Can't handle framebuffer backbuffer!"),
     };
 
+    // NOTE: for curious people, the render_pass, used in both framebuffer creation AND command
+    // buffer when drawing, only need to be _compatible_, which means the SAMPLE count and the
+    // FORMAT is _the exact same_.
+    // Other elements such as attachment load/store methods are irrelevant.
+    // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/html/vkspec.html#renderpass-compatibility
     let render_pass = {
         let color_attachment = pass::Attachment {
             format: Some(format),
@@ -198,6 +213,214 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         .map(|_| command_pool.acquire_command_buffer::<command::MultiShot>())
         .collect();
 
+    // Section 2, shaders
+    pub const VERTEX_SOURCE: &str = "#version 450
+    #extension GL_ARG_separate_shader_objects : enable
+    layout (location = 0) in vec2 position;
+    out gl_PerVertex {
+        vec4 gl_Position;
+    };
+    void main()
+    {
+      gl_Position = vec4(position, 0.0, 1.0);
+    }";
+
+    pub const FRAGMENT_SOURCE: &str = "#version 450
+    #extension GL_ARG_separate_shader_objects : enable
+    layout(location = 0) out vec4 color;
+    void main()
+    {
+      color = vec4(1.0);
+    }";
+
+    let vs_module = {
+        let glsl = VERTEX_SOURCE;
+        let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
+            .unwrap()
+            .bytes()
+            .map(|b| b.unwrap())
+            .collect();
+        unsafe { device.create_shader_module(&spirv) }.unwrap()
+    };
+    let fs_module = {
+        let glsl = FRAGMENT_SOURCE;
+        let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Fragment)
+            .unwrap()
+            .bytes()
+            .map(|b| b.unwrap())
+            .collect();
+        unsafe { device.create_shader_module(&spirv) }.unwrap()
+    };
+    // Describe the shaders
+    const ENTRY_NAME: &str = "main";
+    let vs_module: <back::Backend as Backend>::ShaderModule = vs_module;
+    let (vs_entry, fs_entry) = (
+        pso::EntryPoint {
+            entry: ENTRY_NAME,
+            module: &vs_module,
+            // specialization: pso::Specialization {
+            //     constants: &[pso::SpecializationConstant { id: 0, range: 0..4 }],
+            //     data: unsafe { std::mem::transmute::<&f32, &[u8; 4]>(&0.8f32) },
+            // },
+            specialization: pso::Specialization::default(),
+        },
+        pso::EntryPoint {
+            entry: ENTRY_NAME,
+            module: &fs_module,
+            specialization: pso::Specialization::default(),
+        },
+    );
+    let shader_entries = pso::GraphicsShaderSet {
+        vertex: vs_entry,
+        hull: None,
+        domain: None,
+        geometry: None,
+        fragment: Some(fs_entry),
+    };
+
+    // Create a render pass for this thing
+    let triangle_render_pass = {
+        let attachment = pass::Attachment {
+            format: Some(format),
+            samples: 1,
+            ops: pass::AttachmentOps::new(
+                pass::AttachmentLoadOp::Clear,
+                pass::AttachmentStoreOp::Store,
+            ),
+            stencil_ops: pass::AttachmentOps::DONT_CARE,
+            layouts: image::Layout::Undefined..image::Layout::Present,
+        };
+
+        let subpass = pass::SubpassDesc {
+            colors: &[(0, image::Layout::ColorAttachmentOptimal)],
+            depth_stencil: None,
+            inputs: &[],
+            resolves: &[],
+            preserves: &[],
+        };
+
+        // let dependency = pass::SubpassDependency {
+        //     passes: pass::SubpassRef::External..pass::SubpassRef::Pass(0),
+        //     stages: PipelineStage::COLOR_ATTACHMENT_OUTPUT
+        //         ..PipelineStage::COLOR_ATTACHMENT_OUTPUT,
+        //     accesses: i::Access::empty()
+        //         ..(i::Access::COLOR_ATTACHMENT_READ | i::Access::COLOR_ATTACHMENT_WRITE),
+        // };
+
+        unsafe { device.create_render_pass(&[attachment], &[subpass], &[]) }
+            .expect("Can't create render pass")
+    };
+
+    // ---
+
+    let input_assembler = InputAssemblerDesc::new(Primitive::TriangleList);
+
+    let vertex_buffers: Vec<VertexBufferDesc> = vec![VertexBufferDesc {
+        binding: 0,
+        stride: (size_of::<f32>() * 2) as u32,
+        rate: 0,
+    }];
+    let attributes: Vec<AttributeDesc> = vec![AttributeDesc {
+        location: 0,
+        binding: 0,
+        element: Element {
+            format: format::Format::Rg32Float,
+            offset: 0,
+        },
+    }];
+
+    let rasterizer = Rasterizer {
+        depth_clamping: false,
+        polygon_mode: PolygonMode::Fill,
+        cull_face: Face::NONE,
+        front_face: FrontFace::Clockwise,
+        depth_bias: None,
+        conservative: false,
+    };
+
+    let depth_stencil = DepthStencilDesc {
+        depth: DepthTest::Off,
+        depth_bounds: false,
+        stencil: StencilTest::Off,
+    };
+    let blender = {
+        let blend_state = BlendState::On {
+            color: BlendOp::Add {
+                src: Factor::One,
+                dst: Factor::Zero,
+            },
+            alpha: BlendOp::Add {
+                src: Factor::One,
+                dst: Factor::Zero,
+            },
+        };
+        BlendDesc {
+            logic_op: Some(LogicOp::Copy),
+            targets: vec![ColorBlendDesc(ColorMask::ALL, blend_state)],
+        }
+    };
+    let extent = image::Extent {
+        width: dims.width as u32,
+        height: dims.height as u32,
+        depth: 1,
+    }
+    .rect();
+    let baked_states = BakedStates {
+        viewport: Some(Viewport {
+            rect: extent,
+            depth: (0.0..1.0),
+        }),
+        scissor: Some(extent),
+        blend_color: None,
+        depth_bounds: None,
+    };
+    let bindings = Vec::<DescriptorSetLayoutBinding>::new();
+    let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
+    let descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
+        vec![unsafe {
+            device
+                .create_descriptor_set_layout(bindings, immutable_samplers)
+                .expect("Couldn't make a DescriptorSetLayout")
+        }];
+    let push_constants = Vec::<(ShaderStageFlags, core::ops::Range<u32>)>::new();
+    let triangle_pipeline_layout = unsafe {
+        device
+            .create_pipeline_layout(&descriptor_set_layouts, push_constants)
+            .expect("Couldn't create a pipeline layout")
+    };
+    // Describe the pipeline (rasterization, triangle interpretation)
+let pipeline_desc = GraphicsPipelineDesc {
+          shaders: shader_entries,
+          rasterizer,
+          vertex_buffers,
+          attributes,
+          input_assembler,
+          blender,
+          depth_stencil,
+          multisampling: None,
+          baked_states,
+          layout: &triangle_pipeline_layout,
+          subpass: pass::Subpass {
+            index: 0,
+            main_pass: &triangle_render_pass,
+          },
+          flags: PipelineCreationFlags::empty(),
+          parent: BasePipeline::None,
+        };
+
+    let triangle_pipeline = unsafe {
+        device
+            .create_graphics_pipeline(&pipeline_desc, None)
+            .expect("Couldn't create a graphics pipeline!")
+    };
+
+    unsafe {
+        device.destroy_shader_module(vs_module);
+    }
+    unsafe {
+        device.destroy_shader_module(fs_module);
+    }
+
     Windowing {
         adapter,
         command_buffers,
@@ -218,12 +441,64 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
             w: w as i16,
             h: h as i16,
         },
+        triangle_buffers: vec![],
+        triangle_memory: vec![],
+        triangle_render_pass: ManuallyDrop::new(triangle_render_pass),
+        triangle_pipeline: ManuallyDrop::new(triangle_pipeline),
+        triangle_pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
         render_pass: ManuallyDrop::new(render_pass),
         surf,
         swapchain: ManuallyDrop::new(swapchain),
         vk_inst: ManuallyDrop::new(vk_inst),
         window,
     }
+}
+
+pub fn add_triangle(s: &mut Windowing) {
+    let (buffer, memory, requirements) = unsafe {
+        const F32_XY_TRIANGLE: u64 = (std::mem::size_of::<f32>() * 2 * 3) as u64;
+        use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
+        let mut buffer = s
+            .device
+            .create_buffer(F32_XY_TRIANGLE, gfx_hal::buffer::Usage::VERTEX)
+            .expect("cant make bf");
+        let requirements = s.device.get_buffer_requirements(&buffer);
+        let memory_type_id = s
+            .adapter
+            .physical_device
+            .memory_properties()
+            .memory_types
+            .iter()
+            .enumerate()
+            .find(|&(id, memory_type)| {
+                requirements.type_mask & (1 << id) != 0
+                    && memory_type.properties.contains(Properties::CPU_VISIBLE)
+            })
+            .map(|(id, _)| MemoryTypeId(id))
+            .unwrap();
+        let memory = s
+            .device
+            .allocate_memory(memory_type_id, requirements.size)
+            .expect("Couldn't allocate vertex buffer memory");
+        s.device
+            .bind_buffer_memory(&memory, 0, &mut buffer)
+            .expect("Couldn't bind the buffer memory!");
+        // (buffer, memory, requirements)
+        (buffer, memory, requirements)
+    };
+    // Upload vertex data
+    unsafe {
+        let mut data_target = s
+            .device
+            .acquire_mapping_writer(&memory, 0..requirements.size)
+            .expect("Failed to acquire a memory writer!");
+        data_target[..6].copy_from_slice(&[0.0f32, 0.0, 1.0, 1.0, 1.0, 0.0]);
+        s.device
+            .release_mapping_writer(data_target)
+            .expect("Couldn't release the mapping writer!");
+    }
+    s.triangle_buffers.push(buffer);
+    s.triangle_memory.push(memory);
 }
 
 pub fn collect_input(windowing: &mut Windowing) -> Vec<Event> {
@@ -266,12 +541,21 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>) {
                 1.0f32, 0.0, 0.0, 1.0,
             ]))];
             buffer.begin(false);
-            buffer.begin_render_pass_inline(
-                &s.render_pass,
-                &s.framebuffers[s.current_frame],
-                s.render_area,
-                clear_values.iter(),
-            );
+            {
+                let mut enc = buffer.begin_render_pass_inline(
+                    &s.render_pass,
+                    &s.framebuffers[s.current_frame],
+                    s.render_area,
+                    clear_values.iter(),
+                );
+                enc.bind_graphics_pipeline(&s.triangle_pipeline);
+                for buffer_ref in &s.triangle_buffers {
+                    warn![log, "vxdraw", "Drawing buffer ref"];
+                    let buffers: ArrayVec<[_; 1]> = [(buffer_ref, 0)].into();
+                    enc.bind_vertex_buffers(0, buffers);
+                    enc.draw(0..3, 0..1);
+                }
+            }
             buffer.finish();
         }
 
@@ -312,6 +596,7 @@ mod tests {
         logger.set_colorize(true);
         let mut windowing = init_window_with_vulkan(&mut logger);
         collect_input(&mut windowing);
+        add_triangle(&mut windowing);
         for _ in 0..300 {
             draw_frame(&mut windowing, &mut logger);
             std::thread::sleep(std::time::Duration::new(0, 8_000_000));

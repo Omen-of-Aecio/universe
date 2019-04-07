@@ -28,7 +28,7 @@ use gfx_hal::{
 };
 use logger::{info, warn, InDebug, InDebugPretty, Logger};
 use std::io::Read;
-use std::mem::{size_of, ManuallyDrop};
+use std::mem::{size_of, transmute, ManuallyDrop};
 use winit::{Event, EventsLoop, Window};
 
 // ---
@@ -226,9 +226,12 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
     pub const FRAGMENT_SOURCE: &str = "#version 450
     #extension GL_ARG_separate_shader_objects : enable
     layout(location = 0) out vec4 color;
+    layout(push_constant) uniform ColorBlock {
+        float Color;
+    } PushConstant;
     void main()
     {
-        color = vec4(1.0);
+        color = vec4(PushConstant.Color, 0.0, 0.0, 1.0);
     }";
 
     let vs_module = {
@@ -533,6 +536,12 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>) {
                     &s.framebuffers[s.current_frame],
                     s.render_area,
                     clear_values.iter(),
+                );
+                enc.push_graphics_constants(
+                    &s.triangle_pipeline_layout,
+                    ShaderStageFlags::FRAGMENT,
+                    0,
+                    &[transmute(0.0f32)],
                 );
                 enc.bind_graphics_pipeline(&s.triangle_pipeline);
                 for buffer_ref in &s.triangle_buffers {

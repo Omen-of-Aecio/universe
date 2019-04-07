@@ -101,6 +101,12 @@ pub struct Windowing {
     pub events_loop: winit::EventsLoop,
 
     //
+    // pub texture_buffer: <back::Backend as Backend>::Buffer,
+    // pub texture_memory: <back::Backend as Backend>::Memory,
+    // pub texture_render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
+    // pub texture_pipeline: ManuallyDrop<<back::Backend as Backend>::GraphicsPipeline>,
+    // pub texture_pipeline_layout: ManuallyDrop<<back::Backend as Backend>::PipelineLayout>,
+    //
     pub triangle_buffers: Vec<<back::Backend as Backend>::Buffer>,
     pub triangle_memory: Vec<<back::Backend as Backend>::Memory>,
     pub triangle_render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,

@@ -9,6 +9,8 @@ use gfx_backend_metal as back;
 use gfx_backend_vulkan as back;
 // use gfx_hal::format::{AsFormat, ChannelType, Rgba8Srgb as ColorFormat, Swizzle};
 use arrayvec::ArrayVec;
+use cgmath::prelude::*;
+use cgmath::{Matrix4, Vector3};
 use gfx_hal::{
     adapter::PhysicalDevice,
     command::{self, ClearColor, ClearValue},
@@ -218,20 +220,20 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
     out gl_PerVertex {
         vec4 gl_Position;
     };
+    layout(push_constant) uniform ColorBlock {
+        mat4 view;
+    } PushConstant;
     void main()
     {
-      gl_Position = vec4(position, 0.0, 1.0);
+      gl_Position = PushConstant.view * vec4(position, 0.0, 1.0);
     }";
 
     pub const FRAGMENT_SOURCE: &str = "#version 450
     #extension GL_ARG_separate_shader_objects : enable
     layout(location = 0) out vec4 color;
-    layout(push_constant) uniform ColorBlock {
-        float Color;
-    } PushConstant;
     void main()
     {
-        color = vec4(PushConstant.Color, 0.0, 0.0, 1.0);
+        color = vec4(1.0);
     }";
 
     let vs_module = {
@@ -498,7 +500,7 @@ pub fn collect_input(windowing: &mut Windowing) -> Vec<Event> {
     inputs
 }
 
-pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>) {
+pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &cgmath::Matrix4<f32>) {
     let frame_render_fence = &s.frame_render_fences[s.current_frame];
     let acquire_image_semaphore = &s.acquire_image_semaphores[s.current_frame];
     let present_wait_semaphore = &s.present_wait_semaphores[s.current_frame];
@@ -537,11 +539,13 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>) {
                     s.render_area,
                     clear_values.iter(),
                 );
+                let ptr = view.as_ptr();
+
                 enc.push_graphics_constants(
                     &s.triangle_pipeline_layout,
-                    ShaderStageFlags::FRAGMENT,
+                    ShaderStageFlags::VERTEX,
                     0,
-                    &[transmute(0.0f32)],
+                    transmute::<*const f32, &[u32; 16]>(ptr),
                 );
                 enc.bind_graphics_pipeline(&s.triangle_pipeline);
                 for buffer_ref in &s.triangle_buffers {
@@ -592,10 +596,23 @@ mod tests {
         collect_input(&mut windowing);
         add_triangle(&mut windowing, &[0.0f32, 0.0, 1.0, 1.0, 1.0, 0.0]);
         add_triangle(&mut windowing, &[-0.5f32, 0.5, 0.2, 0.2, 0.3, 0.3]);
-        for _ in 0..300 {
-            draw_frame(&mut windowing, &mut logger);
+        for i in 0..300 {
+            let mat4 = Matrix4::new(
+                1.0f32, 0.0, 0.0, 0.0, 0.0f32, 1.0, 0.0, 0.0, 0.0f32, 0.0, 1.0, 0.0, 0.0f32, 0.0,
+                0.0, 1.0,
+            ) * Matrix4::from_translation(Vector3::new(i as f32 / 300.0, 0.0, 0.0));
+            draw_frame(&mut windowing, &mut logger, &mat4);
             std::thread::sleep(std::time::Duration::new(0, 8_000_000));
         }
+    }
+
+    #[test]
+    fn simple_cgmath() {
+        let mat4 = Matrix4::new(
+            1.0f32, 0.0, 0.0, 0.0, 0.0f32, 1.0, 0.0, 0.0, 0.0f32, 0.0, 1.0, 0.0, 0.0f32, 0.0, 0.0,
+            1.0,
+        );
+        mat4.transform_vector(Vector3::new(1.0, 0.0, 0.0));
     }
 
     #[bench]
@@ -603,8 +620,12 @@ mod tests {
         let mut logger = Logger::spawn_void();
         logger.set_colorize(true);
         let mut windowing = init_window_with_vulkan(&mut logger);
+        let mat4 = Matrix4::new(
+            1.0f32, 0.0, 0.0, 0.0, 0.0f32, 1.0, 0.0, 0.0, 0.0f32, 0.0, 1.0, 0.0, 0.0f32, 0.0, 0.0,
+            1.0,
+        );
         b.iter(|| {
-            draw_frame(&mut windowing, &mut logger);
+            draw_frame(&mut windowing, &mut logger, &mat4);
         });
     }
 }

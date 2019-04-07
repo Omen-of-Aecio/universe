@@ -101,8 +101,12 @@ pub struct Windowing {
     pub events_loop: winit::EventsLoop,
 
     //
-    // pub texture_buffer: <back::Backend as Backend>::Buffer,
-    // pub texture_memory: <back::Backend as Backend>::Memory,
+    pub texture_vertex_buffer: ManuallyDrop<<back::Backend as Backend>::Buffer>,
+    pub texture_vertex_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
+    // pub texture_image: ManuallyDrop<<back::Backend as Backend>::Image>,
+    // pub texture_image_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
+    // pub texture_image_view: ManuallyDrop<<back::Backend as Backend>::ImageView>,
+    // pub texture_image_sampler: ManuallyDrop<<back::Backend as Backend>::Sampler>,
     // pub texture_render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
     // pub texture_pipeline: ManuallyDrop<<back::Backend as Backend>::GraphicsPipeline>,
     // pub texture_pipeline_layout: ManuallyDrop<<back::Backend as Backend>::PipelineLayout>,
@@ -111,6 +115,7 @@ pub struct Windowing {
     pub triangle_memory: Vec<<back::Backend as Backend>::Memory>,
     pub triangle_render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
     pub triangle_pipeline: ManuallyDrop<<back::Backend as Backend>::GraphicsPipeline>,
+    pub triangle_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout>,
     pub triangle_pipeline_layout: ManuallyDrop<<back::Backend as Backend>::PipelineLayout>,
     //
     pub current_frame: usize,
@@ -186,6 +191,9 @@ impl Drop for Windowing {
                 .destroy_pipeline_layout(ManuallyDrop::into_inner(read(
                     &self.triangle_pipeline_layout,
                 )));
+            for dsl in self.triangle_descriptor_set_layouts.drain(..) {
+                self.device.destroy_descriptor_set_layout(dsl);
+            }
 
             ManuallyDrop::drop(&mut self.queue_group);
             ManuallyDrop::drop(&mut self.device);

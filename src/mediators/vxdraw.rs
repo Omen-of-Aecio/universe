@@ -213,7 +213,8 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         .map(|_| command_pool.acquire_command_buffer::<command::MultiShot>())
         .collect();
 
-    // Section 2, shaders
+    // triangle
+
     pub const VERTEX_SOURCE: &str = "#version 450
     #extension GL_ARG_separate_shader_objects : enable
     layout (location = 0) in vec2 position;
@@ -277,7 +278,6 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         fragment: Some(fs_entry),
     };
 
-    // Create a render pass for this thing
     let triangle_render_pass = {
         let attachment = pass::Attachment {
             format: Some(format),
@@ -412,11 +412,145 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         device.destroy_shader_module(fs_module);
     }
 
+    // texture
+    let (texture_vertex_buffer, texture_vertex_memory, requirements) = unsafe {
+        const F32_XY_TRIANGLE: u64 = (std::mem::size_of::<f32>() * 2 * 3 * 2) as u64;
+        use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
+        let mut buffer = device
+            .create_buffer(F32_XY_TRIANGLE, gfx_hal::buffer::Usage::VERTEX)
+            .expect("cant make bf");
+        let requirements = device.get_buffer_requirements(&buffer);
+        let memory_type_id = adapter
+            .physical_device
+            .memory_properties()
+            .memory_types
+            .iter()
+            .enumerate()
+            .find(|&(id, memory_type)| {
+                requirements.type_mask & (1 << id) != 0
+                    && memory_type.properties.contains(Properties::CPU_VISIBLE)
+            })
+            .map(|(id, _)| MemoryTypeId(id))
+            .unwrap();
+        let memory = device
+            .allocate_memory(memory_type_id, requirements.size)
+            .expect("Couldn't allocate vertex buffer memory");
+        device
+            .bind_buffer_memory(&memory, 0, &mut buffer)
+            .expect("Couldn't bind the buffer memory!");
+        // (buffer, memory, requirements)
+        (buffer, memory, requirements)
+    };
+    // Upload vertex data
+    unsafe {
+        let mut data_target = device
+            .acquire_mapping_writer(&texture_vertex_memory, 0..requirements.size)
+            .expect("Failed to acquire a memory writer!");
+        data_target[..12].copy_from_slice(&[-1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0,
+                                             1.0,    -1.0, -1.0, 1.0, 1.0,  1.0]);
+        device
+            .release_mapping_writer(data_target)
+            .expect("Couldn't release the mapping writer!");
+    }
+
+    let (texture_uv_buffer, texture_uv_memory, requirements) = unsafe {
+        const F32_XY_TRIANGLE: u64 = (std::mem::size_of::<f32>() * 2 * 3 * 2) as u64;
+        use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
+        let mut buffer = device
+            .create_buffer(F32_XY_TRIANGLE, gfx_hal::buffer::Usage::VERTEX)
+            .expect("cant make bf");
+        let requirements = device.get_buffer_requirements(&buffer);
+        let memory_type_id = adapter
+            .physical_device
+            .memory_properties()
+            .memory_types
+            .iter()
+            .enumerate()
+            .find(|&(id, memory_type)| {
+                requirements.type_mask & (1 << id) != 0
+                    && memory_type.properties.contains(Properties::CPU_VISIBLE)
+            })
+            .map(|(id, _)| MemoryTypeId(id))
+            .unwrap();
+        let memory = device
+            .allocate_memory(memory_type_id, requirements.size)
+            .expect("Couldn't allocate vertex buffer memory");
+        device
+            .bind_buffer_memory(&memory, 0, &mut buffer)
+            .expect("Couldn't bind the buffer memory!");
+        // (buffer, memory, requirements)
+        (buffer, memory, requirements)
+    };
+    // Upload vertex data
+    unsafe {
+        let mut data_target = device
+            .acquire_mapping_writer(&texture_uv_memory, 0..requirements.size)
+            .expect("Failed to acquire a memory writer!");
+        data_target[..12].copy_from_slice(&[-1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0,
+                                             1.0,    -1.0, -1.0, 1.0, 1.0,  1.0]);
+        device
+            .release_mapping_writer(data_target)
+            .expect("Couldn't release the mapping writer!");
+    }
+    const VERTEX_SOURCE_TEXTURE: &str = "#version 450
+    #extension GL_ARB_separate_shader_objects : enable
+
+    layout(constant_id = 0) const float scale = 1.2f;
+
+    layout(location = 0) in vec2 a_pos;
+    layout(location = 1) in vec2 a_uv;
+    layout(location = 0) out vec2 v_uv;
+
+    out gl_PerVertex {
+        vec4 gl_Position;
+    };
+
+    void main() {
+        v_uv = a_uv;
+        gl_Position = vec4(scale * a_pos, 0.0, 1.0);
+    }";
+
+    const FRAGMENT_SOURCE_TEXTURE: &str = "#version 450
+    #extension GL_ARB_separate_shader_objects : enable
+
+    layout(location = 0) in vec2 v_uv;
+    layout(location = 0) out vec4 target0;
+
+    layout(set = 0, binding = 0) uniform texture2D u_texture;
+    layout(set = 0, binding = 1) uniform sampler u_sampler;
+
+    void main() {
+        target0 = texture(sampler2D(u_texture, u_sampler), v_uv);
+    }";
+    let set_layout = unsafe {
+        device.create_descriptor_set_layout(
+            &[
+                pso::DescriptorSetLayoutBinding {
+                    binding: 0,
+                    ty: pso::DescriptorType::SampledImage,
+                    count: 1,
+                    stage_flags: ShaderStageFlags::FRAGMENT,
+                    immutable_samplers: false,
+                },
+                pso::DescriptorSetLayoutBinding {
+                    binding: 1,
+                    ty: pso::DescriptorType::Sampler,
+                    count: 1,
+                    stage_flags: ShaderStageFlags::FRAGMENT,
+                    immutable_samplers: false,
+                },
+            ],
+            &[],
+        )
+    }
+    .expect("Can't create descriptor set layout");
+
     Windowing {
         adapter,
         command_buffers,
         command_pool: ManuallyDrop::new(command_pool),
         current_frame: 0,
+        triangle_descriptor_set_layouts: descriptor_set_layouts,
         device: ManuallyDrop::new(device),
         events_loop,
         frame_render_fences,
@@ -432,6 +566,8 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
             w: w as i16,
             h: h as i16,
         },
+        texture_vertex_buffer: ManuallyDrop::new(texture_vertex_buffer),
+        texture_vertex_memory: ManuallyDrop::new(texture_vertex_memory),
         triangle_buffers: vec![],
         triangle_memory: vec![],
         triangle_render_pass: ManuallyDrop::new(triangle_render_pass),

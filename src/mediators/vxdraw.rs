@@ -306,6 +306,7 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test::{black_box, Bencher};
 
     #[cfg(feature = "gfx_tests")]
     #[test]
@@ -318,5 +319,15 @@ mod tests {
             draw_frame(&mut windowing, &mut logger);
             std::thread::sleep(std::time::Duration::new(0, 8_000_000));
         }
+    }
+
+    #[cfg(feature = "gfx_tests")]
+    #[bench]
+    fn clears_per_second(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger);
+        b.iter(|| {
+            draw_frame(&mut windowing, &mut logger);
+        });
     }
 }

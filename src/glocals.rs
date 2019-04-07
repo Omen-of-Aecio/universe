@@ -105,7 +105,6 @@ pub struct Windowing {
     pub render_area: gfx_hal::pso::Rect,
 
     pub frame_render_fences: Vec<<back::Backend as Backend>::Fence>,
-    pub frame_fences: Vec<<back::Backend as Backend>::Fence>,
     pub acquire_image_semaphores: Vec<<back::Backend as Backend>::Semaphore>,
     pub present_wait_semaphores: Vec<<back::Backend as Backend>::Semaphore>,
     pub command_pool: ManuallyDrop<gfx_hal::pool::CommandPool<back::Backend, gfx_hal::Graphics>>,
@@ -132,12 +131,6 @@ pub struct Windowing {
 impl Drop for Windowing {
     fn drop(&mut self) {
         let _ = self.device.wait_idle();
-
-        for fence in self.frame_fences.drain(..) {
-            unsafe {
-                self.device.destroy_fence(fence);
-            }
-        }
 
         for fence in self.frame_render_fences.drain(..) {
             unsafe {

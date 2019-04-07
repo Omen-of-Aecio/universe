@@ -179,12 +179,10 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
     let framebuffers_string = format!["{:#?}", framebuffers];
     info![log, "vxdraw", "Framebuffer information"; "framebuffers" => framebuffers_string ];
 
-    let mut frame_fences = vec![];
     let mut frame_render_fences = vec![];
     let mut acquire_image_semaphores = vec![];
     let mut present_wait_semaphores = vec![];
     for _ in 0..image_count {
-        frame_fences.push(device.create_fence(true).expect("Can't create fence"));
         frame_render_fences.push(device.create_fence(true).expect("Can't create fence"));
         acquire_image_semaphores.push(device.create_semaphore().expect("Can't create semaphore"));
         present_wait_semaphores.push(device.create_semaphore().expect("Can't create semaphore"));
@@ -207,7 +205,6 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         current_frame: 0,
         device: ManuallyDrop::new(device),
         events_loop,
-        frame_fences,
         frame_render_fences,
         acquire_image_semaphores,
         present_wait_semaphores,
@@ -238,7 +235,7 @@ pub fn collect_input(windowing: &mut Windowing) -> Vec<Event> {
 }
 
 pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>) {
-    let frame_fence = &s.frame_fences[s.current_frame];
+    let frame_render_fence = &s.frame_render_fences[s.current_frame];
     let acquire_image_semaphore = &s.acquire_image_semaphores[s.current_frame];
     let present_wait_semaphore = &s.present_wait_semaphores[s.current_frame];
     let frame = s.current_frame;
@@ -258,10 +255,10 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>) {
 
         info![log, "vxdraw", "Waiting for fence"];
         s.device
-            .wait_for_fence(frame_fence, u64::max_value())
+            .wait_for_fence(frame_render_fence, u64::max_value())
             .unwrap();
         info![log, "vxdraw", "Resetting fence"];
-        s.device.reset_fence(frame_fence).unwrap();
+        s.device.reset_fence(frame_render_fence).unwrap();
 
         {
             let buffer = &mut s.command_buffers[s.current_frame];
@@ -293,7 +290,7 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>) {
             signal_semaphores,
         };
         let the_command_queue = &mut s.queue_group.queues[0];
-        the_command_queue.submit(submission, Some(frame_fence));
+        the_command_queue.submit(submission, Some(frame_render_fence));
         s.swapchain
             .present(the_command_queue, image_index, present_wait_semaphores)
             .unwrap();
@@ -303,12 +300,12 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>) {
 
 // ---
 
+#[cfg(feature = "gfx_tests")]
 #[cfg(test)]
 mod tests {
     use super::*;
     use test::{black_box, Bencher};
 
-    #[cfg(feature = "gfx_tests")]
     #[test]
     fn init_window_and_get_input() {
         let mut logger = Logger::spawn();
@@ -321,7 +318,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "gfx_tests")]
     #[bench]
     fn clears_per_second(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();

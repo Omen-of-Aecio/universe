@@ -35,6 +35,7 @@ fn run_client_or_server(s: &mut glocals::Main) {
     let commandline = s.commandline.clone();
     if let Some(_connect) = commandline.value_of("connect") {
         let mut logger = logger::Logger::spawn();
+        logger.set_colorize(true);
         logger.set_context_specific_log_level("benchmark", 0);
         if let Some(game_shell) = crate::mediators::game_shell::spawn(logger.clone()) {
             s.threads.game_shell = Some(game_shell.0);

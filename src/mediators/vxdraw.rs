@@ -29,7 +29,7 @@ use gfx_hal::{
     window::{Extent2D, PresentMode::*, Surface, Swapchain},
     Backbuffer, Backend, FrameSync, Instance, Primitive, SwapchainConfig,
 };
-use logger::{info, warn, InDebug, InDebugPretty, Logger};
+use logger::{info, trace, warn, InDebug, InDebugPretty, Logger};
 use std::io::Read;
 use std::mem::{size_of, transmute, ManuallyDrop};
 use winit::{Event, EventsLoop, Window};
@@ -665,7 +665,7 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &cgmath::Matri
     let acquire_image_semaphore = &s.acquire_image_semaphores[s.current_frame];
     let present_wait_semaphore = &s.present_wait_semaphores[s.current_frame];
     let frame = s.current_frame;
-    info![log, "vxdraw", "Current frame"; "frame" => frame];
+    trace![log, "vxdraw", "Current frame"; "frame" => frame];
 
     let image_index;
     unsafe {
@@ -676,14 +676,14 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &cgmath::Matri
                 FrameSync::Semaphore(acquire_image_semaphore),
             )
             .unwrap();
-        info![log, "vxdraw", "Acquired image index"; "index" => image_index];
+        trace![log, "vxdraw", "Acquired image index"; "index" => image_index];
         assert_eq![image_index as usize, s.current_frame];
 
-        info![log, "vxdraw", "Waiting for fence"];
+        trace![log, "vxdraw", "Waiting for fence"];
         s.device
             .wait_for_fence(frame_render_fence, u64::max_value())
             .unwrap();
-        info![log, "vxdraw", "Resetting fence"];
+        trace![log, "vxdraw", "Resetting fence"];
         s.device.reset_fence(frame_render_fence).unwrap();
 
         {

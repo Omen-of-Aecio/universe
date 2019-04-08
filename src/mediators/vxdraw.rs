@@ -11,7 +11,7 @@ use gfx_backend_vulkan as back;
 use ::image as load_image;
 use arrayvec::ArrayVec;
 use cgmath::prelude::*;
-use cgmath::{Matrix4, Vector3};
+use cgmath::{Deg, Matrix4, Vector2, Vector3};
 use gfx_hal::{
     adapter::PhysicalDevice,
     command::{self, ClearColor, ClearValue},
@@ -748,6 +748,27 @@ mod tests {
     use super::*;
     use test::{black_box, Bencher};
 
+    // ---
+
+    fn make_centered_equilateral_triangle() -> [f32; 6] {
+        let mut tri = [0.0f32; 6];
+        static PI: f32 = std::f32::consts::PI;
+        tri[2] = 1.0f32 * (60.0f32 / 180.0f32 * PI).cos();
+        tri[3] = 1.0f32 * (60.0f32 / 180.0f32 * PI).sin();
+        tri[4] = 1.0f32;
+        let avg_x = (tri[0] + tri[2] + tri[4]) / 3.0f32;
+        let avg_y = (tri[1] + tri[3] + tri[5]) / 3.0f32;
+        tri[0] -= avg_x;
+        tri[2] -= avg_x;
+        tri[4] -= avg_x;
+        tri[1] -= avg_y;
+        tri[3] -= avg_y;
+        tri[5] -= avg_y;
+        tri
+    }
+
+    // ---
+
     #[test]
     fn setup_and_teardown() {
         let mut logger = Logger::spawn_void();
@@ -767,6 +788,31 @@ mod tests {
                 1.0f32, 0.0, 0.0, 0.0, 0.0f32, 1.0, 0.0, 0.0, 0.0f32, 0.0, 1.0, 0.0, 0.0f32, 0.0,
                 0.0, 1.0,
             ) * Matrix4::from_translation(Vector3::new(i as f32 / 300.0, 0.0, 0.0));
+            draw_frame(&mut windowing, &mut logger, &mat4);
+            std::thread::sleep(std::time::Duration::new(0, 8_000_000));
+        }
+    }
+
+    #[test]
+    fn rotating_triangle() {
+        let mut logger = Logger::spawn();
+        logger.set_colorize(true);
+        let mut windowing = init_window_with_vulkan(&mut logger);
+        let prspect = {
+            let size = windowing
+                .window
+                .get_inner_size()
+                .unwrap()
+                .to_physical(windowing.window.get_hidpi_factor());
+            let pval = Vector2::new(size.height, size.width).normalize();
+            Matrix4::from_nonuniform_scale(pval.x as f32, pval.y as f32, 1.0)
+        };
+
+        let tri = make_centered_equilateral_triangle();
+        add_triangle(&mut windowing, &tri);
+        for i in 0..=360 {
+            let mat4 =
+                prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(i as f32)); // * Matrix4::from_scale(0.5f32);
             draw_frame(&mut windowing, &mut logger, &mat4);
             std::thread::sleep(std::time::Duration::new(0, 8_000_000));
         }

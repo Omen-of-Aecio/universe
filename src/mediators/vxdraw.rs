@@ -367,7 +367,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
     };
     let bindings = Vec::<DescriptorSetLayoutBinding>::new();
     let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
-    let descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
+    let triangle_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
         vec![unsafe {
             device
                 .create_descriptor_set_layout(bindings, immutable_samplers)
@@ -377,7 +377,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
     push_constants.push((ShaderStageFlags::VERTEX, 0..16));
     let triangle_pipeline_layout = unsafe {
         device
-            .create_pipeline_layout(&descriptor_set_layouts, push_constants)
+            .create_pipeline_layout(&triangle_descriptor_set_layouts, push_constants)
             .expect("Couldn't create a pipeline layout")
     };
     // Describe the pipeline (rasterization, triangle interpretation)
@@ -567,19 +567,18 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
     //     BufferBundle::new(&adapter, device, required_bytes, BufferUsage::TRANSFER_SRC).unwrap();
 
     Windowing {
+        acquire_image_semaphores,
         adapter,
         command_buffers,
         command_pool: ManuallyDrop::new(command_pool),
         current_frame: 0,
-        triangle_descriptor_set_layouts: descriptor_set_layouts,
         device: ManuallyDrop::new(device),
         events_loop,
         frame_render_fences,
-        acquire_image_semaphores,
-        present_wait_semaphores,
         framebuffers,
         image_count: image_count as usize,
         image_views,
+        present_wait_semaphores,
         queue_group: ManuallyDrop::new(queue_group),
         render_area: Rect {
             x: 0,
@@ -587,18 +586,19 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
             w: w as i16,
             h: h as i16,
         },
-        texture_vertex_buffer: ManuallyDrop::new(texture_vertex_buffer),
-        texture_vertex_memory: ManuallyDrop::new(texture_vertex_memory),
-        texture_uv_buffer: ManuallyDrop::new(texture_uv_buffer),
-        texture_uv_memory: ManuallyDrop::new(texture_uv_memory),
-        triangle_buffers: vec![],
-        triangle_memory: vec![],
-        triangle_render_pass: ManuallyDrop::new(triangle_render_pass),
-        triangle_pipeline: ManuallyDrop::new(triangle_pipeline),
-        triangle_pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
         render_pass: ManuallyDrop::new(render_pass),
         surf,
         swapchain: ManuallyDrop::new(swapchain),
+        texture_uv_buffer: ManuallyDrop::new(texture_uv_buffer),
+        texture_uv_memory: ManuallyDrop::new(texture_uv_memory),
+        texture_vertex_buffer: ManuallyDrop::new(texture_vertex_buffer),
+        texture_vertex_memory: ManuallyDrop::new(texture_vertex_memory),
+        triangle_buffers: vec![],
+        triangle_descriptor_set_layouts,
+        triangle_memory: vec![],
+        triangle_pipeline: ManuallyDrop::new(triangle_pipeline),
+        triangle_pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
+        triangle_render_pass: ManuallyDrop::new(triangle_render_pass),
         vk_inst: ManuallyDrop::new(vk_inst),
         window,
     }

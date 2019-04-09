@@ -29,7 +29,7 @@ use gfx_hal::{
     window::{Extent2D, PresentMode::*, Surface, Swapchain},
     Backbuffer, Backend, FrameSync, Instance, Primitive, SwapchainConfig,
 };
-use logger::{info, trace, warn, InDebug, InDebugPretty, Logger};
+use logger::{info, log, trace, warn, InDebug, InDebugPretty, Logger};
 use std::io::Read;
 use std::mem::{size_of, transmute, ManuallyDrop};
 use winit::{Event, EventsLoop, Window};
@@ -66,10 +66,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
             .unwrap_or(formats[0])
     });
 
-    {
-        let present_modes = present_modes.clone();
-        info![log, "vxdraw", "Present modes"; "modes" => InDebugPretty(&present_modes)];
-    }
+    info![log, "vxdraw", "Available present modes"; "modes" => InDebugPretty(&present_modes); clone present_modes];
 
     // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPresentModeKHR.html
     // VK_PRESENT_MODE_FIFO_KHR ... This is the only value of presentMode that is required to be supported
@@ -107,10 +104,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
     let mut swap_config = SwapchainConfig::from_caps(&caps, format, dims);
     swap_config.present_mode = present_mode;
     swap_config.image_count = image_count;
-    {
-        let swap_config = swap_config.clone();
-        info![log, "vxdraw", "Swapchain final configuration"; "swapchain" => InDebugPretty(&swap_config)];
-    }
+    info![log, "vxdraw", "Swapchain final configuration"; "swapchain" => InDebugPretty(&swap_config); clone swap_config];
 
     let (swapchain, backbuffer) = unsafe { device.create_swapchain(&mut surf, swap_config, None) }
         .expect("Unable to create swapchain");
@@ -164,6 +158,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
             resolves: &[],
             preserves: &[],
         };
+        log![128, log, "vxdraw", "Render pass"; "color attachment" => InDebugPretty(&color_attachment); clone color_attachment];
         unsafe {
             device
                 .create_render_pass(&[color_attachment], &[subpass], &[])
@@ -171,6 +166,10 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
                 .unwrap()
         }
     };
+    {
+        let rpfmt = format!["{:#?}", render_pass];
+        info![log, "vxdraw", "Created render pass for framebuffers"; "renderpass" => rpfmt];
+    }
 
     let framebuffers: Vec<<back::Backend as Backend>::Framebuffer> = {
         image_views

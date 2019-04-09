@@ -96,15 +96,19 @@ impl Default for Main<'_> {
     }
 }
 
-pub struct Windowing {
-    pub window: winit::Window,
-    pub events_loop: winit::EventsLoop,
-
-    //
+pub struct SingleTexture {
     pub texture_vertex_buffer: ManuallyDrop<<back::Backend as Backend>::Buffer>,
     pub texture_vertex_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
     pub texture_uv_buffer: ManuallyDrop<<back::Backend as Backend>::Buffer>,
     pub texture_uv_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
+}
+
+pub struct Windowing {
+    pub window: winit::Window,
+    pub events_loop: winit::EventsLoop,
+
+    pub simple_textures: Vec<SingleTexture>,
+    //
     // pub texture_image: ManuallyDrop<<back::Backend as Backend>::Image>,
     // pub texture_image_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
     // pub texture_image_view: ManuallyDrop<<back::Backend as Backend>::ImageView>,
@@ -114,11 +118,11 @@ pub struct Windowing {
     // pub texture_pipeline_layout: ManuallyDrop<<back::Backend as Backend>::PipelineLayout>,
     //
     pub triangle_buffers: Vec<<back::Backend as Backend>::Buffer>,
-    pub triangle_memory: Vec<<back::Backend as Backend>::Memory>,
-    pub triangle_render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
-    pub triangle_pipeline: ManuallyDrop<<back::Backend as Backend>::GraphicsPipeline>,
     pub triangle_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout>,
+    pub triangle_memory: Vec<<back::Backend as Backend>::Memory>,
+    pub triangle_pipeline: ManuallyDrop<<back::Backend as Backend>::GraphicsPipeline>,
     pub triangle_pipeline_layout: ManuallyDrop<<back::Backend as Backend>::PipelineLayout>,
+    pub triangle_render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
     //
     pub current_frame: usize,
     pub image_count: usize,
@@ -193,14 +197,22 @@ impl Drop for Windowing {
                 .destroy_pipeline_layout(ManuallyDrop::into_inner(read(
                     &self.triangle_pipeline_layout,
                 )));
-            self.device
-                .destroy_buffer(ManuallyDrop::into_inner(read(&self.texture_vertex_buffer)));
-            self.device
-                .free_memory(ManuallyDrop::into_inner(read(&self.texture_vertex_memory)));
-            self.device
-                .destroy_buffer(ManuallyDrop::into_inner(read(&self.texture_uv_buffer)));
-            self.device
-                .free_memory(ManuallyDrop::into_inner(read(&self.texture_uv_memory)));
+
+            for simple_tex in self.simple_textures.drain(..) {
+                self.device.destroy_buffer(ManuallyDrop::into_inner(read(
+                    &simple_tex.texture_vertex_buffer,
+                )));
+                self.device.free_memory(ManuallyDrop::into_inner(read(
+                    &simple_tex.texture_vertex_memory,
+                )));
+                self.device.destroy_buffer(ManuallyDrop::into_inner(read(
+                    &simple_tex.texture_uv_buffer,
+                )));
+                self.device.free_memory(ManuallyDrop::into_inner(read(
+                    &simple_tex.texture_uv_memory,
+                )));
+            }
+
             for dsl in self.triangle_descriptor_set_layouts.drain(..) {
                 self.device.destroy_descriptor_set_layout(dsl);
             }

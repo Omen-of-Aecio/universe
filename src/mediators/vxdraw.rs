@@ -1,4 +1,4 @@
-use crate::glocals::{Log, Windowing};
+use crate::glocals::{Log, SingleTexture, Windowing};
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
 #[cfg(feature = "gl")]
@@ -413,7 +413,44 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         device.destroy_shader_module(fs_module);
     }
 
+    Windowing {
+        acquire_image_semaphores,
+        adapter,
+        command_buffers,
+        command_pool: ManuallyDrop::new(command_pool),
+        current_frame: 0,
+        device: ManuallyDrop::new(device),
+        events_loop,
+        frame_render_fences,
+        framebuffers,
+        image_count: image_count as usize,
+        image_views,
+        present_wait_semaphores,
+        queue_group: ManuallyDrop::new(queue_group),
+        render_area: Rect {
+            x: 0,
+            y: 0,
+            w: w as i16,
+            h: h as i16,
+        },
+        render_pass: ManuallyDrop::new(render_pass),
+        surf,
+        swapchain: ManuallyDrop::new(swapchain),
+        simple_textures: vec![],
+        triangle_buffers: vec![],
+        triangle_descriptor_set_layouts,
+        triangle_memory: vec![],
+        triangle_pipeline: ManuallyDrop::new(triangle_pipeline),
+        triangle_pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
+        triangle_render_pass: ManuallyDrop::new(triangle_render_pass),
+        vk_inst: ManuallyDrop::new(vk_inst),
+        window,
+    }
+}
+
+pub fn add_texture(s: &mut Windowing) {
     // texture
+    let device = &s.device;
     let (texture_vertex_buffer, texture_vertex_memory, requirements) = unsafe {
         const F32_XY_TRIANGLE: u64 = (std::mem::size_of::<f32>() * 2 * 3 * 2) as u64;
         use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
@@ -421,7 +458,8 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
             .create_buffer(F32_XY_TRIANGLE, gfx_hal::buffer::Usage::VERTEX)
             .expect("cant make bf");
         let requirements = device.get_buffer_requirements(&buffer);
-        let memory_type_id = adapter
+        let memory_type_id = s
+            .adapter
             .physical_device
             .memory_properties()
             .memory_types
@@ -462,7 +500,8 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
             .create_buffer(F32_XY_TRIANGLE, gfx_hal::buffer::Usage::VERTEX)
             .expect("cant make bf");
         let requirements = device.get_buffer_requirements(&buffer);
-        let memory_type_id = adapter
+        let memory_type_id = s
+            .adapter
             .physical_device
             .memory_properties()
             .memory_types
@@ -532,7 +571,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
     //     .to_rgba();
     // let (img_width, img_height) = img.dimensions();
     // let kind = image::Kind::D2(img_width as image::Size, img_height as image::Size, 1, 1);
-    // let limits = adapter.physical_device.limits();
+    // let limits = s.adapter.physical_device.limits();
     // let row_alignment_mask = limits.min_buffer_copy_pitch_alignment as u32 - 1;
     // let image_stride = 4usize;
     // let row_pitch = (img_width * image_stride as u32 + row_alignment_mask) & !row_alignment_mask;
@@ -543,7 +582,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
     //     unsafe { device.create_buffer(upload_size, gfx_hal::buffer::Usage::TRANSFER_SRC) }.unwrap();
     // let image_mem_reqs = unsafe { device.get_buffer_requirements(&image_upload_buffer) };
     // use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
-    // let memory_type_id = adapter
+    // let memory_type_id = s.adapter
     //     .physical_device
     //     .memory_properties()
     //     .memory_types
@@ -564,44 +603,14 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
     //    transfer_src usage
     // let required_bytes = row_pitch * img.height() as usize;
     // let staging_bundle =
-    //     BufferBundle::new(&adapter, device, required_bytes, BufferUsage::TRANSFER_SRC).unwrap();
+    //     BufferBundle::new(&s.adapter, device, required_bytes, BufferUsage::TRANSFER_SRC).unwrap();
 
-    Windowing {
-        acquire_image_semaphores,
-        adapter,
-        command_buffers,
-        command_pool: ManuallyDrop::new(command_pool),
-        current_frame: 0,
-        device: ManuallyDrop::new(device),
-        events_loop,
-        frame_render_fences,
-        framebuffers,
-        image_count: image_count as usize,
-        image_views,
-        present_wait_semaphores,
-        queue_group: ManuallyDrop::new(queue_group),
-        render_area: Rect {
-            x: 0,
-            y: 0,
-            w: w as i16,
-            h: h as i16,
-        },
-        render_pass: ManuallyDrop::new(render_pass),
-        surf,
-        swapchain: ManuallyDrop::new(swapchain),
-        texture_uv_buffer: ManuallyDrop::new(texture_uv_buffer),
-        texture_uv_memory: ManuallyDrop::new(texture_uv_memory),
+    s.simple_textures.push(SingleTexture {
         texture_vertex_buffer: ManuallyDrop::new(texture_vertex_buffer),
         texture_vertex_memory: ManuallyDrop::new(texture_vertex_memory),
-        triangle_buffers: vec![],
-        triangle_descriptor_set_layouts,
-        triangle_memory: vec![],
-        triangle_pipeline: ManuallyDrop::new(triangle_pipeline),
-        triangle_pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
-        triangle_render_pass: ManuallyDrop::new(triangle_render_pass),
-        vk_inst: ManuallyDrop::new(vk_inst),
-        window,
-    }
+        texture_uv_buffer: ManuallyDrop::new(texture_uv_buffer),
+        texture_uv_memory: ManuallyDrop::new(texture_uv_memory),
+    });
 }
 
 pub fn add_triangle(s: &mut Windowing, triangle: &[f32; 6]) {

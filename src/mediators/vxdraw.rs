@@ -472,91 +472,58 @@ pub fn find_memory_type_id<B: gfx_hal::Backend>(
         .unwrap()
 }
 
-pub fn add_texture(s: &mut Windowing, lgr: &mut Logger<Log>) {
+pub fn make_vertex_buffer_with_data(
+    s: &mut Windowing,
+    data: &[f32],
+) -> (
+    <back::Backend as Backend>::Buffer,
+    <back::Backend as Backend>::Memory,
+) {
     let device = &s.device;
-    let (texture_vertex_buffer, texture_vertex_memory, requirements) = unsafe {
-        const F32_XY_TRIANGLE: u64 = (std::mem::size_of::<f32>() * 2 * 3 * 2) as u64;
+    let (buffer, memory, requirements) = unsafe {
+        let buffer_size: u64 = (std::mem::size_of::<f32>() * data.len()) as u64;
         use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
         let mut buffer = device
-            .create_buffer(F32_XY_TRIANGLE, gfx_hal::buffer::Usage::VERTEX)
+            .create_buffer(buffer_size, gfx_hal::buffer::Usage::VERTEX)
             .expect("cant make bf");
         let requirements = device.get_buffer_requirements(&buffer);
-        let memory_type_id = s
-            .adapter
-            .physical_device
-            .memory_properties()
-            .memory_types
-            .iter()
-            .enumerate()
-            .find(|&(id, memory_type)| {
-                requirements.type_mask & (1 << id) != 0
-                    && memory_type.properties.contains(Properties::CPU_VISIBLE)
-            })
-            .map(|(id, _)| MemoryTypeId(id))
-            .unwrap();
+        let memory_type_id = find_memory_type_id(&s.adapter, requirements, Properties::CPU_VISIBLE);
         let memory = device
             .allocate_memory(memory_type_id, requirements.size)
             .expect("Couldn't allocate vertex buffer memory");
         device
             .bind_buffer_memory(&memory, 0, &mut buffer)
             .expect("Couldn't bind the buffer memory!");
-        // (buffer, memory, requirements)
         (buffer, memory, requirements)
     };
-    // Upload vertex data
     unsafe {
         let mut data_target = device
-            .acquire_mapping_writer(&texture_vertex_memory, 0..requirements.size)
+            .acquire_mapping_writer(&memory, 0..requirements.size)
             .expect("Failed to acquire a memory writer!");
-        data_target[..12].copy_from_slice(&[
-            -1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
-        ]);
+        data_target[..data.len()].copy_from_slice(data);
         device
             .release_mapping_writer(data_target)
             .expect("Couldn't release the mapping writer!");
     }
+    (buffer, memory)
+}
 
-    let (texture_uv_buffer, texture_uv_memory, requirements) = unsafe {
-        const F32_XY_TRIANGLE: u64 = (std::mem::size_of::<f32>() * 2 * 3 * 2) as u64;
-        use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
-        let mut buffer = device
-            .create_buffer(F32_XY_TRIANGLE, gfx_hal::buffer::Usage::VERTEX)
-            .expect("cant make bf");
-        let requirements = device.get_buffer_requirements(&buffer);
-        let memory_type_id = s
-            .adapter
-            .physical_device
-            .memory_properties()
-            .memory_types
-            .iter()
-            .enumerate()
-            .find(|&(id, memory_type)| {
-                requirements.type_mask & (1 << id) != 0
-                    && memory_type.properties.contains(Properties::CPU_VISIBLE)
-            })
-            .map(|(id, _)| MemoryTypeId(id))
-            .unwrap();
-        let memory = device
-            .allocate_memory(memory_type_id, requirements.size)
-            .expect("Couldn't allocate vertex buffer memory");
-        device
-            .bind_buffer_memory(&memory, 0, &mut buffer)
-            .expect("Couldn't bind the buffer memory!");
-        // (buffer, memory, requirements)
-        (buffer, memory, requirements)
-    };
-    // Upload vertex data
-    unsafe {
-        let mut data_target = device
-            .acquire_mapping_writer(&texture_uv_memory, 0..requirements.size)
-            .expect("Failed to acquire a memory writer!");
-        data_target[..12].copy_from_slice(&[
+pub fn add_texture(s: &mut Windowing, lgr: &mut Logger<Log>) {
+    let (texture_vertex_buffer, texture_vertex_memory) = make_vertex_buffer_with_data(
+        s,
+        &[
             -1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
-        ]);
-        device
-            .release_mapping_writer(data_target)
-            .expect("Couldn't release the mapping writer!");
-    }
+        ],
+    );
+    let (texture_uv_buffer, texture_uv_memory) = make_vertex_buffer_with_data(
+        s,
+        &[
+            -1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
+        ],
+    );
+
+    let device = &s.device;
+
     const VERTEX_SOURCE_TEXTURE: &str = "#version 450
     #extension GL_ARB_separate_shader_objects : enable
 
@@ -605,19 +572,7 @@ pub fn add_texture(s: &mut Windowing, lgr: &mut Logger<Log>) {
         unsafe { device.create_buffer(upload_size, gfx_hal::buffer::Usage::TRANSFER_SRC) }.unwrap();
     let image_mem_reqs = unsafe { device.get_buffer_requirements(&image_upload_buffer) };
     use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
-    let memory_type_id = s
-        .adapter
-        .physical_device
-        .memory_properties()
-        .memory_types
-        .iter()
-        .enumerate()
-        .find(|&(id, memory_type)| {
-            requirements.type_mask & (1 << id) != 0
-                && memory_type.properties.contains(Properties::CPU_VISIBLE)
-        })
-        .map(|(id, _)| MemoryTypeId(id))
-        .unwrap();
+    let memory_type_id = find_memory_type_id(&s.adapter, image_mem_reqs, Properties::CPU_VISIBLE);
     let image_upload_memory =
         unsafe { device.allocate_memory(memory_type_id, image_mem_reqs.size) }.unwrap();
     unsafe { device.bind_buffer_memory(&image_upload_memory, 0, &mut image_upload_buffer) }
@@ -638,36 +593,7 @@ pub fn add_texture(s: &mut Windowing, lgr: &mut Logger<Log>) {
 }
 
 pub fn add_triangle(s: &mut Windowing, triangle: &[f32; 6]) {
-    let (buffer, memory, requirements) = unsafe {
-        const F32_XY_TRIANGLE: u64 = (std::mem::size_of::<f32>() * 2 * 3) as u64;
-        use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
-        let mut buffer = s
-            .device
-            .create_buffer(F32_XY_TRIANGLE, gfx_hal::buffer::Usage::VERTEX)
-            .expect("cant make bf");
-        let requirements = s.device.get_buffer_requirements(&buffer);
-        let memory_type_id = find_memory_type_id(&s.adapter, requirements, Properties::CPU_VISIBLE);
-        let memory = s
-            .device
-            .allocate_memory(memory_type_id, requirements.size)
-            .expect("Couldn't allocate vertex buffer memory");
-        s.device
-            .bind_buffer_memory(&memory, 0, &mut buffer)
-            .expect("Couldn't bind the buffer memory!");
-        // (buffer, memory, requirements)
-        (buffer, memory, requirements)
-    };
-    // Upload vertex data
-    unsafe {
-        let mut data_target = s
-            .device
-            .acquire_mapping_writer(&memory, 0..requirements.size)
-            .expect("Failed to acquire a memory writer!");
-        data_target[..6].copy_from_slice(triangle);
-        s.device
-            .release_mapping_writer(data_target)
-            .expect("Couldn't release the mapping writer!");
-    }
+    let (buffer, memory) = make_vertex_buffer_with_data(s, &triangle[..]);
     s.triangle_buffers.push(buffer);
     s.triangle_memory.push(memory);
 }
@@ -792,7 +718,7 @@ mod tests {
     #[test]
     fn setup_and_teardown() {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger);
+        let windowing = init_window_with_vulkan(&mut logger);
     }
 
     #[test]

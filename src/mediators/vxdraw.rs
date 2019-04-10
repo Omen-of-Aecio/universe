@@ -13,11 +13,11 @@ use arrayvec::ArrayVec;
 use cgmath::prelude::*;
 use cgmath::{Deg, Matrix4, Vector2, Vector3};
 use gfx_hal::{
-    adapter::PhysicalDevice,
+    adapter::{MemoryTypeId, PhysicalDevice},
     command::{self, ClearColor, ClearValue},
     device::Device,
     format::{self, ChannelType, Swizzle},
-    image, pass, pool,
+    image, memory, pass, pool,
     pso::{
         self, AttributeDesc, BakedStates, BasePipeline, BlendDesc, BlendOp, BlendState,
         ColorBlendDesc, ColorMask, DepthStencilDesc, DepthTest, DescriptorSetLayoutBinding,
@@ -27,7 +27,7 @@ use gfx_hal::{
     },
     queue::Submission,
     window::{Extent2D, PresentMode::*, Surface, Swapchain},
-    Backbuffer, Backend, FrameSync, Instance, Primitive, SwapchainConfig,
+    Adapter, Backbuffer, Backend, FrameSync, Instance, Primitive, SwapchainConfig,
 };
 use logger::{info, log, trace, warn, InDebug, InDebugPretty, Logger};
 use std::io::Read;
@@ -47,7 +47,8 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
     info![log, "vxdraw", "Adapters found"; "count" => len];
     for (idx, adap) in adapters.iter().enumerate() {
         let info = adap.info.clone();
-        info![log, "vxdraw", "Adapter found"; "idx" => idx, "info" => InDebugPretty(&info)];
+        let limits = adap.physical_device.limits();
+        info![log, "vxdraw", "Adapter found"; "idx" => idx, "info" => InDebugPretty(&info), "device limits" => InDebugPretty(&limits)];
     }
     // TODO Find appropriate adapter, I've never seen a case where we have 2+ adapters, that time
     // will come one day
@@ -58,6 +59,8 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
 
     let (caps, formats, present_modes, _composite_alpha) =
         surf.compatibility(&adapter.physical_device);
+
+    info![log, "vxdraw", "Formats available"; "formats" => InDebugPretty(&formats); clone formats];
     let format = formats.map_or(format::Format::Rgba8Srgb, |formats| {
         formats
             .iter()
@@ -66,6 +69,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
             .unwrap_or(formats[0])
     });
 
+    info![log, "vxdraw", "Format chosen"; "format" => InDebugPretty(&format); clone format];
     info![log, "vxdraw", "Available present modes"; "modes" => InDebugPretty(&present_modes); clone present_modes];
 
     // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPresentModeKHR.html
@@ -120,7 +124,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
                     .create_image_view(
                         &image,
                         image::ViewKind::D2,
-                        format,
+                        format, // MUST be identical to the image's format
                         Swizzle::NO,
                         image::SubresourceRange {
                             aspects: format::Aspects::COLOR,
@@ -400,6 +404,9 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         parent: BasePipeline::None,
     };
 
+    let tr_pipe_fmt = format!["{:#?}", pipeline_desc];
+    info![log, "vxdraw", "Pipeline descriptor"; "pipeline" => InDebugPretty(&tr_pipe_fmt)];
+
     let triangle_pipeline = unsafe {
         device
             .create_graphics_pipeline(&pipeline_desc, None)
@@ -448,8 +455,24 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
     }
 }
 
-pub fn add_texture(s: &mut Windowing) {
-    // texture
+pub fn find_memory_type_id<B: gfx_hal::Backend>(
+    adap: &Adapter<B>,
+    reqs: memory::Requirements,
+    prop: memory::Properties,
+) -> MemoryTypeId {
+    adap.physical_device
+        .memory_properties()
+        .memory_types
+        .iter()
+        .enumerate()
+        .find(|&(id, memory_type)| {
+            reqs.type_mask & (1 << id) != 0 && memory_type.properties.contains(prop)
+        })
+        .map(|(id, _)| MemoryTypeId(id))
+        .unwrap()
+}
+
+pub fn add_texture(s: &mut Windowing, lgr: &mut Logger<Log>) {
     let device = &s.device;
     let (texture_vertex_buffer, texture_vertex_memory, requirements) = unsafe {
         const F32_XY_TRIANGLE: u64 = (std::mem::size_of::<f32>() * 2 * 3 * 2) as u64;
@@ -565,39 +588,40 @@ pub fn add_texture(s: &mut Windowing) {
         target0 = texture(sampler2D(u_texture, u_sampler), v_uv);
     }";
 
-    // let img_data = include_bytes!["../../assets/images/logo.png"];
-    // let img = load_image::load_from_memory_with_format(&img_data[..], load_image::PNG)
-    //     .unwrap()
-    //     .to_rgba();
-    // let (img_width, img_height) = img.dimensions();
-    // let kind = image::Kind::D2(img_width as image::Size, img_height as image::Size, 1, 1);
-    // let limits = s.adapter.physical_device.limits();
-    // let row_alignment_mask = limits.min_buffer_copy_pitch_alignment as u32 - 1;
-    // let image_stride = 4usize;
-    // let row_pitch = (img_width * image_stride as u32 + row_alignment_mask) & !row_alignment_mask;
-    // let upload_size = (img_height * row_pitch) as u64;
-    // // debug_assert!(row_pitch as usize >= row_size);
+    let img_data = include_bytes!["../../assets/images/logo.png"];
+    let img = load_image::load_from_memory_with_format(&img_data[..], load_image::PNG)
+        .unwrap()
+        .to_rgba();
+    let (img_width, img_height) = img.dimensions();
+    let kind = image::Kind::D2(img_width as image::Size, img_height as image::Size, 1, 1);
+    let limits = s.adapter.physical_device.limits();
+    let row_alignment_mask = limits.min_buffer_copy_pitch_alignment as u32 - 1;
+    let image_stride = 4usize;
+    let row_pitch = (img_width * image_stride as u32 + row_alignment_mask) & !row_alignment_mask;
+    let upload_size = (img_height * row_pitch) as u64;
+    // debug_assert!(row_pitch as usize >= row_size);
 
-    // let mut image_upload_buffer =
-    //     unsafe { device.create_buffer(upload_size, gfx_hal::buffer::Usage::TRANSFER_SRC) }.unwrap();
-    // let image_mem_reqs = unsafe { device.get_buffer_requirements(&image_upload_buffer) };
-    // use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
-    // let memory_type_id = s.adapter
-    //     .physical_device
-    //     .memory_properties()
-    //     .memory_types
-    //     .iter()
-    //     .enumerate()
-    //     .find(|&(id, memory_type)| {
-    //         requirements.type_mask & (1 << id) != 0
-    //             && memory_type.properties.contains(Properties::CPU_VISIBLE)
-    //     })
-    //     .map(|(id, _)| MemoryTypeId(id))
-    //     .unwrap();
-    // let image_upload_memory =
-    //     unsafe { device.allocate_memory(memory_type_id, image_mem_reqs.size) }.unwrap();
-    // unsafe { device.bind_buffer_memory(&image_upload_memory, 0, &mut image_upload_buffer) }
-    //     .unwrap();
+    let mut image_upload_buffer =
+        unsafe { device.create_buffer(upload_size, gfx_hal::buffer::Usage::TRANSFER_SRC) }.unwrap();
+    let image_mem_reqs = unsafe { device.get_buffer_requirements(&image_upload_buffer) };
+    use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
+    let memory_type_id = s
+        .adapter
+        .physical_device
+        .memory_properties()
+        .memory_types
+        .iter()
+        .enumerate()
+        .find(|&(id, memory_type)| {
+            requirements.type_mask & (1 << id) != 0
+                && memory_type.properties.contains(Properties::CPU_VISIBLE)
+        })
+        .map(|(id, _)| MemoryTypeId(id))
+        .unwrap();
+    let image_upload_memory =
+        unsafe { device.allocate_memory(memory_type_id, image_mem_reqs.size) }.unwrap();
+    unsafe { device.bind_buffer_memory(&image_upload_memory, 0, &mut image_upload_buffer) }
+        .unwrap();
 
     // 1. make a staging buffer with enough memory for the image, and a
     //    transfer_src usage
@@ -622,19 +646,7 @@ pub fn add_triangle(s: &mut Windowing, triangle: &[f32; 6]) {
             .create_buffer(F32_XY_TRIANGLE, gfx_hal::buffer::Usage::VERTEX)
             .expect("cant make bf");
         let requirements = s.device.get_buffer_requirements(&buffer);
-        let memory_type_id = s
-            .adapter
-            .physical_device
-            .memory_properties()
-            .memory_types
-            .iter()
-            .enumerate()
-            .find(|&(id, memory_type)| {
-                requirements.type_mask & (1 << id) != 0
-                    && memory_type.properties.contains(Properties::CPU_VISIBLE)
-            })
-            .map(|(id, _)| MemoryTypeId(id))
-            .unwrap();
+        let memory_type_id = find_memory_type_id(&s.adapter, requirements, Properties::CPU_VISIBLE);
         let memory = s
             .device
             .allocate_memory(memory_type_id, requirements.size)
@@ -818,6 +830,30 @@ mod tests {
 
         let tri = make_centered_equilateral_triangle();
         add_triangle(&mut windowing, &tri);
+        for i in 0..=360 {
+            let mat4 =
+                prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(i as f32)); // * Matrix4::from_scale(0.5f32);
+            draw_frame(&mut windowing, &mut logger, &mat4);
+            std::thread::sleep(std::time::Duration::new(0, 8_000_000));
+        }
+    }
+
+    #[test]
+    fn texture() {
+        let mut logger = Logger::spawn();
+        logger.set_colorize(true);
+        let mut windowing = init_window_with_vulkan(&mut logger);
+        let prspect = {
+            let size = windowing
+                .window
+                .get_inner_size()
+                .unwrap()
+                .to_physical(windowing.window.get_hidpi_factor());
+            let pval = Vector2::new(size.height, size.width).normalize();
+            Matrix4::from_nonuniform_scale(pval.x as f32, pval.y as f32, 1.0)
+        };
+
+        add_texture(&mut windowing, &mut logger);
         for i in 0..=360 {
             let mat4 =
                 prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(i as f32)); // * Matrix4::from_scale(0.5f32);

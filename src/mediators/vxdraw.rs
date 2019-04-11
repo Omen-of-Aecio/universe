@@ -17,7 +17,9 @@ use gfx_hal::{
     command::{self, BufferCopy, ClearColor, ClearValue},
     device::Device,
     format::{self, ChannelType, Swizzle},
-    image, memory, pass, pool,
+    image, memory,
+    memory::Properties,
+    pass, pool,
     pso::{
         self, AttributeDesc, BakedStates, BasePipeline, BlendDesc, BlendOp, BlendState,
         ColorBlendDesc, ColorMask, DepthStencilDesc, DepthTest, DescriptorSetLayoutBinding,
@@ -483,7 +485,6 @@ pub fn make_vertex_buffer_with_data(
     let device = &s.device;
     let (buffer, memory, requirements) = unsafe {
         let buffer_size: u64 = (std::mem::size_of::<f32>() * data.len()) as u64;
-        use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
         let mut buffer = device
             .create_buffer(buffer_size, gfx_hal::buffer::Usage::VERTEX)
             .expect("cant make bf");
@@ -519,7 +520,6 @@ pub fn make_vertex_buffer_with_data_on_gpu(
     let device = &s.device;
     let (buffer, memory, requirements) = unsafe {
         let buffer_size: u64 = (std::mem::size_of::<f32>() * data.len()) as u64;
-        use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
         let mut buffer = device
             .create_buffer(buffer_size, gfx_hal::buffer::Usage::TRANSFER_SRC)
             .expect("cant make bf");
@@ -543,9 +543,8 @@ pub fn make_vertex_buffer_with_data_on_gpu(
             .expect("Couldn't release the mapping writer!");
     }
 
-    let (buffer_gpu, memory_gpu, requirements_gpu) = unsafe {
+    let (buffer_gpu, memory_gpu) = unsafe {
         let buffer_size: u64 = (std::mem::size_of::<f32>() * data.len()) as u64;
-        use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
         let mut buffer = device
             .create_buffer(
                 buffer_size,
@@ -561,7 +560,7 @@ pub fn make_vertex_buffer_with_data_on_gpu(
         device
             .bind_buffer_memory(&memory, 0, &mut buffer)
             .expect("Couldn't bind the buffer memory!");
-        (buffer, memory, requirements)
+        (buffer, memory)
     };
     let buffer_size: u64 = (std::mem::size_of::<f32>() * data.len()) as u64;
     let mut cmd_buffer = s
@@ -612,7 +611,7 @@ pub fn make_vertex_buffer_with_data_on_gpu(
     (buffer_gpu, memory_gpu)
 }
 
-pub fn add_texture(s: &mut Windowing, lgr: &mut Logger<Log>) {
+pub fn add_texture(s: &mut Windowing, _lgr: &mut Logger<Log>) {
     let (texture_vertex_buffer, texture_vertex_memory) = make_vertex_buffer_with_data(
         s,
         &[
@@ -628,43 +627,43 @@ pub fn add_texture(s: &mut Windowing, lgr: &mut Logger<Log>) {
 
     let device = &s.device;
 
-    const VERTEX_SOURCE_TEXTURE: &str = "#version 450
-    #extension GL_ARB_separate_shader_objects : enable
+    // const VERTEX_SOURCE_TEXTURE: &str = "#version 450
+    // #extension GL_ARB_separate_shader_objects : enable
 
-    layout(constant_id = 0) const float scale = 1.2f;
+    // layout(constant_id = 0) const float scale = 1.2f;
 
-    layout(location = 0) in vec2 a_pos;
-    layout(location = 1) in vec2 a_uv;
-    layout(location = 0) out vec2 v_uv;
+    // layout(location = 0) in vec2 a_pos;
+    // layout(location = 1) in vec2 a_uv;
+    // layout(location = 0) out vec2 v_uv;
 
-    out gl_PerVertex {
-        vec4 gl_Position;
-    };
+    // out gl_PerVertex {
+    //     vec4 gl_Position;
+    // };
 
-    void main() {
-        v_uv = a_uv;
-        gl_Position = vec4(scale * a_pos, 0.0, 1.0);
-    }";
+    // void main() {
+    //     v_uv = a_uv;
+    //     gl_Position = vec4(scale * a_pos, 0.0, 1.0);
+    // }";
 
-    const FRAGMENT_SOURCE_TEXTURE: &str = "#version 450
-    #extension GL_ARB_separate_shader_objects : enable
+    // const FRAGMENT_SOURCE_TEXTURE: &str = "#version 450
+    // #extension GL_ARB_separate_shader_objects : enable
 
-    layout(location = 0) in vec2 v_uv;
-    layout(location = 0) out vec4 target0;
+    // layout(location = 0) in vec2 v_uv;
+    // layout(location = 0) out vec4 target0;
 
-    layout(set = 0, binding = 0) uniform texture2D u_texture;
-    layout(set = 0, binding = 1) uniform sampler u_sampler;
+    // layout(set = 0, binding = 0) uniform texture2D u_texture;
+    // layout(set = 0, binding = 1) uniform sampler u_sampler;
 
-    void main() {
-        target0 = texture(sampler2D(u_texture, u_sampler), v_uv);
-    }";
+    // void main() {
+    //     target0 = texture(sampler2D(u_texture, u_sampler), v_uv);
+    // }";
 
     let img_data = include_bytes!["../../assets/images/logo.png"];
     let img = load_image::load_from_memory_with_format(&img_data[..], load_image::PNG)
         .unwrap()
         .to_rgba();
     let (img_width, img_height) = img.dimensions();
-    let kind = image::Kind::D2(img_width as image::Size, img_height as image::Size, 1, 1);
+    let _kind = image::Kind::D2(img_width as image::Size, img_height as image::Size, 1, 1);
     let limits = s.adapter.physical_device.limits();
     let row_alignment_mask = limits.min_buffer_copy_pitch_alignment as u32 - 1;
     let image_stride = 4usize;
@@ -675,7 +674,6 @@ pub fn add_texture(s: &mut Windowing, lgr: &mut Logger<Log>) {
     let mut image_upload_buffer =
         unsafe { device.create_buffer(upload_size, gfx_hal::buffer::Usage::TRANSFER_SRC) }.unwrap();
     let image_mem_reqs = unsafe { device.get_buffer_requirements(&image_upload_buffer) };
-    use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
     let memory_type_id = find_memory_type_id(&s.adapter, image_mem_reqs, Properties::CPU_VISIBLE);
     let image_upload_memory =
         unsafe { device.allocate_memory(memory_type_id, image_mem_reqs.size) }.unwrap();
@@ -686,12 +684,6 @@ pub fn add_texture(s: &mut Windowing, lgr: &mut Logger<Log>) {
         device.destroy_buffer(image_upload_buffer);
         device.free_memory(image_upload_memory);
     }
-
-    // 1. make a staging buffer with enough memory for the image, and a
-    //    transfer_src usage
-    // let required_bytes = row_pitch * img.height() as usize;
-    // let staging_bundle =
-    //     BufferBundle::new(&s.adapter, device, required_bytes, BufferUsage::TRANSFER_SRC).unwrap();
 
     s.simple_textures.push(SingleTexture {
         texture_vertex_buffer: ManuallyDrop::new(texture_vertex_buffer),
@@ -827,7 +819,7 @@ mod tests {
     #[test]
     fn setup_and_teardown() {
         let mut logger = Logger::spawn_void();
-        let windowing = init_window_with_vulkan(&mut logger);
+        let _ = init_window_with_vulkan(&mut logger);
     }
 
     #[test]

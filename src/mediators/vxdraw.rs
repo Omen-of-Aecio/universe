@@ -14,7 +14,7 @@ use cgmath::prelude::*;
 use cgmath::{Deg, Matrix4, Vector2, Vector3};
 use gfx_hal::{
     adapter::{MemoryTypeId, PhysicalDevice},
-    command::{self, ClearColor, ClearValue},
+    command::{self, BufferCopy, ClearColor, ClearValue},
     device::Device,
     format::{self, ChannelType, Swizzle},
     image, memory, pass, pool,
@@ -31,6 +31,7 @@ use gfx_hal::{
 };
 use logger::{info, log, trace, warn, InDebug, InDebugPretty, Logger};
 use std::io::Read;
+use std::iter::once;
 use std::mem::{size_of, transmute, ManuallyDrop};
 use winit::{Event, EventsLoop, Window};
 
@@ -508,6 +509,109 @@ pub fn make_vertex_buffer_with_data(
     (buffer, memory)
 }
 
+pub fn make_vertex_buffer_with_data_on_gpu(
+    s: &mut Windowing,
+    data: &[f32],
+) -> (
+    <back::Backend as Backend>::Buffer,
+    <back::Backend as Backend>::Memory,
+) {
+    let device = &s.device;
+    let (buffer, memory, requirements) = unsafe {
+        let buffer_size: u64 = (std::mem::size_of::<f32>() * data.len()) as u64;
+        use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
+        let mut buffer = device
+            .create_buffer(buffer_size, gfx_hal::buffer::Usage::TRANSFER_SRC)
+            .expect("cant make bf");
+        let requirements = device.get_buffer_requirements(&buffer);
+        let memory_type_id = find_memory_type_id(&s.adapter, requirements, Properties::CPU_VISIBLE);
+        let memory = device
+            .allocate_memory(memory_type_id, requirements.size)
+            .expect("Couldn't allocate vertex buffer memory");
+        device
+            .bind_buffer_memory(&memory, 0, &mut buffer)
+            .expect("Couldn't bind the buffer memory!");
+        (buffer, memory, requirements)
+    };
+    unsafe {
+        let mut data_target = device
+            .acquire_mapping_writer(&memory, 0..requirements.size)
+            .expect("Failed to acquire a memory writer!");
+        data_target[..data.len()].copy_from_slice(data);
+        device
+            .release_mapping_writer(data_target)
+            .expect("Couldn't release the mapping writer!");
+    }
+
+    let (buffer_gpu, memory_gpu, requirements_gpu) = unsafe {
+        let buffer_size: u64 = (std::mem::size_of::<f32>() * data.len()) as u64;
+        use gfx_hal::{adapter::MemoryTypeId, memory::Properties};
+        let mut buffer = device
+            .create_buffer(
+                buffer_size,
+                gfx_hal::buffer::Usage::TRANSFER_DST | gfx_hal::buffer::Usage::VERTEX,
+            )
+            .expect("cant make bf");
+        let requirements = device.get_buffer_requirements(&buffer);
+        let memory_type_id =
+            find_memory_type_id(&s.adapter, requirements, Properties::DEVICE_LOCAL);
+        let memory = device
+            .allocate_memory(memory_type_id, requirements.size)
+            .expect("Couldn't allocate vertex buffer memory");
+        device
+            .bind_buffer_memory(&memory, 0, &mut buffer)
+            .expect("Couldn't bind the buffer memory!");
+        (buffer, memory, requirements)
+    };
+    let buffer_size: u64 = (std::mem::size_of::<f32>() * data.len()) as u64;
+    let mut cmd_buffer = s
+        .command_pool
+        .acquire_command_buffer::<gfx_hal::command::OneShot>();
+    unsafe {
+        cmd_buffer.begin();
+        let buffer_barrier = gfx_hal::memory::Barrier::Buffer {
+            families: None,
+            range: None..None,
+            states: gfx_hal::buffer::Access::empty()..gfx_hal::buffer::Access::TRANSFER_WRITE,
+            target: &buffer_gpu,
+        };
+        cmd_buffer.pipeline_barrier(
+            PipelineStage::TOP_OF_PIPE..PipelineStage::TRANSFER,
+            gfx_hal::memory::Dependencies::empty(),
+            &[buffer_barrier],
+        );
+        let copy = once(BufferCopy {
+            src: 0,
+            dst: 0,
+            size: buffer_size,
+        });
+        cmd_buffer.copy_buffer(&buffer, &buffer_gpu, copy);
+        let buffer_barrier = gfx_hal::memory::Barrier::Buffer {
+            families: None,
+            range: None..None,
+            states: gfx_hal::buffer::Access::TRANSFER_WRITE..gfx_hal::buffer::Access::SHADER_READ,
+            target: &buffer_gpu,
+        };
+        cmd_buffer.pipeline_barrier(
+            PipelineStage::TRANSFER..PipelineStage::FRAGMENT_SHADER,
+            gfx_hal::memory::Dependencies::empty(),
+            &[buffer_barrier],
+        );
+        cmd_buffer.finish();
+        let upload_fence = device
+            .create_fence(false)
+            .expect("Couldn't create an upload fence!");
+        s.queue_group.queues[0].submit_nosemaphores(Some(&cmd_buffer), Some(&upload_fence));
+        device
+            .wait_for_fence(&upload_fence, core::u64::MAX)
+            .expect("Couldn't wait for the fence!");
+        device.destroy_fence(upload_fence);
+        device.destroy_buffer(buffer);
+        device.free_memory(memory);
+    }
+    (buffer_gpu, memory_gpu)
+}
+
 pub fn add_texture(s: &mut Windowing, lgr: &mut Logger<Log>) {
     let (texture_vertex_buffer, texture_vertex_memory) = make_vertex_buffer_with_data(
         s,
@@ -578,6 +682,11 @@ pub fn add_texture(s: &mut Windowing, lgr: &mut Logger<Log>) {
     unsafe { device.bind_buffer_memory(&image_upload_memory, 0, &mut image_upload_buffer) }
         .unwrap();
 
+    unsafe {
+        device.destroy_buffer(image_upload_buffer);
+        device.free_memory(image_upload_memory);
+    }
+
     // 1. make a staging buffer with enough memory for the image, and a
     //    transfer_src usage
     // let required_bytes = row_pitch * img.height() as usize;
@@ -593,7 +702,7 @@ pub fn add_texture(s: &mut Windowing, lgr: &mut Logger<Log>) {
 }
 
 pub fn add_triangle(s: &mut Windowing, triangle: &[f32; 6]) {
-    let (buffer, memory) = make_vertex_buffer_with_data(s, &triangle[..]);
+    let (buffer, memory) = make_vertex_buffer_with_data_on_gpu(s, &triangle[..]);
     s.triangle_buffers.push(buffer);
     s.triangle_memory.push(memory);
 }
@@ -719,6 +828,19 @@ mod tests {
     fn setup_and_teardown() {
         let mut logger = Logger::spawn_void();
         let windowing = init_window_with_vulkan(&mut logger);
+    }
+
+    #[test]
+    fn setup_and_teardown_with_gpu_upload() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger);
+
+        let (buffer, memory) =
+            make_vertex_buffer_with_data_on_gpu(&mut windowing, &[1.0f32, 2.0, 3.0, 4.0]);
+        unsafe {
+            windowing.device.destroy_buffer(buffer);
+            windowing.device.free_memory(memory);
+        }
     }
 
     #[test]

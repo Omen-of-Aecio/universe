@@ -11,12 +11,8 @@ use gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 use gfx_backend_vulkan as back;
 use gfx_hal::{
-    command,
     device::Device,
-    format::{self, ChannelType, Swizzle},
-    image, pass, pool,
-    window::{Extent2D, PresentMode::*, Surface, Swapchain},
-    Adapter, Backbuffer, Backend, FrameSync, Instance, SwapchainConfig,
+    Adapter, Backend,
 };
 pub use glium::uniforms::{MagnifySamplerFilter, MinifySamplerFilter};
 use glium::{implement_vertex, texture::Texture2d};

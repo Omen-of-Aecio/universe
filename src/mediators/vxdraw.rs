@@ -11,7 +11,7 @@ use gfx_backend_vulkan as back;
 use ::image as load_image;
 use arrayvec::ArrayVec;
 use cgmath::prelude::*;
-use cgmath::{Deg, Matrix4, Vector2, Vector3};
+use cgmath::Matrix4;
 use gfx_hal::{
     adapter::{MemoryTypeId, PhysicalDevice},
     command::{self, BufferCopy, ClearColor, ClearValue},
@@ -31,7 +31,7 @@ use gfx_hal::{
     window::{Extent2D, PresentMode::*, Surface, Swapchain},
     Adapter, Backbuffer, Backend, FrameSync, Instance, Primitive, SwapchainConfig,
 };
-use logger::{info, log, trace, warn, InDebug, InDebugPretty, Logger};
+use logger::{info, log, trace, InDebug, InDebugPretty, Logger};
 use std::io::Read;
 use std::iter::once;
 use std::mem::{size_of, transmute, ManuallyDrop};
@@ -472,7 +472,7 @@ pub fn find_memory_type_id<B: gfx_hal::Backend>(
             reqs.type_mask & (1 << id) != 0 && memory_type.properties.contains(prop)
         })
         .map(|(id, _)| MemoryTypeId(id))
-        .unwrap()
+        .expect("Unable to find memory type id")
 }
 
 pub fn make_vertex_buffer_with_data(
@@ -707,7 +707,7 @@ pub fn collect_input(windowing: &mut Windowing) -> Vec<Event> {
     inputs
 }
 
-pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &cgmath::Matrix4<f32>) {
+pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &Matrix4<f32>) {
     let frame_render_fence = &s.frame_render_fences[s.current_frame];
     let acquire_image_semaphore = &s.acquire_image_semaphores[s.current_frame];
     let present_wait_semaphore = &s.present_wait_semaphores[s.current_frame];

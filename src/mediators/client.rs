@@ -291,12 +291,12 @@ fn update_bullets(bullets: &mut Vec<Bullet>) {
     }
 }
 
-fn play_song(s: &mut Client) {
-    use std::{fs::File, io::BufReader};
-    let file = File::open("assets/sound/Kitsune^2 - Rainbow Tylenol.mp3").unwrap();
-    let source = rodio::Decoder::new(BufReader::new(file)).unwrap();
-    s.audio.append(source);
-}
+// fn play_song(s: &mut Client) {
+//     use std::{fs::File, io::BufReader};
+//     let file = File::open("assets/sound/Kitsune^2 - Rainbow Tylenol.mp3").unwrap();
+//     let source = rodio::Decoder::new(BufReader::new(file)).unwrap();
+//     s.audio.append(source);
+// }
 
 fn remove_bullets_outside_camera(_log: &mut Logger<Log>, bullets: &mut Vec<Bullet>, cam: &Camera) {
     let bocs = cam.get_view_bocs();

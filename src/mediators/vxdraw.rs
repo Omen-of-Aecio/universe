@@ -1,4 +1,4 @@
-use crate::glocals::{Log, SingleTexture, Windowing};
+use crate::glocals::{DebugTriangle, Log, SingleTexture, Windowing};
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
 #[cfg(feature = "gl")]
@@ -423,12 +423,13 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         device.destroy_shader_module(fs_module);
     }
 
-    Windowing {
+    let mut windowing = Windowing {
         acquire_image_semaphores,
         adapter,
         command_buffers,
         command_pool: ManuallyDrop::new(command_pool),
         current_frame: 0,
+        debug_triangles: None,
         device: ManuallyDrop::new(device),
         events_loop,
         frame_render_fences,
@@ -455,7 +456,17 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         triangle_render_pass: ManuallyDrop::new(triangle_render_pass),
         vk_inst: ManuallyDrop::new(vk_inst),
         window,
-    }
+    };
+    let (dtbuffer, dtmemory) =
+        make_vertex_buffer_with_data(&mut windowing, &vec![0.0f32; 6 * 1024]);
+    let debug_triangles = DebugTriangle {
+        capacity: 6 * 1024,
+        triangles_count: 0,
+        triangles_buffer: dtbuffer,
+        triangles_memory: dtmemory,
+    };
+    windowing.debug_triangles = Some(debug_triangles);
+    windowing
 }
 
 pub fn find_memory_type_id<B: gfx_hal::Backend>(
@@ -707,6 +718,34 @@ pub fn collect_input(windowing: &mut Windowing) -> Vec<Event> {
     inputs
 }
 
+pub fn add_to_triangles(s: &mut Windowing, triangle: &[f32; 6]) {
+    let device = &s.device;
+    if let Some(ref mut debug_triangles) = s.debug_triangles {
+        unsafe {
+            let mut data_target = device
+                .acquire_mapping_writer(
+                    &debug_triangles.triangles_memory,
+                    0..debug_triangles.capacity,
+                )
+                // .acquire_mapping_writer(&debug_triangles.triangles_memory, begin..end)
+                .expect("Failed to acquire a memory writer!");
+            let idx = debug_triangles.triangles_count;
+            data_target[idx..idx + triangle.len()].copy_from_slice(triangle);
+            debug_triangles.triangles_count += triangle.len();
+            device
+                .release_mapping_writer(data_target)
+                .expect("Couldn't release the mapping writer!");
+        }
+    }
+}
+
+pub fn pop_to_triangles(s: &mut Windowing) {
+    if let Some(ref mut debug_triangles) = s.debug_triangles {
+        s.device.wait_idle().expect("device idle");
+        debug_triangles.triangles_count -= 6;
+    }
+}
+
 pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &Matrix4<f32>) {
     let frame_render_fence = &s.frame_render_fences[s.current_frame];
     let acquire_image_semaphore = &s.acquire_image_semaphores[s.current_frame];
@@ -759,6 +798,12 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &Matrix4<f32>)
                     let buffers: ArrayVec<[_; 1]> = [(buffer_ref, 0)].into();
                     enc.bind_vertex_buffers(0, buffers);
                     enc.draw(0..3, 0..1);
+                }
+                if let Some(ref debug_triangles) = s.debug_triangles {
+                    let count = debug_triangles.triangles_count;
+                    let buffers: ArrayVec<[_; 1]> = [(&debug_triangles.triangles_buffer, 0)].into();
+                    enc.bind_vertex_buffers(0, buffers);
+                    enc.draw(0..(debug_triangles.triangles_count / 2) as u32, 0..1);
                 }
             }
             buffer.finish();
@@ -871,12 +916,20 @@ mod tests {
         };
 
         let tri = make_centered_equilateral_triangle();
-        add_triangle(&mut windowing, &tri);
+        // add_triangle(&mut windowing, &tri);
+        add_to_triangles(&mut windowing, &tri);
         for i in 0..=360 {
+            if i % 2 == 0 {
+                info![logger, "test", "Adding"];
+                add_to_triangles(&mut windowing, &[-1.0f32, -1.0, -1.0, 0.0, 0.0, -1.0]);
+            } else {
+                info![logger, "test", "Subbing"];
+                pop_to_triangles(&mut windowing);
+            }
             let mat4 =
                 prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(i as f32)); // * Matrix4::from_scale(0.5f32);
             draw_frame(&mut windowing, &mut logger, &mat4);
-            std::thread::sleep(std::time::Duration::new(0, 8_000_000));
+            std::thread::sleep(std::time::Duration::new(0, 100_000_000));
         }
     }
 

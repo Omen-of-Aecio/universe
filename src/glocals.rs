@@ -96,6 +96,13 @@ pub struct SingleTexture {
     pub texture_uv_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
 }
 
+pub struct DebugTriangle {
+    pub capacity: u64,
+    pub triangles_count: usize,
+    pub triangles_buffer: <back::Backend as Backend>::Buffer,
+    pub triangles_memory: <back::Backend as Backend>::Memory,
+}
+
 pub struct Windowing {
     pub window: winit::Window,
     pub events_loop: winit::EventsLoop,
@@ -109,6 +116,8 @@ pub struct Windowing {
     // pub texture_render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
     // pub texture_pipeline: ManuallyDrop<<back::Backend as Backend>::GraphicsPipeline>,
     // pub texture_pipeline_layout: ManuallyDrop<<back::Backend as Backend>::PipelineLayout>,
+    //
+    pub debug_triangles: Option<DebugTriangle>,
     //
     pub triangle_buffers: Vec<<back::Backend as Backend>::Buffer>,
     pub triangle_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout>,
@@ -174,6 +183,11 @@ impl Drop for Windowing {
         }
 
         unsafe {
+            if let Some(debug_triangles) = self.debug_triangles.take() {
+                self.device.destroy_buffer(debug_triangles.triangles_buffer);
+                self.device.free_memory(debug_triangles.triangles_memory);
+            }
+
             self.device.destroy_command_pool(
                 ManuallyDrop::into_inner(read(&self.command_pool)).into_raw(),
             );

@@ -795,6 +795,8 @@ mod tests {
     use super::*;
     use test::{black_box, Bencher};
 
+    use cgmath::{Deg, Vector2, Vector3};
+
     // ---
 
     fn make_centered_equilateral_triangle() -> [f32; 6] {

@@ -10,10 +10,7 @@ use gfx_backend_gl as back;
 use gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 use gfx_backend_vulkan as back;
-use gfx_hal::{
-    device::Device,
-    Adapter, Backend,
-};
+use gfx_hal::{device::Device, Adapter, Backend};
 pub use glium::uniforms::{MagnifySamplerFilter, MinifySamplerFilter};
 use glium::{implement_vertex, texture::Texture2d};
 use input;

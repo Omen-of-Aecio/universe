@@ -531,7 +531,7 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
 
     let vertex_buffers: Vec<VertexBufferDesc> = vec![VertexBufferDesc {
         binding: 0,
-        stride: (size_of::<f32>() * (2 + 4)) as u32,
+        stride: (size_of::<f32>() * (2 + 1)) as u32,
         rate: 0,
     }];
     let attributes: Vec<AttributeDesc> = vec![
@@ -547,7 +547,7 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
             location: 1,
             binding: 0,
             element: Element {
-                format: format::Format::Rgba32Float,
+                format: format::Format::Rgba8Unorm,
                 offset: 8,
             },
         },
@@ -953,13 +953,13 @@ pub fn add_to_triangles(s: &mut Windowing, triangle: &[f32; 6]) {
                 .expect("Failed to acquire a memory writer!");
             let mut idx = debug_triangles.triangles_count;
             data_target[idx..idx + 2].copy_from_slice(&triangle[0..2]);
-            data_target[idx + 2..idx + 6].copy_from_slice(&[0.8f32, 0.8, 0.0, 0.8]);
-            idx += 6;
+            data_target[idx + 2..idx + 3].copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[255u8, 240, 10, 255]));
+            idx += 3;
             data_target[idx..idx + 2].copy_from_slice(&triangle[2..4]);
-            data_target[idx + 2..idx + 6].copy_from_slice(&[0.8f32, 0.8, 0.0, 0.8]);
-            idx += 6;
+            data_target[idx + 2..idx + 3].copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[0u8, 240, 200, 255]));
+            idx += 3;
             data_target[idx..idx + 2].copy_from_slice(&triangle[4..6]);
-            data_target[idx + 2..idx + 6].copy_from_slice(&[0.8f32, 0.0, 1.0, 0.8]);
+            data_target[idx + 2..idx + 3].copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[0u8, 240, 10, 255]));
             // data_target[idx..idx + triangle.len()].copy_from_slice(triangle);
             // debug_triangles.triangles_count += triangle.len();
             debug_triangles.triangles_count += 6 + 4 * 3;
@@ -1030,12 +1030,6 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &Matrix4<f32>)
                     enc.bind_vertex_buffers(0, buffers);
                     enc.draw(0..3, 0..1);
                 }
-                // if let Some(ref debug_triangles) = s.debug_triangles {
-                //     let count = debug_triangles.triangles_count;
-                //     let buffers: ArrayVec<[_; 1]> = [(&debug_triangles.triangles_buffer, 0)].into();
-                //     enc.bind_vertex_buffers(0, buffers);
-                //     enc.draw(0..(debug_triangles.triangles_count / 2) as u32, 0..1);
-                // }
                 if let Some(ref debug_triangles) = s.debug_triangles {
                     enc.bind_graphics_pipeline(&debug_triangles.pipeline);
                     let count = debug_triangles.triangles_count / 2 / 3;
@@ -1157,7 +1151,9 @@ mod tests {
         let tri = make_centered_equilateral_triangle();
         // add_triangle(&mut windowing, &tri);
         add_to_triangles(&mut windowing, &tri);
-        add_to_triangles(&mut windowing, &[-1.0f32, -1.0, -1.0, 0.0, 0.0, -1.0]);
+        for i in 0..30 {
+            add_to_triangles(&mut windowing, &[-1.0f32 + i as f32 / 30f32, -1.0, -1.0, 0.0, 0.0, -1.0]);
+        }
         info![logger, "tst", "equi"; "equi" => InDebug(&tri); clone tri];
         let mat4 =
             prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(32 as f32)); // * Matrix4::from_scale(0.5f32);

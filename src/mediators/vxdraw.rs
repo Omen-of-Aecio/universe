@@ -949,20 +949,26 @@ pub fn add_to_triangles(s: &mut Windowing, triangle: &[f32; 6]) {
                     &debug_triangles.triangles_memory,
                     0..debug_triangles.capacity,
                 )
-                // .acquire_mapping_writer(&debug_triangles.triangles_memory, begin..end)
                 .expect("Failed to acquire a memory writer!");
-            let mut idx = debug_triangles.triangles_count;
+            const PTS: usize = 3;
+            const COLORS: usize = 4;
+            const COMPNTS: usize = 2;
+            let mut idx = debug_triangles.triangles_count
+                * (size_of::<f32>() * COMPNTS * PTS + size_of::<u8>() * COLORS * PTS)
+                / size_of::<f32>();
+
             data_target[idx..idx + 2].copy_from_slice(&triangle[0..2]);
-            data_target[idx + 2..idx + 3].copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[255u8, 240, 10, 255]));
+            data_target[idx + 2..idx + 3]
+                .copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[255u8, 240, 10, 255]));
             idx += 3;
             data_target[idx..idx + 2].copy_from_slice(&triangle[2..4]);
-            data_target[idx + 2..idx + 3].copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[0u8, 240, 200, 255]));
+            data_target[idx + 2..idx + 3]
+                .copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[0u8, 240, 200, 255]));
             idx += 3;
             data_target[idx..idx + 2].copy_from_slice(&triangle[4..6]);
-            data_target[idx + 2..idx + 3].copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[0u8, 240, 10, 255]));
-            // data_target[idx..idx + triangle.len()].copy_from_slice(triangle);
-            // debug_triangles.triangles_count += triangle.len();
-            debug_triangles.triangles_count += 6 + 4 * 3;
+            data_target[idx + 2..idx + 3]
+                .copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[0u8, 240, 10, 255]));
+            debug_triangles.triangles_count += 1;
             device
                 .release_mapping_writer(data_target)
                 .expect("Couldn't release the mapping writer!");
@@ -1032,11 +1038,11 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &Matrix4<f32>)
                 }
                 if let Some(ref debug_triangles) = s.debug_triangles {
                     enc.bind_graphics_pipeline(&debug_triangles.pipeline);
-                    let count = debug_triangles.triangles_count / 2 / 3;
+                    let count = debug_triangles.triangles_count;
                     let buffers: ArrayVec<[_; 1]> = [(&debug_triangles.triangles_buffer, 0)].into();
                     enc.bind_vertex_buffers(0, buffers);
                     info![log, "vxdraw", "mesh count"; "count" => count];
-                    enc.draw(0..count as u32, 0..1);
+                    enc.draw(0..(count * 3) as u32, 0..1);
                 }
             }
             buffer.finish();
@@ -1151,10 +1157,11 @@ mod tests {
         let tri = make_centered_equilateral_triangle();
         // add_triangle(&mut windowing, &tri);
         add_to_triangles(&mut windowing, &tri);
-        for i in 0..30 {
-            add_to_triangles(&mut windowing, &[-1.0f32 + i as f32 / 30f32, -1.0, -1.0, 0.0, 0.0, -1.0]);
-        }
-        info![logger, "tst", "equi"; "equi" => InDebug(&tri); clone tri];
+        add_to_triangles(&mut windowing, &[-1.0f32, -1.0, -1.0, 0.0, 0.0, -1.0]);
+        add_to_triangles(&mut windowing, &[-1.0f32, 1.0, -1.0, 0.0, 0.0, 1.0]);
+        add_to_triangles(&mut windowing, &[1.0f32, -1.0, 0.0, -1.0, 1.0, 0.0]);
+        add_to_triangles(&mut windowing, &[1.0f32, -1.0, 0.0, -1.0, 1.0, 0.0]);
+        add_to_triangles(&mut windowing, &[1.0f32, 1.0, 0.0, 1.0, 1.0, 0.0]);
         let mat4 =
             prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(32 as f32)); // * Matrix4::from_scale(0.5f32);
         draw_frame(&mut windowing, &mut logger, &mat4);

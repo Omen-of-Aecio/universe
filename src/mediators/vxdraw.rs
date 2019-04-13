@@ -1194,15 +1194,31 @@ pub fn pop_n_triangles(s: &mut Windowing, n: usize) {
     }
 }
 
+pub fn draw_frame_copy_framebuffer(
+    s: &mut Windowing,
+    log: &mut Logger<Log>,
+    view: &Matrix4<f32>,
+) -> Vec<u8> {
+    draw_frame_internal(s, log, view, copy_image_to_rgb)
+}
+
 pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &Matrix4<f32>) {
+    draw_frame_internal(s, log, view, |_| {});
+}
+
+fn draw_frame_internal<T>(
+    s: &mut Windowing,
+    log: &mut Logger<Log>,
+    view: &Matrix4<f32>,
+    postproc: fn(&mut Windowing) -> T,
+) -> T {
     let frame_render_fence = &s.frame_render_fences[s.current_frame];
     let acquire_image_semaphore = &s.acquire_image_semaphores[s.current_frame];
-    let present_wait_semaphore = &s.present_wait_semaphores[s.current_frame];
     let frame = s.current_frame;
     trace![log, "vxdraw", "Current frame"; "frame" => frame];
 
     let image_index;
-    unsafe {
+    let postproc_res = unsafe {
         image_index = s
             .swapchain
             .acquire_image(
@@ -1265,21 +1281,31 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &Matrix4<f32>)
             PipelineStage::COLOR_ATTACHMENT_OUTPUT,
         )]
         .into();
-        let signal_semaphores: ArrayVec<[_; 1]> = [present_wait_semaphore].into();
-        // yes, you have to write it twice like this. yes, it's silly.
+        {
+            let present_wait_semaphore = &s.present_wait_semaphores[frame];
+            let signal_semaphores: ArrayVec<[_; 1]> = [present_wait_semaphore].into();
+            // yes, you have to write it twice like this. yes, it's silly.
+            let submission = Submission {
+                command_buffers: std::iter::once(command_buffers),
+                wait_semaphores,
+                signal_semaphores,
+            };
+            s.queue_group.queues[0].submit(submission, Some(frame_render_fence));
+        }
+        let postproc_res = postproc(s);
+        let present_wait_semaphore = &s.present_wait_semaphores[frame];
         let present_wait_semaphores: ArrayVec<[_; 1]> = [present_wait_semaphore].into();
-        let submission = Submission {
-            command_buffers: std::iter::once(command_buffers),
-            wait_semaphores,
-            signal_semaphores,
-        };
-        let the_command_queue = &mut s.queue_group.queues[0];
-        the_command_queue.submit(submission, Some(frame_render_fence));
         s.swapchain
-            .present(the_command_queue, image_index, present_wait_semaphores)
+            .present(
+                &mut s.queue_group.queues[0],
+                image_index,
+                present_wait_semaphores,
+            )
             .unwrap();
-    }
+        postproc_res
+    };
     s.current_frame = (s.current_frame + 1) % s.image_count;
+    postproc_res
 }
 
 pub fn average_xy(triangle: &mut [f32; 6]) -> (f32, f32) {
@@ -1311,14 +1337,18 @@ fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
         Backbuffer::Images(ref images) => images,
         Backbuffer::Framebuffer(_) => unimplemented![],
     };
-    s.device.wait_idle().expect("Unable to wait for device");
+    unsafe {
+        s.device
+            .wait_for_fence(&s.frame_render_fences[s.current_frame], u64::max_value())
+            .expect("Unable to wait for fence");
+    }
     unsafe {
         let mut cmd_buffer = s
             .command_pool
             .acquire_command_buffer::<gfx_hal::command::OneShot>();
         cmd_buffer.begin();
         let image_barrier = gfx_hal::memory::Barrier::Image {
-            states: (gfx_hal::image::Access::empty(), image::Layout::Undefined)
+            states: (gfx_hal::image::Access::empty(), image::Layout::Present)
                 ..(
                     gfx_hal::image::Access::TRANSFER_READ,
                     image::Layout::TransferSrcOptimal,
@@ -1378,6 +1408,24 @@ fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
                     z: 1,
                 },
             }),
+        );
+        let image_barrier = gfx_hal::memory::Barrier::Image {
+            states: (
+                gfx_hal::image::Access::TRANSFER_READ,
+                image::Layout::TransferSrcOptimal,
+            )..(gfx_hal::image::Access::empty(), image::Layout::Present),
+            target: &images[s.swapchain_prev_idx as usize],
+            families: None,
+            range: image::SubresourceRange {
+                aspects: format::Aspects::COLOR,
+                levels: 0..1,
+                layers: 0..1,
+            },
+        };
+        cmd_buffer.pipeline_barrier(
+            PipelineStage::TRANSFER..PipelineStage::BOTTOM_OF_PIPE,
+            gfx_hal::memory::Dependencies::empty(),
+            &[image_barrier],
         );
         cmd_buffer.finish();
         let the_command_queue = &mut s.queue_group.queues[0];
@@ -1542,11 +1590,10 @@ mod tests {
         add_to_triangles(windowing, &[1.0f32, 1.0, 0.0, 1.0, 1.0, 0.0]);
     }
 
-    fn assert_swapchain_eq(windowing: &mut Windowing, name: &str) {
+    fn assert_swapchain_eq(windowing: &mut Windowing, name: &str, rgb: Vec<u8>) {
         use load_image::ImageDecoder;
         std::fs::create_dir_all("_build/vxdraw_results").expect("Unable to create directories");
 
-        let rgba = copy_image_to_rgb(windowing);
         let genname = String::from("_build/vxdraw_results/") + name + ".png";
         let correctname = String::from("tests/vxdraw/") + name + ".png";
         let diffname = String::from("_build/vxdraw_results/") + name + "#diff.png";
@@ -1555,7 +1602,7 @@ mod tests {
         let file = std::fs::File::create(&genname).expect("Unable to create file");
         let enc = load_image::png::PNGEncoder::new(file);
         enc.encode(
-            &rgba,
+            &rgb,
             windowing.swapconfig.extent.width,
             windowing.swapconfig.extent.height,
             load_image::ColorType::RGB(8),
@@ -1595,12 +1642,11 @@ mod tests {
             }
         }
 
-        if correct_bytes != rgba {
+        if correct_bytes != rgb {
             let mut diff = Vec::with_capacity(correct_bytes.len());
             for (idx, byte) in correct_bytes.iter().enumerate() {
-                diff.push(absdiff(*byte, rgba[idx]));
+                diff.push(absdiff(*byte, rgb[idx]));
             }
-            let diffname = String::from("_build/vxdraw_results/") + name + "#diff.png";
             let file = std::fs::File::create(&diffname).expect("Unable to create file");
             let enc = load_image::png::PNGEncoder::new(file);
             enc.encode(
@@ -1651,9 +1697,9 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
-        draw_frame(&mut windowing, &mut logger, &prspect);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
-        assert_swapchain_eq(&mut windowing, "setup_and_teardown_draw_with_test");
+        assert_swapchain_eq(&mut windowing, "setup_and_teardown_draw_with_test", img);
     }
 
     #[test]
@@ -1687,9 +1733,9 @@ mod tests {
         add_to_triangles(&mut windowing, &tri);
         add_4_screencorners(&mut windowing);
 
-        draw_frame(&mut windowing, &mut logger, &prspect);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
-        assert_swapchain_eq(&mut windowing, "simple_triangle");
+        assert_swapchain_eq(&mut windowing, "simple_triangle", img);
     }
 
     #[test]
@@ -1702,9 +1748,9 @@ mod tests {
         add_to_triangles(&mut windowing, &tri);
         set_triangle_color(&mut windowing, 0, &[255, 0, 255, 255]);
 
-        draw_frame(&mut windowing, &mut logger, &prspect);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
-        assert_swapchain_eq(&mut windowing, "simple_triangle_change_color");
+        assert_swapchain_eq(&mut windowing, "simple_triangle_change_color", img);
     }
 
     #[test]
@@ -1714,9 +1760,9 @@ mod tests {
         let prspect = gen_perspective(&mut windowing);
 
         add_windmills(&mut windowing);
-        draw_frame(&mut windowing, &mut logger, &prspect);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
-        assert_swapchain_eq(&mut windowing, "windmills");
+        assert_swapchain_eq(&mut windowing, "windmills", img);
     }
 
     #[test]
@@ -1750,9 +1796,9 @@ mod tests {
         for _ in 0..30 {
             rotate_to_triangles(&mut windowing, Deg(1.0f32));
         }
-        draw_frame(&mut windowing, &mut logger, &prspect);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
-        assert_swapchain_eq(&mut windowing, "rotating_windmills_drawing_invariant");
+        assert_swapchain_eq(&mut windowing, "rotating_windmills_drawing_invariant", img);
         remove_windmills(&mut windowing);
 
         add_windmills(&mut windowing);
@@ -1760,7 +1806,17 @@ mod tests {
             rotate_to_triangles(&mut windowing, Deg(1.0f32));
             draw_frame(&mut windowing, &mut logger, &prspect);
         }
-        assert_swapchain_eq(&mut windowing, "rotating_windmills_drawing_invariant");
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "rotating_windmills_drawing_invariant", img);
+
+        // // for _ in 0..30000 {
+        //     for _ in 0..360 {
+        //         rotate_to_triangles(&mut windowing, Deg(1.0f32));
+        //     }
+        // // }
+        // let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+
+        // assert_swapchain_eq(&mut windowing, "rotating_windmills_drawing_invariant", img);
     }
 
     // ---

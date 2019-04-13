@@ -483,6 +483,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         render_pass: ManuallyDrop::new(render_pass),
         surf,
         swapchain: ManuallyDrop::new(swapchain),
+        swapchain_prev_idx: 0,
         swapconfig: swap_config,
         simple_textures: vec![],
         triangle_buffers: vec![],
@@ -795,6 +796,40 @@ pub fn make_transfer_buffer_of_size(
             .expect("Couldn't allocate vertex buffer memory");
         device
             .bind_buffer_memory(&memory, 0, &mut buffer)
+            .expect("Couldn't bind the buffer memory!");
+        (buffer, memory, requirements)
+    };
+    (buffer, memory, requirements)
+}
+
+pub fn make_transfer_img_of_size(
+    s: &mut Windowing,
+    w: u32,
+    h: u32,
+) -> (
+    <back::Backend as Backend>::Image,
+    <back::Backend as Backend>::Memory,
+    memory::Requirements,
+) {
+    let device = &s.device;
+    let (buffer, memory, requirements) = unsafe {
+        let mut buffer = device
+            .create_image(
+                image::Kind::D2(w, h, 1, 1),
+                1,
+                format::Format::Rgb8Unorm,
+                image::Tiling::Linear,
+                image::Usage::TRANSFER_SRC | image::Usage::TRANSFER_DST,
+                image::ViewCapabilities::empty(),
+            )
+            .expect("cant make bf");
+        let requirements = device.get_image_requirements(&buffer);
+        let memory_type_id = find_memory_type_id(&s.adapter, requirements, Properties::CPU_VISIBLE);
+        let memory = device
+            .allocate_memory(memory_type_id, requirements.size)
+            .expect("Couldn't allocate image buffer memory");
+        device
+            .bind_image_memory(&memory, 0, &mut buffer)
             .expect("Couldn't bind the buffer memory!");
         (buffer, memory, requirements)
     };
@@ -1177,7 +1212,7 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &Matrix4<f32>)
             .unwrap();
         trace![log, "vxdraw", "Acquired image index"; "index" => image_index];
         assert_eq![image_index as usize, s.current_frame];
-
+        s.swapchain_prev_idx = image_index;
         trace![log, "vxdraw", "Waiting for fence"];
         s.device
             .wait_for_fence(frame_render_fence, u64::max_value())
@@ -1188,7 +1223,7 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &Matrix4<f32>)
         {
             let buffer = &mut s.command_buffers[s.current_frame];
             let clear_values = [ClearValue::Color(ClearColor::Float([
-                1.0f32, 0.0, 0.0, 1.0,
+                1.0f32, 0.25, 0.5, 0.75,
             ]))];
             buffer.begin(false);
             {
@@ -1266,7 +1301,12 @@ pub fn gen_perspective(s: &mut Windowing) -> Matrix4<f32> {
 }
 
 fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
-    let (buffer, memory, requirements) = make_transfer_buffer_of_size(s, 400);
+    let width = s.swapconfig.extent.width;
+    let height = s.swapconfig.extent.height;
+
+    let (buffer, memory, requirements) =
+        make_transfer_buffer_of_size(s, (width * height * 3) as u64);
+    let (imgbuf, imgmem, _imgreq) = make_transfer_img_of_size(s, width, height);
     let images = match s.backbuffer {
         Backbuffer::Images(ref images) => images,
         Backbuffer::Framebuffer(_) => unimplemented![],
@@ -1283,7 +1323,86 @@ fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
                     gfx_hal::image::Access::TRANSFER_READ,
                     image::Layout::TransferSrcOptimal,
                 ),
-            target: &images[0],
+            target: &images[s.swapchain_prev_idx as usize],
+            families: None,
+            range: image::SubresourceRange {
+                aspects: format::Aspects::COLOR,
+                levels: 0..1,
+                layers: 0..1,
+            },
+        };
+        let dstbarrier = gfx_hal::memory::Barrier::Image {
+            states: (gfx_hal::image::Access::empty(), image::Layout::Undefined)
+                ..(
+                    gfx_hal::image::Access::TRANSFER_WRITE,
+                    image::Layout::General,
+                ),
+            target: &imgbuf,
+            families: None,
+            range: image::SubresourceRange {
+                aspects: format::Aspects::COLOR,
+                levels: 0..1,
+                layers: 0..1,
+            },
+        };
+        cmd_buffer.pipeline_barrier(
+            PipelineStage::TOP_OF_PIPE..PipelineStage::TRANSFER,
+            gfx_hal::memory::Dependencies::empty(),
+            &[image_barrier, dstbarrier],
+        );
+        cmd_buffer.blit_image(
+            &images[s.swapchain_prev_idx as usize],
+            image::Layout::TransferSrcOptimal,
+            &imgbuf,
+            image::Layout::General,
+            image::Filter::Nearest,
+            once(command::ImageBlit {
+                src_subresource: image::SubresourceLayers {
+                    aspects: format::Aspects::COLOR,
+                    level: 0,
+                    layers: 0..1,
+                },
+                src_bounds: image::Offset { x: 0, y: 0, z: 0 }..image::Offset {
+                    x: width as i32,
+                    y: height as i32,
+                    z: 1,
+                },
+                dst_subresource: image::SubresourceLayers {
+                    aspects: format::Aspects::COLOR,
+                    level: 0,
+                    layers: 0..1,
+                },
+                dst_bounds: image::Offset { x: 0, y: 0, z: 0 }..image::Offset {
+                    x: width as i32,
+                    y: height as i32,
+                    z: 1,
+                },
+            }),
+        );
+        cmd_buffer.finish();
+        let the_command_queue = &mut s.queue_group.queues[0];
+        let fence = s
+            .device
+            .create_fence(false)
+            .expect("Unable to create fence");
+        the_command_queue.submit_nosemaphores(once(&cmd_buffer), Some(&fence));
+        s.device
+            .wait_for_fence(&fence, u64::max_value())
+            .expect("unable to wait for fence");
+        s.device.destroy_fence(fence);
+    }
+    unsafe {
+        let mut cmd_buffer = s
+            .command_pool
+            .acquire_command_buffer::<gfx_hal::command::OneShot>();
+        cmd_buffer.begin();
+        let image_barrier = gfx_hal::memory::Barrier::Image {
+            states: (gfx_hal::image::Access::empty(), image::Layout::Undefined)
+                ..(
+                    gfx_hal::image::Access::TRANSFER_READ,
+                    image::Layout::TransferSrcOptimal,
+                ),
+            target: &imgbuf,
             families: None,
             range: image::SubresourceRange {
                 aspects: format::Aspects::COLOR,
@@ -1297,13 +1416,13 @@ fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
             &[image_barrier],
         );
         cmd_buffer.copy_image_to_buffer(
-            &images[0],
+            &imgbuf,
             image::Layout::TransferSrcOptimal,
             &buffer,
             once(command::BufferImageCopy {
                 buffer_offset: 0,
-                buffer_width: 10,
-                buffer_height: 10,
+                buffer_width: width,
+                buffer_height: height,
                 image_layers: image::SubresourceLayers {
                     aspects: format::Aspects::COLOR,
                     level: 0,
@@ -1311,8 +1430,8 @@ fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
                 },
                 image_offset: image::Offset { x: 0, y: 0, z: 0 },
                 image_extent: image::Extent {
-                    width: 10,
-                    height: 10,
+                    width: width,
+                    height: height,
                     depth: 1,
                 },
             }),
@@ -1332,22 +1451,31 @@ fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
     unsafe {
         let reader = s
             .device
-            .acquire_mapping_reader::<u8>(
-                &memory,
-                0..align_top(Alignment(requirements.alignment), 4 * 100),
-            )
+            .acquire_mapping_reader::<u8>(&memory, 0..requirements.size as u64)
             .expect("Unable to open reader");
-        let result = reader.iter().take(4 * 100).map(|x| *x).collect::<Vec<_>>();
+        let result = reader
+            .iter()
+            .take((3 * width * height) as usize)
+            .map(|x| *x)
+            .collect::<Vec<_>>();
         s.device.release_mapping_reader(reader);
         s.device.destroy_buffer(buffer);
         s.device.free_memory(memory);
+        s.device.destroy_image(imgbuf);
+        s.device.free_memory(imgmem);
         result
     }
 }
 
 pub struct Alignment(u64);
 fn align_top(alignment: Alignment, value: u64) -> u64 {
-    value + value % alignment.0
+    if value % alignment.0 != 0 {
+        let alig = value + (alignment.0 - value % alignment.0);
+        assert![alig % alignment.0 == 0];
+        alig
+    } else {
+        value
+    }
 }
 
 // ---
@@ -1359,6 +1487,7 @@ mod tests {
     use test::Bencher;
 
     use cgmath::{Deg, Vector3};
+    use rand_pcg::Pcg64Mcg as random;
 
     // ---
 
@@ -1380,8 +1509,8 @@ mod tests {
     }
 
     fn add_windmills(windowing: &mut Windowing) {
-        let mut rng = rand::thread_rng();
         use rand::Rng;
+        let mut rng = random::new(0);
         for _ in 0..1000 {
             let mut tri = make_centered_equilateral_triangle();
             let (dx, dy) = (
@@ -1402,11 +1531,107 @@ mod tests {
         }
     }
 
+    fn remove_windmills(windowing: &mut Windowing) {
+        pop_n_triangles(windowing, 1000);
+    }
+
     fn add_4_screencorners(windowing: &mut Windowing) {
         add_to_triangles(windowing, &[-1.0f32, -1.0, 0.0, -1.0, -1.0, 0.0]);
         add_to_triangles(windowing, &[-1.0f32, 1.0, 0.0, 1.0, -1.0, 0.0]);
         add_to_triangles(windowing, &[1.0f32, -1.0, 0.0, -1.0, 1.0, 0.0]);
         add_to_triangles(windowing, &[1.0f32, 1.0, 0.0, 1.0, 1.0, 0.0]);
+    }
+
+    fn assert_swapchain_eq(windowing: &mut Windowing, name: &str) {
+        use load_image::ImageDecoder;
+        std::fs::create_dir_all("_build/vxdraw_results").expect("Unable to create directories");
+
+        let rgba = copy_image_to_rgb(windowing);
+        let genname = String::from("_build/vxdraw_results/") + name + ".png";
+        let correctname = String::from("tests/vxdraw/") + name + ".png";
+        let diffname = String::from("_build/vxdraw_results/") + name + "#diff.png";
+        let appendname = String::from("_build/vxdraw_results/") + name + "#sum.png";
+
+        let file = std::fs::File::create(&genname).expect("Unable to create file");
+        let enc = load_image::png::PNGEncoder::new(file);
+        enc.encode(
+            &rgba,
+            windowing.swapconfig.extent.width,
+            windowing.swapconfig.extent.height,
+            load_image::ColorType::RGB(8),
+        )
+        .expect("Unable to encode PNG file");
+
+        let correct = std::fs::File::open(&correctname).unwrap();
+        let dec = load_image::png::PNGDecoder::new(correct)
+            .expect("Unable to read PNG file (does it exist?)");
+
+        assert_eq![
+            (
+                windowing.swapconfig.extent.width as u64,
+                windowing.swapconfig.extent.height as u64
+            ),
+            dec.dimensions(),
+            "The swapchain image and the preset correct image MUST be of the exact same size"
+        ];
+        assert_eq![
+            load_image::ColorType::RGB(8),
+            dec.colortype(),
+            "Both images MUST have the RGB(8) format"
+        ];
+
+        let correct_bytes = dec
+            .into_reader()
+            .expect("Unable to read file")
+            .bytes()
+            .map(|x| x.expect("Unable to read byte"))
+            .collect::<Vec<u8>>();
+
+        fn absdiff(lhs: u8, rhs: u8) -> u8 {
+            if let Some(newbyte) = lhs.checked_sub(rhs) {
+                newbyte
+            } else {
+                rhs - lhs
+            }
+        }
+
+        if correct_bytes != rgba {
+            let mut diff = Vec::with_capacity(correct_bytes.len());
+            for (idx, byte) in correct_bytes.iter().enumerate() {
+                diff.push(absdiff(*byte, rgba[idx]));
+            }
+            let diffname = String::from("_build/vxdraw_results/") + name + "#diff.png";
+            let file = std::fs::File::create(&diffname).expect("Unable to create file");
+            let enc = load_image::png::PNGEncoder::new(file);
+            enc.encode(
+                &diff,
+                windowing.swapconfig.extent.width,
+                windowing.swapconfig.extent.height,
+                load_image::ColorType::RGB(8),
+            )
+            .expect("Unable to encode PNG file");
+            std::process::Command::new("convert")
+                .args(&[
+                    "-bordercolor".into(),
+                    "black".into(),
+                    "-border".into(),
+                    "20".into(),
+                    correctname,
+                    genname,
+                    diffname,
+                    "+append".into(),
+                    appendname.clone(),
+                ])
+                .output()
+                .expect("Failed to execute process");
+            std::process::Command::new("feh")
+                .args(&[appendname])
+                .output()
+                .expect("Failed to execute process");
+            assert![false, "Images were NOT the same!"];
+        } else {
+            assert![true];
+        }
     }
 
     // ---
@@ -1418,43 +1643,17 @@ mod tests {
     }
 
     #[test]
-    fn setup_and_teardown_draw_with_test() {
-        let mut logger = Logger::spawn_void();
-        // logger.set_colorize(true);
-        // logger.set_log_level(64);
+    fn setup_and_teardown_draw_clear() {
+        let mut logger = Logger::spawn();
+        logger.set_colorize(true);
+        logger.set_log_level(64);
 
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
-        // add_to_triangles(&mut windowing, &[-1.0, 0.0, -1.0f32, -1.0, 0.0, 0.0]);
         draw_frame(&mut windowing, &mut logger, &prspect);
 
-        let rgb = copy_image_to_rgb(&mut windowing);
-        // let prev = vec![
-        //     0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0,
-        //     255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 3, 255, 6,
-        //     255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0,
-        //     0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 3, 254, 12, 255, 10, 254,
-        //     5, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255,
-        //     0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 3, 254, 17, 255, 10, 254, 11, 255, 16,
-        //     254, 4, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255,
-        //     255, 0, 0, 255, 255, 0, 0, 255, 255, 3, 254, 21, 255, 10, 254, 16, 255, 16, 254, 11,
-        //     255, 20, 254, 4, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255,
-        //     0, 0, 255, 255, 0, 0, 255, 255, 3, 254, 24, 255, 10, 254, 20, 255, 16, 254, 16, 255,
-        //     20, 254, 10, 255, 24, 254, 3, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0,
-        //     0, 255, 255, 0, 0, 255, 255, 3, 253, 27, 255, 10, 253, 24, 255, 16, 253, 20, 255, 20,
-        //     253, 15, 255, 24, 253, 9, 255, 28, 253, 3, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0,
-        //     255, 255, 0, 0, 255, 255, 3, 253, 30, 255, 10, 253, 27, 255, 16, 253, 24, 255, 20, 253,
-        //     20, 255, 24, 253, 15, 255, 28, 253, 9, 255, 31, 253, 2, 255, 0, 0, 255, 255, 0, 0, 255,
-        //     255, 0, 0, 255, 255, 3, 253, 33, 255, 10, 253, 30, 255, 16, 253, 27, 255, 20, 253, 23,
-        //     255, 24, 253, 19, 255, 28, 253, 14, 255, 31, 253, 8, 255, 34, 253, 1, 255, 0, 0, 255,
-        //     255, 0, 0, 255, 255, 3, 253, 35, 255, 10, 253, 32, 255, 16, 253, 30, 255, 20, 253, 26,
-        //     255, 24, 253, 23, 255, 28, 253, 19, 255, 31, 253, 14, 255, 34, 253, 7, 255, 36, 253, 0,
-        //     255, 0, 0, 255, 255,
-        // ];
-        warn![logger, "tst", "Got the image"; "image" => InDebug(&rgb); clone rgb];
-        // std::thread::sleep(std::time::Duration::new(3, 0));
-        // assert![prev == rgb];
+        assert_swapchain_eq(&mut windowing, "setup_and_teardown_draw_with_test");
     }
 
     #[test]
@@ -1489,6 +1688,8 @@ mod tests {
         add_4_screencorners(&mut windowing);
 
         draw_frame(&mut windowing, &mut logger, &prspect);
+
+        assert_swapchain_eq(&mut windowing, "simple_triangle");
     }
 
     #[test]
@@ -1502,7 +1703,8 @@ mod tests {
         set_triangle_color(&mut windowing, 0, &[255, 0, 255, 255]);
 
         draw_frame(&mut windowing, &mut logger, &prspect);
-        std::thread::sleep(std::time::Duration::new(10, 0));
+
+        assert_swapchain_eq(&mut windowing, "simple_triangle_change_color");
     }
 
     #[test]
@@ -1513,6 +1715,8 @@ mod tests {
 
         add_windmills(&mut windowing);
         draw_frame(&mut windowing, &mut logger, &prspect);
+
+        assert_swapchain_eq(&mut windowing, "windmills");
     }
 
     #[test]
@@ -1534,6 +1738,29 @@ mod tests {
             draw_frame(&mut windowing, &mut logger, &rot);
             std::thread::sleep(std::time::Duration::new(0, 80_000_000));
         }
+    }
+
+    #[test]
+    fn rotating_windmills_drawing_invariant() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&mut windowing);
+
+        add_windmills(&mut windowing);
+        for _ in 0..30 {
+            rotate_to_triangles(&mut windowing, Deg(1.0f32));
+        }
+        draw_frame(&mut windowing, &mut logger, &prspect);
+
+        assert_swapchain_eq(&mut windowing, "rotating_windmills_drawing_invariant");
+        remove_windmills(&mut windowing);
+
+        add_windmills(&mut windowing);
+        for _ in 0..30 {
+            rotate_to_triangles(&mut windowing, Deg(1.0f32));
+            draw_frame(&mut windowing, &mut logger, &prspect);
+        }
+        assert_swapchain_eq(&mut windowing, "rotating_windmills_drawing_invariant");
     }
 
     // ---

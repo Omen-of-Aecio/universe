@@ -153,6 +153,7 @@ pub struct Windowing {
     pub image_views: Vec<<back::Backend as Backend>::ImageView>,
     pub render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
     pub queue_group: ManuallyDrop<gfx_hal::QueueGroup<back::Backend, gfx_hal::Graphics>>,
+    pub swapchain_prev_idx: u32,
     pub swapchain: ManuallyDrop<<back::Backend as Backend>::Swapchain>,
     pub swapconfig: gfx_hal::window::SwapchainConfig,
     pub device: ManuallyDrop<back::Device>,

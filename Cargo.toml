@@ -28,7 +28,7 @@ gfx_window_sdl = "0.8"
 glium = "0.16.0"
 glsl-to-spirv = "0.1.4"
 honggfuzz = "0.5"
-image = "0.19"
+image = "0.21"
 priority-queue = "0.5.2"
 rand = "0.6.1"
 rodio = "0.8.1"
@@ -52,6 +52,7 @@ metac =       { path = "libs/metac" }
 udp_ack =     { path = "libs/udp_ack" }
 
 [dev-dependencies]
+rand_pcg = "0.1.2"
 regex = "1.1.0"
 slog-async = "2.3"
 slog-json = "2.3"

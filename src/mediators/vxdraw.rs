@@ -35,13 +35,28 @@ use logger::{info, log, trace, InDebug, InDebugPretty, Logger};
 use std::io::Read;
 use std::iter::once;
 use std::mem::{size_of, transmute, ManuallyDrop};
-use winit::{Event, EventsLoop, Window};
+use winit::{Event, EventsLoop, WindowBuilder};
+
+// pub mod manytris;
 
 // ---
 
-pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
+#[derive(PartialEq)]
+pub enum ShowWindow {
+    Headless,
+    Enable,
+}
+
+pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windowing {
     let events_loop = EventsLoop::new();
-    let window = Window::new(&events_loop).unwrap();
+    let window = WindowBuilder::new()
+        .with_visibility(if show == ShowWindow::Headless {
+            false
+        } else {
+            true
+        })
+        .build(&events_loop)
+        .unwrap();
     let version = 1;
     let vk_inst = back::Instance::create("renderer", version);
     let mut surf: <back::Backend as Backend>::Surface = vk_inst.create_surface(&window);
@@ -959,11 +974,11 @@ pub fn set_triangle_color(s: &mut Windowing, inst: usize, rgba: &[u8; 4]) {
                 * (size_of::<f32>() * COMPNTS * PTS + size_of::<u8>() * COLORS * PTS)
                 / size_of::<f32>();
             let rgba = transmute::<&[u8; 4], &[f32; 1]>(rgba);
-            data_target[idx+2 .. idx+3].copy_from_slice(rgba);
+            data_target[idx + 2..idx + 3].copy_from_slice(rgba);
             idx += 3;
-            data_target[idx+2 .. idx+3].copy_from_slice(rgba);
+            data_target[idx + 2..idx + 3].copy_from_slice(rgba);
             idx += 3;
-            data_target[idx+2 .. idx+3].copy_from_slice(rgba);
+            data_target[idx + 2..idx + 3].copy_from_slice(rgba);
             device
                 .release_mapping_writer(data_target)
                 .expect("Couldn't release the mapping writer!");
@@ -1275,13 +1290,13 @@ mod tests {
     #[test]
     fn setup_and_teardown() {
         let mut logger = Logger::spawn_void();
-        let _ = init_window_with_vulkan(&mut logger);
+        let _ = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
     }
 
     #[test]
     fn setup_and_teardown_with_gpu_upload() {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
 
         let (buffer, memory) =
             make_vertex_buffer_with_data_on_gpu(&mut windowing, &vec![1.0f32; 10_000]);
@@ -1295,14 +1310,14 @@ mod tests {
     #[test]
     fn init_window_and_get_input() {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
         collect_input(&mut windowing);
     }
 
     #[test]
     fn simple_triangle() {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
         let prspect = gen_perspective(&mut windowing);
         let tri = make_centered_equilateral_triangle();
 
@@ -1315,7 +1330,7 @@ mod tests {
     #[test]
     fn simple_triangle_change_color() {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
         let prspect = gen_perspective(&mut windowing);
         let tri = make_centered_equilateral_triangle();
 
@@ -1329,7 +1344,7 @@ mod tests {
     #[test]
     fn windmills() {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
         let prspect = gen_perspective(&mut windowing);
 
         add_windmills(&mut windowing);
@@ -1338,9 +1353,8 @@ mod tests {
 
     #[test]
     fn tearing_test() {
-        let mut logger = Logger::spawn();
-        logger.set_colorize(true);
-        let mut windowing = init_window_with_vulkan(&mut logger);
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
         let prspect = gen_perspective(&mut windowing);
 
         let tri = make_centered_equilateral_triangle();
@@ -1363,7 +1377,7 @@ mod tests {
     #[bench]
     fn bench_simple_triangle(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
         let prspect = gen_perspective(&mut windowing);
 
         let tri = make_centered_equilateral_triangle();
@@ -1378,7 +1392,7 @@ mod tests {
     #[bench]
     fn bench_still_windmills(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
         let prspect = gen_perspective(&mut windowing);
 
         add_windmills(&mut windowing);
@@ -1391,7 +1405,7 @@ mod tests {
     #[bench]
     fn bench_rotating_windmills(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
         let prspect = gen_perspective(&mut windowing);
 
         add_windmills(&mut windowing);
@@ -1405,7 +1419,7 @@ mod tests {
     #[bench]
     fn bench_rotating_windmills_no_render(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
 
         add_windmills(&mut windowing);
 
@@ -1417,8 +1431,7 @@ mod tests {
     #[bench]
     fn clears_per_second(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
-        logger.set_colorize(true);
-        let mut windowing = init_window_with_vulkan(&mut logger);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
         let prspect = gen_perspective(&mut windowing);
 
         b.iter(|| {
@@ -1429,7 +1442,7 @@ mod tests {
     #[bench]
     fn noninstanced_1k_triangles(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
         let prspect = gen_perspective(&mut windowing);
         let tri = make_centered_equilateral_triangle();
         for _ in 0..1000 {

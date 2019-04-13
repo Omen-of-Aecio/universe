@@ -154,6 +154,7 @@ pub struct Windowing {
     pub render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
     pub queue_group: ManuallyDrop<gfx_hal::QueueGroup<back::Backend, gfx_hal::Graphics>>,
     pub swapchain: ManuallyDrop<<back::Backend as Backend>::Swapchain>,
+    pub swapconfig: gfx_hal::window::SwapchainConfig,
     pub device: ManuallyDrop<back::Device>,
     pub adapter: Adapter<back::Backend>,
     pub surf: <back::Backend as Backend>::Surface,

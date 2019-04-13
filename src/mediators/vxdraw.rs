@@ -31,11 +31,11 @@ use gfx_hal::{
     window::{Extent2D, PresentMode::*, Surface, Swapchain},
     Adapter, Backbuffer, Backend, FrameSync, Instance, Primitive, SwapchainConfig,
 };
-use logger::{info, log, trace, warn, InDebug, InDebugPretty, Logger};
+use logger::{debug, info, log, trace, warn, InDebug, InDebugPretty, Logger};
 use std::io::Read;
 use std::iter::once;
 use std::mem::{size_of, transmute, ManuallyDrop};
-use winit::{Event, EventsLoop, WindowBuilder};
+use winit::{dpi::LogicalSize, Event, EventsLoop, WindowBuilder};
 
 // pub mod manytris;
 
@@ -43,20 +43,27 @@ use winit::{Event, EventsLoop, WindowBuilder};
 
 #[derive(PartialEq)]
 pub enum ShowWindow {
-    Headless,
+    /// Runs vulkan in headless mode (hidden window) with a swapchain of 1000x1000
+    Headless1k,
     Enable,
 }
 
 pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windowing {
     let events_loop = EventsLoop::new();
+
     let window = WindowBuilder::new()
-        .with_visibility(if show == ShowWindow::Headless {
-            false
-        } else {
-            true
-        })
+        .with_visibility(show != ShowWindow::Headless1k)
         .build(&events_loop)
         .unwrap();
+
+    if show == ShowWindow::Headless1k {
+        let dpi_factor = window.get_hidpi_factor();
+        window.set_inner_size(LogicalSize {
+            width: 1000f64 / dpi_factor,
+            height: 1000f64 / dpi_factor,
+        });
+    }
+
     let version = 1;
     let vk_inst = back::Instance::create("renderer", version);
     let mut surf: <back::Backend as Backend>::Surface = vk_inst.create_surface(&window);
@@ -117,28 +124,31 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
     };
     info![log, "vxdraw", "Using swapchain images"; "count" => image_count];
 
-    let dpi_factor = window.get_hidpi_factor();
-    info![log, "vxdraw", "Window DPI factor"; "factor" => dpi_factor];
-
-    let (w, h): (u32, u32) = window
-        .get_inner_size()
-        .unwrap()
-        .to_physical(dpi_factor)
-        .into();
-    let dims = Extent2D {
-        width: w,
-        height: h,
+    let dims = {
+        let dpi_factor = window.get_hidpi_factor();
+        info![log, "vxdraw", "Window DPI factor"; "factor" => dpi_factor];
+        let (w, h): (u32, u32) = window
+            .get_inner_size()
+            .unwrap()
+            .to_physical(dpi_factor)
+            .into();
+        Extent2D {
+            width: w,
+            height: h,
+        }
     };
     info![log, "vxdraw", "Swapchain size"; "extent" => InDebug(&dims)];
 
     let mut swap_config = SwapchainConfig::from_caps(&caps, format, dims);
     swap_config.present_mode = present_mode;
     swap_config.image_count = image_count;
+    swap_config.extent = dims;
     swap_config.image_usage |= gfx_hal::image::Usage::TRANSFER_SRC;
     info![log, "vxdraw", "Swapchain final configuration"; "swapchain" => InDebugPretty(&swap_config); clone swap_config];
 
-    let (swapchain, backbuffer) = unsafe { device.create_swapchain(&mut surf, swap_config, None) }
-        .expect("Unable to create swapchain");
+    let (swapchain, backbuffer) =
+        unsafe { device.create_swapchain(&mut surf, swap_config.clone(), None) }
+            .expect("Unable to create swapchain");
 
     let backbuffer_string = format!["{:#?}", backbuffer];
     info![log, "vxdraw", "Backbuffer information"; "backbuffers" => backbuffer_string];
@@ -467,12 +477,13 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         render_area: Rect {
             x: 0,
             y: 0,
-            w: w as i16,
-            h: h as i16,
+            w: dims.width as i16,
+            h: dims.height as i16,
         },
         render_pass: ManuallyDrop::new(render_pass),
         surf,
         swapchain: ManuallyDrop::new(swapchain),
+        swapconfig: swap_config,
         simple_textures: vec![],
         triangle_buffers: vec![],
         triangle_descriptor_set_layouts,
@@ -608,14 +619,9 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
             targets: vec![ColorBlendDesc(ColorMask::ALL, blend_state)],
         }
     };
-    let size = s
-        .window
-        .get_inner_size()
-        .unwrap()
-        .to_physical(s.window.get_hidpi_factor());
     let extent = image::Extent {
-        width: size.width as u32,
-        height: size.height as u32,
+        width: s.swapconfig.extent.width,
+        height: s.swapconfig.extent.height,
         depth: 1,
     }
     .rect();
@@ -766,6 +772,32 @@ pub fn make_vertex_buffer_with_data(
             .release_mapping_writer(data_target)
             .expect("Couldn't release the mapping writer!");
     }
+    (buffer, memory, requirements)
+}
+
+pub fn make_transfer_buffer_of_size(
+    s: &mut Windowing,
+    size: u64,
+) -> (
+    <back::Backend as Backend>::Buffer,
+    <back::Backend as Backend>::Memory,
+    memory::Requirements,
+) {
+    let device = &s.device;
+    let (buffer, memory, requirements) = unsafe {
+        let mut buffer = device
+            .create_buffer(size, gfx_hal::buffer::Usage::TRANSFER_DST)
+            .expect("cant make bf");
+        let requirements = device.get_buffer_requirements(&buffer);
+        let memory_type_id = find_memory_type_id(&s.adapter, requirements, Properties::CPU_VISIBLE);
+        let memory = device
+            .allocate_memory(memory_type_id, requirements.size)
+            .expect("Couldn't allocate vertex buffer memory");
+        device
+            .bind_buffer_memory(&memory, 0, &mut buffer)
+            .expect("Couldn't bind the buffer memory!");
+        (buffer, memory, requirements)
+    };
     (buffer, memory, requirements)
 }
 
@@ -1185,7 +1217,7 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &Matrix4<f32>)
                     let count = debug_triangles.triangles_count;
                     let buffers: ArrayVec<[_; 1]> = [(&debug_triangles.triangles_buffer, 0)].into();
                     enc.bind_vertex_buffers(0, buffers);
-                    info![log, "vxdraw", "mesh count"; "count" => count];
+                    debug![log, "vxdraw", "mesh count"; "count" => count];
                     enc.draw(0..(count * 3) as u32, 0..1);
                 }
             }
@@ -1228,17 +1260,13 @@ pub fn average_xy(triangle: &mut [f32; 6]) -> (f32, f32) {
 }
 
 pub fn gen_perspective(s: &mut Windowing) -> Matrix4<f32> {
-    let size = s
-        .window
-        .get_inner_size()
-        .unwrap()
-        .to_physical(s.window.get_hidpi_factor());
-    let pval = Vector2::new(size.height, size.width).normalize();
+    let size = s.swapconfig.extent;
+    let pval = Vector2::new(size.height as f32, size.width as f32).normalize();
     Matrix4::from_nonuniform_scale(pval.x as f32, pval.y as f32, 1.0)
 }
 
 fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
-    let (buffer, memory, _) = make_vertex_buffer_with_data(s, &vec![0f32; 100]);
+    let (buffer, memory, requirements) = make_transfer_buffer_of_size(s, 400);
     let images = match s.backbuffer {
         Backbuffer::Images(ref images) => images,
         Backbuffer::Framebuffer(_) => unimplemented![],
@@ -1252,10 +1280,10 @@ fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
         let image_barrier = gfx_hal::memory::Barrier::Image {
             states: (gfx_hal::image::Access::empty(), image::Layout::Undefined)
                 ..(
-                    gfx_hal::image::Access::TRANSFER_WRITE,
-                    image::Layout::TransferDstOptimal,
+                    gfx_hal::image::Access::TRANSFER_READ,
+                    image::Layout::TransferSrcOptimal,
                 ),
-            target: &images[1],
+            target: &images[0],
             families: None,
             range: image::SubresourceRange {
                 aspects: format::Aspects::COLOR,
@@ -1269,8 +1297,8 @@ fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
             &[image_barrier],
         );
         cmd_buffer.copy_image_to_buffer(
-            &images[1],
-            image::Layout::Present,
+            &images[0],
+            image::Layout::TransferSrcOptimal,
             &buffer,
             once(command::BufferImageCopy {
                 buffer_offset: 0,
@@ -1278,7 +1306,7 @@ fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
                 buffer_height: 10,
                 image_layers: image::SubresourceLayers {
                     aspects: format::Aspects::COLOR,
-                    level: 1,
+                    level: 0,
                     layers: 0..1,
                 },
                 image_offset: image::Offset { x: 0, y: 0, z: 0 },
@@ -1288,24 +1316,6 @@ fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
                     depth: 1,
                 },
             }),
-        );
-        let image_barrier = gfx_hal::memory::Barrier::Image {
-            states: (
-                gfx_hal::image::Access::TRANSFER_WRITE,
-                image::Layout::TransferDstOptimal,
-            )..(gfx_hal::image::Access::HOST_READ, image::Layout::General),
-            target: &images[1],
-            families: None,
-            range: image::SubresourceRange {
-                aspects: format::Aspects::COLOR,
-                levels: 0..1,
-                layers: 0..1,
-            },
-        };
-        cmd_buffer.pipeline_barrier(
-            PipelineStage::TRANSFER..PipelineStage::FRAGMENT_SHADER,
-            gfx_hal::memory::Dependencies::empty(),
-            &[image_barrier],
         );
         cmd_buffer.finish();
         let the_command_queue = &mut s.queue_group.queues[0];
@@ -1322,17 +1332,22 @@ fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
     unsafe {
         let reader = s
             .device
-            .acquire_mapping_reader::<f32>(&memory, 0..100)
+            .acquire_mapping_reader::<u8>(
+                &memory,
+                0..align_top(Alignment(requirements.alignment), 4 * 100),
+            )
             .expect("Unable to open reader");
-        let result = reader.iter().map(|x| *x).collect::<Vec<_>>();
+        let result = reader.iter().take(4 * 100).map(|x| *x).collect::<Vec<_>>();
         s.device.release_mapping_reader(reader);
-        let mut you8 = vec![];
-        for i in result {
-            let x: [u8; 4] = transmute::<f32, [u8; 4]>(i);
-            you8.extend(x.iter());
-        }
-        you8
+        s.device.destroy_buffer(buffer);
+        s.device.free_memory(memory);
+        result
     }
+}
+
+pub struct Alignment(u64);
+fn align_top(alignment: Alignment, value: u64) -> u64 {
+    value + value % alignment.0
 }
 
 // ---
@@ -1399,37 +1414,53 @@ mod tests {
     #[test]
     fn setup_and_teardown() {
         let mut logger = Logger::spawn_void();
-        let _ = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
+        let _ = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
     }
 
     #[test]
     fn setup_and_teardown_draw_with_test() {
-        let mut logger = Logger::spawn();
-        logger.set_colorize(true);
-        logger.set_log_level(64);
+        let mut logger = Logger::spawn_void();
+        // logger.set_colorize(true);
+        // logger.set_log_level(64);
 
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
-        add_to_triangles(&mut windowing, &[-1.0, 0.0, -1.0f32, -1.0, 0.0, 0.0]);
+        // add_to_triangles(&mut windowing, &[-1.0, 0.0, -1.0f32, -1.0, 0.0, 0.0]);
         draw_frame(&mut windowing, &mut logger, &prspect);
 
         let rgb = copy_image_to_rgb(&mut windowing);
-        let prev = vec![
-            2, 255, 0, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0,
-            255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 2, 255, 5,
-            255, 5, 255, 2, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0,
-            0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 2, 254, 11, 255, 5, 254,
-            7, 255, 9, 254, 3, 255, 0, 0, 255, 255, 0, 0, 255, 255,
-        ];
+        // let prev = vec![
+        //     0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0,
+        //     255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 3, 255, 6,
+        //     255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0,
+        //     0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 3, 254, 12, 255, 10, 254,
+        //     5, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255,
+        //     0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 3, 254, 17, 255, 10, 254, 11, 255, 16,
+        //     254, 4, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255,
+        //     255, 0, 0, 255, 255, 0, 0, 255, 255, 3, 254, 21, 255, 10, 254, 16, 255, 16, 254, 11,
+        //     255, 20, 254, 4, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255,
+        //     0, 0, 255, 255, 0, 0, 255, 255, 3, 254, 24, 255, 10, 254, 20, 255, 16, 254, 16, 255,
+        //     20, 254, 10, 255, 24, 254, 3, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0,
+        //     0, 255, 255, 0, 0, 255, 255, 3, 253, 27, 255, 10, 253, 24, 255, 16, 253, 20, 255, 20,
+        //     253, 15, 255, 24, 253, 9, 255, 28, 253, 3, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0,
+        //     255, 255, 0, 0, 255, 255, 3, 253, 30, 255, 10, 253, 27, 255, 16, 253, 24, 255, 20, 253,
+        //     20, 255, 24, 253, 15, 255, 28, 253, 9, 255, 31, 253, 2, 255, 0, 0, 255, 255, 0, 0, 255,
+        //     255, 0, 0, 255, 255, 3, 253, 33, 255, 10, 253, 30, 255, 16, 253, 27, 255, 20, 253, 23,
+        //     255, 24, 253, 19, 255, 28, 253, 14, 255, 31, 253, 8, 255, 34, 253, 1, 255, 0, 0, 255,
+        //     255, 0, 0, 255, 255, 3, 253, 35, 255, 10, 253, 32, 255, 16, 253, 30, 255, 20, 253, 26,
+        //     255, 24, 253, 23, 255, 28, 253, 19, 255, 31, 253, 14, 255, 34, 253, 7, 255, 36, 253, 0,
+        //     255, 0, 0, 255, 255,
+        // ];
         warn![logger, "tst", "Got the image"; "image" => InDebug(&rgb); clone rgb];
-        assert![prev == rgb];
+        // std::thread::sleep(std::time::Duration::new(3, 0));
+        // assert![prev == rgb];
     }
 
     #[test]
     fn setup_and_teardown_with_gpu_upload() {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
 
         let (buffer, memory) =
             make_vertex_buffer_with_data_on_gpu(&mut windowing, &vec![1.0f32; 10_000]);
@@ -1443,14 +1474,14 @@ mod tests {
     #[test]
     fn init_window_and_get_input() {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         collect_input(&mut windowing);
     }
 
     #[test]
     fn simple_triangle() {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
         let tri = make_centered_equilateral_triangle();
 
@@ -1463,7 +1494,7 @@ mod tests {
     #[test]
     fn simple_triangle_change_color() {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
         let tri = make_centered_equilateral_triangle();
 
@@ -1477,7 +1508,7 @@ mod tests {
     #[test]
     fn windmills() {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
         add_windmills(&mut windowing);
@@ -1487,7 +1518,7 @@ mod tests {
     #[test]
     fn tearing_test() {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
         let tri = make_centered_equilateral_triangle();
@@ -1510,7 +1541,7 @@ mod tests {
     #[bench]
     fn bench_simple_triangle(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
         let tri = make_centered_equilateral_triangle();
@@ -1525,7 +1556,7 @@ mod tests {
     #[bench]
     fn bench_still_windmills(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
         add_windmills(&mut windowing);
@@ -1538,7 +1569,7 @@ mod tests {
     #[bench]
     fn bench_rotating_windmills(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
         add_windmills(&mut windowing);
@@ -1552,7 +1583,7 @@ mod tests {
     #[bench]
     fn bench_rotating_windmills_no_render(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
 
         add_windmills(&mut windowing);
 
@@ -1564,7 +1595,7 @@ mod tests {
     #[bench]
     fn clears_per_second(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
         b.iter(|| {
@@ -1575,7 +1606,7 @@ mod tests {
     #[bench]
     fn noninstanced_1k_triangles(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
         let tri = make_centered_equilateral_triangle();
         for _ in 0..1000 {

@@ -101,6 +101,7 @@ pub struct ColoredTriangleList {
     pub triangles_count: usize,
     pub triangles_buffer: <back::Backend as Backend>::Buffer,
     pub triangles_memory: <back::Backend as Backend>::Memory,
+    pub memory_requirements: gfx_hal::memory::Requirements,
 
     pub descriptor_set: Vec<<back::Backend as Backend>::DescriptorSetLayout>,
     pub pipeline: ManuallyDrop<<back::Backend as Backend>::GraphicsPipeline>,

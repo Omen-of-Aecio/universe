@@ -674,12 +674,13 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
     unsafe {
         s.device.destroy_shader_module(fs_module);
     }
-    let (dtbuffer, dtmemory) = make_vertex_buffer_with_data(s, &vec![0.0f32; 6 * 1024]);
+    let (dtbuffer, dtmemory, dtreqs) = make_vertex_buffer_with_data(s, &vec![0.0f32; 6 * 1024]);
     let debug_triangles = ColoredTriangleList {
-        capacity: 6 * 1024,
+        capacity: dtreqs.size,
         triangles_count: 0,
         triangles_buffer: dtbuffer,
         triangles_memory: dtmemory,
+        memory_requirements: dtreqs,
 
         descriptor_set: triangle_descriptor_set_layouts,
         pipeline: ManuallyDrop::new(triangle_pipeline),
@@ -712,6 +713,7 @@ pub fn make_vertex_buffer_with_data(
 ) -> (
     <back::Backend as Backend>::Buffer,
     <back::Backend as Backend>::Memory,
+    memory::Requirements,
 ) {
     let device = &s.device;
     let (buffer, memory, requirements) = unsafe {
@@ -738,7 +740,7 @@ pub fn make_vertex_buffer_with_data(
             .release_mapping_writer(data_target)
             .expect("Couldn't release the mapping writer!");
     }
-    (buffer, memory)
+    (buffer, memory, requirements)
 }
 
 pub fn make_vertex_buffer_with_data_on_gpu(
@@ -843,13 +845,13 @@ pub fn make_vertex_buffer_with_data_on_gpu(
 }
 
 pub fn add_texture(s: &mut Windowing, _lgr: &mut Logger<Log>) {
-    let (texture_vertex_buffer, texture_vertex_memory) = make_vertex_buffer_with_data(
+    let (texture_vertex_buffer, texture_vertex_memory, _) = make_vertex_buffer_with_data(
         s,
         &[
             -1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
         ],
     );
-    let (texture_uv_buffer, texture_uv_memory) = make_vertex_buffer_with_data(
+    let (texture_uv_buffer, texture_uv_memory, _) = make_vertex_buffer_with_data(
         s,
         &[
             -1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0,

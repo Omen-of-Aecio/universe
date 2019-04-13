@@ -1019,6 +1019,11 @@ pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) 
 pub fn add_to_triangles(s: &mut Windowing, triangle: &[f32; 6]) {
     let device = &s.device;
     if let Some(ref mut debug_triangles) = s.debug_triangles {
+        const PTS: usize = 3;
+        const COLORS: usize = 4;
+        const COMPNTS: usize = 2;
+        const TRI_SIZE: usize = size_of::<f32>() * COMPNTS * PTS + size_of::<u8>() * COLORS * PTS;
+        assert![(debug_triangles.triangles_count + 1) * TRI_SIZE <= debug_triangles.capacity as usize];
         unsafe {
             let mut data_target = device
                 .acquire_mapping_writer(
@@ -1026,9 +1031,6 @@ pub fn add_to_triangles(s: &mut Windowing, triangle: &[f32; 6]) {
                     0..debug_triangles.capacity,
                 )
                 .expect("Failed to acquire a memory writer!");
-            const PTS: usize = 3;
-            const COLORS: usize = 4;
-            const COMPNTS: usize = 2;
             let mut idx = debug_triangles.triangles_count
                 * (size_of::<f32>() * COMPNTS * PTS + size_of::<u8>() * COLORS * PTS)
                 / size_of::<f32>();
@@ -1208,7 +1210,7 @@ mod tests {
     fn add_windmills(windowing: &mut Windowing) {
         let mut rng = rand::thread_rng();
         use rand::Rng;
-        for _ in 0..500 {
+        for _ in 0..1000 {
             let mut tri = make_centered_equilateral_triangle();
             let (dx, dy) = (
                 rng.gen_range(-1.0f32, 1.0f32),

@@ -149,6 +149,7 @@ pub struct Windowing {
             gfx_hal::command::Primary,
         >,
     >,
+    pub backbuffer: gfx_hal::window::Backbuffer<back::Backend>,
     pub image_views: Vec<<back::Backend as Backend>::ImageView>,
     pub render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
     pub queue_group: ManuallyDrop<gfx_hal::QueueGroup<back::Backend, gfx_hal::Graphics>>,

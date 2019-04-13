@@ -31,7 +31,7 @@ use gfx_hal::{
     window::{Extent2D, PresentMode::*, Surface, Swapchain},
     Adapter, Backbuffer, Backend, FrameSync, Instance, Primitive, SwapchainConfig,
 };
-use logger::{info, log, trace, InDebug, InDebugPretty, Logger};
+use logger::{info, log, trace, warn, InDebug, InDebugPretty, Logger};
 use std::io::Read;
 use std::iter::once;
 use std::mem::{size_of, transmute, ManuallyDrop};
@@ -78,6 +78,14 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
     let (caps, formats, present_modes, _composite_alpha) =
         surf.compatibility(&adapter.physical_device);
 
+    if !caps.usage.contains(image::Usage::TRANSFER_SRC) {
+        warn![
+            log,
+            "vxdraw", "Surface does not support TRANSFER_SRC, may fail during testing"
+        ];
+    }
+
+    info![log, "vxdraw", "Surface capabilities"; "capabilities" => InDebugPretty(&caps); clone caps];
     info![log, "vxdraw", "Formats available"; "formats" => InDebugPretty(&formats); clone formats];
     let format = formats.map_or(format::Format::Rgba8Srgb, |formats| {
         formats
@@ -126,6 +134,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
     let mut swap_config = SwapchainConfig::from_caps(&caps, format, dims);
     swap_config.present_mode = present_mode;
     swap_config.image_count = image_count;
+    swap_config.image_usage |= gfx_hal::image::Usage::TRANSFER_SRC;
     info![log, "vxdraw", "Swapchain final configuration"; "swapchain" => InDebugPretty(&swap_config); clone swap_config];
 
     let (swapchain, backbuffer) = unsafe { device.create_swapchain(&mut surf, swap_config, None) }
@@ -135,7 +144,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
     info![log, "vxdraw", "Backbuffer information"; "backbuffers" => backbuffer_string];
 
     let image_views: Vec<_> = match backbuffer {
-        Backbuffer::Images(images) => images
+        Backbuffer::Images(ref images) => images
             .into_iter()
             .map(|image| unsafe {
                 device
@@ -441,6 +450,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
     let mut windowing = Windowing {
         acquire_image_semaphores,
         adapter,
+        backbuffer,
         command_buffers,
         command_pool: ManuallyDrop::new(command_pool),
         current_frame: 0,
@@ -690,6 +700,7 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
         s.device.destroy_shader_module(fs_module);
     }
     let (dtbuffer, dtmemory, dtreqs) = make_vertex_buffer_with_data(s, &vec![0.0f32; 3 * 3 * 1000]);
+    info![log, "vxdraw", "Vertex buffer size"; "requirements" => InDebugPretty(&dtreqs)];
     let debug_triangles = ColoredTriangleList {
         capacity: dtreqs.size,
         triangles_count: 0,
@@ -1226,6 +1237,104 @@ pub fn gen_perspective(s: &mut Windowing) -> Matrix4<f32> {
     Matrix4::from_nonuniform_scale(pval.x as f32, pval.y as f32, 1.0)
 }
 
+fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
+    let (buffer, memory, _) = make_vertex_buffer_with_data(s, &vec![0f32; 100]);
+    let images = match s.backbuffer {
+        Backbuffer::Images(ref images) => images,
+        Backbuffer::Framebuffer(_) => unimplemented![],
+    };
+    s.device.wait_idle().expect("Unable to wait for device");
+    unsafe {
+        let mut cmd_buffer = s
+            .command_pool
+            .acquire_command_buffer::<gfx_hal::command::OneShot>();
+        cmd_buffer.begin();
+        let image_barrier = gfx_hal::memory::Barrier::Image {
+            states: (gfx_hal::image::Access::empty(), image::Layout::Undefined)
+                ..(
+                    gfx_hal::image::Access::TRANSFER_WRITE,
+                    image::Layout::TransferDstOptimal,
+                ),
+            target: &images[1],
+            families: None,
+            range: image::SubresourceRange {
+                aspects: format::Aspects::COLOR,
+                levels: 0..1,
+                layers: 0..1,
+            },
+        };
+        cmd_buffer.pipeline_barrier(
+            PipelineStage::TOP_OF_PIPE..PipelineStage::TRANSFER,
+            gfx_hal::memory::Dependencies::empty(),
+            &[image_barrier],
+        );
+        cmd_buffer.copy_image_to_buffer(
+            &images[1],
+            image::Layout::Present,
+            &buffer,
+            once(command::BufferImageCopy {
+                buffer_offset: 0,
+                buffer_width: 10,
+                buffer_height: 10,
+                image_layers: image::SubresourceLayers {
+                    aspects: format::Aspects::COLOR,
+                    level: 1,
+                    layers: 0..1,
+                },
+                image_offset: image::Offset { x: 0, y: 0, z: 0 },
+                image_extent: image::Extent {
+                    width: 10,
+                    height: 10,
+                    depth: 1,
+                },
+            }),
+        );
+        let image_barrier = gfx_hal::memory::Barrier::Image {
+            states: (
+                gfx_hal::image::Access::TRANSFER_WRITE,
+                image::Layout::TransferDstOptimal,
+            )..(gfx_hal::image::Access::HOST_READ, image::Layout::General),
+            target: &images[1],
+            families: None,
+            range: image::SubresourceRange {
+                aspects: format::Aspects::COLOR,
+                levels: 0..1,
+                layers: 0..1,
+            },
+        };
+        cmd_buffer.pipeline_barrier(
+            PipelineStage::TRANSFER..PipelineStage::FRAGMENT_SHADER,
+            gfx_hal::memory::Dependencies::empty(),
+            &[image_barrier],
+        );
+        cmd_buffer.finish();
+        let the_command_queue = &mut s.queue_group.queues[0];
+        let fence = s
+            .device
+            .create_fence(false)
+            .expect("Unable to create fence");
+        the_command_queue.submit_nosemaphores(once(&cmd_buffer), Some(&fence));
+        s.device
+            .wait_for_fence(&fence, u64::max_value())
+            .expect("unable to wait for fence");
+        s.device.destroy_fence(fence);
+    }
+    unsafe {
+        let reader = s
+            .device
+            .acquire_mapping_reader::<f32>(&memory, 0..100)
+            .expect("Unable to open reader");
+        let result = reader.iter().map(|x| *x).collect::<Vec<_>>();
+        s.device.release_mapping_reader(reader);
+        let mut you8 = vec![];
+        for i in result {
+            let x: [u8; 4] = transmute::<f32, [u8; 4]>(i);
+            you8.extend(x.iter());
+        }
+        you8
+    }
+}
+
 // ---
 
 #[cfg(feature = "gfx_tests")]
@@ -1291,6 +1400,30 @@ mod tests {
     fn setup_and_teardown() {
         let mut logger = Logger::spawn_void();
         let _ = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
+    }
+
+    #[test]
+    fn setup_and_teardown_draw_with_test() {
+        let mut logger = Logger::spawn();
+        logger.set_colorize(true);
+        logger.set_log_level(64);
+
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless);
+        let prspect = gen_perspective(&mut windowing);
+
+        add_to_triangles(&mut windowing, &[-1.0, 0.0, -1.0f32, -1.0, 0.0, 0.0]);
+        draw_frame(&mut windowing, &mut logger, &prspect);
+
+        let rgb = copy_image_to_rgb(&mut windowing);
+        let prev = vec![
+            2, 255, 0, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0,
+            255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 2, 255, 5,
+            255, 5, 255, 2, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0,
+            0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 2, 254, 11, 255, 5, 254,
+            7, 255, 9, 254, 3, 255, 0, 0, 255, 255, 0, 0, 255, 255,
+        ];
+        warn![logger, "tst", "Got the image"; "image" => InDebug(&rgb); clone rgb];
+        assert![prev == rgb];
     }
 
     #[test]

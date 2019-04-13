@@ -2,7 +2,6 @@
 #![feature(test)]
 extern crate test;
 
-use std::sync::mpsc;
 use test::{black_box, Bencher};
 
 trait T {
@@ -19,6 +18,7 @@ impl T for C {
 fn static_call(obj: &C) -> Option<()> {
     obj.call()
 }
+
 fn dynamic_call(obj: &T) -> Option<()> {
     obj.call()
 }

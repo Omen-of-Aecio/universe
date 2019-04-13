@@ -16,6 +16,7 @@ fn server_tick(_s: &mut Main) {}
 mod tests {
     use super::*;
 
+    #[test]
     fn exit_server_if_none() {
         let mut main = Main::default();
         entry_point_server(&mut main);

@@ -11,12 +11,12 @@ use gfx_backend_vulkan as back;
 use ::image as load_image;
 use arrayvec::ArrayVec;
 use cgmath::prelude::*;
-use cgmath::{Deg, Matrix4, Rad, Vector2, Vector3, Vector4};
+use cgmath::{Matrix4, Rad, Vector2, Vector3, Vector4};
 use gfx_hal::{
     adapter::{MemoryTypeId, PhysicalDevice},
     command::{self, BufferCopy, ClearColor, ClearValue},
     device::Device,
-    format::{self, ChannelType, Format, Swizzle},
+    format::{self, ChannelType, Swizzle},
     image, memory,
     memory::Properties,
     pass, pool,
@@ -940,11 +940,7 @@ pub fn collect_input(windowing: &mut Windowing) -> Vec<Event> {
     inputs
 }
 
-pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(
-    s: &mut Windowing,
-    deg: T,
-    lgr: &mut Logger<Log>,
-) {
+pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
     // NOTE: This algorithm sucks, we have to de-transform the triangle back to the origin
     // triangle, perform a rotation, and then re-translate the triangle back. This is highly
     // dubious and may result in drift due to float inaccuracies. A better method would be to use a
@@ -981,7 +977,7 @@ pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(
             device.release_mapping_reader(data_reader);
 
             for vert in vertices.iter_mut() {
-                let off = (average_xy(vert));
+                let off = average_xy(vert);
                 let a = Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), deg)
                     * Vector4::new(vert[0], vert[1], 0.0, 1.0);
                 let b = Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), deg)
@@ -1039,15 +1035,15 @@ pub fn add_to_triangles(s: &mut Windowing, triangle: &[f32; 6]) {
 
             data_target[idx..idx + 2].copy_from_slice(&triangle[0..2]);
             data_target[idx + 2..idx + 3]
-                .copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[255u8, 240, 10, 255]));
+                .copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[255u8, 0, 0, 255]));
             idx += 3;
             data_target[idx..idx + 2].copy_from_slice(&triangle[2..4]);
             data_target[idx + 2..idx + 3]
-                .copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[0u8, 240, 200, 255]));
+                .copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[0u8, 255, 0, 255]));
             idx += 3;
             data_target[idx..idx + 2].copy_from_slice(&triangle[4..6]);
             data_target[idx + 2..idx + 3]
-                .copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[0u8, 240, 10, 255]));
+                .copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[0u8, 0, 255, 255]));
             debug_triangles.triangles_count += 1;
             device
                 .release_mapping_writer(data_target)
@@ -1186,9 +1182,9 @@ pub fn gen_perspective(s: &mut Windowing) -> Matrix4<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test::{black_box, Bencher};
+    use test::Bencher;
 
-    use cgmath::{Deg, Vector2, Vector3};
+    use cgmath::{Deg, Vector3};
 
     // ---
 
@@ -1352,8 +1348,20 @@ mod tests {
         add_windmills(&mut windowing);
 
         b.iter(|| {
-            rotate_to_triangles(&mut windowing, Deg(1.0f32), &mut logger);
+            rotate_to_triangles(&mut windowing, Deg(1.0f32));
             draw_frame(&mut windowing, &mut logger, &prspect);
+        });
+    }
+
+    #[bench]
+    fn bench_rotating_windmills_no_render(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger);
+
+        add_windmills(&mut windowing);
+
+        b.iter(|| {
+            rotate_to_triangles(&mut windowing, Deg(1.0f32));
         });
     }
 

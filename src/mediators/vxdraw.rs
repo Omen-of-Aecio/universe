@@ -11,7 +11,7 @@ use gfx_backend_vulkan as back;
 use ::image as load_image;
 use arrayvec::ArrayVec;
 use cgmath::prelude::*;
-use cgmath::{Deg, Matrix4, Rad, Vector3, Vector4};
+use cgmath::{Deg, Matrix4, Rad, Vector2, Vector3, Vector4};
 use gfx_hal::{
     adapter::{MemoryTypeId, PhysicalDevice},
     command::{self, BufferCopy, ClearColor, ClearValue},
@@ -945,6 +945,13 @@ pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(
     deg: T,
     lgr: &mut Logger<Log>,
 ) {
+    // NOTE: This algorithm sucks, we have to de-transform the triangle back to the origin
+    // triangle, perform a rotation, and then re-translate the triangle back. This is highly
+    // dubious and may result in drift due to float inaccuracies. A better method would be to use a
+    // compute shader to compute the vertices.. but these vertices are completely arbitrary, so
+    // that might not even work. Another way is to store rotation (2D) alongside the vertex, but
+    // this is quite heavy... again, we'd need 3 floats (rotation) + 2 floats for the "average" of
+    // this object in order to re-translate it.
     let device = &s.device;
     if let Some(ref mut debug_triangles) = s.debug_triangles {
         const PTS: usize = 3;
@@ -973,7 +980,6 @@ pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(
             }
             device.release_mapping_reader(data_reader);
 
-            // info![lgr, "vxdraw", "Doing a rotation"; "vertices" => InDebugPretty(&vertices); clone vertices];
             for vert in vertices.iter_mut() {
                 let off = (average_xy(vert));
                 let a = Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), deg)
@@ -1007,11 +1013,6 @@ pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(
                 idx += 3;
                 data_target[idx..idx + 2].copy_from_slice(&vert[4..6]);
             }
-            // data_target[idx..idx + 2].copy_from_slice(&triangle[0..2]);
-            // idx += 3;
-            // data_target[idx..idx + 2].copy_from_slice(&triangle[2..4]);
-            // idx += 3;
-            // data_target[idx..idx + 2].copy_from_slice(&triangle[4..6]);
             device
                 .release_mapping_writer(data_target)
                 .expect("Couldn't release the mapping writer!");
@@ -1059,6 +1060,13 @@ pub fn pop_to_triangles(s: &mut Windowing) {
     if let Some(ref mut debug_triangles) = s.debug_triangles {
         s.device.wait_idle().expect("device idle");
         debug_triangles.triangles_count -= 1;
+    }
+}
+
+pub fn pop_n_triangles(s: &mut Windowing, n: usize) {
+    if let Some(ref mut debug_triangles) = s.debug_triangles {
+        s.device.wait_idle().expect("device idle");
+        debug_triangles.triangles_count -= n;
     }
 }
 
@@ -1162,6 +1170,16 @@ pub fn average_xy(triangle: &mut [f32; 6]) -> (f32, f32) {
     (ax, ay)
 }
 
+pub fn gen_perspective(s: &mut Windowing) -> Matrix4<f32> {
+    let size = s
+        .window
+        .get_inner_size()
+        .unwrap()
+        .to_physical(s.window.get_hidpi_factor());
+    let pval = Vector2::new(size.height, size.width).normalize();
+    Matrix4::from_nonuniform_scale(pval.x as f32, pval.y as f32, 1.0)
+}
+
 // ---
 
 #[cfg(feature = "gfx_tests")]
@@ -1183,12 +1201,42 @@ mod tests {
         let avg_x = (tri[0] + tri[2] + tri[4]) / 3.0f32;
         let avg_y = (tri[1] + tri[3] + tri[5]) / 3.0f32;
         tri[0] -= avg_x;
-        tri[2] -= avg_x;
-        tri[4] -= avg_x;
         tri[1] -= avg_y;
+        tri[2] -= avg_x;
         tri[3] -= avg_y;
+        tri[4] -= avg_x;
         tri[5] -= avg_y;
         tri
+    }
+
+    fn add_windmills(windowing: &mut Windowing) {
+        let mut rng = rand::thread_rng();
+        use rand::Rng;
+        for _ in 0..500 {
+            let mut tri = make_centered_equilateral_triangle();
+            let (dx, dy) = (
+                rng.gen_range(-1.0f32, 1.0f32),
+                rng.gen_range(-1.0f32, 1.0f32),
+            );
+            let scale = rng.gen_range(0.03f32, 0.1f32);
+            for idx in 0..tri.len() {
+                tri[idx] *= scale;
+            }
+            tri[0] += dx;
+            tri[1] += dy;
+            tri[2] += dx;
+            tri[3] += dy;
+            tri[4] += dx;
+            tri[5] += dy;
+            add_to_triangles(windowing, &tri);
+        }
+    }
+
+    fn add_4_screencorners(windowing: &mut Windowing) {
+        add_to_triangles(windowing, &[-1.0f32, -1.0, 0.0, -1.0, -1.0, 0.0]);
+        add_to_triangles(windowing, &[-1.0f32, 1.0, 0.0, 1.0, -1.0, 0.0]);
+        add_to_triangles(windowing, &[1.0f32, -1.0, 0.0, -1.0, 1.0, 0.0]);
+        add_to_triangles(windowing, &[1.0f32, 1.0, 0.0, 1.0, 1.0, 0.0]);
     }
 
     // ---
@@ -1205,7 +1253,8 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger);
 
         let (buffer, memory) =
-            make_vertex_buffer_with_data_on_gpu(&mut windowing, &[1.0f32, 2.0, 3.0, 4.0]);
+            make_vertex_buffer_with_data_on_gpu(&mut windowing, &vec![1.0f32; 10_000]);
+
         unsafe {
             windowing.device.destroy_buffer(buffer);
             windowing.device.free_memory(memory);
@@ -1214,273 +1263,98 @@ mod tests {
 
     #[test]
     fn init_window_and_get_input() {
-        let mut logger = Logger::spawn();
-        logger.set_colorize(true);
+        let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger);
         collect_input(&mut windowing);
-        add_triangle(&mut windowing, &[0.0f32, 0.0, 1.0, 1.0, 1.0, 0.0]);
-        add_triangle(&mut windowing, &[-0.5f32, 0.5, 0.2, 0.2, 0.3, 0.3]);
-        for i in 0..300 {
-            let mat4 = Matrix4::new(
-                1.0f32, 0.0, 0.0, 0.0, 0.0f32, 1.0, 0.0, 0.0, 0.0f32, 0.0, 1.0, 0.0, 0.0f32, 0.0,
-                0.0, 1.0,
-            ) * Matrix4::from_translation(Vector3::new(i as f32 / 300.0, 0.0, 0.0));
-            draw_frame(&mut windowing, &mut logger, &mat4);
-            std::thread::sleep(std::time::Duration::new(0, 8_000_000));
-        }
     }
 
     #[test]
     fn simple_triangle() {
-        let mut logger = Logger::spawn();
-        logger.set_colorize(true);
+        let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger);
-        let prspect = {
-            let size = windowing
-                .window
-                .get_inner_size()
-                .unwrap()
-                .to_physical(windowing.window.get_hidpi_factor());
-            let pval = Vector2::new(size.height, size.width).normalize();
-            Matrix4::from_nonuniform_scale(pval.x as f32, pval.y as f32, 1.0)
-        };
-
+        let prspect = gen_perspective(&mut windowing);
         let tri = make_centered_equilateral_triangle();
-        // add_triangle(&mut windowing, &tri);
+
         add_to_triangles(&mut windowing, &tri);
-        add_to_triangles(&mut windowing, &[-1.0f32, -1.0, -1.0, 0.0, 0.0, -1.0]);
-        add_to_triangles(&mut windowing, &[-1.0f32, 1.0, -1.0, 0.0, 0.0, 1.0]);
-        add_to_triangles(&mut windowing, &[1.0f32, -1.0, 0.0, -1.0, 1.0, 0.0]);
-        add_to_triangles(&mut windowing, &[1.0f32, -1.0, 0.0, -1.0, 1.0, 0.0]);
-        add_to_triangles(&mut windowing, &[1.0f32, 1.0, 0.0, 1.0, 1.0, 0.0]);
-        let mat4 =
-            prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(32 as f32)); // * Matrix4::from_scale(0.5f32);
-        draw_frame(&mut windowing, &mut logger, &mat4);
-        std::thread::sleep(std::time::Duration::new(10, 8_000_000));
+        add_4_screencorners(&mut windowing);
+
+        draw_frame(&mut windowing, &mut logger, &prspect);
     }
 
     #[test]
     fn windmills() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger);
+        let prspect = gen_perspective(&mut windowing);
+
+        add_windmills(&mut windowing);
+        draw_frame(&mut windowing, &mut logger, &prspect);
+    }
+
+    #[test]
+    fn tearing_test() {
         let mut logger = Logger::spawn();
         logger.set_colorize(true);
         let mut windowing = init_window_with_vulkan(&mut logger);
-        let prspect = {
-            let size = windowing
-                .window
-                .get_inner_size()
-                .unwrap()
-                .to_physical(windowing.window.get_hidpi_factor());
-            let pval = Vector2::new(size.height, size.width).normalize();
-            Matrix4::from_nonuniform_scale(pval.x as f32, pval.y as f32, 1.0)
-        };
+        let prspect = gen_perspective(&mut windowing);
 
-        let mut rng = rand::thread_rng();
-        use rand::Rng;
-        for _ in 0..1000 {
-            let mut tri = make_centered_equilateral_triangle();
-            let (dx, dy) = (
-                rng.gen_range(-1.0f32, 1.0f32),
-                rng.gen_range(-1.0f32, 1.0f32),
-            );
-            let scale = rng.gen_range(0.03f32, 0.1f32);
-            for idx in 0..tri.len() {
-                tri[idx] *= scale;
+        let tri = make_centered_equilateral_triangle();
+        add_triangle(&mut windowing, &tri);
+        for i in 0..=360 {
+            if i % 2 == 0 {
+                add_4_screencorners(&mut windowing);
+            } else {
+                pop_n_triangles(&mut windowing, 4);
             }
-            tri[0] += dx;
-            tri[1] += dy;
-            tri[2] += dx;
-            tri[3] += dy;
-            tri[4] += dx;
-            tri[5] += dy;
-            add_to_triangles(&mut windowing, &tri);
-        }
-        let mat4 =
-            prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(0.0 as f32));
-        let mut cnt = 0usize;
-        for _ in 0..=360 {
-            // rotate_to_triangles(&mut windowing, Deg(1.0f32), &mut logger);
-            draw_frame(&mut windowing, &mut logger, &mat4);
-            // std::thread::sleep(std::time::Duration::new(0, 8_000_000));
+            let rot =
+                prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(i as f32));
+            draw_frame(&mut windowing, &mut logger, &rot);
+            std::thread::sleep(std::time::Duration::new(0, 80_000_000));
         }
     }
+
+    // ---
 
     #[bench]
     fn bench_simple_triangle(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
-        logger.set_colorize(true);
-        logger.set_log_level(0);
         let mut windowing = init_window_with_vulkan(&mut logger);
-        let prspect = {
-            let size = windowing
-                .window
-                .get_inner_size()
-                .unwrap()
-                .to_physical(windowing.window.get_hidpi_factor());
-            let pval = Vector2::new(size.height, size.width).normalize();
-            Matrix4::from_nonuniform_scale(pval.x as f32, pval.y as f32, 1.0)
-        };
+        let prspect = gen_perspective(&mut windowing);
 
         let tri = make_centered_equilateral_triangle();
-        // add_triangle(&mut windowing, &tri);
         add_to_triangles(&mut windowing, &tri);
-        add_to_triangles(&mut windowing, &[-1.0f32, -1.0, -1.0, 0.0, 0.0, -1.0]);
-        add_to_triangles(&mut windowing, &[-1.0f32, 1.0, -1.0, 0.0, 0.0, 1.0]);
-        add_to_triangles(&mut windowing, &[1.0f32, -1.0, 0.0, -1.0, 1.0, 0.0]);
-        add_to_triangles(&mut windowing, &[1.0f32, -1.0, 0.0, -1.0, 1.0, 0.0]);
-        add_to_triangles(&mut windowing, &[1.0f32, 1.0, 0.0, 1.0, 1.0, 0.0]);
-        let mat4 =
-            prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(32 as f32)); // * Matrix4::from_scale(0.5f32);
+        add_4_screencorners(&mut windowing);
+
         b.iter(|| {
-            draw_frame(&mut windowing, &mut logger, &mat4);
+            draw_frame(&mut windowing, &mut logger, &prspect);
         });
     }
 
     #[bench]
     fn bench_still_windmills(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
-        logger.set_colorize(true);
-        logger.set_log_level(0);
         let mut windowing = init_window_with_vulkan(&mut logger);
-        let prspect = {
-            let size = windowing
-                .window
-                .get_inner_size()
-                .unwrap()
-                .to_physical(windowing.window.get_hidpi_factor());
-            let pval = Vector2::new(size.height, size.width).normalize();
-            Matrix4::from_nonuniform_scale(pval.x as f32, pval.y as f32, 1.0)
-        };
+        let prspect = gen_perspective(&mut windowing);
 
-        let mut rng = rand::thread_rng();
-        use rand::Rng;
-        for _ in 0..1000 {
-            let mut tri = make_centered_equilateral_triangle();
-            let (dx, dy) = (
-                rng.gen_range(-1.0f32, 1.0f32),
-                rng.gen_range(-1.0f32, 1.0f32),
-            );
-            let scale = rng.gen_range(0.03f32, 0.1f32);
-            for idx in 0..tri.len() {
-                tri[idx] *= scale;
-            }
-            tri[0] += dx;
-            tri[1] += dy;
-            tri[2] += dx;
-            tri[3] += dy;
-            tri[4] += dx;
-            tri[5] += dy;
-            add_to_triangles(&mut windowing, &tri);
-        }
-        let mat4 =
-            prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(0.0 as f32));
-        let mut cnt = 0usize;
+        add_windmills(&mut windowing);
+
         b.iter(|| {
-            draw_frame(&mut windowing, &mut logger, &mat4);
+            draw_frame(&mut windowing, &mut logger, &prspect);
         });
     }
 
     #[bench]
     fn bench_rotating_windmills(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
-        logger.set_colorize(true);
-        logger.set_log_level(0);
         let mut windowing = init_window_with_vulkan(&mut logger);
-        let prspect = {
-            let size = windowing
-                .window
-                .get_inner_size()
-                .unwrap()
-                .to_physical(windowing.window.get_hidpi_factor());
-            let pval = Vector2::new(size.height, size.width).normalize();
-            Matrix4::from_nonuniform_scale(pval.x as f32, pval.y as f32, 1.0)
-        };
+        let prspect = gen_perspective(&mut windowing);
 
-        let mut rng = rand::thread_rng();
-        use rand::Rng;
-        for _ in 0..1000 {
-            let mut tri = make_centered_equilateral_triangle();
-            let (dx, dy) = (
-                rng.gen_range(-1.0f32, 1.0f32),
-                rng.gen_range(-1.0f32, 1.0f32),
-            );
-            let scale = rng.gen_range(0.03f32, 0.1f32);
-            for idx in 0..tri.len() {
-                tri[idx] *= scale;
-            }
-            tri[0] += dx;
-            tri[1] += dy;
-            tri[2] += dx;
-            tri[3] += dy;
-            tri[4] += dx;
-            tri[5] += dy;
-            add_to_triangles(&mut windowing, &tri);
-        }
-        let mat4 =
-            prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(0.0 as f32));
-        let mut cnt = 0usize;
+        add_windmills(&mut windowing);
+
         b.iter(|| {
             rotate_to_triangles(&mut windowing, Deg(1.0f32), &mut logger);
-            draw_frame(&mut windowing, &mut logger, &mat4);
+            draw_frame(&mut windowing, &mut logger, &prspect);
         });
-    }
-
-    #[test]
-    fn rotating_triangle() {
-        let mut logger = Logger::spawn();
-        logger.set_colorize(true);
-        let mut windowing = init_window_with_vulkan(&mut logger);
-        let prspect = {
-            let size = windowing
-                .window
-                .get_inner_size()
-                .unwrap()
-                .to_physical(windowing.window.get_hidpi_factor());
-            let pval = Vector2::new(size.height, size.width).normalize();
-            Matrix4::from_nonuniform_scale(pval.x as f32, pval.y as f32, 1.0)
-        };
-
-        let tri = make_centered_equilateral_triangle();
-        add_triangle(&mut windowing, &tri);
-        // add_to_triangles(&mut windowing, &tri);
-        for i in 0..=360 {
-            let mat4 =
-                prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(i as f32)); // * Matrix4::from_scale(0.5f32);
-            draw_frame(&mut windowing, &mut logger, &mat4);
-            std::thread::sleep(std::time::Duration::new(0, 8_000_000));
-        }
-    }
-
-    #[test]
-    fn texture() {
-        let mut logger = Logger::spawn();
-        logger.set_colorize(true);
-        let mut windowing = init_window_with_vulkan(&mut logger);
-        let prspect = {
-            let size = windowing
-                .window
-                .get_inner_size()
-                .unwrap()
-                .to_physical(windowing.window.get_hidpi_factor());
-            let pval = Vector2::new(size.height, size.width).normalize();
-            Matrix4::from_nonuniform_scale(pval.x as f32, pval.y as f32, 1.0)
-        };
-
-        add_texture(&mut windowing, &mut logger);
-        for i in 0..=360 {
-            let mat4 =
-                prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(i as f32)); // * Matrix4::from_scale(0.5f32);
-            draw_frame(&mut windowing, &mut logger, &mat4);
-            std::thread::sleep(std::time::Duration::new(0, 8_000_000));
-        }
-    }
-
-    #[test]
-    fn simple_cgmath() {
-        let mat4 = Matrix4::new(
-            1.0f32, 0.0, 0.0, 0.0, 0.0f32, 1.0, 0.0, 0.0, 0.0f32, 0.0, 1.0, 0.0, 0.0f32, 0.0, 0.0,
-            1.0,
-        );
-        mat4.transform_vector(Vector3::new(1.0, 0.0, 0.0));
     }
 
     #[bench]
@@ -1488,29 +1362,25 @@ mod tests {
         let mut logger = Logger::spawn_void();
         logger.set_colorize(true);
         let mut windowing = init_window_with_vulkan(&mut logger);
-        let mat4 = Matrix4::new(
-            1.0f32, 0.0, 0.0, 0.0, 0.0f32, 1.0, 0.0, 0.0, 0.0f32, 0.0, 1.0, 0.0, 0.0f32, 0.0, 0.0,
-            1.0,
-        );
+        let prspect = gen_perspective(&mut windowing);
+
         b.iter(|| {
-            draw_frame(&mut windowing, &mut logger, &mat4);
+            draw_frame(&mut windowing, &mut logger, &prspect);
         });
     }
 
     #[bench]
     fn noninstanced_1k_triangles(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
-        logger.set_colorize(true);
         let mut windowing = init_window_with_vulkan(&mut logger);
-        let mat4 = Matrix4::new(
-            1.0f32, 0.0, 0.0, 0.0, 0.0f32, 1.0, 0.0, 0.0, 0.0f32, 0.0, 1.0, 0.0, 0.0f32, 0.0, 0.0,
-            1.0,
-        );
+        let prspect = gen_perspective(&mut windowing);
+        let tri = make_centered_equilateral_triangle();
         for _ in 0..1000 {
-            add_triangle(&mut windowing, &[0.0f32, 0.0, 1.0, 1.0, 1.0, 0.0]);
+            add_triangle(&mut windowing, &tri);
         }
+
         b.iter(|| {
-            draw_frame(&mut windowing, &mut logger, &mat4);
+            draw_frame(&mut windowing, &mut logger, &prspect);
         });
     }
 }

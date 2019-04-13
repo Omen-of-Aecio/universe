@@ -11,7 +11,7 @@ use gfx_backend_vulkan as back;
 use ::image as load_image;
 use arrayvec::ArrayVec;
 use cgmath::prelude::*;
-use cgmath::Matrix4;
+use cgmath::{Deg, Matrix4, Rad, Vector3, Vector4};
 use gfx_hal::{
     adapter::{MemoryTypeId, PhysicalDevice},
     command::{self, BufferCopy, ClearColor, ClearValue},
@@ -674,7 +674,7 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
     unsafe {
         s.device.destroy_shader_module(fs_module);
     }
-    let (dtbuffer, dtmemory, dtreqs) = make_vertex_buffer_with_data(s, &vec![0.0f32; 6 * 1024]);
+    let (dtbuffer, dtmemory, dtreqs) = make_vertex_buffer_with_data(s, &vec![0.0f32; 3 * 3 * 1000]);
     let debug_triangles = ColoredTriangleList {
         capacity: dtreqs.size,
         triangles_count: 0,
@@ -940,6 +940,85 @@ pub fn collect_input(windowing: &mut Windowing) -> Vec<Event> {
     inputs
 }
 
+pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(
+    s: &mut Windowing,
+    deg: T,
+    lgr: &mut Logger<Log>,
+) {
+    let device = &s.device;
+    if let Some(ref mut debug_triangles) = s.debug_triangles {
+        const PTS: usize = 3;
+        const COLORS: usize = 4;
+        const COMPNTS: usize = 2;
+        device.wait_idle().expect("Unable to wait for device idle");
+        unsafe {
+            let data_reader = device
+                .acquire_mapping_reader::<f32>(
+                    &debug_triangles.triangles_memory,
+                    0..debug_triangles.capacity,
+                )
+                .expect("Failed to acquire a memory writer!");
+            let mut vertices =
+                Vec::<[f32; 6]>::with_capacity(debug_triangles.triangles_count * PTS);
+            for i in 0..debug_triangles.triangles_count {
+                let mut idx = i
+                    * (size_of::<f32>() * COMPNTS * PTS + size_of::<u8>() * COLORS * PTS)
+                    / size_of::<f32>();
+                let card1 = &data_reader[idx..idx + 2];
+                idx += 3;
+                let card2 = &data_reader[idx..idx + 2];
+                idx += 3;
+                let card3 = &data_reader[idx..idx + 2];
+                vertices.push([card1[0], card1[1], card2[0], card2[1], card3[0], card3[1]]);
+            }
+            device.release_mapping_reader(data_reader);
+
+            // info![lgr, "vxdraw", "Doing a rotation"; "vertices" => InDebugPretty(&vertices); clone vertices];
+            for vert in vertices.iter_mut() {
+                let off = (average_xy(vert));
+                let a = Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), deg)
+                    * Vector4::new(vert[0], vert[1], 0.0, 1.0);
+                let b = Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), deg)
+                    * Vector4::new(vert[2], vert[3], 0.0, 1.0);
+                let c = Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), deg)
+                    * Vector4::new(vert[4], vert[5], 0.0, 1.0);
+                vert[0] = a.x + off.0;
+                vert[1] = a.y + off.1;
+                vert[2] = b.x + off.0;
+                vert[3] = b.y + off.1;
+                vert[4] = c.x + off.0;
+                vert[5] = c.y + off.1;
+            }
+
+            let mut data_target = device
+                .acquire_mapping_writer::<f32>(
+                    &debug_triangles.triangles_memory,
+                    0..debug_triangles.capacity,
+                )
+                .expect("Failed to acquire a memory writer!");
+
+            for (i, vert) in vertices.iter().enumerate() {
+                let mut idx = i
+                    * (size_of::<f32>() * COMPNTS * PTS + size_of::<u8>() * COLORS * PTS)
+                    / size_of::<f32>();
+                data_target[idx..idx + 2].copy_from_slice(&vert[0..2]);
+                idx += 3;
+                data_target[idx..idx + 2].copy_from_slice(&vert[2..4]);
+                idx += 3;
+                data_target[idx..idx + 2].copy_from_slice(&vert[4..6]);
+            }
+            // data_target[idx..idx + 2].copy_from_slice(&triangle[0..2]);
+            // idx += 3;
+            // data_target[idx..idx + 2].copy_from_slice(&triangle[2..4]);
+            // idx += 3;
+            // data_target[idx..idx + 2].copy_from_slice(&triangle[4..6]);
+            device
+                .release_mapping_writer(data_target)
+                .expect("Couldn't release the mapping writer!");
+        }
+    }
+}
+
 pub fn add_to_triangles(s: &mut Windowing, triangle: &[f32; 6]) {
     let device = &s.device;
     if let Some(ref mut debug_triangles) = s.debug_triangles {
@@ -979,7 +1058,7 @@ pub fn add_to_triangles(s: &mut Windowing, triangle: &[f32; 6]) {
 pub fn pop_to_triangles(s: &mut Windowing) {
     if let Some(ref mut debug_triangles) = s.debug_triangles {
         s.device.wait_idle().expect("device idle");
-        debug_triangles.triangles_count -= 6;
+        debug_triangles.triangles_count -= 1;
     }
 }
 
@@ -1069,6 +1148,18 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &Matrix4<f32>)
             .unwrap();
     }
     s.current_frame = (s.current_frame + 1) % s.image_count;
+}
+
+pub fn average_xy(triangle: &mut [f32; 6]) -> (f32, f32) {
+    let ax = (triangle[0] + triangle[2] + triangle[4]) / 3.0f32;
+    let ay = (triangle[1] + triangle[3] + triangle[5]) / 3.0f32;
+    triangle[0] -= ax;
+    triangle[1] -= ay;
+    triangle[2] -= ax;
+    triangle[3] -= ay;
+    triangle[4] -= ax;
+    triangle[5] -= ay;
+    (ax, ay)
 }
 
 // ---
@@ -1166,6 +1257,51 @@ mod tests {
             prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(32 as f32)); // * Matrix4::from_scale(0.5f32);
         draw_frame(&mut windowing, &mut logger, &mat4);
         std::thread::sleep(std::time::Duration::new(10, 8_000_000));
+    }
+
+    #[test]
+    fn windmills() {
+        let mut logger = Logger::spawn();
+        logger.set_colorize(true);
+        let mut windowing = init_window_with_vulkan(&mut logger);
+        let prspect = {
+            let size = windowing
+                .window
+                .get_inner_size()
+                .unwrap()
+                .to_physical(windowing.window.get_hidpi_factor());
+            let pval = Vector2::new(size.height, size.width).normalize();
+            Matrix4::from_nonuniform_scale(pval.x as f32, pval.y as f32, 1.0)
+        };
+
+        let mut rng = rand::thread_rng();
+        use rand::Rng;
+        for _ in 0..1000 {
+            let mut tri = make_centered_equilateral_triangle();
+            let (dx, dy) = (
+                rng.gen_range(-1.0f32, 1.0f32),
+                rng.gen_range(-1.0f32, 1.0f32),
+            );
+            let scale = rng.gen_range(0.03f32, 0.1f32);
+            for idx in 0..tri.len() {
+                tri[idx] *= scale;
+            }
+            tri[0] += dx;
+            tri[1] += dy;
+            tri[2] += dx;
+            tri[3] += dy;
+            tri[4] += dx;
+            tri[5] += dy;
+            add_to_triangles(&mut windowing, &tri);
+        }
+        let mat4 =
+            prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(0.0 as f32)); // * Matrix4::from_scale(0.5f32);
+        let mut cnt = 0usize;
+        for _ in 0..=360 {
+            rotate_to_triangles(&mut windowing, Deg(1.0f32), &mut logger);
+            draw_frame(&mut windowing, &mut logger, &mat4);
+            std::thread::sleep(std::time::Duration::new(0, 8_000_000));
+        }
     }
 
     #[test]

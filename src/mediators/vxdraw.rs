@@ -940,6 +940,37 @@ pub fn collect_input(windowing: &mut Windowing) -> Vec<Event> {
     inputs
 }
 
+pub fn set_triangle_color(s: &mut Windowing, inst: usize, rgba: &[u8; 4]) {
+    let device = &s.device;
+    if let Some(ref mut debug_triangles) = s.debug_triangles {
+        const PTS: usize = 3;
+        const COLORS: usize = 4;
+        const COMPNTS: usize = 2;
+        device.wait_idle().expect("Unable to wait for device idle");
+        unsafe {
+            let mut data_target = device
+                .acquire_mapping_writer::<f32>(
+                    &debug_triangles.triangles_memory,
+                    0..debug_triangles.capacity,
+                )
+                .expect("Failed to acquire a memory writer!");
+
+            let mut idx = inst
+                * (size_of::<f32>() * COMPNTS * PTS + size_of::<u8>() * COLORS * PTS)
+                / size_of::<f32>();
+            let rgba = transmute::<&[u8; 4], &[f32; 1]>(rgba);
+            data_target[idx+2 .. idx+3].copy_from_slice(rgba);
+            idx += 3;
+            data_target[idx+2 .. idx+3].copy_from_slice(rgba);
+            idx += 3;
+            data_target[idx+2 .. idx+3].copy_from_slice(rgba);
+            device
+                .release_mapping_writer(data_target)
+                .expect("Couldn't release the mapping writer!");
+        }
+    }
+}
+
 pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
     // NOTE: This algorithm sucks, we have to de-transform the triangle back to the origin
     // triangle, perform a rotation, and then re-translate the triangle back. This is highly
@@ -1023,7 +1054,9 @@ pub fn add_to_triangles(s: &mut Windowing, triangle: &[f32; 6]) {
         const COLORS: usize = 4;
         const COMPNTS: usize = 2;
         const TRI_SIZE: usize = size_of::<f32>() * COMPNTS * PTS + size_of::<u8>() * COLORS * PTS;
-        assert![(debug_triangles.triangles_count + 1) * TRI_SIZE <= debug_triangles.capacity as usize];
+        assert![
+            (debug_triangles.triangles_count + 1) * TRI_SIZE <= debug_triangles.capacity as usize
+        ];
         unsafe {
             let mut data_target = device
                 .acquire_mapping_writer(
@@ -1277,6 +1310,20 @@ mod tests {
         add_4_screencorners(&mut windowing);
 
         draw_frame(&mut windowing, &mut logger, &prspect);
+    }
+
+    #[test]
+    fn simple_triangle_change_color() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger);
+        let prspect = gen_perspective(&mut windowing);
+        let tri = make_centered_equilateral_triangle();
+
+        add_to_triangles(&mut windowing, &tri);
+        set_triangle_color(&mut windowing, 0, &[255, 0, 255, 255]);
+
+        draw_frame(&mut windowing, &mut logger, &prspect);
+        std::thread::sleep(std::time::Duration::new(10, 0));
     }
 
     #[test]

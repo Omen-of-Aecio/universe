@@ -96,11 +96,16 @@ pub struct SingleTexture {
     pub texture_uv_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
 }
 
-pub struct DebugTriangle {
+pub struct ColoredTriangleList {
     pub capacity: u64,
     pub triangles_count: usize,
     pub triangles_buffer: <back::Backend as Backend>::Buffer,
     pub triangles_memory: <back::Backend as Backend>::Memory,
+
+    pub descriptor_set: Vec<<back::Backend as Backend>::DescriptorSetLayout>,
+    pub pipeline: ManuallyDrop<<back::Backend as Backend>::GraphicsPipeline>,
+    pub pipeline_layout: ManuallyDrop<<back::Backend as Backend>::PipelineLayout>,
+    pub render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
 }
 
 pub struct Windowing {
@@ -117,7 +122,7 @@ pub struct Windowing {
     // pub texture_pipeline: ManuallyDrop<<back::Backend as Backend>::GraphicsPipeline>,
     // pub texture_pipeline_layout: ManuallyDrop<<back::Backend as Backend>::PipelineLayout>,
     //
-    pub debug_triangles: Option<DebugTriangle>,
+    pub debug_triangles: Option<ColoredTriangleList>,
     //
     pub triangle_buffers: Vec<<back::Backend as Backend>::Buffer>,
     pub triangle_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout>,
@@ -150,6 +155,7 @@ pub struct Windowing {
     pub device: ManuallyDrop<back::Device>,
     pub adapter: Adapter<back::Backend>,
     pub surf: <back::Backend as Backend>::Surface,
+    pub format: gfx_hal::format::Format,
 
     pub vk_inst: ManuallyDrop<back::Instance>,
 }
@@ -183,9 +189,24 @@ impl Drop for Windowing {
         }
 
         unsafe {
-            if let Some(debug_triangles) = self.debug_triangles.take() {
+            if let Some(mut debug_triangles) = self.debug_triangles.take() {
                 self.device.destroy_buffer(debug_triangles.triangles_buffer);
                 self.device.free_memory(debug_triangles.triangles_memory);
+                for dsl in debug_triangles.descriptor_set.drain(..) {
+                    self.device.destroy_descriptor_set_layout(dsl);
+                }
+                self.device
+                    .destroy_graphics_pipeline(ManuallyDrop::into_inner(read(
+                        &debug_triangles.pipeline,
+                    )));
+                self.device
+                    .destroy_pipeline_layout(ManuallyDrop::into_inner(read(
+                        &debug_triangles.pipeline_layout,
+                    )));
+                self.device
+                    .destroy_render_pass(ManuallyDrop::into_inner(read(
+                        &debug_triangles.render_pass,
+                    )));
             }
 
             self.device.destroy_command_pool(

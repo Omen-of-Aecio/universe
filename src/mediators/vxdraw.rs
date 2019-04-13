@@ -1,4 +1,4 @@
-use crate::glocals::{DebugTriangle, Log, SingleTexture, Windowing};
+use crate::glocals::{ColoredTriangleList, Log, SingleTexture, Windowing};
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
 #[cfg(feature = "gl")]
@@ -16,7 +16,7 @@ use gfx_hal::{
     adapter::{MemoryTypeId, PhysicalDevice},
     command::{self, BufferCopy, ClearColor, ClearValue},
     device::Device,
-    format::{self, ChannelType, Swizzle},
+    format::{self, ChannelType, Format, Swizzle},
     image, memory,
     memory::Properties,
     pass, pool,
@@ -434,6 +434,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         events_loop,
         frame_render_fences,
         framebuffers,
+        format,
         image_count: image_count as usize,
         image_views,
         present_wait_semaphores,
@@ -457,16 +458,235 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>) -> Windowing {
         vk_inst: ManuallyDrop::new(vk_inst),
         window,
     };
-    let (dtbuffer, dtmemory) =
-        make_vertex_buffer_with_data(&mut windowing, &vec![0.0f32; 6 * 1024]);
-    let debug_triangles = DebugTriangle {
+    create_debug_triangle(&mut windowing, log);
+    windowing
+}
+
+pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
+    pub const VERTEX_SOURCE: &str = "#version 450
+    #extension GL_ARG_separate_shader_objects : enable
+    layout (location = 0) in vec2 position;
+    layout (location = 1) in vec4 color;
+    layout (location = 0) out vec4 outcolor;
+    out gl_PerVertex {
+        vec4 gl_Position;
+    };
+    void main() {
+      gl_Position = vec4(position, 0.0, 1.0);
+      outcolor = color;
+    }";
+
+    pub const FRAGMENT_SOURCE: &str = "#version 450
+    #extension GL_ARG_separate_shader_objects : enable
+    layout(location = 0) in vec4 incolor;
+    layout(location = 0) out vec4 color;
+    void main() {
+        color = incolor;
+    }";
+
+    info![log, "vxdraw", "Before shading module"];
+    let vs_module = {
+        let glsl = VERTEX_SOURCE;
+        let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
+            .unwrap()
+            .bytes()
+            .map(Result::unwrap)
+            .collect();
+        unsafe { s.device.create_shader_module(&spirv) }.unwrap()
+    };
+    let fs_module = {
+        let glsl = FRAGMENT_SOURCE;
+        let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Fragment)
+            .unwrap()
+            .bytes()
+            .map(Result::unwrap)
+            .collect();
+        unsafe { s.device.create_shader_module(&spirv) }.unwrap()
+    };
+    info![log, "vxdraw", "After shading module"];
+    // Describe the shaders
+    const ENTRY_NAME: &str = "main";
+    let vs_module: <back::Backend as Backend>::ShaderModule = vs_module;
+    let (vs_entry, fs_entry) = (
+        pso::EntryPoint {
+            entry: ENTRY_NAME,
+            module: &vs_module,
+            specialization: pso::Specialization::default(),
+        },
+        pso::EntryPoint {
+            entry: ENTRY_NAME,
+            module: &fs_module,
+            specialization: pso::Specialization::default(),
+        },
+    );
+    info![log, "vxdraw", "After making"];
+    let shader_entries = pso::GraphicsShaderSet {
+        vertex: vs_entry,
+        hull: None,
+        domain: None,
+        geometry: None,
+        fragment: Some(fs_entry),
+    };
+    let input_assembler = InputAssemblerDesc::new(Primitive::TriangleList);
+
+    let vertex_buffers: Vec<VertexBufferDesc> = vec![VertexBufferDesc {
+        binding: 0,
+        stride: (size_of::<f32>() * (2 + 4)) as u32,
+        rate: 0,
+    }];
+    let attributes: Vec<AttributeDesc> = vec![
+        AttributeDesc {
+            location: 0,
+            binding: 0,
+            element: Element {
+                format: format::Format::Rg32Float,
+                offset: 0,
+            },
+        },
+        AttributeDesc {
+            location: 1,
+            binding: 0,
+            element: Element {
+                format: format::Format::Rgba32Float,
+                offset: 8,
+            },
+        },
+    ];
+
+    let rasterizer = Rasterizer {
+        depth_clamping: false,
+        polygon_mode: PolygonMode::Fill,
+        cull_face: Face::NONE,
+        front_face: FrontFace::Clockwise,
+        depth_bias: None,
+        conservative: false,
+    };
+
+    let depth_stencil = DepthStencilDesc {
+        depth: DepthTest::Off,
+        depth_bounds: false,
+        stencil: StencilTest::Off,
+    };
+    let blender = {
+        let blend_state = BlendState::On {
+            color: BlendOp::Add {
+                src: Factor::One,
+                dst: Factor::Zero,
+            },
+            alpha: BlendOp::Add {
+                src: Factor::One,
+                dst: Factor::Zero,
+            },
+        };
+        BlendDesc {
+            logic_op: Some(LogicOp::Copy),
+            targets: vec![ColorBlendDesc(ColorMask::ALL, blend_state)],
+        }
+    };
+    let size = s
+        .window
+        .get_inner_size()
+        .unwrap()
+        .to_physical(s.window.get_hidpi_factor());
+    let extent = image::Extent {
+        width: size.width as u32,
+        height: size.height as u32,
+        depth: 1,
+    }
+    .rect();
+    let triangle_render_pass = {
+        let attachment = pass::Attachment {
+            format: Some(s.format),
+            samples: 1,
+            ops: pass::AttachmentOps::new(
+                pass::AttachmentLoadOp::Clear,
+                pass::AttachmentStoreOp::Store,
+            ),
+            stencil_ops: pass::AttachmentOps::DONT_CARE,
+            layouts: image::Layout::Undefined..image::Layout::Present,
+        };
+
+        let subpass = pass::SubpassDesc {
+            colors: &[(0, image::Layout::ColorAttachmentOptimal)],
+            depth_stencil: None,
+            inputs: &[],
+            resolves: &[],
+            preserves: &[],
+        };
+
+        unsafe { s.device.create_render_pass(&[attachment], &[subpass], &[]) }
+            .expect("Can't create render pass")
+    };
+    let baked_states = BakedStates {
+        viewport: Some(Viewport {
+            rect: extent,
+            depth: (0.0..1.0),
+        }),
+        scissor: Some(extent),
+        blend_color: None,
+        depth_bounds: None,
+    };
+    let bindings = Vec::<DescriptorSetLayoutBinding>::new();
+    let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
+    let triangle_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
+        vec![unsafe {
+            s.device
+                .create_descriptor_set_layout(bindings, immutable_samplers)
+                .expect("Couldn't make a DescriptorSetLayout")
+        }];
+    let push_constants = Vec::<(ShaderStageFlags, core::ops::Range<u32>)>::new();
+    let triangle_pipeline_layout = unsafe {
+        s.device
+            .create_pipeline_layout(&triangle_descriptor_set_layouts, push_constants)
+            .expect("Couldn't create a pipeline layout")
+    };
+    info![log, "vxdraw", "Creating custom pipe"];
+    // Describe the pipeline (rasterization, triangle interpretation)
+    let pipeline_desc = GraphicsPipelineDesc {
+        shaders: shader_entries,
+        rasterizer,
+        vertex_buffers,
+        attributes,
+        input_assembler,
+        blender,
+        depth_stencil,
+        multisampling: None,
+        baked_states,
+        layout: &triangle_pipeline_layout,
+        subpass: pass::Subpass {
+            index: 0,
+            main_pass: &triangle_render_pass,
+        },
+        flags: PipelineCreationFlags::empty(),
+        parent: BasePipeline::None,
+    };
+    info![log, "vxdraw", "Neat shit"];
+
+    let triangle_pipeline = unsafe {
+        s.device
+            .create_graphics_pipeline(&pipeline_desc, None)
+            .expect("Couldn't create a graphics pipeline!")
+    };
+
+    unsafe {
+        s.device.destroy_shader_module(vs_module);
+    }
+    unsafe {
+        s.device.destroy_shader_module(fs_module);
+    }
+    let (dtbuffer, dtmemory) = make_vertex_buffer_with_data(s, &vec![0.0f32; 6 * 1024]);
+    let debug_triangles = ColoredTriangleList {
         capacity: 6 * 1024,
         triangles_count: 0,
         triangles_buffer: dtbuffer,
         triangles_memory: dtmemory,
+
+        descriptor_set: triangle_descriptor_set_layouts,
+        pipeline: ManuallyDrop::new(triangle_pipeline),
+        pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
+        render_pass: ManuallyDrop::new(triangle_render_pass),
     };
-    windowing.debug_triangles = Some(debug_triangles);
-    windowing
+    s.debug_triangles = Some(debug_triangles);
 }
 
 pub fn find_memory_type_id<B: gfx_hal::Backend>(
@@ -729,9 +949,18 @@ pub fn add_to_triangles(s: &mut Windowing, triangle: &[f32; 6]) {
                 )
                 // .acquire_mapping_writer(&debug_triangles.triangles_memory, begin..end)
                 .expect("Failed to acquire a memory writer!");
-            let idx = debug_triangles.triangles_count;
-            data_target[idx..idx + triangle.len()].copy_from_slice(triangle);
-            debug_triangles.triangles_count += triangle.len();
+            let mut idx = debug_triangles.triangles_count;
+            data_target[idx..idx + 2].copy_from_slice(&triangle[0..2]);
+            data_target[idx + 2..idx + 6].copy_from_slice(&[0.8f32, 0.8, 0.0, 0.8]);
+            idx += 6;
+            data_target[idx..idx + 2].copy_from_slice(&triangle[2..4]);
+            data_target[idx + 2..idx + 6].copy_from_slice(&[0.8f32, 0.8, 0.0, 0.8]);
+            idx += 6;
+            data_target[idx..idx + 2].copy_from_slice(&triangle[4..6]);
+            data_target[idx + 2..idx + 6].copy_from_slice(&[0.8f32, 0.0, 1.0, 0.8]);
+            // data_target[idx..idx + triangle.len()].copy_from_slice(triangle);
+            // debug_triangles.triangles_count += triangle.len();
+            debug_triangles.triangles_count += 6 + 4 * 3;
             device
                 .release_mapping_writer(data_target)
                 .expect("Couldn't release the mapping writer!");
@@ -799,11 +1028,19 @@ pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &Matrix4<f32>)
                     enc.bind_vertex_buffers(0, buffers);
                     enc.draw(0..3, 0..1);
                 }
+                // if let Some(ref debug_triangles) = s.debug_triangles {
+                //     let count = debug_triangles.triangles_count;
+                //     let buffers: ArrayVec<[_; 1]> = [(&debug_triangles.triangles_buffer, 0)].into();
+                //     enc.bind_vertex_buffers(0, buffers);
+                //     enc.draw(0..(debug_triangles.triangles_count / 2) as u32, 0..1);
+                // }
                 if let Some(ref debug_triangles) = s.debug_triangles {
-                    let count = debug_triangles.triangles_count;
+                    enc.bind_graphics_pipeline(&debug_triangles.pipeline);
+                    let count = debug_triangles.triangles_count / 2 / 3;
                     let buffers: ArrayVec<[_; 1]> = [(&debug_triangles.triangles_buffer, 0)].into();
                     enc.bind_vertex_buffers(0, buffers);
-                    enc.draw(0..(debug_triangles.triangles_count / 2) as u32, 0..1);
+                    info![log, "vxdraw", "mesh count"; "count" => count];
+                    enc.draw(0..count as u32, 0..1);
                 }
             }
             buffer.finish();
@@ -848,7 +1085,7 @@ mod tests {
         let mut tri = [0.0f32; 6];
         static PI: f32 = std::f32::consts::PI;
         tri[2] = 1.0f32 * (60.0f32 / 180.0f32 * PI).cos();
-        tri[3] = 1.0f32 * (60.0f32 / 180.0f32 * PI).sin();
+        tri[3] = -1.0f32 * (60.0f32 / 180.0f32 * PI).sin();
         tri[4] = 1.0f32;
         let avg_x = (tri[0] + tri[2] + tri[4]) / 3.0f32;
         let avg_y = (tri[1] + tri[3] + tri[5]) / 3.0f32;
@@ -901,7 +1138,7 @@ mod tests {
     }
 
     #[test]
-    fn rotating_triangle() {
+    fn simple_triangle() {
         let mut logger = Logger::spawn();
         logger.set_colorize(true);
         let mut windowing = init_window_with_vulkan(&mut logger);
@@ -918,18 +1155,37 @@ mod tests {
         let tri = make_centered_equilateral_triangle();
         // add_triangle(&mut windowing, &tri);
         add_to_triangles(&mut windowing, &tri);
+        add_to_triangles(&mut windowing, &[-1.0f32, -1.0, -1.0, 0.0, 0.0, -1.0]);
+        info![logger, "tst", "equi"; "equi" => InDebug(&tri); clone tri];
+        let mat4 =
+            prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(32 as f32)); // * Matrix4::from_scale(0.5f32);
+        draw_frame(&mut windowing, &mut logger, &mat4);
+        std::thread::sleep(std::time::Duration::new(10, 8_000_000));
+    }
+
+    #[test]
+    fn rotating_triangle() {
+        let mut logger = Logger::spawn();
+        logger.set_colorize(true);
+        let mut windowing = init_window_with_vulkan(&mut logger);
+        let prspect = {
+            let size = windowing
+                .window
+                .get_inner_size()
+                .unwrap()
+                .to_physical(windowing.window.get_hidpi_factor());
+            let pval = Vector2::new(size.height, size.width).normalize();
+            Matrix4::from_nonuniform_scale(pval.x as f32, pval.y as f32, 1.0)
+        };
+
+        let tri = make_centered_equilateral_triangle();
+        add_triangle(&mut windowing, &tri);
+        // add_to_triangles(&mut windowing, &tri);
         for i in 0..=360 {
-            if i % 2 == 0 {
-                info![logger, "test", "Adding"];
-                add_to_triangles(&mut windowing, &[-1.0f32, -1.0, -1.0, 0.0, 0.0, -1.0]);
-            } else {
-                info![logger, "test", "Subbing"];
-                pop_to_triangles(&mut windowing);
-            }
             let mat4 =
                 prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(i as f32)); // * Matrix4::from_scale(0.5f32);
             draw_frame(&mut windowing, &mut logger, &mat4);
-            std::thread::sleep(std::time::Duration::new(0, 100_000_000));
+            std::thread::sleep(std::time::Duration::new(0, 8_000_000));
         }
     }
 

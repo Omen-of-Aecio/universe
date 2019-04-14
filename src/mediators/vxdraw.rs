@@ -155,7 +155,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
 
     let image_views: Vec<_> = match backbuffer {
         Backbuffer::Images(ref images) => images
-            .into_iter()
+            .iter()
             .map(|image| unsafe {
                 device
                     .create_image_view(
@@ -706,7 +706,7 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
     unsafe {
         s.device.destroy_shader_module(fs_module);
     }
-    let (dtbuffer, dtmemory, dtreqs) = make_vertex_buffer_with_data(s, &vec![0.0f32; 3 * 3 * 1000]);
+    let (dtbuffer, dtmemory, dtreqs) = make_vertex_buffer_with_data(s, &[0.0f32; 3 * 3 * 1000]);
     info![log, "vxdraw", "Vertex buffer size"; "requirements" => InDebugPretty(&dtreqs)];
     let debug_triangles = ColoredTriangleList {
         capacity: dtreqs.size,
@@ -994,7 +994,7 @@ pub fn add_texture(s: &mut Windowing, _lgr: &mut Logger<Log>) {
     let row_alignment_mask = limits.min_buffer_copy_pitch_alignment as u32 - 1;
     let image_stride = 4usize;
     let row_pitch = (img_width * image_stride as u32 + row_alignment_mask) & !row_alignment_mask;
-    let upload_size = (img_height * row_pitch) as u64;
+    let upload_size = u64::from(img_height * row_pitch);
     // debug_assert!(row_pitch as usize >= row_size);
 
     let mut image_upload_buffer =
@@ -1033,7 +1033,7 @@ pub fn collect_input(windowing: &mut Windowing) -> Vec<Event> {
     inputs
 }
 
-pub fn set_triangle_color(s: &mut Windowing, inst: usize, rgba: &[u8; 4]) {
+pub fn set_triangle_color(s: &mut Windowing, inst: usize, rgba: [u8; 4]) {
     let device = &s.device;
     if let Some(ref mut debug_triangles) = s.debug_triangles {
         const PTS: usize = 3;
@@ -1051,7 +1051,7 @@ pub fn set_triangle_color(s: &mut Windowing, inst: usize, rgba: &[u8; 4]) {
             let mut idx = inst
                 * (size_of::<f32>() * COMPNTS * PTS + size_of::<u8>() * COLORS * PTS)
                 / size_of::<f32>();
-            let rgba = transmute::<&[u8; 4], &[f32; 1]>(rgba);
+            let rgba = &transmute::<[u8; 4], [f32; 1]>(rgba);
             data_target[idx + 2..idx + 3].copy_from_slice(rgba);
             idx += 3;
             data_target[idx + 2..idx + 3].copy_from_slice(rgba);
@@ -1478,8 +1478,8 @@ fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
                 },
                 image_offset: image::Offset { x: 0, y: 0, z: 0 },
                 image_extent: image::Extent {
-                    width: width,
-                    height: height,
+                    width,
+                    height,
                     depth: 1,
                 },
             }),
@@ -1504,7 +1504,7 @@ fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
         let result = reader
             .iter()
             .take((3 * width * height) as usize)
-            .map(|x| *x)
+            .cloned()
             .collect::<Vec<_>>();
         s.device.release_mapping_reader(reader);
         s.device.destroy_buffer(buffer);

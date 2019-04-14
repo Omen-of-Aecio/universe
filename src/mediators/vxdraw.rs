@@ -45,6 +45,7 @@ use winit::{dpi::LogicalSize, Event, EventsLoop, WindowBuilder};
 pub enum ShowWindow {
     /// Runs vulkan in headless mode (hidden window) with a swapchain of 1000x1000
     Headless1k,
+    Headless2x1k,
     Enable,
 }
 
@@ -52,16 +53,27 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
     let events_loop = EventsLoop::new();
 
     let window = WindowBuilder::new()
-        .with_visibility(show != ShowWindow::Headless1k)
+        .with_visibility(show == ShowWindow::Enable)
         .build(&events_loop)
         .unwrap();
 
-    if show == ShowWindow::Headless1k {
-        let dpi_factor = window.get_hidpi_factor();
-        window.set_inner_size(LogicalSize {
-            width: 1000f64 / dpi_factor,
-            height: 1000f64 / dpi_factor,
-        });
+    match show {
+        ShowWindow::Headless1k => {
+            let dpi_factor = window.get_hidpi_factor();
+            window.set_inner_size(LogicalSize {
+                width: 1000f64 / dpi_factor,
+                height: 1000f64 / dpi_factor,
+            });
+        }
+        ShowWindow::Headless2x1k => {
+            let dpi_factor = window.get_hidpi_factor();
+            window.set_inner_size(LogicalSize {
+                width: 2000f64 / dpi_factor,
+                height: 1000f64 / dpi_factor,
+            });
+        }
+        ShowWindow::Enable => {
+        }
     }
 
     let version = 1;
@@ -2211,6 +2223,18 @@ mod tests {
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
         assert_swapchain_eq(&mut windowing, "windmills", img);
+    }
+
+    #[test]
+    fn windmills_ignore_perspective() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
+        let prspect = gen_perspective(&mut windowing);
+
+        add_windmills(&mut windowing);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+
+        assert_swapchain_eq(&mut windowing, "windmills_ignore_perspective", img);
     }
 
     #[test]

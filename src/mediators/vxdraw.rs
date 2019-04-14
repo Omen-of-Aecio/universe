@@ -950,16 +950,17 @@ pub fn make_vertex_buffer_with_data_on_gpu(
     (buffer_gpu, memory_gpu, memory_gpu_requirements)
 }
 
-pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) {
+pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
     #[rustfmt::skip]
     let (texture_vertex_buffer, texture_vertex_memory, _) = make_vertex_buffer_with_data_on_gpu(
         s,
         &[
             // -1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
-            -1.0f32, -1.0,
-            0.0, 0.0,
-            0.0, 0.0,
-            0.0, 0.0,
+            -1.0f32, -1.0, // Original position
+            0.0, 0.0,      // UV
+            0.0, 0.0,      // DX DY
+            0.0,           // Rot
+            0.0,           // image index
 
             -1.0f32, 1.0,
             0.0, 1.0,
@@ -1168,6 +1169,7 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) {
 
     layout(location = 0) in vec2 v_pos;
     layout(location = 1) in vec2 v_uv;
+    layout(location = 2) in vec2 v_dxdy;
 
     layout(location = 0) out vec2 f_uv;
 
@@ -1177,7 +1179,7 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) {
 
     void main() {
         f_uv = v_uv;
-        gl_Position = vec4(v_pos, 0.0, 1.0);
+        gl_Position = vec4(v_pos + v_dxdy, 0.0, 1.0);
     }";
 
     const FRAGMENT_SOURCE_TEXTURE: &str = "#version 450
@@ -1260,6 +1262,14 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) {
                 offset: 8,
             },
         },
+        AttributeDesc {
+            location: 2,
+            binding: 0,
+            element: Element {
+                format: format::Format::Rg32Float,
+                offset: 16,
+            },
+        },
     ];
 
     let rasterizer = Rasterizer {
@@ -1279,12 +1289,12 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) {
     let blender = {
         let blend_state = BlendState::On {
             color: BlendOp::Add {
-                src: Factor::One,
-                dst: Factor::Zero,
+                src: Factor::SrcAlpha,
+                dst: Factor::OneMinusSrcAlpha,
             },
             alpha: BlendOp::Add {
                 src: Factor::One,
-                dst: Factor::Zero,
+                dst: Factor::OneMinusSrcAlpha,
             },
         };
         BlendDesc {
@@ -1456,6 +1466,7 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) {
         pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
         render_pass: ManuallyDrop::new(triangle_render_pass),
     });
+    s.simple_textures.len()
 }
 
 pub fn add_triangle(s: &mut Windowing, triangle: &[f32; 6]) {
@@ -2280,8 +2291,10 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         add_texture(&mut windowing, &mut logger);
+
         let prspect = gen_perspective(&mut windowing);
-        draw_frame(&mut windowing, &mut logger, &prspect);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "simple_texture", img);
     }
 
     #[test]

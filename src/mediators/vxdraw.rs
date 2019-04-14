@@ -842,6 +842,7 @@ pub fn make_vertex_buffer_with_data_on_gpu(
 ) -> (
     <back::Backend as Backend>::Buffer,
     <back::Backend as Backend>::Memory,
+    memory::Requirements,
 ) {
     let device = &s.device;
     let (buffer, memory, requirements) = unsafe {
@@ -869,7 +870,7 @@ pub fn make_vertex_buffer_with_data_on_gpu(
             .expect("Couldn't release the mapping writer!");
     }
 
-    let (buffer_gpu, memory_gpu) = unsafe {
+    let (buffer_gpu, memory_gpu, memory_gpu_requirements) = unsafe {
         let buffer_size: u64 = (std::mem::size_of::<f32>() * data.len()) as u64;
         let mut buffer = device
             .create_buffer(
@@ -886,7 +887,7 @@ pub fn make_vertex_buffer_with_data_on_gpu(
         device
             .bind_buffer_memory(&memory, 0, &mut buffer)
             .expect("Couldn't bind the buffer memory!");
-        (buffer, memory)
+        (buffer, memory, requirements)
     };
     let buffer_size: u64 = (std::mem::size_of::<f32>() * data.len()) as u64;
     let mut cmd_buffer = s
@@ -934,17 +935,17 @@ pub fn make_vertex_buffer_with_data_on_gpu(
         device.destroy_buffer(buffer);
         device.free_memory(memory);
     }
-    (buffer_gpu, memory_gpu)
+    (buffer_gpu, memory_gpu, memory_gpu_requirements)
 }
 
 pub fn add_texture(s: &mut Windowing, _lgr: &mut Logger<Log>) {
-    let (texture_vertex_buffer, texture_vertex_memory, _) = make_vertex_buffer_with_data(
+    let (texture_vertex_buffer, texture_vertex_memory, _) = make_vertex_buffer_with_data_on_gpu(
         s,
         &[
             -1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
         ],
     );
-    let (texture_uv_buffer, texture_uv_memory, _) = make_vertex_buffer_with_data(
+    let (texture_uv_buffer, texture_uv_memory, _) = make_vertex_buffer_with_data_on_gpu(
         s,
         &[
             -1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
@@ -1020,7 +1021,7 @@ pub fn add_texture(s: &mut Windowing, _lgr: &mut Logger<Log>) {
 }
 
 pub fn add_triangle(s: &mut Windowing, triangle: &[f32; 6]) {
-    let (buffer, memory) = make_vertex_buffer_with_data_on_gpu(s, &triangle[..]);
+    let (buffer, memory, _) = make_vertex_buffer_with_data_on_gpu(s, &triangle[..]);
     s.triangle_buffers.push(buffer);
     s.triangle_memory.push(memory);
 }
@@ -1331,7 +1332,7 @@ fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
     let height = s.swapconfig.extent.height;
 
     let (buffer, memory, requirements) =
-        make_transfer_buffer_of_size(s, (width * height * 3) as u64);
+        make_transfer_buffer_of_size(s, u64::from(width * height * 3));
     let (imgbuf, imgmem, _imgreq) = make_transfer_img_of_size(s, width, height);
     let images = match s.backbuffer {
         Backbuffer::Images(ref images) => images,
@@ -1532,7 +1533,7 @@ fn align_top(alignment: Alignment, value: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test::Bencher;
+    use test::{black_box, Bencher};
 
     use cgmath::{Deg, Vector3};
     use rand_pcg::Pcg64Mcg as random;
@@ -1707,7 +1708,7 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
 
-        let (buffer, memory) =
+        let (buffer, memory, _) =
             make_vertex_buffer_with_data_on_gpu(&mut windowing, &vec![1.0f32; 10_000]);
 
         unsafe {
@@ -1766,6 +1767,23 @@ mod tests {
     }
 
     #[test]
+    fn windmills_change_color() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&mut windowing);
+
+        add_windmills(&mut windowing);
+        set_triangle_color(&mut windowing, 0, [255, 0, 0, 255]);
+        set_triangle_color(&mut windowing, 249, [0, 255, 0, 255]);
+        set_triangle_color(&mut windowing, 499, [0, 0, 255, 255]);
+        set_triangle_color(&mut windowing, 999, [0, 0, 0, 255]);
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+
+        assert_swapchain_eq(&mut windowing, "windmills_change_color", img);
+    }
+
+    #[test]
     fn tearing_test() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
@@ -1808,15 +1826,6 @@ mod tests {
         }
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         assert_swapchain_eq(&mut windowing, "rotating_windmills_drawing_invariant", img);
-
-        // // for _ in 0..30000 {
-        //     for _ in 0..360 {
-        //         rotate_to_triangles(&mut windowing, Deg(1.0f32));
-        //     }
-        // // }
-        // let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-
-        // assert_swapchain_eq(&mut windowing, "rotating_windmills_drawing_invariant", img);
     }
 
     // ---
@@ -1846,6 +1855,18 @@ mod tests {
 
         b.iter(|| {
             draw_frame(&mut windowing, &mut logger, &prspect);
+        });
+    }
+
+    #[bench]
+    fn bench_windmills_set_color(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+
+        add_windmills(&mut windowing);
+
+        b.iter(|| {
+            set_triangle_color(&mut windowing, 0, black_box([0, 0, 0, 255]));
         });
     }
 

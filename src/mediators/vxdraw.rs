@@ -22,10 +22,10 @@ use gfx_hal::{
     pass, pool,
     pso::{
         self, AttributeDesc, BakedStates, BasePipeline, BlendDesc, BlendOp, BlendState,
-        ColorBlendDesc, ColorMask, DepthStencilDesc, DepthTest, DescriptorSetLayoutBinding,
-        Element, Face, Factor, FrontFace, GraphicsPipelineDesc, InputAssemblerDesc, LogicOp,
-        PipelineCreationFlags, PipelineStage, PolygonMode, Rasterizer, Rect, ShaderStageFlags,
-        StencilTest, VertexBufferDesc, Viewport,
+        ColorBlendDesc, ColorMask, DepthStencilDesc, DepthTest, DescriptorPool,
+        DescriptorSetLayoutBinding, Element, Face, Factor, FrontFace, GraphicsPipelineDesc,
+        InputAssemblerDesc, LogicOp, PipelineCreationFlags, PipelineStage, PolygonMode, Rasterizer,
+        Rect, ShaderStageFlags, StencilTest, VertexBufferDesc, Viewport,
     },
     queue::Submission,
     window::{Extent2D, PresentMode::*, Surface, Swapchain},
@@ -938,7 +938,7 @@ pub fn make_vertex_buffer_with_data_on_gpu(
     (buffer_gpu, memory_gpu, memory_gpu_requirements)
 }
 
-pub fn add_texture(s: &mut Windowing, _lgr: &mut Logger<Log>) {
+pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) {
     let (texture_vertex_buffer, texture_vertex_memory, _) = make_vertex_buffer_with_data_on_gpu(
         s,
         &[
@@ -954,52 +954,23 @@ pub fn add_texture(s: &mut Windowing, _lgr: &mut Logger<Log>) {
 
     let device = &s.device;
 
-    // const VERTEX_SOURCE_TEXTURE: &str = "#version 450
-    // #extension GL_ARB_separate_shader_objects : enable
-
-    // layout(constant_id = 0) const float scale = 1.2f;
-
-    // layout(location = 0) in vec2 a_pos;
-    // layout(location = 1) in vec2 a_uv;
-    // layout(location = 0) out vec2 v_uv;
-
-    // out gl_PerVertex {
-    //     vec4 gl_Position;
-    // };
-
-    // void main() {
-    //     v_uv = a_uv;
-    //     gl_Position = vec4(scale * a_pos, 0.0, 1.0);
-    // }";
-
-    // const FRAGMENT_SOURCE_TEXTURE: &str = "#version 450
-    // #extension GL_ARB_separate_shader_objects : enable
-
-    // layout(location = 0) in vec2 v_uv;
-    // layout(location = 0) out vec4 target0;
-
-    // layout(set = 0, binding = 0) uniform texture2D u_texture;
-    // layout(set = 0, binding = 1) uniform sampler u_sampler;
-
-    // void main() {
-    //     target0 = texture(sampler2D(u_texture, u_sampler), v_uv);
-    // }";
-
     let img_data = include_bytes!["../../assets/images/logo.png"];
     let img = load_image::load_from_memory_with_format(&img_data[..], load_image::PNG)
         .unwrap()
         .to_rgba();
-    let (img_width, img_height) = img.dimensions();
-    let _kind = image::Kind::D2(img_width as image::Size, img_height as image::Size, 1, 1);
+
+    let pixel_size = 4; //size_of::<image::Rgba<u8>>();
+    let row_size = pixel_size * (img.width() as usize);
     let limits = s.adapter.physical_device.limits();
     let row_alignment_mask = limits.min_buffer_copy_pitch_alignment as u32 - 1;
-    let image_stride = 4usize;
-    let row_pitch = (img_width * image_stride as u32 + row_alignment_mask) & !row_alignment_mask;
-    let upload_size = u64::from(img_height * row_pitch);
-    // debug_assert!(row_pitch as usize >= row_size);
+    let row_pitch = ((row_size as u32 + row_alignment_mask) & !row_alignment_mask) as usize;
+    debug_assert!(row_pitch as usize >= row_size);
+    let required_bytes = row_pitch * img.height() as usize;
 
-    let mut image_upload_buffer =
-        unsafe { device.create_buffer(upload_size, gfx_hal::buffer::Usage::TRANSFER_SRC) }.unwrap();
+    let mut image_upload_buffer = unsafe {
+        device.create_buffer(required_bytes as u64, gfx_hal::buffer::Usage::TRANSFER_SRC)
+    }
+    .unwrap();
     let image_mem_reqs = unsafe { device.get_buffer_requirements(&image_upload_buffer) };
     let memory_type_id = find_memory_type_id(&s.adapter, image_mem_reqs, Properties::CPU_VISIBLE);
     let image_upload_memory =
@@ -1008,8 +979,426 @@ pub fn add_texture(s: &mut Windowing, _lgr: &mut Logger<Log>) {
         .unwrap();
 
     unsafe {
+        let mut writer = s
+            .device
+            .acquire_mapping_writer::<u8>(&image_upload_memory, 0..image_mem_reqs.size)
+            .expect("Unable to get mapping writer");
+        for y in 0..img.height() as usize {
+            let row = &(*img)[y * row_size..(y + 1) * row_size];
+            let dest_base = y * row_pitch;
+            writer[dest_base..dest_base + row.len()].copy_from_slice(row);
+        }
+        device
+            .release_mapping_writer(writer)
+            .expect("Couldn't release the mapping writer to the staging buffer!");
+    }
+
+    let mut the_image = unsafe {
+        device
+            .create_image(
+                image::Kind::D2(img.width(), img.height(), 1, 1),
+                1,
+                format::Format::Rgba8Srgb,
+                image::Tiling::Optimal,
+                image::Usage::TRANSFER_DST | image::Usage::SAMPLED,
+                image::ViewCapabilities::empty(),
+            )
+            .expect("Couldn't create the image!")
+    };
+
+    let image_memory = unsafe {
+        let requirements = device.get_image_requirements(&the_image);
+        let memory_type_id =
+            find_memory_type_id(&s.adapter, requirements, memory::Properties::DEVICE_LOCAL);
+        device
+            .allocate_memory(memory_type_id, requirements.size)
+            .expect("Unable to allocate")
+    };
+
+    let image_view = unsafe {
+        device
+            .bind_image_memory(&image_memory, 0, &mut the_image)
+            .expect("Unable to bind memory");
+
+        device
+            .create_image_view(
+                &the_image,
+                image::ViewKind::D2,
+                format::Format::Rgba8Srgb,
+                format::Swizzle::NO,
+                image::SubresourceRange {
+                    aspects: format::Aspects::COLOR,
+                    levels: 0..1,
+                    layers: 0..1,
+                },
+            )
+            .expect("Couldn't create the image view!")
+    };
+
+    let sampler = unsafe {
+        s.device
+            .create_sampler(image::SamplerInfo::new(
+                image::Filter::Nearest,
+                image::WrapMode::Tile,
+            ))
+            .expect("Couldn't create the sampler!")
+    };
+
+    unsafe {
+        let mut cmd_buffer = s.command_pool.acquire_command_buffer::<command::OneShot>();
+        cmd_buffer.begin();
+        let image_barrier = memory::Barrier::Image {
+            states: (image::Access::empty(), image::Layout::Undefined)
+                ..(
+                    image::Access::TRANSFER_WRITE,
+                    image::Layout::TransferDstOptimal,
+                ),
+            target: &the_image,
+            families: None,
+            range: image::SubresourceRange {
+                aspects: format::Aspects::COLOR,
+                levels: 0..1,
+                layers: 0..1,
+            },
+        };
+        cmd_buffer.pipeline_barrier(
+            PipelineStage::TOP_OF_PIPE..PipelineStage::TRANSFER,
+            memory::Dependencies::empty(),
+            &[image_barrier],
+        );
+        cmd_buffer.copy_buffer_to_image(
+            &image_upload_buffer,
+            &the_image,
+            image::Layout::TransferDstOptimal,
+            &[command::BufferImageCopy {
+                buffer_offset: 0,
+                buffer_width: (row_pitch / pixel_size) as u32,
+                buffer_height: img.height(),
+                image_layers: gfx_hal::image::SubresourceLayers {
+                    aspects: format::Aspects::COLOR,
+                    level: 0,
+                    layers: 0..1,
+                },
+                image_offset: image::Offset { x: 0, y: 0, z: 0 },
+                image_extent: image::Extent {
+                    width: img.width(),
+                    height: img.height(),
+                    depth: 1,
+                },
+            }],
+        );
+        let image_barrier = memory::Barrier::Image {
+            states: (
+                image::Access::TRANSFER_WRITE,
+                image::Layout::TransferDstOptimal,
+            )
+                ..(
+                    image::Access::SHADER_READ,
+                    image::Layout::ShaderReadOnlyOptimal,
+                ),
+            target: &the_image,
+            families: None,
+            range: image::SubresourceRange {
+                aspects: format::Aspects::COLOR,
+                levels: 0..1,
+                layers: 0..1,
+            },
+        };
+        cmd_buffer.pipeline_barrier(
+            PipelineStage::TRANSFER..PipelineStage::FRAGMENT_SHADER,
+            memory::Dependencies::empty(),
+            &[image_barrier],
+        );
+        cmd_buffer.finish();
+        let upload_fence = s
+            .device
+            .create_fence(false)
+            .expect("Couldn't create an upload fence!");
+        s.queue_group.queues[0].submit_nosemaphores(Some(&cmd_buffer), Some(&upload_fence));
+        s.device
+            .wait_for_fence(&upload_fence, u64::max_value())
+            .expect("Couldn't wait for the fence!");
+        s.device.destroy_fence(upload_fence);
+    }
+
+    unsafe {
         device.destroy_buffer(image_upload_buffer);
         device.free_memory(image_upload_memory);
+    }
+
+    const VERTEX_SOURCE_TEXTURE: &str = "#version 450
+    #extension GL_ARB_separate_shader_objects : enable
+
+    layout(location = 0) in vec2 v_pos;
+    layout(location = 1) in vec2 v_uv;
+
+    layout(location = 0) out vec2 f_uv;
+
+    out gl_PerVertex {
+        vec4 gl_Position;
+    };
+
+    void main() {
+        f_uv = v_uv;
+        gl_Position = vec4(v_pos, 0.0, 1.0);
+    }";
+
+    const FRAGMENT_SOURCE_TEXTURE: &str = "#version 450
+    #extension GL_ARB_separate_shader_objects : enable
+
+    layout(location = 0) in vec2 f_uv;
+    layout(location = 0) out vec4 color;
+
+    layout(set = 0, binding = 0) uniform texture2D f_texture;
+    layout(set = 0, binding = 1) uniform sampler f_sampler;
+
+    void main() {
+        color = texture(sampler2D(f_texture, f_sampler), f_uv);
+    }";
+
+    info![log, "vxdraw", "Before shading module"];
+    let vs_module = {
+        let glsl = VERTEX_SOURCE_TEXTURE;
+        let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
+            .unwrap()
+            .bytes()
+            .map(Result::unwrap)
+            .collect();
+        unsafe { s.device.create_shader_module(&spirv) }.unwrap()
+    };
+    let fs_module = {
+        let glsl = FRAGMENT_SOURCE_TEXTURE;
+        let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Fragment)
+            .unwrap()
+            .bytes()
+            .map(Result::unwrap)
+            .collect();
+        unsafe { s.device.create_shader_module(&spirv) }.unwrap()
+    };
+    info![log, "vxdraw", "After shading module"];
+    // Describe the shaders
+    const ENTRY_NAME: &str = "main";
+    let vs_module: <back::Backend as Backend>::ShaderModule = vs_module;
+    let (vs_entry, fs_entry) = (
+        pso::EntryPoint {
+            entry: ENTRY_NAME,
+            module: &vs_module,
+            specialization: pso::Specialization::default(),
+        },
+        pso::EntryPoint {
+            entry: ENTRY_NAME,
+            module: &fs_module,
+            specialization: pso::Specialization::default(),
+        },
+    );
+    info![log, "vxdraw", "After making"];
+    let shader_entries = pso::GraphicsShaderSet {
+        vertex: vs_entry,
+        hull: None,
+        domain: None,
+        geometry: None,
+        fragment: Some(fs_entry),
+    };
+    let input_assembler = InputAssemblerDesc::new(Primitive::TriangleStrip);
+
+    let vertex_buffers: Vec<VertexBufferDesc> = vec![VertexBufferDesc {
+        binding: 0,
+        stride: (size_of::<f32>() * (2 + 2 + 2 + 1 + 1)) as u32,
+        rate: 0,
+    }];
+    let attributes: Vec<AttributeDesc> = vec![
+        AttributeDesc {
+            location: 0,
+            binding: 0,
+            element: Element {
+                format: format::Format::Rg32Float,
+                offset: 0,
+            },
+        },
+        AttributeDesc {
+            location: 1,
+            binding: 0,
+            element: Element {
+                format: format::Format::Rg32Float,
+                offset: 8,
+            },
+        },
+    ];
+
+    let rasterizer = Rasterizer {
+        depth_clamping: false,
+        polygon_mode: PolygonMode::Fill,
+        cull_face: Face::NONE,
+        front_face: FrontFace::Clockwise,
+        depth_bias: None,
+        conservative: false,
+    };
+
+    let depth_stencil = DepthStencilDesc {
+        depth: DepthTest::Off,
+        depth_bounds: false,
+        stencil: StencilTest::Off,
+    };
+    let blender = {
+        let blend_state = BlendState::On {
+            color: BlendOp::Add {
+                src: Factor::One,
+                dst: Factor::Zero,
+            },
+            alpha: BlendOp::Add {
+                src: Factor::One,
+                dst: Factor::Zero,
+            },
+        };
+        BlendDesc {
+            logic_op: Some(LogicOp::Copy),
+            targets: vec![ColorBlendDesc(ColorMask::ALL, blend_state)],
+        }
+    };
+    let extent = image::Extent {
+        width: s.swapconfig.extent.width,
+        height: s.swapconfig.extent.height,
+        depth: 1,
+    }
+    .rect();
+    let triangle_render_pass = {
+        let attachment = pass::Attachment {
+            format: Some(s.format),
+            samples: 1,
+            ops: pass::AttachmentOps::new(
+                pass::AttachmentLoadOp::Clear,
+                pass::AttachmentStoreOp::Store,
+            ),
+            stencil_ops: pass::AttachmentOps::DONT_CARE,
+            layouts: image::Layout::Undefined..image::Layout::Present,
+        };
+
+        let subpass = pass::SubpassDesc {
+            colors: &[(0, image::Layout::ColorAttachmentOptimal)],
+            depth_stencil: None,
+            inputs: &[],
+            resolves: &[],
+            preserves: &[],
+        };
+
+        unsafe { s.device.create_render_pass(&[attachment], &[subpass], &[]) }
+            .expect("Can't create render pass")
+    };
+    let baked_states = BakedStates {
+        viewport: Some(Viewport {
+            rect: extent,
+            depth: (0.0..1.0),
+        }),
+        scissor: Some(extent),
+        blend_color: None,
+        depth_bounds: None,
+    };
+    let mut bindings = Vec::<DescriptorSetLayoutBinding>::new();
+    bindings.push(DescriptorSetLayoutBinding {
+        binding: 0,
+        ty: pso::DescriptorType::SampledImage,
+        count: 1,
+        stage_flags: ShaderStageFlags::FRAGMENT,
+        immutable_samplers: false,
+    });
+    bindings.push(DescriptorSetLayoutBinding {
+        binding: 1,
+        ty: pso::DescriptorType::Sampler,
+        count: 1,
+        stage_flags: ShaderStageFlags::FRAGMENT,
+        immutable_samplers: false,
+    });
+    let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
+    let triangle_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
+        vec![unsafe {
+            s.device
+                .create_descriptor_set_layout(bindings, immutable_samplers)
+                .expect("Couldn't make a DescriptorSetLayout")
+        }];
+
+    let mut descriptor_pool = unsafe {
+        s.device
+            .create_descriptor_pool(
+                1, // sets
+                &[
+                    pso::DescriptorRangeDesc {
+                        ty: pso::DescriptorType::SampledImage,
+                        count: 1,
+                    },
+                    pso::DescriptorRangeDesc {
+                        ty: pso::DescriptorType::Sampler,
+                        count: 1,
+                    },
+                ],
+            )
+            .expect("Couldn't create a descriptor pool!")
+    };
+
+    let descriptor_set = unsafe {
+        descriptor_pool
+            .allocate_set(&triangle_descriptor_set_layouts[0])
+            .expect("Couldn't make a Descriptor Set!")
+    };
+
+    unsafe {
+        s.device.write_descriptor_sets(vec![
+            pso::DescriptorSetWrite {
+                set: &descriptor_set,
+                binding: 0,
+                array_offset: 0,
+                descriptors: Some(pso::Descriptor::Image(
+                    &image_view,
+                    image::Layout::ShaderReadOnlyOptimal,
+                )),
+            },
+            pso::DescriptorSetWrite {
+                set: &descriptor_set,
+                binding: 1,
+                array_offset: 0,
+                descriptors: Some(pso::Descriptor::Sampler(&sampler)),
+            },
+        ]);
+    }
+
+    let push_constants = Vec::<(ShaderStageFlags, core::ops::Range<u32>)>::new();
+    let triangle_pipeline_layout = unsafe {
+        s.device
+            .create_pipeline_layout(&triangle_descriptor_set_layouts, push_constants)
+            .expect("Couldn't create a pipeline layout")
+    };
+    info![log, "vxdraw", "Creating custom pipe"];
+    // Describe the pipeline (rasterization, triangle interpretation)
+    let pipeline_desc = GraphicsPipelineDesc {
+        shaders: shader_entries,
+        rasterizer,
+        vertex_buffers,
+        attributes,
+        input_assembler,
+        blender,
+        depth_stencil,
+        multisampling: None,
+        baked_states,
+        layout: &triangle_pipeline_layout,
+        subpass: pass::Subpass {
+            index: 0,
+            main_pass: &triangle_render_pass,
+        },
+        flags: PipelineCreationFlags::empty(),
+        parent: BasePipeline::None,
+    };
+    info![log, "vxdraw", "Neat shit"];
+
+    let triangle_pipeline = unsafe {
+        s.device
+            .create_graphics_pipeline(&pipeline_desc, None)
+            .expect("Couldn't create a graphics pipeline!")
+    };
+
+    unsafe {
+        s.device.destroy_shader_module(vs_module);
+    }
+    unsafe {
+        s.device.destroy_shader_module(fs_module);
     }
 
     s.simple_textures.push(SingleTexture {
@@ -1017,6 +1406,18 @@ pub fn add_texture(s: &mut Windowing, _lgr: &mut Logger<Log>) {
         texture_vertex_memory: ManuallyDrop::new(texture_vertex_memory),
         texture_uv_buffer: ManuallyDrop::new(texture_uv_buffer),
         texture_uv_memory: ManuallyDrop::new(texture_uv_memory),
+        texture_image_buffer: ManuallyDrop::new(the_image),
+        texture_image_memory: ManuallyDrop::new(image_memory),
+
+        descriptor_pool: ManuallyDrop::new(descriptor_pool),
+        image_view: ManuallyDrop::new(image_view),
+        sampler: ManuallyDrop::new(sampler),
+
+        descriptor_set: ManuallyDrop::new(descriptor_set),
+        descriptor_set_layouts: triangle_descriptor_set_layouts,
+        pipeline: ManuallyDrop::new(triangle_pipeline),
+        pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
+        render_pass: ManuallyDrop::new(triangle_render_pass),
     });
 }
 
@@ -1142,15 +1543,22 @@ pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) 
 }
 
 pub fn add_to_triangles(s: &mut Windowing, triangle: &[f32; 6]) {
-    let device = &s.device;
+    const PTS: usize = 3;
+    const COLORS: usize = 4;
+    const COMPNTS: usize = 2;
+    const TRI_SIZE: usize = size_of::<f32>() * COMPNTS * PTS + size_of::<u8>() * COLORS * PTS;
+
+    let overrun = if let Some(ref mut debug_triangles) = s.debug_triangles {
+        Some((debug_triangles.triangles_count + 1) * TRI_SIZE > debug_triangles.capacity as usize)
+    } else {
+        None
+    };
+    if let Some(overrun) = overrun {
+        // Do reallocation here
+        assert_eq![false, overrun];
+    }
     if let Some(ref mut debug_triangles) = s.debug_triangles {
-        const PTS: usize = 3;
-        const COLORS: usize = 4;
-        const COMPNTS: usize = 2;
-        const TRI_SIZE: usize = size_of::<f32>() * COMPNTS * PTS + size_of::<u8>() * COLORS * PTS;
-        assert![
-            (debug_triangles.triangles_count + 1) * TRI_SIZE <= debug_triangles.capacity as usize
-        ];
+        let device = &s.device;
         unsafe {
             let mut data_target = device
                 .acquire_mapping_writer(
@@ -1802,6 +2210,13 @@ mod tests {
             draw_frame(&mut windowing, &mut logger, &rot);
             std::thread::sleep(std::time::Duration::new(0, 80_000_000));
         }
+    }
+
+    #[test]
+    fn simple_texture() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        add_texture(&mut windowing, &mut logger);
     }
 
     #[test]

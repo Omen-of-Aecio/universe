@@ -94,6 +94,18 @@ pub struct SingleTexture {
     pub texture_vertex_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
     pub texture_uv_buffer: ManuallyDrop<<back::Backend as Backend>::Buffer>,
     pub texture_uv_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
+    pub texture_image_buffer: ManuallyDrop<<back::Backend as Backend>::Image>,
+    pub texture_image_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
+
+    pub sampler: ManuallyDrop<<back::Backend as Backend>::Sampler>,
+    pub image_view: ManuallyDrop<<back::Backend as Backend>::ImageView>,
+    pub descriptor_pool: ManuallyDrop<<back::Backend as Backend>::DescriptorPool>,
+
+    pub descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout>,
+    pub pipeline: ManuallyDrop<<back::Backend as Backend>::GraphicsPipeline>,
+    pub pipeline_layout: ManuallyDrop<<back::Backend as Backend>::PipelineLayout>,
+    pub render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
+    pub descriptor_set: ManuallyDrop<<back::Backend as Backend>::DescriptorSet>,
 }
 
 pub struct ColoredTriangleList {
@@ -230,7 +242,7 @@ impl Drop for Windowing {
                     &self.triangle_pipeline_layout,
                 )));
 
-            for simple_tex in self.simple_textures.drain(..) {
+            for mut simple_tex in self.simple_textures.drain(..) {
                 self.device.destroy_buffer(ManuallyDrop::into_inner(read(
                     &simple_tex.texture_vertex_buffer,
                 )));
@@ -243,6 +255,33 @@ impl Drop for Windowing {
                 self.device.free_memory(ManuallyDrop::into_inner(read(
                     &simple_tex.texture_uv_memory,
                 )));
+                self.device.destroy_image(ManuallyDrop::into_inner(read(
+                    &simple_tex.texture_image_buffer,
+                )));
+                self.device.free_memory(ManuallyDrop::into_inner(read(
+                    &simple_tex.texture_image_memory,
+                )));
+                self.device
+                    .destroy_render_pass(ManuallyDrop::into_inner(read(&simple_tex.render_pass)));
+                self.device
+                    .destroy_pipeline_layout(ManuallyDrop::into_inner(read(
+                        &simple_tex.pipeline_layout,
+                    )));
+                self.device
+                    .destroy_graphics_pipeline(ManuallyDrop::into_inner(read(
+                        &simple_tex.pipeline,
+                    )));
+                for dsl in simple_tex.descriptor_set_layouts.drain(..) {
+                    self.device.destroy_descriptor_set_layout(dsl);
+                }
+                self.device
+                    .destroy_descriptor_pool(ManuallyDrop::into_inner(read(
+                        &simple_tex.descriptor_pool,
+                    )));
+                self.device
+                    .destroy_sampler(ManuallyDrop::into_inner(read(&simple_tex.sampler)));
+                self.device
+                    .destroy_image_view(ManuallyDrop::into_inner(read(&simple_tex.image_view)));
             }
 
             for dsl in self.triangle_descriptor_set_layouts.drain(..) {

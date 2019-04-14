@@ -1746,7 +1746,7 @@ mod tests {
         let tri = make_centered_equilateral_triangle();
 
         add_to_triangles(&mut windowing, &tri);
-        set_triangle_color(&mut windowing, 0, &[255, 0, 255, 255]);
+        set_triangle_color(&mut windowing, 0, [255, 0, 255, 255]);
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 

@@ -27,6 +27,7 @@ use std::mem::{size_of, transmute, ManuallyDrop};
 
 // ---
 
+#[derive(Clone, Copy)]
 pub struct DebugTriangle {
     pub origin: [(f32, f32); 3],
     pub colors_rgba: [(u8, u8, u8, u8); 3],
@@ -62,6 +63,19 @@ impl Default for DebugTriangle {
             translation: (0f32, 0f32),
             scale: 1f32,
         }
+    }
+}
+
+impl DebugTriangle {
+    pub fn radius(&self) -> f32 {
+        (self.origin[0].0.powi(2) + self.origin[0].1.powi(2))
+            .sqrt()
+            .max(
+                (self.origin[1].0.powi(2) + self.origin[1].1.powi(2))
+                    .sqrt()
+                    .max((self.origin[2].0.powi(2) + self.origin[2].1.powi(2)).sqrt()),
+            )
+            * self.scale
     }
 }
 
@@ -154,13 +168,23 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
     layout (location = 3) in float rotation;
     layout (location = 4) in float scale;
 
+    layout(push_constant) uniform PushConstant {
+        float w_over_h;
+    } push_constant;
+
     layout (location = 0) out vec4 outcolor;
     out gl_PerVertex {
         vec4 gl_Position;
     };
     void main() {
         mat2 rotmatrix = mat2(cos(rotation), -sin(rotation), sin(rotation), cos(rotation));
-        gl_Position = vec4(rotmatrix * scale * position + dxdy, 0.0, 1.0);
+        vec2 pos = rotmatrix * scale * position;
+        if (push_constant.w_over_h >= 1.0) {
+            pos.x /= push_constant.w_over_h;
+        } else {
+            pos.y *= push_constant.w_over_h;
+        }
+        gl_Position = vec4(pos + dxdy, 0.0, 1.0);
         outcolor = color;
     }";
 
@@ -341,7 +365,9 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
                 .create_descriptor_set_layout(bindings, immutable_samplers)
                 .expect("Couldn't make a DescriptorSetLayout")
         }];
-    let push_constants = Vec::<(ShaderStageFlags, core::ops::Range<u32>)>::new();
+    let mut push_constants = Vec::<(ShaderStageFlags, core::ops::Range<u32>)>::new();
+    push_constants.push((ShaderStageFlags::VERTEX, 0..1));
+
     let triangle_pipeline_layout = unsafe {
         s.device
             .create_pipeline_layout(&triangle_descriptor_set_layouts, push_constants)
@@ -381,7 +407,8 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
     unsafe {
         s.device.destroy_shader_module(fs_module);
     }
-    let (dtbuffer, dtmemory, dtreqs) = make_vertex_buffer_with_data(s, &[0.0f32; 3 * 7 * 1000]);
+    let (dtbuffer, dtmemory, dtreqs) =
+        make_vertex_buffer_with_data(s, &[0.0f32; TRI_BYTE_SIZE / 4 * 1000]);
     info![log, "vxdraw", "Vertex buffer size"; "requirements" => InDebugPretty(&dtreqs)];
     let debug_triangles = ColoredTriangleList {
         capacity: dtreqs.size,

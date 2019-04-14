@@ -49,6 +49,7 @@ pub enum ShowWindow {
     /// Runs vulkan in headless mode (hidden window) with a swapchain of 1000x1000
     Headless1k,
     Headless2x1k,
+    Headless1x2k,
     Enable,
 }
 
@@ -73,6 +74,13 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
             window.set_inner_size(LogicalSize {
                 width: 2000f64 / dpi_factor,
                 height: 1000f64 / dpi_factor,
+            });
+        }
+        ShowWindow::Headless1x2k => {
+            let dpi_factor = window.get_hidpi_factor();
+            window.set_inner_size(LogicalSize {
+                width: 1000f64 / dpi_factor,
+                height: 2000f64 / dpi_factor,
             });
         }
         ShowWindow::Enable => {}
@@ -1131,6 +1139,14 @@ fn draw_frame_internal<T>(
                 }
                 if let Some(ref debug_triangles) = s.debug_triangles {
                     enc.bind_graphics_pipeline(&debug_triangles.pipeline);
+                    let ratio =
+                        s.swapconfig.extent.width as f32 / s.swapconfig.extent.height as f32;
+                    enc.push_graphics_constants(
+                        &debug_triangles.pipeline_layout,
+                        ShaderStageFlags::VERTEX,
+                        0,
+                        &(std::mem::transmute::<f32, [u32; 1]>(ratio)),
+                    );
                     let count = debug_triangles.triangles_count;
                     let buffers: ArrayVec<[_; 1]> = [(&debug_triangles.triangles_buffer, 0)].into();
                     enc.bind_vertex_buffers(0, buffers);
@@ -1391,6 +1407,84 @@ mod tests {
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
         assert_swapchain_eq(&mut windowing, "simple_triangle_change_color", img);
+    }
+
+    #[test]
+    fn debug_triangle_corners_widescreen() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
+        let prspect = gen_perspective(&mut windowing);
+
+        for i in [-1f32, 1f32].iter() {
+            for j in [-1f32, 1f32].iter() {
+                let mut tri = DebugTriangle::default();
+                tri.translation = (*i, *j);
+                let idx = add_to_triangles(&mut windowing, tri);
+            }
+        }
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+
+        assert_swapchain_eq(&mut windowing, "debug_triangle_corners_widescreen", img);
+    }
+
+    #[test]
+    fn debug_triangle_corners_tallscreen() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1x2k);
+        let prspect = gen_perspective(&mut windowing);
+
+        for i in [-1f32, 1f32].iter() {
+            for j in [-1f32, 1f32].iter() {
+                let mut tri = DebugTriangle::default();
+                tri.translation = (*i, *j);
+                let idx = add_to_triangles(&mut windowing, tri);
+            }
+        }
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+
+        assert_swapchain_eq(&mut windowing, "debug_triangle_corners_tallscreen", img);
+    }
+
+    #[test]
+    fn circle_of_triangles() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
+        let prspect = gen_perspective(&mut windowing);
+
+        for i in 0..360 {
+            let mut tri = DebugTriangle::default();
+            tri.translation = ((i as f32).cos(), (i as f32).sin());
+            tri.scale = 0.1f32;
+            let idx = add_to_triangles(&mut windowing, tri);
+        }
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+
+        assert_swapchain_eq(&mut windowing, "circle_of_triangles", img);
+    }
+
+    #[test]
+    fn triangle_in_corner() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&mut windowing);
+
+        let mut tri = DebugTriangle::default();
+        tri.scale = 0.1f32;
+        let radi = tri.radius();
+
+        let trans = -1f32 + radi;
+        for j in 0..31 {
+            for i in 0..31 {
+                tri.translation = (trans + i as f32 * 2.0 * radi, trans + j as f32 * 2.0 * radi);
+                add_to_triangles(&mut windowing, tri);
+            }
+        }
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "triangle_in_corner", img);
     }
 
     #[test]

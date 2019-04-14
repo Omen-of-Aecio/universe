@@ -939,10 +939,35 @@ pub fn make_vertex_buffer_with_data_on_gpu(
 }
 
 pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) {
+    #[rustfmt::skip]
     let (texture_vertex_buffer, texture_vertex_memory, _) = make_vertex_buffer_with_data_on_gpu(
         s,
         &[
-            -1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
+            // -1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
+            -1.0f32, -1.0,
+            0.0, 0.0,
+            0.0, 0.0,
+            0.0, 0.0,
+
+            -1.0f32, 1.0,
+            0.0, 1.0,
+            0.0, 0.0,
+            0.0, 0.0,
+
+            1.0f32, 1.0,
+            1.0f32, 1.0,
+            0.0, 0.0,
+            0.0, 0.0,
+
+            1.0f32, -1.0,
+            1.0f32, 0.0,
+            0.0, 0.0,
+            0.0, 0.0,
+
+            -1.0f32, -1.0,
+            0.0f32, 0.0,
+            0.0, 0.0,
+            0.0, 0.0,
         ],
     );
     let (texture_uv_buffer, texture_uv_memory, _) = make_vertex_buffer_with_data_on_gpu(
@@ -1672,6 +1697,20 @@ fn draw_frame_internal<T>(
                     enc.bind_vertex_buffers(0, buffers);
                     enc.draw(0..3, 0..1);
                 }
+                for simple_tex in s.simple_textures.iter() {
+                    enc.bind_graphics_pipeline(&simple_tex.pipeline);
+                    info![log, "vxdraw", "Drawing that simple_tex boi"];
+                    enc.bind_graphics_descriptor_sets(
+                        &simple_tex.pipeline_layout,
+                        0,
+                        Some(&*simple_tex.descriptor_set),
+                        &[],
+                    );
+                    let buffers: ArrayVec<[_; 1]> =
+                        [(&*simple_tex.texture_vertex_buffer, 0)].into();
+                    enc.bind_vertex_buffers(0, buffers);
+                    enc.draw(0..5, 0..1);
+                }
                 if let Some(ref debug_triangles) = s.debug_triangles {
                     enc.bind_graphics_pipeline(&debug_triangles.pipeline);
                     let count = debug_triangles.triangles_count;
@@ -2217,6 +2256,8 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         add_texture(&mut windowing, &mut logger);
+        let prspect = gen_perspective(&mut windowing);
+        draw_frame(&mut windowing, &mut logger, &prspect);
     }
 
     #[test]

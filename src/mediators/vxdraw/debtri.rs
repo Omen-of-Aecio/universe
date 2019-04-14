@@ -1,4 +1,6 @@
-use crate::glocals::{ColoredTriangleList, Log, SingleTexture, Windowing};
+use super::utils::*;
+use crate::glocals::{ColoredTriangleList, Log, Windowing};
+use cgmath::Rad;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
 #[cfg(feature = "gl")]
@@ -7,36 +9,23 @@ use gfx_backend_gl as back;
 use gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 use gfx_backend_vulkan as back;
-// use gfx_hal::format::{AsFormat, ChannelType, Rgba8Srgb as ColorFormat, Swizzle};
-use ::image as load_image;
-use arrayvec::ArrayVec;
-use cgmath::prelude::*;
-use cgmath::{Matrix4, Rad, Vector2, Vector3, Vector4};
 use gfx_hal::{
-    adapter::{MemoryTypeId, PhysicalDevice},
-    command::{self, BufferCopy, ClearColor, ClearValue},
     device::Device,
-    format::{self, ChannelType, Swizzle},
-    image, memory,
-    memory::Properties,
-    pass, pool,
+    format, image, pass,
     pso::{
         self, AttributeDesc, BakedStates, BasePipeline, BlendDesc, BlendOp, BlendState,
-        ColorBlendDesc, ColorMask, DepthStencilDesc, DepthTest, DescriptorPool,
-        DescriptorSetLayoutBinding, Element, Face, Factor, FrontFace, GraphicsPipelineDesc,
-        InputAssemblerDesc, LogicOp, PipelineCreationFlags, PipelineStage, PolygonMode, Rasterizer,
-        Rect, ShaderStageFlags, StencilTest, VertexBufferDesc, Viewport,
+        ColorBlendDesc, ColorMask, DepthStencilDesc, DepthTest, DescriptorSetLayoutBinding,
+        Element, Face, Factor, FrontFace, GraphicsPipelineDesc, InputAssemblerDesc, LogicOp,
+        PipelineCreationFlags, PolygonMode, Rasterizer, ShaderStageFlags, StencilTest,
+        VertexBufferDesc, Viewport,
     },
-    queue::Submission,
-    window::{Extent2D, PresentMode::*, Surface, Swapchain},
-    Adapter, Backbuffer, Backend, FrameSync, Instance, Primitive, SwapchainConfig,
+    Backend, Primitive,
 };
-use logger::{debug, info, log, trace, warn, InDebug, InDebugPretty, Logger};
+use logger::{info, InDebugPretty, Logger};
 use std::io::Read;
-use std::iter::once;
 use std::mem::{size_of, transmute, ManuallyDrop};
-use winit::{dpi::LogicalSize, Event, EventsLoop, WindowBuilder};
-use super::utils::*;
+
+// ---
 
 pub struct DebugTriangle {
     pub origin: [(f32, f32); 3],
@@ -76,18 +65,29 @@ impl Default for DebugTriangle {
     }
 }
 
-pub fn add_to_triangles(s: &mut Windowing, triangle: DebugTriangle) -> usize {
-    const PTS: usize = 3;
-    const COLORS: usize = 4;
-    const COMPNTS: usize = 2;
-    const TRI_SIZE: usize = size_of::<f32>() * COMPNTS * PTS
-        + size_of::<u8>() * COLORS * PTS
-        + size_of::<f32>() * COMPNTS * PTS
-        + size_of::<f32>() * PTS
-        + size_of::<f32>() * PTS;
+// ---
 
+const PTS_PER_TRI: usize = 3;
+const XY_COMPNTS: usize = 2;
+const COLOR_CMPNTS: usize = 4;
+const UV_CMPNTS: usize = 2;
+const ROT_CMPNTS: usize = 1;
+const SCALE_CMPNTS: usize = 1;
+const TRI_BYTE_SIZE: usize = PTS_PER_TRI
+    * (size_of::<f32>() * XY_COMPNTS
+        + size_of::<u8>() * COLOR_CMPNTS
+        + size_of::<f32>() * UV_CMPNTS
+        + size_of::<f32>() * ROT_CMPNTS
+        + size_of::<f32>() * SCALE_CMPNTS);
+
+// ---
+
+pub fn add_to_triangles(s: &mut Windowing, triangle: DebugTriangle) -> usize {
     let overrun = if let Some(ref mut debug_triangles) = s.debug_triangles {
-        Some((debug_triangles.triangles_count + 1) * TRI_SIZE > debug_triangles.capacity as usize)
+        Some(
+            (debug_triangles.triangles_count + 1) * TRI_BYTE_SIZE
+                > debug_triangles.capacity as usize,
+        )
     } else {
         None
     };
@@ -104,19 +104,17 @@ pub fn add_to_triangles(s: &mut Windowing, triangle: DebugTriangle) -> usize {
                     0..debug_triangles.capacity,
                 )
                 .expect("Failed to acquire a memory writer!");
-            let idx = debug_triangles.triangles_count * TRI_SIZE / size_of::<f32>();
+            let idx = debug_triangles.triangles_count * TRI_BYTE_SIZE / size_of::<f32>();
 
             for (i, idx) in [idx, idx + 7, idx + 14].iter().enumerate() {
                 data_target[*idx..*idx + 2]
                     .copy_from_slice(&[triangle.origin[i].0, triangle.origin[i].1]);
-                data_target[*idx + 2..*idx + 3].copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(
-                    &[
-                        triangle.colors_rgba[i].0,
-                        triangle.colors_rgba[i].1,
-                        triangle.colors_rgba[i].2,
-                        triangle.colors_rgba[i].3,
-                    ],
-                ));
+                data_target[*idx + 2..*idx + 3].copy_from_slice(&transmute::<[u8; 4], [f32; 1]>([
+                    triangle.colors_rgba[i].0,
+                    triangle.colors_rgba[i].1,
+                    triangle.colors_rgba[i].2,
+                    triangle.colors_rgba[i].3,
+                ]));
                 data_target[*idx + 3..*idx + 5]
                     .copy_from_slice(&[triangle.translation.0, triangle.translation.1]);
                 data_target[*idx + 5..*idx + 6].copy_from_slice(&[triangle.rotation]);
@@ -146,7 +144,6 @@ pub fn pop_n_triangles(s: &mut Windowing, n: usize) {
         debug_triangles.triangles_count -= n;
     }
 }
-
 
 pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
     pub const VERTEX_SOURCE: &str = "#version 450
@@ -222,7 +219,7 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
 
     let vertex_buffers: Vec<VertexBufferDesc> = vec![VertexBufferDesc {
         binding: 0,
-        stride: (size_of::<f32>() * (2 + 1 + 2 + 1 + 1)) as u32,
+        stride: (TRI_BYTE_SIZE / PTS_PER_TRI) as u32,
         rate: 0,
     }];
     let attributes: Vec<AttributeDesc> = vec![
@@ -404,14 +401,6 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
 pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
     let device = &s.device;
     if let Some(ref mut debug_triangles) = s.debug_triangles {
-        const PTS: usize = 3;
-        const COLORS: usize = 4;
-        const COMPNTS: usize = 2;
-        const TRI_SIZE: usize = size_of::<f32>() * COMPNTS * PTS
-            + size_of::<u8>() * COLORS * PTS
-            + size_of::<f32>() * COMPNTS * PTS
-            + size_of::<f32>() * PTS
-            + size_of::<f32>() * PTS;
         device.wait_idle().expect("Unable to wait for device idle");
         unsafe {
             let data_reader = device
@@ -422,7 +411,7 @@ pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) 
                 .expect("Failed to acquire a memory writer!");
             let mut vertices = Vec::<f32>::with_capacity(debug_triangles.triangles_count);
             for i in 0..debug_triangles.triangles_count {
-                let mut idx = i * TRI_SIZE / size_of::<f32>();
+                let idx = i * TRI_BYTE_SIZE / size_of::<f32>();
                 let rotation = &data_reader[idx + 5..idx + 6];
                 vertices.push(rotation[0]);
             }
@@ -436,7 +425,7 @@ pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) 
                 .expect("Failed to acquire a memory writer!");
 
             for (i, vert) in vertices.iter().enumerate() {
-                let mut idx = i * TRI_SIZE / size_of::<f32>();
+                let mut idx = i * TRI_BYTE_SIZE / size_of::<f32>();
                 data_target[idx + 5..idx + 6].copy_from_slice(&[*vert + deg.into().0]);
                 idx += 7;
                 data_target[idx + 5..idx + 6].copy_from_slice(&[*vert + deg.into().0]);
@@ -453,9 +442,6 @@ pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) 
 pub fn set_triangle_color(s: &mut Windowing, inst: usize, rgba: [u8; 4]) {
     let device = &s.device;
     if let Some(ref mut debug_triangles) = s.debug_triangles {
-        const PTS: usize = 3;
-        const COLORS: usize = 4;
-        const COMPNTS: usize = 2;
         device.wait_idle().expect("Unable to wait for device idle");
         unsafe {
             let mut data_target = device
@@ -465,12 +451,7 @@ pub fn set_triangle_color(s: &mut Windowing, inst: usize, rgba: [u8; 4]) {
                 )
                 .expect("Failed to acquire a memory writer!");
 
-            const TRI_SIZE: usize = size_of::<f32>() * COMPNTS * PTS
-                + size_of::<u8>() * COLORS * PTS
-                + size_of::<f32>() * COMPNTS * PTS
-                + size_of::<f32>() * PTS
-                + size_of::<f32>() * PTS;
-            let mut idx = inst * TRI_SIZE / size_of::<f32>();
+            let mut idx = inst * TRI_BYTE_SIZE / size_of::<f32>();
             let rgba = &transmute::<[u8; 4], [f32; 1]>(rgba);
             data_target[idx + 2..idx + 3].copy_from_slice(rgba);
             idx += 7;
@@ -483,4 +464,3 @@ pub fn set_triangle_color(s: &mut Windowing, inst: usize, rgba: [u8; 4]) {
         }
     }
 }
-

@@ -1,4 +1,4 @@
-use crate::glocals::{ColoredTriangleList, Log, SingleTexture, Windowing};
+use crate::glocals::{Log, SingleTexture, Windowing};
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
 #[cfg(feature = "gl")]
@@ -11,10 +11,10 @@ use gfx_backend_vulkan as back;
 use ::image as load_image;
 use arrayvec::ArrayVec;
 use cgmath::prelude::*;
-use cgmath::{Matrix4, Rad, Vector2, Vector3, Vector4};
+use cgmath::Matrix4;
 use gfx_hal::{
-    adapter::{MemoryTypeId, PhysicalDevice},
-    command::{self, BufferCopy, ClearColor, ClearValue},
+    adapter::PhysicalDevice,
+    command::{self, ClearColor, ClearValue},
     device::Device,
     format::{self, ChannelType, Swizzle},
     image, memory,
@@ -29,12 +29,11 @@ use gfx_hal::{
     },
     queue::Submission,
     window::{Extent2D, PresentMode::*, Surface, Swapchain},
-    Adapter, Backbuffer, Backend, FrameSync, Instance, Primitive, SwapchainConfig,
+    Backbuffer, Backend, FrameSync, Instance, Primitive, SwapchainConfig,
 };
 use logger::{debug, info, log, trace, warn, InDebug, InDebugPretty, Logger};
 use std::io::Read;
-use std::iter::once;
-use std::mem::{size_of, transmute, ManuallyDrop};
+use std::mem::{size_of, ManuallyDrop};
 use winit::{dpi::LogicalSize, Event, EventsLoop, WindowBuilder};
 
 pub mod debtri;
@@ -1109,7 +1108,7 @@ fn draw_frame_internal<T>(
                     &s.triangle_pipeline_layout,
                     ShaderStageFlags::VERTEX,
                     0,
-                    transmute::<*const f32, &[u32; 16]>(ptr),
+                    &*(ptr as *const [u32; 16]),
                 );
                 for buffer_ref in &s.triangle_buffers {
                     let buffers: ArrayVec<[_; 1]> = [(buffer_ref, 0)].into();

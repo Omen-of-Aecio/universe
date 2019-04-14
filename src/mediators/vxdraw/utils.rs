@@ -1,4 +1,6 @@
-use crate::glocals::{ColoredTriangleList, Log, SingleTexture, Windowing};
+use crate::glocals::Windowing;
+use cgmath::prelude::*;
+use cgmath::{Matrix4, Vector2};
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
 #[cfg(feature = "gl")]
@@ -7,35 +9,20 @@ use gfx_backend_gl as back;
 use gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 use gfx_backend_vulkan as back;
-// use gfx_hal::format::{AsFormat, ChannelType, Rgba8Srgb as ColorFormat, Swizzle};
-use ::image as load_image;
-use arrayvec::ArrayVec;
-use cgmath::prelude::*;
-use cgmath::{Matrix4, Rad, Vector2, Vector3, Vector4};
 use gfx_hal::{
     adapter::{MemoryTypeId, PhysicalDevice},
-    command::{self, BufferCopy, ClearColor, ClearValue},
+    command::{self, BufferCopy},
     device::Device,
-    format::{self, ChannelType, Swizzle},
-    image, memory,
+    format, image, memory,
     memory::Properties,
-    pass, pool,
-    pso::{
-        self, AttributeDesc, BakedStates, BasePipeline, BlendDesc, BlendOp, BlendState,
-        ColorBlendDesc, ColorMask, DepthStencilDesc, DepthTest, DescriptorPool,
-        DescriptorSetLayoutBinding, Element, Face, Factor, FrontFace, GraphicsPipelineDesc,
-        InputAssemblerDesc, LogicOp, PipelineCreationFlags, PipelineStage, PolygonMode, Rasterizer,
-        Rect, ShaderStageFlags, StencilTest, VertexBufferDesc, Viewport,
-    },
-    queue::Submission,
-    window::{Extent2D, PresentMode::*, Surface, Swapchain},
-    Adapter, Backbuffer, Backend, FrameSync, Instance, Primitive, SwapchainConfig,
+    pso, Adapter, Backbuffer, Backend,
 };
-use logger::{debug, info, log, trace, warn, InDebug, InDebugPretty, Logger};
-use std::io::Read;
 use std::iter::once;
-use std::mem::{size_of, transmute, ManuallyDrop};
-use winit::{dpi::LogicalSize, Event, EventsLoop, WindowBuilder};
+
+// ---
+
+/// Find the memory type id that satisfies the requirements and the memory properties for the given
+/// adapter
 pub fn find_memory_type_id<B: gfx_hal::Backend>(
     adap: &Adapter<B>,
     reqs: memory::Requirements,
@@ -215,7 +202,7 @@ pub fn make_vertex_buffer_with_data_on_gpu(
             target: &buffer_gpu,
         };
         cmd_buffer.pipeline_barrier(
-            PipelineStage::TOP_OF_PIPE..PipelineStage::TRANSFER,
+            pso::PipelineStage::TOP_OF_PIPE..pso::PipelineStage::TRANSFER,
             gfx_hal::memory::Dependencies::empty(),
             &[buffer_barrier],
         );
@@ -232,7 +219,7 @@ pub fn make_vertex_buffer_with_data_on_gpu(
             target: &buffer_gpu,
         };
         cmd_buffer.pipeline_barrier(
-            PipelineStage::TRANSFER..PipelineStage::FRAGMENT_SHADER,
+            pso::PipelineStage::TRANSFER..pso::PipelineStage::FRAGMENT_SHADER,
             gfx_hal::memory::Dependencies::empty(),
             &[buffer_barrier],
         );
@@ -324,7 +311,7 @@ pub fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
             },
         };
         cmd_buffer.pipeline_barrier(
-            PipelineStage::TOP_OF_PIPE..PipelineStage::TRANSFER,
+            pso::PipelineStage::TOP_OF_PIPE..pso::PipelineStage::TRANSFER,
             gfx_hal::memory::Dependencies::empty(),
             &[image_barrier, dstbarrier],
         );
@@ -371,7 +358,7 @@ pub fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
             },
         };
         cmd_buffer.pipeline_barrier(
-            PipelineStage::TRANSFER..PipelineStage::BOTTOM_OF_PIPE,
+            pso::PipelineStage::TRANSFER..pso::PipelineStage::BOTTOM_OF_PIPE,
             gfx_hal::memory::Dependencies::empty(),
             &[image_barrier],
         );
@@ -407,7 +394,7 @@ pub fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
             },
         };
         cmd_buffer.pipeline_barrier(
-            PipelineStage::TOP_OF_PIPE..PipelineStage::TRANSFER,
+            pso::PipelineStage::TOP_OF_PIPE..pso::PipelineStage::TRANSFER,
             gfx_hal::memory::Dependencies::empty(),
             &[image_barrier],
         );
@@ -473,4 +460,3 @@ pub fn align_top(alignment: Alignment, value: u64) -> u64 {
         value
     }
 }
-

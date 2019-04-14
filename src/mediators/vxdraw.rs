@@ -72,8 +72,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
                 height: 1000f64 / dpi_factor,
             });
         }
-        ShowWindow::Enable => {
-        }
+        ShowWindow::Enable => {}
     }
 
     let version = 1;
@@ -516,13 +515,18 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
     #extension GL_ARG_separate_shader_objects : enable
     layout (location = 0) in vec2 position;
     layout (location = 1) in vec4 color;
+    layout (location = 2) in vec2 dxdy;
+    layout (location = 3) in float rotation;
+    layout (location = 4) in float scale;
+
     layout (location = 0) out vec4 outcolor;
     out gl_PerVertex {
         vec4 gl_Position;
     };
     void main() {
-      gl_Position = vec4(position, 0.0, 1.0);
-      outcolor = color;
+        mat2 rotmatrix = mat2(cos(rotation), -sin(rotation), sin(rotation), cos(rotation));
+        gl_Position = vec4(rotmatrix * (scale * position) + dxdy, 0.0, 1.0);
+        outcolor = color;
     }";
 
     pub const FRAGMENT_SOURCE: &str = "#version 450
@@ -580,7 +584,7 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
 
     let vertex_buffers: Vec<VertexBufferDesc> = vec![VertexBufferDesc {
         binding: 0,
-        stride: (size_of::<f32>() * (2 + 1)) as u32,
+        stride: (size_of::<f32>() * (2 + 1 + 2 + 1 + 1)) as u32,
         rate: 0,
     }];
     let attributes: Vec<AttributeDesc> = vec![
@@ -598,6 +602,30 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
             element: Element {
                 format: format::Format::Rgba8Unorm,
                 offset: 8,
+            },
+        },
+        AttributeDesc {
+            location: 2,
+            binding: 0,
+            element: Element {
+                format: format::Format::Rg32Float,
+                offset: 12,
+            },
+        },
+        AttributeDesc {
+            location: 3,
+            binding: 0,
+            element: Element {
+                format: format::Format::R32Float,
+                offset: 20,
+            },
+        },
+        AttributeDesc {
+            location: 4,
+            binding: 0,
+            element: Element {
+                format: format::Format::R32Float,
+                offset: 24,
             },
         },
     ];
@@ -718,7 +746,7 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
     unsafe {
         s.device.destroy_shader_module(fs_module);
     }
-    let (dtbuffer, dtmemory, dtreqs) = make_vertex_buffer_with_data(s, &[0.0f32; 3 * 3 * 1000]);
+    let (dtbuffer, dtmemory, dtreqs) = make_vertex_buffer_with_data(s, &[0.0f32; 3 * 7 * 1000]);
     info![log, "vxdraw", "Vertex buffer size"; "requirements" => InDebugPretty(&dtreqs)];
     let debug_triangles = ColoredTriangleList {
         capacity: dtreqs.size,
@@ -1498,14 +1526,17 @@ pub fn set_triangle_color(s: &mut Windowing, inst: usize, rgba: [u8; 4]) {
                 )
                 .expect("Failed to acquire a memory writer!");
 
-            let mut idx = inst
-                * (size_of::<f32>() * COMPNTS * PTS + size_of::<u8>() * COLORS * PTS)
-                / size_of::<f32>();
+            const TRI_SIZE: usize = size_of::<f32>() * COMPNTS * PTS
+                + size_of::<u8>() * COLORS * PTS
+                + size_of::<f32>() * COMPNTS * PTS
+                + size_of::<f32>() * PTS
+                + size_of::<f32>() * PTS;
+            let mut idx = inst * TRI_SIZE / size_of::<f32>();
             let rgba = &transmute::<[u8; 4], [f32; 1]>(rgba);
             data_target[idx + 2..idx + 3].copy_from_slice(rgba);
-            idx += 3;
+            idx += 7;
             data_target[idx + 2..idx + 3].copy_from_slice(rgba);
-            idx += 3;
+            idx += 7;
             data_target[idx + 2..idx + 3].copy_from_slice(rgba);
             device
                 .release_mapping_writer(data_target)
@@ -1515,18 +1546,16 @@ pub fn set_triangle_color(s: &mut Windowing, inst: usize, rgba: [u8; 4]) {
 }
 
 pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
-    // NOTE: This algorithm sucks, we have to de-transform the triangle back to the origin
-    // triangle, perform a rotation, and then re-translate the triangle back. This is highly
-    // dubious and may result in drift due to float inaccuracies. A better method would be to use a
-    // compute shader to compute the vertices.. but these vertices are completely arbitrary, so
-    // that might not even work. Another way is to store rotation (2D) alongside the vertex, but
-    // this is quite heavy... again, we'd need 3 floats (rotation) + 2 floats for the "average" of
-    // this object in order to re-translate it.
     let device = &s.device;
     if let Some(ref mut debug_triangles) = s.debug_triangles {
         const PTS: usize = 3;
         const COLORS: usize = 4;
         const COMPNTS: usize = 2;
+        const TRI_SIZE: usize = size_of::<f32>() * COMPNTS * PTS
+            + size_of::<u8>() * COLORS * PTS
+            + size_of::<f32>() * COMPNTS * PTS
+            + size_of::<f32>() * PTS
+            + size_of::<f32>() * PTS;
         device.wait_idle().expect("Unable to wait for device idle");
         unsafe {
             let data_reader = device
@@ -1535,36 +1564,13 @@ pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) 
                     0..debug_triangles.capacity,
                 )
                 .expect("Failed to acquire a memory writer!");
-            let mut vertices =
-                Vec::<[f32; 6]>::with_capacity(debug_triangles.triangles_count * PTS);
+            let mut vertices = Vec::<f32>::with_capacity(debug_triangles.triangles_count);
             for i in 0..debug_triangles.triangles_count {
-                let mut idx = i
-                    * (size_of::<f32>() * COMPNTS * PTS + size_of::<u8>() * COLORS * PTS)
-                    / size_of::<f32>();
-                let card1 = &data_reader[idx..idx + 2];
-                idx += 3;
-                let card2 = &data_reader[idx..idx + 2];
-                idx += 3;
-                let card3 = &data_reader[idx..idx + 2];
-                vertices.push([card1[0], card1[1], card2[0], card2[1], card3[0], card3[1]]);
+                let mut idx = i * TRI_SIZE / size_of::<f32>();
+                let rotation = &data_reader[idx + 5..idx + 6];
+                vertices.push(rotation[0]);
             }
             device.release_mapping_reader(data_reader);
-
-            for vert in vertices.iter_mut() {
-                let off = average_xy(vert);
-                let a = Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), deg)
-                    * Vector4::new(vert[0], vert[1], 0.0, 1.0);
-                let b = Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), deg)
-                    * Vector4::new(vert[2], vert[3], 0.0, 1.0);
-                let c = Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), deg)
-                    * Vector4::new(vert[4], vert[5], 0.0, 1.0);
-                vert[0] = a.x + off.0;
-                vert[1] = a.y + off.1;
-                vert[2] = b.x + off.0;
-                vert[3] = b.y + off.1;
-                vert[4] = c.x + off.0;
-                vert[5] = c.y + off.1;
-            }
 
             let mut data_target = device
                 .acquire_mapping_writer::<f32>(
@@ -1574,14 +1580,12 @@ pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) 
                 .expect("Failed to acquire a memory writer!");
 
             for (i, vert) in vertices.iter().enumerate() {
-                let mut idx = i
-                    * (size_of::<f32>() * COMPNTS * PTS + size_of::<u8>() * COLORS * PTS)
-                    / size_of::<f32>();
-                data_target[idx..idx + 2].copy_from_slice(&vert[0..2]);
-                idx += 3;
-                data_target[idx..idx + 2].copy_from_slice(&vert[2..4]);
-                idx += 3;
-                data_target[idx..idx + 2].copy_from_slice(&vert[4..6]);
+                let mut idx = i * TRI_SIZE / size_of::<f32>();
+                data_target[idx + 5..idx + 6].copy_from_slice(&[*vert + deg.into().0]);
+                idx += 7;
+                data_target[idx + 5..idx + 6].copy_from_slice(&[*vert + deg.into().0]);
+                idx += 7;
+                data_target[idx + 5..idx + 6].copy_from_slice(&[*vert + deg.into().0]);
             }
             device
                 .release_mapping_writer(data_target)
@@ -1590,11 +1594,70 @@ pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) 
     }
 }
 
-pub fn add_to_triangles(s: &mut Windowing, triangle: &[f32; 6]) {
+pub struct DebugTriangle {
+    pub origin: [(f32, f32); 3],
+    pub colors_rgba: [(u8, u8, u8, u8); 3],
+    pub translation: (f32, f32),
+    pub rotation: f32,
+    pub scale: f32,
+}
+
+fn make_centered_equilateral_triangle() -> [f32; 6] {
+    use std::f32::consts::PI;
+    let mut tri = [0.0f32; 6];
+    tri[2] = 1.0f32 * (60.0f32 / 180.0f32 * PI).cos();
+    tri[3] = -1.0f32 * (60.0f32 / 180.0f32 * PI).sin();
+    tri[4] = 1.0f32;
+    let avg_x = (tri[0] + tri[2] + tri[4]) / 3.0f32;
+    let avg_y = (tri[1] + tri[3] + tri[5]) / 3.0f32;
+    tri[0] -= avg_x;
+    tri[1] -= avg_y;
+    tri[2] -= avg_x;
+    tri[3] -= avg_y;
+    tri[4] -= avg_x;
+    tri[5] -= avg_y;
+    tri
+}
+
+impl From<[f32; 6]> for DebugTriangle {
+    fn from(array: [f32; 6]) -> Self {
+        let mut tri = Self::default();
+        tri.origin[0].0 = array[0];
+        tri.origin[0].1 = array[1];
+        tri.origin[1].0 = array[2];
+        tri.origin[1].1 = array[3];
+        tri.origin[2].0 = array[4];
+        tri.origin[2].1 = array[5];
+        tri
+    }
+}
+
+impl Default for DebugTriangle {
+    fn default() -> Self {
+        let origin = make_centered_equilateral_triangle();
+        DebugTriangle {
+            origin: [
+                (origin[0], origin[1]),
+                (origin[2], origin[3]),
+                (origin[4], origin[5]),
+            ],
+            colors_rgba: [(255, 0, 0, 255), (0, 255, 0, 255), (0, 0, 255, 255)],
+            rotation: 0f32,
+            translation: (0f32, 0f32),
+            scale: 1f32,
+        }
+    }
+}
+
+pub fn add_to_triangles(s: &mut Windowing, triangle: DebugTriangle) -> usize {
     const PTS: usize = 3;
     const COLORS: usize = 4;
     const COMPNTS: usize = 2;
-    const TRI_SIZE: usize = size_of::<f32>() * COMPNTS * PTS + size_of::<u8>() * COLORS * PTS;
+    const TRI_SIZE: usize = size_of::<f32>() * COMPNTS * PTS
+        + size_of::<u8>() * COLORS * PTS
+        + size_of::<f32>() * COMPNTS * PTS
+        + size_of::<f32>() * PTS
+        + size_of::<f32>() * PTS;
 
     let overrun = if let Some(ref mut debug_triangles) = s.debug_triangles {
         Some((debug_triangles.triangles_count + 1) * TRI_SIZE > debug_triangles.capacity as usize)
@@ -1614,26 +1677,32 @@ pub fn add_to_triangles(s: &mut Windowing, triangle: &[f32; 6]) {
                     0..debug_triangles.capacity,
                 )
                 .expect("Failed to acquire a memory writer!");
-            let mut idx = debug_triangles.triangles_count
-                * (size_of::<f32>() * COMPNTS * PTS + size_of::<u8>() * COLORS * PTS)
-                / size_of::<f32>();
+            let idx = debug_triangles.triangles_count * TRI_SIZE / size_of::<f32>();
 
-            data_target[idx..idx + 2].copy_from_slice(&triangle[0..2]);
-            data_target[idx + 2..idx + 3]
-                .copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[255u8, 0, 0, 255]));
-            idx += 3;
-            data_target[idx..idx + 2].copy_from_slice(&triangle[2..4]);
-            data_target[idx + 2..idx + 3]
-                .copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[0u8, 255, 0, 255]));
-            idx += 3;
-            data_target[idx..idx + 2].copy_from_slice(&triangle[4..6]);
-            data_target[idx + 2..idx + 3]
-                .copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(&[0u8, 0, 255, 255]));
+            for (i, idx) in [idx, idx + 7, idx + 14].iter().enumerate() {
+                data_target[*idx..*idx + 2]
+                    .copy_from_slice(&[triangle.origin[i].0, triangle.origin[i].1]);
+                data_target[*idx + 2..*idx + 3].copy_from_slice(transmute::<&[u8; 4], &[f32; 1]>(
+                    &[
+                        triangle.colors_rgba[i].0,
+                        triangle.colors_rgba[i].1,
+                        triangle.colors_rgba[i].2,
+                        triangle.colors_rgba[i].3,
+                    ],
+                ));
+                data_target[*idx + 3..*idx + 5]
+                    .copy_from_slice(&[triangle.translation.0, triangle.translation.1]);
+                data_target[*idx + 5..*idx + 6].copy_from_slice(&[triangle.rotation]);
+                data_target[*idx + 6..*idx + 7].copy_from_slice(&[triangle.scale]);
+            }
             debug_triangles.triangles_count += 1;
             device
                 .release_mapping_writer(data_target)
                 .expect("Couldn't release the mapping writer!");
         }
+        debug_triangles.triangles_count - 1
+    } else {
+        0
     }
 }
 
@@ -2010,43 +2079,23 @@ mod tests {
 
     // ---
 
-    fn make_centered_equilateral_triangle() -> [f32; 6] {
-        let mut tri = [0.0f32; 6];
-        static PI: f32 = std::f32::consts::PI;
-        tri[2] = 1.0f32 * (60.0f32 / 180.0f32 * PI).cos();
-        tri[3] = -1.0f32 * (60.0f32 / 180.0f32 * PI).sin();
-        tri[4] = 1.0f32;
-        let avg_x = (tri[0] + tri[2] + tri[4]) / 3.0f32;
-        let avg_y = (tri[1] + tri[3] + tri[5]) / 3.0f32;
-        tri[0] -= avg_x;
-        tri[1] -= avg_y;
-        tri[2] -= avg_x;
-        tri[3] -= avg_y;
-        tri[4] -= avg_x;
-        tri[5] -= avg_y;
-        tri
-    }
-
-    fn add_windmills(windowing: &mut Windowing) {
+    fn add_windmills(windowing: &mut Windowing, rand_rotat: bool) {
         use rand::Rng;
+        use std::f32::consts::PI;
         let mut rng = random::new(0);
         for _ in 0..1000 {
-            let mut tri = make_centered_equilateral_triangle();
+            let mut tri = DebugTriangle::default();
             let (dx, dy) = (
                 rng.gen_range(-1.0f32, 1.0f32),
                 rng.gen_range(-1.0f32, 1.0f32),
             );
             let scale = rng.gen_range(0.03f32, 0.1f32);
-            for idx in 0..tri.len() {
-                tri[idx] *= scale;
+            if rand_rotat {
+                tri.rotation = rng.gen_range(-PI, PI);
             }
-            tri[0] += dx;
-            tri[1] += dy;
-            tri[2] += dx;
-            tri[3] += dy;
-            tri[4] += dx;
-            tri[5] += dy;
-            add_to_triangles(windowing, &tri);
+            tri.scale = scale;
+            tri.translation = (dx, dy);
+            add_to_triangles(windowing, tri);
         }
     }
 
@@ -2055,10 +2104,22 @@ mod tests {
     }
 
     fn add_4_screencorners(windowing: &mut Windowing) {
-        add_to_triangles(windowing, &[-1.0f32, -1.0, 0.0, -1.0, -1.0, 0.0]);
-        add_to_triangles(windowing, &[-1.0f32, 1.0, 0.0, 1.0, -1.0, 0.0]);
-        add_to_triangles(windowing, &[1.0f32, -1.0, 0.0, -1.0, 1.0, 0.0]);
-        add_to_triangles(windowing, &[1.0f32, 1.0, 0.0, 1.0, 1.0, 0.0]);
+        add_to_triangles(
+            windowing,
+            DebugTriangle::from([-1.0f32, -1.0, 0.0, -1.0, -1.0, 0.0]),
+        );
+        add_to_triangles(
+            windowing,
+            DebugTriangle::from([-1.0f32, 1.0, 0.0, 1.0, -1.0, 0.0]),
+        );
+        add_to_triangles(
+            windowing,
+            DebugTriangle::from([1.0f32, -1.0, 0.0, -1.0, 1.0, 0.0]),
+        );
+        add_to_triangles(
+            windowing,
+            DebugTriangle::from([1.0f32, 1.0, 0.0, 1.0, 1.0, 0.0]),
+        );
     }
 
     fn assert_swapchain_eq(windowing: &mut Windowing, name: &str, rgb: Vec<u8>) {
@@ -2199,9 +2260,9 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
-        let tri = make_centered_equilateral_triangle();
+        let tri = DebugTriangle::default();
 
-        add_to_triangles(&mut windowing, &tri);
+        add_to_triangles(&mut windowing, tri);
         add_4_screencorners(&mut windowing);
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
@@ -2214,10 +2275,10 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
-        let tri = make_centered_equilateral_triangle();
+        let tri = DebugTriangle::default();
 
-        add_to_triangles(&mut windowing, &tri);
-        set_triangle_color(&mut windowing, 0, [255, 0, 255, 255]);
+        let idx = add_to_triangles(&mut windowing, tri);
+        set_triangle_color(&mut windowing, idx, [255, 0, 255, 255]);
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
@@ -2230,7 +2291,7 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
-        add_windmills(&mut windowing);
+        add_windmills(&mut windowing, false);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
         assert_swapchain_eq(&mut windowing, "windmills", img);
@@ -2242,7 +2303,7 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
         let prspect = gen_perspective(&mut windowing);
 
-        add_windmills(&mut windowing);
+        add_windmills(&mut windowing, false);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
         assert_swapchain_eq(&mut windowing, "windmills_ignore_perspective", img);
@@ -2254,7 +2315,7 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
-        add_windmills(&mut windowing);
+        add_windmills(&mut windowing, false);
         set_triangle_color(&mut windowing, 0, [255, 0, 0, 255]);
         set_triangle_color(&mut windowing, 249, [0, 255, 0, 255]);
         set_triangle_color(&mut windowing, 499, [0, 0, 255, 255]);
@@ -2303,22 +2364,33 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
-        add_windmills(&mut windowing);
+        add_windmills(&mut windowing, false);
         for _ in 0..30 {
-            rotate_to_triangles(&mut windowing, Deg(1.0f32));
+            rotate_to_triangles(&mut windowing, Deg(-1.0f32));
         }
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
         assert_swapchain_eq(&mut windowing, "rotating_windmills_drawing_invariant", img);
         remove_windmills(&mut windowing);
 
-        add_windmills(&mut windowing);
+        add_windmills(&mut windowing, false);
         for _ in 0..30 {
-            rotate_to_triangles(&mut windowing, Deg(1.0f32));
+            rotate_to_triangles(&mut windowing, Deg(-1.0f32));
             draw_frame(&mut windowing, &mut logger, &prspect);
         }
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         assert_swapchain_eq(&mut windowing, "rotating_windmills_drawing_invariant", img);
+    }
+
+    #[test]
+    fn windmills_given_initial_rotation() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&mut windowing);
+
+        add_windmills(&mut windowing, true);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "windmills_given_initial_rotation", img);
     }
 
     // ---
@@ -2329,8 +2401,7 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
-        let tri = make_centered_equilateral_triangle();
-        add_to_triangles(&mut windowing, &tri);
+        add_to_triangles(&mut windowing, DebugTriangle::default());
         add_4_screencorners(&mut windowing);
 
         b.iter(|| {
@@ -2344,7 +2415,7 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
-        add_windmills(&mut windowing);
+        add_windmills(&mut windowing, false);
 
         b.iter(|| {
             draw_frame(&mut windowing, &mut logger, &prspect);
@@ -2356,7 +2427,7 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
 
-        add_windmills(&mut windowing);
+        add_windmills(&mut windowing, false);
 
         b.iter(|| {
             set_triangle_color(&mut windowing, 0, black_box([0, 0, 0, 255]));
@@ -2369,7 +2440,7 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
-        add_windmills(&mut windowing);
+        add_windmills(&mut windowing, false);
 
         b.iter(|| {
             rotate_to_triangles(&mut windowing, Deg(1.0f32));
@@ -2382,7 +2453,7 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
 
-        add_windmills(&mut windowing);
+        add_windmills(&mut windowing, false);
 
         b.iter(|| {
             rotate_to_triangles(&mut windowing, Deg(1.0f32));

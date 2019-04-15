@@ -1,7 +1,12 @@
-#version 330
+#version 450
+#extension GL_ARG_separate_shader_objects : enable
 
-in vec2 pos;
-out vec2 texpos;
+layout (location = 0) in vec2 pos;
+layout (location = 0) out vec2 texpos;
+
+out gl_PerVertex {
+    vec4 gl_Position;
+};
 
 void main() {
     texpos = (pos + 1)/2;

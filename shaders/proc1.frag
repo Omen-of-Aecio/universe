@@ -1,10 +1,12 @@
-#version 330
+#version 450
+#extension GL_ARG_separate_shader_objects : enable
 
-in vec2 texpos;
-out vec4 Color;
+layout (location = 0) in vec2 texpos;
+layout (location = 0) out vec4 Color;
 
-uniform float width;
-uniform vec3 rand_seed;
+layout(push_constant) uniform PushConstant {
+    layout (offset = 0) vec4 rand_seed;
+} push;
 
 // Hash function: http://amindforeverprogramming.blogspot.com/2013/07/random-floats-in-glsl-330.html
 uint hash( uint x ) {
@@ -91,7 +93,7 @@ float FBM(vec3 pos, int octaves) {
     float result = 0;
     float p;
 
-    pos *= width; // Frequency = pixel
+    pos *= push.rand_seed.x; // Frequency = pixel
     /* pos *= 1000; */
 
     const float power = 3;  // Higher -> lower frequencies dominate. Normally 2.
@@ -113,7 +115,7 @@ void main()
 {
     int octaves = 8;
     float r;
-    r = FBM(vec3(texpos,0) + rand_seed, octaves);
+    r = FBM(vec3(texpos,0) + push.rand_seed.yzw, octaves);
     r = step(0.5, r);
     Color = vec4(vec3(r), 1);
 }

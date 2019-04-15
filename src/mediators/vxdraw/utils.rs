@@ -436,6 +436,7 @@ pub fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
             .device
             .acquire_mapping_reader::<u8>(&memory, 0..requirements.size as u64)
             .expect("Unable to open reader");
+        assert![u64::from(3 * width * height) <= requirements.size];
         let result = reader
             .iter()
             .take((3 * width * height) as usize)

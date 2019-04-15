@@ -1190,6 +1190,306 @@ fn draw_frame_internal<T>(
     postproc_res
 }
 
+pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) -> Vec<u8> {
+    static VERTEX_SOURCE: &str = include_str!("../../shaders/proc1.vert");
+    static FRAGMENT_SOURCE: &str = include_str!("../../shaders/proc1.frag");
+    let vs_module = {
+        let glsl = VERTEX_SOURCE;
+        let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
+            .unwrap()
+            .bytes()
+            .map(Result::unwrap)
+            .collect();
+        unsafe { s.device.create_shader_module(&spirv) }.unwrap()
+    };
+    let fs_module = {
+        let glsl = FRAGMENT_SOURCE;
+        let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Fragment)
+            .unwrap()
+            .bytes()
+            .map(Result::unwrap)
+            .collect();
+        unsafe { s.device.create_shader_module(&spirv) }.unwrap()
+    };
+    info![log, "vxdraw", "After shading module"];
+    // Describe the shaders
+    const ENTRY_NAME: &str = "main";
+    let vs_module: <back::Backend as Backend>::ShaderModule = vs_module;
+    let (vs_entry, fs_entry) = (
+        pso::EntryPoint {
+            entry: ENTRY_NAME,
+            module: &vs_module,
+            specialization: pso::Specialization::default(),
+        },
+        pso::EntryPoint {
+            entry: ENTRY_NAME,
+            module: &fs_module,
+            specialization: pso::Specialization::default(),
+        },
+    );
+    info![log, "vxdraw", "After making"];
+    let shader_entries = pso::GraphicsShaderSet {
+        vertex: vs_entry,
+        hull: None,
+        domain: None,
+        geometry: None,
+        fragment: Some(fs_entry),
+    };
+    let input_assembler = InputAssemblerDesc::new(Primitive::TriangleList);
+
+    let vertex_buffers: Vec<VertexBufferDesc> = vec![VertexBufferDesc {
+        binding: 0,
+        stride: 8u32,
+        rate: 0,
+    }];
+    let attributes: Vec<AttributeDesc> = vec![AttributeDesc {
+        location: 0,
+        binding: 0,
+        element: Element {
+            format: format::Format::Rg32Float,
+            offset: 0,
+        },
+    }];
+
+    let rasterizer = Rasterizer {
+        depth_clamping: false,
+        polygon_mode: PolygonMode::Fill,
+        cull_face: Face::NONE,
+        front_face: FrontFace::Clockwise,
+        depth_bias: None,
+        conservative: false,
+    };
+
+    let depth_stencil = DepthStencilDesc {
+        depth: DepthTest::Off,
+        depth_bounds: false,
+        stencil: StencilTest::Off,
+    };
+    let blender = {
+        let blend_state = BlendState::On {
+            color: BlendOp::Add {
+                src: Factor::One,
+                dst: Factor::Zero,
+            },
+            alpha: BlendOp::Add {
+                src: Factor::One,
+                dst: Factor::Zero,
+            },
+        };
+        BlendDesc {
+            logic_op: Some(LogicOp::Copy),
+            targets: vec![ColorBlendDesc(ColorMask::ALL, blend_state)],
+        }
+    };
+    let extent = image::Extent {
+        width: s.swapconfig.extent.width,
+        height: s.swapconfig.extent.height,
+        depth: 1,
+    }
+    .rect();
+    let triangle_render_pass = {
+        let attachment = pass::Attachment {
+            format: Some(s.format),
+            samples: 1,
+            ops: pass::AttachmentOps::new(
+                pass::AttachmentLoadOp::Clear,
+                pass::AttachmentStoreOp::Store,
+            ),
+            stencil_ops: pass::AttachmentOps::DONT_CARE,
+            layouts: image::Layout::General..image::Layout::General,
+        };
+
+        let subpass = pass::SubpassDesc {
+            colors: &[(0, image::Layout::General)],
+            depth_stencil: None,
+            inputs: &[],
+            resolves: &[],
+            preserves: &[],
+        };
+
+        unsafe { s.device.create_render_pass(&[attachment], &[subpass], &[]) }
+            .expect("Can't create render pass")
+    };
+    let baked_states = BakedStates {
+        viewport: Some(Viewport {
+            rect: extent,
+            depth: (0.0..1.0),
+        }),
+        scissor: Some(extent),
+        blend_color: None,
+        depth_bounds: None,
+    };
+    let bindings = Vec::<DescriptorSetLayoutBinding>::new();
+    let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
+    let triangle_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
+        vec![unsafe {
+            s.device
+                .create_descriptor_set_layout(bindings, immutable_samplers)
+                .expect("Couldn't make a DescriptorSetLayout")
+        }];
+    let mut push_constants = Vec::<(ShaderStageFlags, core::ops::Range<u32>)>::new();
+    push_constants.push((ShaderStageFlags::FRAGMENT, 0..4));
+
+    let triangle_pipeline_layout = unsafe {
+        s.device
+            .create_pipeline_layout(&triangle_descriptor_set_layouts, push_constants)
+            .expect("Couldn't create a pipeline layout")
+    };
+    info![log, "vxdraw", "Creating custom pipe"];
+    // Describe the pipeline (rasterization, triangle interpretation)
+    let pipeline_desc = GraphicsPipelineDesc {
+        shaders: shader_entries,
+        rasterizer,
+        vertex_buffers,
+        attributes,
+        input_assembler,
+        blender,
+        depth_stencil,
+        multisampling: None,
+        baked_states,
+        layout: &triangle_pipeline_layout,
+        subpass: pass::Subpass {
+            index: 0,
+            main_pass: &triangle_render_pass,
+        },
+        flags: PipelineCreationFlags::empty(),
+        parent: BasePipeline::None,
+    };
+    info![log, "vxdraw", "Neat shit"];
+
+    let triangle_pipeline = unsafe {
+        s.device
+            .create_graphics_pipeline(&pipeline_desc, None)
+            .expect("Couldn't create a graphics pipeline!")
+    };
+
+    unsafe {
+        s.device.destroy_shader_module(vs_module);
+    }
+    unsafe {
+        s.device.destroy_shader_module(fs_module);
+    }
+
+    // ---
+
+    unsafe {
+        let mut image = s
+            .device
+            .create_image(
+                image::Kind::D2(w, h, 1, 1),
+                1,
+                format::Format::Rgba8Srgb,
+                image::Tiling::Linear,
+                image::Usage::COLOR_ATTACHMENT | image::Usage::TRANSFER_DST | image::Usage::SAMPLED,
+                image::ViewCapabilities::empty(),
+            )
+            .expect("Unable to create image");
+        let requirements = s.device.get_image_requirements(&image);
+        let memory_type_id =
+            find_memory_type_id(&s.adapter, requirements, memory::Properties::CPU_VISIBLE);
+        let memory = s
+            .device
+            .allocate_memory(memory_type_id, requirements.size)
+            .expect("Unable to allocate memory");
+        let image_view = {
+            s.device
+                .bind_image_memory(&memory, 0, &mut image)
+                .expect("Unable to bind memory");
+
+            s.device
+                .create_image_view(
+                    &image,
+                    image::ViewKind::D2,
+                    format::Format::Rgba8Srgb,
+                    format::Swizzle::NO,
+                    image::SubresourceRange {
+                        aspects: format::Aspects::COLOR,
+                        levels: 0..1,
+                        layers: 0..1,
+                    },
+                )
+                .expect("Couldn't create the image view!")
+        };
+
+        let framebuffer = s
+            .device
+            .create_framebuffer(
+                &triangle_render_pass,
+                vec![image_view],
+                image::Extent {
+                    width: w,
+                    height: h,
+                    depth: 1,
+                },
+            )
+            .expect("fbo");
+
+        #[rustfmt::skip]
+        let (pt_buffer, buffer_memory, _) = make_vertex_buffer_with_data(
+            s,
+            &[
+                -1.0, -1.0,
+                1.0, -1.0,
+                1.0, 1.0,
+                1.0, 1.0,
+                -1.0, 1.0,
+                -1.0, -1.0,
+            ],
+        );
+
+        let mut cmd_buffer = s.command_pool.acquire_command_buffer::<command::OneShot>();
+        let clear_values = [ClearValue::Color(ClearColor::Float([
+            1.0f32, 0.25, 0.5, 0.75,
+        ]))];
+        cmd_buffer.begin();
+        {
+            let mut enc = cmd_buffer.begin_render_pass_inline(
+                &triangle_render_pass,
+                &framebuffer,
+                extent,
+                clear_values.iter(),
+            );
+
+            enc.bind_graphics_pipeline(&triangle_pipeline);
+            enc.push_graphics_constants(
+                &triangle_pipeline_layout,
+                ShaderStageFlags::FRAGMENT,
+                0,
+                &(std::mem::transmute::<[f32; 4], [u32; 4]>([0.0f32, 0.0, 0.0, 0.0])),
+            );
+            let buffers: ArrayVec<[_; 1]> = [(pt_buffer, 0)].into();
+            enc.bind_vertex_buffers(0, buffers);
+            enc.draw(0..6, 0..1);
+        }
+        cmd_buffer.finish();
+        let upload_fence = s
+            .device
+            .create_fence(false)
+            .expect("Couldn't create an upload fence!");
+        // s.queue_group.queues[0].submit_nosemaphores(Some(&cmd_buffer), Some(&upload_fence));
+        s.queue_group.queues[0].submit_nosemaphores(Some(&cmd_buffer), Some(&upload_fence));
+        s.device.wait_for_fence(&upload_fence, u64::max_value());
+        s.device.destroy_fence(upload_fence);
+
+        let map = s.device.acquire_mapping_reader(&memory, 0..4*1000*1000).expect("Mapped memory");
+        info![log, "vxdraw", "Memsize"; "reqs" => InDebugPretty(&requirements)];
+
+        let pixel_size = 4; //size_of::<image::Rgba<u8>>();
+        let row_size = pixel_size * (1000  as usize);
+        let limits = s.adapter.physical_device.limits();
+        info![log, "vxdraw", "lims"; "limits" => InDebugPretty(&limits)];
+        let row_alignment_mask = limits.min_buffer_copy_pitch_alignment as u32 - 1;
+        let row_pitch = ((row_size as u32 + row_alignment_mask) & !row_alignment_mask) as usize;
+        let mut result = Vec::new();
+        for y in 0..1000 as usize {
+            let dest_base = y * row_pitch;
+            result.extend(map[dest_base..dest_base + row_size].iter());
+        }
+        s.device.release_mapping_reader(map);
+        result
+    }
+}
+
 // ---
 
 #[cfg(feature = "gfx_tests")]

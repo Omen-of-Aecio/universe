@@ -31,8 +31,9 @@ use gfx_hal::{
     window::{Extent2D, PresentMode::*, Surface, Swapchain},
     Backbuffer, Backend, FrameSync, Instance, Primitive, SwapchainConfig,
 };
-use logger::{debug, info, log, trace, warn, InDebug, InDebugPretty, Logger};
+use logger::{debug, info, log, trace, warn, InDebug, InDebugPretty, InHex, Logger};
 use std::io::Read;
+use std::iter::once;
 use std::mem::{size_of, ManuallyDrop};
 use winit::{dpi::LogicalSize, Event, EventsLoop, WindowBuilder};
 
@@ -1168,7 +1169,7 @@ fn draw_frame_internal<T>(
             let signal_semaphores: ArrayVec<[_; 1]> = [present_wait_semaphore].into();
             // yes, you have to write it twice like this. yes, it's silly.
             let submission = Submission {
-                command_buffers: std::iter::once(command_buffers),
+                command_buffers: once(command_buffers),
                 wait_semaphores,
                 signal_semaphores,
             };
@@ -1323,7 +1324,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
     };
     let bindings = Vec::<DescriptorSetLayoutBinding>::new();
     let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
-    let mapgen_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
+    let mut mapgen_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
         vec![unsafe {
             s.device
                 .create_descriptor_set_layout(bindings, immutable_samplers)
@@ -1417,7 +1418,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
             .device
             .create_framebuffer(
                 &mapgen_render_pass,
-                vec![image_view],
+                vec![&image_view],
                 image::Extent {
                     width: w,
                     height: h,
@@ -1427,7 +1428,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
             .expect("fbo");
 
         #[rustfmt::skip]
-        let (pt_buffer, buffer_memory, _) = make_vertex_buffer_with_data(
+        let (pt_buffer, pt_memory, _) = make_vertex_buffer_with_data(
             s,
             &[
                 -1.0, -1.0,
@@ -1447,10 +1448,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
         {
             let image_barrier = memory::Barrier::Image {
                 states: (image::Access::empty(), image::Layout::Undefined)
-                    ..(
-                        image::Access::SHADER_WRITE,
-                        image::Layout::General,
-                    ),
+                    ..(image::Access::SHADER_WRITE, image::Layout::General),
                 target: &image,
                 families: None,
                 range: image::SubresourceRange {
@@ -1490,23 +1488,38 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
         s.queue_group.queues[0].submit_nosemaphores(Some(&cmd_buffer), Some(&upload_fence));
         s.device.wait_for_fence(&upload_fence, u64::max_value());
         s.device.destroy_fence(upload_fence);
+        s.command_pool.free(once(cmd_buffer));
 
-        let map = s.device.acquire_mapping_reader(&memory, 0..requirements.size).expect("Mapped memory");
+        let map = s
+            .device
+            .acquire_mapping_reader(&memory, 0..requirements.size)
+            .expect("Mapped memory");
         info![log, "vxdraw", "Memsize"; "reqs" => InDebugPretty(&requirements)];
 
-        let pixel_size = 4; //size_of::<image::Rgba<u8>>();
-        let row_size = pixel_size * (1000 as usize);
-        let limits = s.adapter.physical_device.limits();
-        info![log, "vxdraw", "lims"; "limits" => InDebugPretty(&limits)];
-        let row_alignment_mask = limits.min_buffer_copy_pitch_alignment as u32 - 1;
-        let row_pitch = ((row_size as u32 + row_alignment_mask) & !row_alignment_mask) as usize;
-        let mut result = Vec::new();
-        for y in 0..1000 as usize {
+        let pixel_size = size_of::<load_image::Rgba<u8>>() as u32;
+        let row_size = pixel_size * w;
+        let row_pitch =
+            (row_size as u64 + (requirements.size / w as u64) as u64 % h as u64) as usize;
+
+        let mut result: Vec<u8> = Vec::new();
+        for y in 0..1000usize {
             let dest_base = y * row_pitch;
-            result.extend(map[dest_base..dest_base + row_size].iter());
+            result.extend(map[dest_base..dest_base + row_size as usize].iter());
         }
-        // result.extend(map[0..4*1000*1000].iter());
         s.device.release_mapping_reader(map);
+
+        s.device.destroy_buffer(pt_buffer);
+        s.device.free_memory(pt_memory);
+        s.device.destroy_pipeline_layout(mapgen_pipeline_layout);
+        s.device.destroy_graphics_pipeline(mapgen_pipeline);
+        for desc_set_layout in mapgen_descriptor_set_layouts.drain(..) {
+            s.device.destroy_descriptor_set_layout(desc_set_layout);
+        }
+        s.device.destroy_render_pass(mapgen_render_pass);
+        s.device.destroy_framebuffer(framebuffer);
+        s.device.destroy_image_view(image_view);
+        s.device.destroy_image(image);
+        s.device.free_memory(memory);
         result
     }
 }
@@ -1806,6 +1819,49 @@ mod tests {
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         assert_swapchain_eq(&mut windowing, "triangle_in_corner", img);
+    }
+
+    #[test]
+    fn a_bunch_of_quads() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&mut windowing);
+
+        let mut topright = DebugTriangle::from([-1.0, -1.0, 1.0, 1.0, 1.0, -1.0]);
+        let mut bottomleft = DebugTriangle::from([-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]);
+        topright.scale = 0.1;
+        bottomleft.scale = 0.1;
+        let radi = 0.1;
+        let trans = -1f32 + radi;
+
+        for j in 0..10 {
+            for i in 0..10 {
+                topright.translation =
+                    (trans + i as f32 * 2.0 * radi, trans + j as f32 * 2.0 * radi);
+                bottomleft.translation =
+                    (trans + i as f32 * 2.0 * radi, trans + j as f32 * 2.0 * radi);
+                add_to_triangles(&mut windowing, topright);
+                add_to_triangles(&mut windowing, bottomleft);
+            }
+        }
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "a_bunch_of_quads", img);
+    }
+
+    #[test]
+    fn generate_map() {
+        let mut logger = Logger::spawn();
+        logger.set_colorize(true);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let mut img = super::generate_map(&mut windowing, 1000, 1000, &mut logger);
+        let img = img
+            .drain(..)
+            .enumerate()
+            .filter(|(idx, _)| idx % 4 != 0)
+            .map(|(_, v)| v)
+            .collect::<Vec<u8>>();
+        assert_swapchain_eq(&mut windowing, "genmap", img);
     }
 
     #[test]

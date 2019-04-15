@@ -10,7 +10,7 @@ use glium::{
     Surface,
 };
 use input::Input;
-use logger::Logger;
+use logger::{debug, Logger};
 use std::time::Instant;
 
 fn initialize_grid(s: &mut Grid<u8>) {
@@ -313,14 +313,7 @@ fn remove_bullets_outside_camera(_log: &mut Logger<Log>, bullets: &mut Vec<Bulle
 
 fn stop_benchmark(benchmarker: &mut Benchmarker, logger: &mut Logger<Log>, msg: &'static str) {
     if let Some(duration) = benchmarker.stop() {
-        logger.debug(
-            "benchmark",
-            Log::I64(
-                msg,
-                "µs",
-                duration.num_microseconds().map(|x| x / 100).unwrap_or(-1),
-            ),
-        );
+        debug![logger, "benchmark", "{}", msg; "µs" => duration.as_micros() / 100];
     }
 }
 

@@ -70,6 +70,7 @@ use std::time::{Duration, Instant};
 
 extern crate test;
 
+/// Run a stopwatch on a function, use a function to report said time
 pub fn stopwatch<T: FnMut(), R: FnMut(std::time::Duration)>(mut timer: T, mut reporter: R) {
     let before = Instant::now();
     timer();

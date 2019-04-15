@@ -1282,14 +1282,16 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
         }
     };
     let extent = image::Extent {
-        width: s.swapconfig.extent.width,
-        height: s.swapconfig.extent.height,
+        // width: s.swapconfig.extent.width,
+        // height: s.swapconfig.extent.height,
+        width: 1000,
+        height: 1000,
         depth: 1,
     }
     .rect();
-    let triangle_render_pass = {
+    let mapgen_render_pass = {
         let attachment = pass::Attachment {
-            format: Some(s.format),
+            format: Some(format::Format::Rgba8Srgb),
             samples: 1,
             ops: pass::AttachmentOps::new(
                 pass::AttachmentLoadOp::Clear,
@@ -1321,7 +1323,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
     };
     let bindings = Vec::<DescriptorSetLayoutBinding>::new();
     let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
-    let triangle_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
+    let mapgen_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
         vec![unsafe {
             s.device
                 .create_descriptor_set_layout(bindings, immutable_samplers)
@@ -1330,13 +1332,13 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
     let mut push_constants = Vec::<(ShaderStageFlags, core::ops::Range<u32>)>::new();
     push_constants.push((ShaderStageFlags::FRAGMENT, 0..4));
 
-    let triangle_pipeline_layout = unsafe {
+    let mapgen_pipeline_layout = unsafe {
         s.device
-            .create_pipeline_layout(&triangle_descriptor_set_layouts, push_constants)
+            .create_pipeline_layout(&mapgen_descriptor_set_layouts, push_constants)
             .expect("Couldn't create a pipeline layout")
     };
     info![log, "vxdraw", "Creating custom pipe"];
-    // Describe the pipeline (rasterization, triangle interpretation)
+    // Describe the pipeline (rasterization, mapgen interpretation)
     let pipeline_desc = GraphicsPipelineDesc {
         shaders: shader_entries,
         rasterizer,
@@ -1347,17 +1349,17 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
         depth_stencil,
         multisampling: None,
         baked_states,
-        layout: &triangle_pipeline_layout,
+        layout: &mapgen_pipeline_layout,
         subpass: pass::Subpass {
             index: 0,
-            main_pass: &triangle_render_pass,
+            main_pass: &mapgen_render_pass,
         },
         flags: PipelineCreationFlags::empty(),
         parent: BasePipeline::None,
     };
     info![log, "vxdraw", "Neat shit"];
 
-    let triangle_pipeline = unsafe {
+    let mapgen_pipeline = unsafe {
         s.device
             .create_graphics_pipeline(&pipeline_desc, None)
             .expect("Couldn't create a graphics pipeline!")
@@ -1414,7 +1416,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
         let framebuffer = s
             .device
             .create_framebuffer(
-                &triangle_render_pass,
+                &mapgen_render_pass,
                 vec![image_view],
                 image::Extent {
                     width: w,
@@ -1443,19 +1445,37 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
         ]))];
         cmd_buffer.begin();
         {
+            let image_barrier = memory::Barrier::Image {
+                states: (image::Access::empty(), image::Layout::Undefined)
+                    ..(
+                        image::Access::SHADER_WRITE,
+                        image::Layout::General,
+                    ),
+                target: &image,
+                families: None,
+                range: image::SubresourceRange {
+                    aspects: format::Aspects::COLOR,
+                    levels: 0..1,
+                    layers: 0..1,
+                },
+            };
+            cmd_buffer.pipeline_barrier(
+                PipelineStage::TOP_OF_PIPE..PipelineStage::FRAGMENT_SHADER,
+                memory::Dependencies::empty(),
+                &[image_barrier],
+            );
             let mut enc = cmd_buffer.begin_render_pass_inline(
-                &triangle_render_pass,
+                &mapgen_render_pass,
                 &framebuffer,
                 extent,
                 clear_values.iter(),
             );
-
-            enc.bind_graphics_pipeline(&triangle_pipeline);
+            enc.bind_graphics_pipeline(&mapgen_pipeline);
             enc.push_graphics_constants(
-                &triangle_pipeline_layout,
+                &mapgen_pipeline_layout,
                 ShaderStageFlags::FRAGMENT,
                 0,
-                &(std::mem::transmute::<[f32; 4], [u32; 4]>([0.0f32, 0.0, 0.0, 0.0])),
+                &(std::mem::transmute::<[f32; 4], [u32; 4]>([1000f32, 0.3, 93.0, 3.0])),
             );
             let buffers: ArrayVec<[_; 1]> = [(pt_buffer, 0)].into();
             enc.bind_vertex_buffers(0, buffers);
@@ -1471,11 +1491,11 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
         s.device.wait_for_fence(&upload_fence, u64::max_value());
         s.device.destroy_fence(upload_fence);
 
-        let map = s.device.acquire_mapping_reader(&memory, 0..4*1000*1000).expect("Mapped memory");
+        let map = s.device.acquire_mapping_reader(&memory, 0..requirements.size).expect("Mapped memory");
         info![log, "vxdraw", "Memsize"; "reqs" => InDebugPretty(&requirements)];
 
         let pixel_size = 4; //size_of::<image::Rgba<u8>>();
-        let row_size = pixel_size * (1000  as usize);
+        let row_size = pixel_size * (1000 as usize);
         let limits = s.adapter.physical_device.limits();
         info![log, "vxdraw", "lims"; "limits" => InDebugPretty(&limits)];
         let row_alignment_mask = limits.min_buffer_copy_pitch_alignment as u32 - 1;
@@ -1485,6 +1505,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
             let dest_base = y * row_pitch;
             result.extend(map[dest_base..dest_base + row_size].iter());
         }
+        // result.extend(map[0..4*1000*1000].iter());
         s.device.release_mapping_reader(map);
         result
     }

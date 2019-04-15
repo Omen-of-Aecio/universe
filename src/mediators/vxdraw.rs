@@ -2065,4 +2065,13 @@ mod tests {
             draw_frame(&mut windowing, &mut logger, &prspect);
         });
     }
+
+    #[bench]
+    fn bench_generate_map(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        b.iter(|| {
+            super::generate_map(&mut windowing, 1000, 1000, &mut logger);
+        });
+    }
 }

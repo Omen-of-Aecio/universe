@@ -1,5 +1,20 @@
 //! Simple, stupid benchmarker
 //!
+//! This crate provides two benchmarkers, one stopwatch for single-case benchmarking, and another
+//! for collecting many samples.
+//!
+//! ```
+//! use benchmarker::stopwatch;
+//!
+//! fn main() {
+//!     stopwatch(|| {
+//!         // Operation taking time
+//!     }, |t: std::time::Duration| {
+//!         println!["It took {:?}", t];
+//!     });
+//! }
+//! ```
+//!
 //! Allows simple sums of repeated benchmarks. Does no statistical processing,
 //! just adds N benchmarks together before returning the sum from `stop`.
 //!
@@ -51,41 +66,48 @@
 //! sum representing 99+1 samples. This is to allow the 0-case, where we have
 //! 0+1 samples.
 #![feature(test)]
-use time::{Duration, PreciseTime};
+use std::time::{Duration, Instant};
 
 extern crate test;
 
+pub fn stopwatch<T: FnMut(), R: FnMut(std::time::Duration)>(mut timer: T, mut reporter: R) {
+    let before = Instant::now();
+    timer();
+    let after = Instant::now();
+    reporter(after - before);
+}
+
 pub struct Benchmarker {
-    last: PreciseTime,
+    last: Instant,
     count: usize,
     window: usize,
-    sum: time::Duration,
+    sum: Duration,
 }
 
 impl Benchmarker {
     pub fn new(window: usize) -> Benchmarker {
         Benchmarker {
-            last: PreciseTime::now(),
+            last: Instant::now(),
             count: 0,
             window,
-            sum: Duration::zero(),
+            sum: Duration::new(0, 0),
         }
     }
 
     pub fn start(&mut self) {
-        self.last = PreciseTime::now();
+        self.last = Instant::now();
     }
 
     pub fn stop(&mut self) -> Option<Duration> {
-        let now = PreciseTime::now();
-        self.sum = self.sum + self.last.to(now);
+        let now = Instant::now();
+        self.sum += now - self.last;
         if self.count < self.window {
             self.count += 1;
             None
         } else {
             self.count = 0;
             let ret = Some(self.sum);
-            self.sum = Duration::zero();
+            self.sum = Duration::new(0, 0);
             ret
         }
     }

@@ -9,4 +9,3 @@ name = "benchmarker"
 path = "lib.rs"
 
 [dependencies]
-time = "0.1.40"

@@ -1285,8 +1285,8 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
     let extent = image::Extent {
         // width: s.swapconfig.extent.width,
         // height: s.swapconfig.extent.height,
-        width: 1000,
-        height: 1000,
+        width: w,
+        height: h,
         depth: 1,
     }
     .rect();
@@ -1473,7 +1473,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
                 &mapgen_pipeline_layout,
                 ShaderStageFlags::FRAGMENT,
                 0,
-                &(std::mem::transmute::<[f32; 4], [u32; 4]>([1000f32, 0.3, 93.0, 3.0])),
+                &(std::mem::transmute::<[f32; 4], [u32; 4]>([w as f32, 0.3, 93.0, 3.0])),
             );
             let buffers: ArrayVec<[_; 1]> = [(pt_buffer, 0)].into();
             enc.bind_vertex_buffers(0, buffers);
@@ -1484,9 +1484,10 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
             .device
             .create_fence(false)
             .expect("Couldn't create an upload fence!");
-        // s.queue_group.queues[0].submit_nosemaphores(Some(&cmd_buffer), Some(&upload_fence));
         s.queue_group.queues[0].submit_nosemaphores(Some(&cmd_buffer), Some(&upload_fence));
-        s.device.wait_for_fence(&upload_fence, u64::max_value());
+        s.device
+            .wait_for_fence(&upload_fence, u64::max_value())
+            .expect("Unable to wait for fence");
         s.device.destroy_fence(upload_fence);
         s.command_pool.free(once(cmd_buffer));
 
@@ -1502,7 +1503,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
             (row_size as u64 + (requirements.size / w as u64) as u64 % h as u64) as usize;
 
         let mut result: Vec<u8> = Vec::new();
-        for y in 0..1000usize {
+        for y in 0..h as usize {
             let dest_base = y * row_pitch;
             result.extend(map[dest_base..dest_base + row_size as usize].iter());
         }

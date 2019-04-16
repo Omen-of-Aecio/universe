@@ -1764,7 +1764,7 @@ mod tests {
             for j in [-1f32, 1f32].iter() {
                 let mut tri = DebugTriangle::default();
                 tri.translation = (*i, *j);
-                let idx = add_to_triangles(&mut windowing, tri);
+                let _idx = add_to_triangles(&mut windowing, tri);
             }
         }
 
@@ -1783,7 +1783,7 @@ mod tests {
             for j in [-1f32, 1f32].iter() {
                 let mut tri = DebugTriangle::default();
                 tri.translation = (*i, *j);
-                let idx = add_to_triangles(&mut windowing, tri);
+                let _idx = add_to_triangles(&mut windowing, tri);
             }
         }
 
@@ -1802,7 +1802,7 @@ mod tests {
             let mut tri = DebugTriangle::default();
             tri.translation = ((i as f32).cos(), (i as f32).sin());
             tri.scale = 0.1f32;
-            let idx = add_to_triangles(&mut windowing, tri);
+            let _idx = add_to_triangles(&mut windowing, tri);
         }
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);

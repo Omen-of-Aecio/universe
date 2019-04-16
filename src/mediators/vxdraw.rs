@@ -1116,6 +1116,12 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
         s.device.destroy_shader_module(fs_module);
     }
 
+    let (
+        texture_vertex_buffer_indices,
+        texture_vertex_memory_indices,
+        texture_vertex_requirements_indices,
+    ) = make_index_buffer_with_data(s, &[0f32; 4 * 1000]);
+
     s.simple_textures.push(SingleTexture {
         count: 0,
 

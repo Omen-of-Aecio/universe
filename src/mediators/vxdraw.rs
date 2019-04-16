@@ -1498,19 +1498,23 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
         s.device.destroy_fence(upload_fence);
         s.command_pool.free(once(cmd_buffer));
 
+        let footprint = s.device.get_image_subresource_footprint(&image, image::Subresource {
+            aspects: format::Aspects::COLOR,
+            level: 0,
+            layer: 0,
+        });
+
         let map = s
             .device
-            .acquire_mapping_reader(&memory, 0..requirements.size)
+            .acquire_mapping_reader(&memory, footprint.slice)
             .expect("Mapped memory");
 
         let pixel_size = size_of::<load_image::Rgba<u8>>() as u32;
         let row_size = pixel_size * w;
-        let row_pitch =
-            (row_size as u64 + (requirements.size / w as u64) as u64 % h as u64) as usize;
 
         let mut result: Vec<u8> = Vec::new();
         for y in 0..h as usize {
-            let dest_base = y * row_pitch;
+            let dest_base = y * footprint.row_pitch as usize;
             result.extend(map[dest_base..dest_base + row_size as usize].iter());
         }
         s.device.release_mapping_reader(map);
@@ -1858,8 +1862,7 @@ mod tests {
 
     #[test]
     fn generate_map() {
-        let mut logger = Logger::spawn();
-        logger.set_colorize(true);
+        let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let mut img = super::generate_map(&mut windowing, 1000, 1000, &mut logger);
         let img = img

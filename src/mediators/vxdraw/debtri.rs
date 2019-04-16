@@ -86,13 +86,13 @@ impl DebugTriangle {
 const PTS_PER_TRI: usize = 3;
 const XY_COMPNTS: usize = 2;
 const COLOR_CMPNTS: usize = 4;
-const UV_CMPNTS: usize = 2;
+const DELTA_CMPNTS: usize = 2;
 const ROT_CMPNTS: usize = 1;
 const SCALE_CMPNTS: usize = 1;
 const TRI_BYTE_SIZE: usize = PTS_PER_TRI
     * (size_of::<f32>() * XY_COMPNTS
         + size_of::<u8>() * COLOR_CMPNTS
-        + size_of::<f32>() * UV_CMPNTS
+        + size_of::<f32>() * DELTA_CMPNTS
         + size_of::<f32>() * ROT_CMPNTS
         + size_of::<f32>() * SCALE_CMPNTS);
 

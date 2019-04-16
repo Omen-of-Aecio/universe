@@ -90,10 +90,12 @@ impl Default for Main<'_> {
 }
 
 pub struct SingleTexture {
+    pub count: u32,
+
     pub texture_vertex_buffer: ManuallyDrop<<back::Backend as Backend>::Buffer>,
     pub texture_vertex_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
-    pub texture_uv_buffer: ManuallyDrop<<back::Backend as Backend>::Buffer>,
-    pub texture_uv_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
+    pub texture_vertex_requirements: gfx_hal::memory::Requirements,
+
     pub texture_image_buffer: ManuallyDrop<<back::Backend as Backend>::Image>,
     pub texture_image_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
 
@@ -248,12 +250,6 @@ impl Drop for Windowing {
                 )));
                 self.device.free_memory(ManuallyDrop::into_inner(read(
                     &simple_tex.texture_vertex_memory,
-                )));
-                self.device.destroy_buffer(ManuallyDrop::into_inner(read(
-                    &simple_tex.texture_uv_buffer,
-                )));
-                self.device.free_memory(ManuallyDrop::into_inner(read(
-                    &simple_tex.texture_uv_memory,
                 )));
                 self.device.destroy_image(ManuallyDrop::into_inner(read(
                     &simple_tex.texture_image_buffer,

@@ -533,45 +533,112 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
     windowing
 }
 
+pub struct Sprite {
+    width: f32,
+    height: f32,
+    uv_begin: (f32, f32),
+    uv_end: (f32, f32),
+    translation: (f32, f32),
+    rotation: f32,
+    scale: f32,
+}
+
+pub fn add_sprite(s: &mut Windowing, sprite: Sprite, texture: usize, log: &mut Logger<Log>) -> u32 {
+    let tex = &mut s.simple_textures[texture];
+    let device = &s.device;
+
+    // Derive xy from the sprite's initial UV
+    let a = sprite.uv_begin;
+    let b = sprite.uv_end;
+
+    let width = sprite.width;
+    let height = sprite.height;
+
+    let topleft = (-width / 2f32, -height / 2f32);
+    let topleft_uv = a;
+
+    let topright = (width / 2f32, -height / 2f32);
+    let topright_uv = (b.0, a.1);
+
+    let bottomleft = (-width / 2f32, height / 2f32);
+    let bottomleft_uv = (a.0, b.1);
+
+    let bottomright = (width / 2f32, height / 2f32);
+    let bottomright_uv = (b.0, b.1);
+
+    unsafe {
+        let mut data_target = device
+            .acquire_mapping_writer(
+                &tex.texture_vertex_memory,
+                0..tex.texture_vertex_requirements.size,
+            )
+            .expect("Failed to acquire a memory writer!");
+        let idx = (tex.count * 6 * 8) as usize;
+
+        for (i, (idx, point, uv)) in [
+            (idx, topleft, topleft_uv),
+            (idx + 8, bottomleft, bottomleft_uv),
+            (idx + 16, bottomright, bottomright_uv),
+            (idx + 24, bottomright, bottomright_uv),
+            (idx + 32, topright, topright_uv),
+            (idx + 40, topleft, topleft_uv),
+        ]
+        .iter()
+        .enumerate()
+        {
+            data_target[*idx..*idx + 2].copy_from_slice(&[point.0, point.1]);
+            data_target[*idx + 2..*idx + 4].copy_from_slice(&[uv.0, uv.1]);
+            data_target[*idx + 4..*idx + 6]
+                .copy_from_slice(&[sprite.translation.0, sprite.translation.1]);
+            data_target[*idx + 6..*idx + 7].copy_from_slice(&[sprite.rotation]);
+            data_target[*idx + 7..*idx + 8].copy_from_slice(&[sprite.scale]);
+        }
+        tex.count += 1;
+        device
+            .release_mapping_writer(data_target)
+            .expect("Couldn't release the mapping writer!");
+    }
+    tex.count - 1
+}
+
 pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
     #[rustfmt::skip]
-    let (texture_vertex_buffer, texture_vertex_memory, _) = make_vertex_buffer_with_data_on_gpu(
+    let (texture_vertex_buffer, texture_vertex_memory, texture_vertex_requirements) = make_vertex_buffer_with_data(
         s,
-        &[
-            // -1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
-            -1.0f32, -1.0, // Original position
-            0.0, 0.0,      // UV
-            0.0, 0.0,      // DX DY
-            0.0,           // Rot
-            0.0,           // image index
+        &[0f32; 8*6*1000]);
+    // &[
+    // -1.0f32, -1.0, // Original position
+    // 0.0, 0.0,      // UV
+    // 0.0, 0.0,      // DX DY
+    // 0.0,           // Rot
+    // 0.0,           // Scale
 
-            -1.0f32, 1.0,
-            0.0, 1.0,
-            0.0, 0.0,
-            0.0, 0.0,
+    // -1.0f32, 1.0,
+    // 0.0, 1.0,
+    // 0.0, 0.0,
+    // 0.0,
 
-            1.0f32, 1.0,
-            1.0f32, 1.0,
-            0.0, 0.0,
-            0.0, 0.0,
+    // 1.0f32, 1.0,
+    // 1.0f32, 1.0,
+    // 0.0, 0.0,
+    // 0.0,
 
-            1.0f32, -1.0,
-            1.0f32, 0.0,
-            0.0, 0.0,
-            0.0, 0.0,
+    // 1.0f32, 1.0,
+    // 1.0f32, 1.0,
+    // 0.0, 0.0,
+    // 0.0,
 
-            -1.0f32, -1.0,
-            0.0f32, 0.0,
-            0.0, 0.0,
-            0.0, 0.0,
-        ],
-    );
-    let (texture_uv_buffer, texture_uv_memory, _) = make_vertex_buffer_with_data_on_gpu(
-        s,
-        &[
-            -1.0f32, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
-        ],
-    );
+    // 1.0f32, -1.0,
+    // 1.0f32, 0.0,
+    // 0.0, 0.0,
+    // 0.0,
+
+    // -1.0f32, -1.0,
+    // 0.0f32, 0.0,
+    // 0.0, 0.0,
+    // 0.0,
+    // ],
+    // );
 
     let device = &s.device;
 
@@ -753,6 +820,8 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
     layout(location = 0) in vec2 v_pos;
     layout(location = 1) in vec2 v_uv;
     layout(location = 2) in vec2 v_dxdy;
+    layout(location = 3) in float rotation;
+    layout(location = 4) in float scale;
 
     layout(location = 0) out vec2 f_uv;
 
@@ -761,8 +830,10 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
     };
 
     void main() {
+        mat2 rotmatrix = mat2(cos(rotation), -sin(rotation), sin(rotation), cos(rotation));
+        vec2 pos = rotmatrix * scale * v_pos;
         f_uv = v_uv;
-        gl_Position = vec4(v_pos + v_dxdy, 0.0, 1.0);
+        gl_Position = vec4(pos + v_dxdy, 0.0, 1.0);
     }";
 
     const FRAGMENT_SOURCE_TEXTURE: &str = "#version 450
@@ -820,11 +891,11 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
         geometry: None,
         fragment: Some(fs_entry),
     };
-    let input_assembler = InputAssemblerDesc::new(Primitive::TriangleStrip);
+    let input_assembler = InputAssemblerDesc::new(Primitive::TriangleList);
 
     let vertex_buffers: Vec<VertexBufferDesc> = vec![VertexBufferDesc {
         binding: 0,
-        stride: (size_of::<f32>() * (2 + 2 + 2 + 1 + 1)) as u32,
+        stride: (size_of::<f32>() * (2 + 2 + 2 + 2)) as u32,
         rate: 0,
     }];
     let attributes: Vec<AttributeDesc> = vec![
@@ -850,6 +921,22 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
             element: Element {
                 format: format::Format::Rg32Float,
                 offset: 16,
+            },
+        },
+        AttributeDesc {
+            location: 3,
+            binding: 0,
+            element: Element {
+                format: format::Format::R32Float,
+                offset: 24,
+            },
+        },
+        AttributeDesc {
+            location: 4,
+            binding: 0,
+            element: Element {
+                format: format::Format::R32Float,
+                offset: 28,
             },
         },
     ];
@@ -1030,10 +1117,12 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
     }
 
     s.simple_textures.push(SingleTexture {
+        count: 0,
+
         texture_vertex_buffer: ManuallyDrop::new(texture_vertex_buffer),
         texture_vertex_memory: ManuallyDrop::new(texture_vertex_memory),
-        texture_uv_buffer: ManuallyDrop::new(texture_uv_buffer),
-        texture_uv_memory: ManuallyDrop::new(texture_uv_memory),
+        texture_vertex_requirements,
+
         texture_image_buffer: ManuallyDrop::new(the_image),
         texture_image_memory: ManuallyDrop::new(image_memory),
 
@@ -1047,7 +1136,7 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
         pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
         render_pass: ManuallyDrop::new(triangle_render_pass),
     });
-    s.simple_textures.len()
+    s.simple_textures.len() - 1
 }
 
 pub fn add_triangle(s: &mut Windowing, triangle: &[f32; 6]) {
@@ -1135,7 +1224,6 @@ fn draw_frame_internal<T>(
                 }
                 for simple_tex in s.simple_textures.iter() {
                     enc.bind_graphics_pipeline(&simple_tex.pipeline);
-                    info![log, "vxdraw", "Drawing that simple_tex boi"];
                     enc.bind_graphics_descriptor_sets(
                         &simple_tex.pipeline_layout,
                         0,
@@ -1145,7 +1233,7 @@ fn draw_frame_internal<T>(
                     let buffers: ArrayVec<[_; 1]> =
                         [(&*simple_tex.texture_vertex_buffer, 0)].into();
                     enc.bind_vertex_buffers(0, buffers);
-                    enc.draw(0..5, 0..1);
+                    enc.draw(0..simple_tex.count * 6, 0..1);
                 }
                 if let Some(ref debug_triangles) = s.debug_triangles {
                     enc.bind_graphics_pipeline(&debug_triangles.pipeline);
@@ -1160,7 +1248,7 @@ fn draw_frame_internal<T>(
                     let count = debug_triangles.triangles_count;
                     let buffers: ArrayVec<[_; 1]> = [(&debug_triangles.triangles_buffer, 0)].into();
                     enc.bind_vertex_buffers(0, buffers);
-                    debug![log, "vxdraw", "mesh count"; "count" => count];
+                    trace![log, "vxdraw", "mesh count"; "count" => count];
                     enc.draw(0..(count * 3) as u32, 0..1);
                 }
             }
@@ -1498,11 +1586,14 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
         s.device.destroy_fence(upload_fence);
         s.command_pool.free(once(cmd_buffer));
 
-        let footprint = s.device.get_image_subresource_footprint(&image, image::Subresource {
-            aspects: format::Aspects::COLOR,
-            level: 0,
-            layer: 0,
-        });
+        let footprint = s.device.get_image_subresource_footprint(
+            &image,
+            image::Subresource {
+                aspects: format::Aspects::COLOR,
+                level: 0,
+                layer: 0,
+            },
+        );
 
         let map = s
             .device
@@ -1942,11 +2033,52 @@ mod tests {
     fn simple_texture() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        add_texture(&mut windowing, &mut logger);
+        let tex = add_texture(&mut windowing, &mut logger);
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                width: 2f32,
+                height: 2f32,
+                uv_begin: (0.0, 0.0),
+                uv_end: (1.0, 1.0),
+                translation: (0.0, 0.0),
+                rotation: 0.0,
+                scale: 1.0,
+            },
+            tex,
+            &mut logger,
+        );
 
         let prspect = gen_perspective(&mut windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         assert_swapchain_eq(&mut windowing, "simple_texture", img);
+    }
+
+    #[test]
+    fn many_sprites() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let tex = add_texture(&mut windowing, &mut logger);
+        for i in 0..360 {
+            add_sprite(
+                &mut windowing,
+                Sprite {
+                    width: 2f32,
+                    height: 2f32,
+                    uv_begin: (0.0, 0.0),
+                    uv_end: (1.0, 1.0),
+                    translation: (0.0, 0.0),
+                    rotation: ((i * 10) as f32 / 180f32 * 3.14),
+                    scale: 0.5,
+                },
+                tex,
+                &mut logger,
+            );
+        }
+
+        let prspect = gen_perspective(&mut windowing);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "many_sprites", img);
     }
 
     #[test]
@@ -1985,6 +2117,34 @@ mod tests {
     }
 
     // ---
+
+    #[bench]
+    fn bench_many_sprites(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let tex = add_texture(&mut windowing, &mut logger);
+        for i in 0..500 {
+            add_sprite(
+                &mut windowing,
+                Sprite {
+                    width: 2f32,
+                    height: 2f32,
+                    uv_begin: (0.0, 0.0),
+                    uv_end: (0.05, 0.05),
+                    translation: (0.0, 0.0),
+                    rotation: ((i * 10) as f32 / 180f32 * 3.14),
+                    scale: 0.5,
+                },
+                tex,
+                &mut logger,
+            );
+        }
+
+        let prspect = gen_perspective(&mut windowing);
+        b.iter(|| {
+            draw_frame(&mut windowing, &mut logger, &prspect);
+        });
+    }
 
     #[bench]
     fn bench_simple_triangle(b: &mut Bencher) {

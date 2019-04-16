@@ -45,7 +45,7 @@ use utils::*;
 
 // ---
 
-#[derive(PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ShowWindow {
     /// Runs vulkan in headless mode (hidden window) with a swapchain of 1000x1000
     Headless1k,
@@ -55,6 +55,7 @@ pub enum ShowWindow {
 }
 
 pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windowing {
+    info![log, "vxdraw", "Initializing rendering"; "headless" => InDebug(&show)];
     let events_loop = EventsLoop::new();
 
     let window = WindowBuilder::new()
@@ -199,6 +200,11 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         Backbuffer::Framebuffer(_) => unimplemented!("Can't handle framebuffer backbuffer!"),
     };
 
+    {
+        let image_views = format!["{:?}", image_views];
+        info![log, "vxdraw", "Created image views"; "image views" => image_views];
+    }
+
     // NOTE: for curious people, the render_pass, used in both framebuffer creation AND command
     // buffer when drawing, only need to be _compatible_, which means the SAMPLE count and the
     // FORMAT is _the exact same_.
@@ -222,7 +228,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
             resolves: &[],
             preserves: &[],
         };
-        log![128, log, "vxdraw", "Render pass"; "color attachment" => InDebugPretty(&color_attachment); clone color_attachment];
+        info![log, "vxdraw", "Render pass info"; "color attachment" => InDebugPretty(&color_attachment); clone color_attachment];
         unsafe {
             device
                 .create_render_pass(&[color_attachment], &[subpass], &[])
@@ -256,7 +262,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
     };
 
     let framebuffers_string = format!["{:#?}", framebuffers];
-    info![log, "vxdraw", "Framebuffer information"; "framebuffers" => framebuffers_string ];
+    info![log, "vxdraw", "Framebuffer information"; "framebuffers" => framebuffers_string];
 
     let mut frame_render_fences = vec![];
     let mut acquire_image_semaphores = vec![];
@@ -265,6 +271,11 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         frame_render_fences.push(device.create_fence(true).expect("Can't create fence"));
         acquire_image_semaphores.push(device.create_semaphore().expect("Can't create semaphore"));
         present_wait_semaphores.push(device.create_semaphore().expect("Can't create semaphore"));
+    }
+
+    {
+        let count = frame_render_fences.len();
+        info![log, "vxdraw", "Allocated fences and semaphores"; "count" => count];
     }
 
     let mut command_pool = unsafe {
@@ -465,7 +476,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
     };
 
     let tr_pipe_fmt = format!["{:#?}", pipeline_desc];
-    info![log, "vxdraw", "Pipeline descriptor"; "pipeline" => InDebugPretty(&tr_pipe_fmt)];
+    info![log, "vxdraw", "Pipeline descriptor"; "pipeline" => tr_pipe_fmt];
 
     let triangle_pipeline = unsafe {
         device
@@ -767,7 +778,6 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
         color = texture(sampler2D(f_texture, f_sampler), f_uv);
     }";
 
-    info![log, "vxdraw", "Before shading module"];
     let vs_module = {
         let glsl = VERTEX_SOURCE_TEXTURE;
         let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
@@ -786,7 +796,7 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
             .collect();
         unsafe { s.device.create_shader_module(&spirv) }.unwrap()
     };
-    info![log, "vxdraw", "After shading module"];
+
     // Describe the shaders
     const ENTRY_NAME: &str = "main";
     let vs_module: <back::Backend as Backend>::ShaderModule = vs_module;
@@ -985,7 +995,7 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
             .create_pipeline_layout(&triangle_descriptor_set_layouts, push_constants)
             .expect("Couldn't create a pipeline layout")
     };
-    info![log, "vxdraw", "Creating custom pipe"];
+
     // Describe the pipeline (rasterization, triangle interpretation)
     let pipeline_desc = GraphicsPipelineDesc {
         shaders: shader_entries,
@@ -1005,7 +1015,6 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
         flags: PipelineCreationFlags::empty(),
         parent: BasePipeline::None,
     };
-    info![log, "vxdraw", "Neat shit"];
 
     let triangle_pipeline = unsafe {
         s.device
@@ -1212,7 +1221,6 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
             .collect();
         unsafe { s.device.create_shader_module(&spirv) }.unwrap()
     };
-    info![log, "vxdraw", "After shading module"];
     // Describe the shaders
     const ENTRY_NAME: &str = "main";
     let vs_module: <back::Backend as Backend>::ShaderModule = vs_module;
@@ -1228,7 +1236,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
             specialization: pso::Specialization::default(),
         },
     );
-    info![log, "vxdraw", "After making"];
+
     let shader_entries = pso::GraphicsShaderSet {
         vertex: vs_entry,
         hull: None,
@@ -1338,7 +1346,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
             .create_pipeline_layout(&mapgen_descriptor_set_layouts, push_constants)
             .expect("Couldn't create a pipeline layout")
     };
-    info![log, "vxdraw", "Creating custom pipe"];
+
     // Describe the pipeline (rasterization, mapgen interpretation)
     let pipeline_desc = GraphicsPipelineDesc {
         shaders: shader_entries,
@@ -1358,7 +1366,6 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
         flags: PipelineCreationFlags::empty(),
         parent: BasePipeline::None,
     };
-    info![log, "vxdraw", "Neat shit"];
 
     let mapgen_pipeline = unsafe {
         s.device
@@ -1495,7 +1502,6 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
             .device
             .acquire_mapping_reader(&memory, 0..requirements.size)
             .expect("Mapped memory");
-        info![log, "vxdraw", "Memsize"; "reqs" => InDebugPretty(&requirements)];
 
         let pixel_size = size_of::<load_image::Rgba<u8>>() as u32;
         let row_size = pixel_size * w;

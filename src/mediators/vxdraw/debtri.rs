@@ -196,7 +196,6 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
         color = incolor;
     }";
 
-    info![log, "vxdraw", "Before shading module"];
     let vs_module = {
         let glsl = VERTEX_SOURCE;
         let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
@@ -215,7 +214,7 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
             .collect();
         unsafe { s.device.create_shader_module(&spirv) }.unwrap()
     };
-    info![log, "vxdraw", "After shading module"];
+
     // Describe the shaders
     const ENTRY_NAME: &str = "main";
     let vs_module: <back::Backend as Backend>::ShaderModule = vs_module;
@@ -231,7 +230,6 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
             specialization: pso::Specialization::default(),
         },
     );
-    info![log, "vxdraw", "After making"];
     let shader_entries = pso::GraphicsShaderSet {
         vertex: vs_entry,
         hull: None,
@@ -373,7 +371,7 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
             .create_pipeline_layout(&triangle_descriptor_set_layouts, push_constants)
             .expect("Couldn't create a pipeline layout")
     };
-    info![log, "vxdraw", "Creating custom pipe"];
+
     // Describe the pipeline (rasterization, triangle interpretation)
     let pipeline_desc = GraphicsPipelineDesc {
         shaders: shader_entries,
@@ -393,7 +391,6 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
         flags: PipelineCreationFlags::empty(),
         parent: BasePipeline::None,
     };
-    info![log, "vxdraw", "Neat shit"];
 
     let triangle_pipeline = unsafe {
         s.device
@@ -409,7 +406,6 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
     }
     let (dtbuffer, dtmemory, dtreqs) =
         make_vertex_buffer_with_data(s, &[0.0f32; TRI_BYTE_SIZE / 4 * 1000]);
-    info![log, "vxdraw", "Vertex buffer size"; "requirements" => InDebugPretty(&dtreqs)];
     let debug_triangles = ColoredTriangleList {
         capacity: dtreqs.size,
         triangles_count: 0,

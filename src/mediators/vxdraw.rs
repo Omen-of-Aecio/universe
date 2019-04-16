@@ -1548,10 +1548,11 @@ mod tests {
 
     // ---
 
-    fn add_windmills(windowing: &mut Windowing, rand_rotat: bool) {
+    fn add_windmills(windowing: &mut Windowing, rand_rotat: bool) -> Vec<DebugTriangleHandle> {
         use rand::Rng;
         use std::f32::consts::PI;
         let mut rng = random::new(0);
+        let mut debug_triangles = Vec::with_capacity(1000);
         for _ in 0..1000 {
             let mut tri = DebugTriangle::default();
             let (dx, dy) = (
@@ -1564,8 +1565,9 @@ mod tests {
             }
             tri.scale = scale;
             tri.translation = (dx, dy);
-            add_to_triangles(windowing, tri);
+            debug_triangles.push(add_to_triangles(windowing, tri));
         }
+        debug_triangles
     }
 
     fn remove_windmills(windowing: &mut Windowing) {
@@ -1747,7 +1749,7 @@ mod tests {
         let tri = DebugTriangle::default();
 
         let idx = add_to_triangles(&mut windowing, tri);
-        set_triangle_color(&mut windowing, idx, [255, 0, 255, 255]);
+        set_triangle_color(&mut windowing, &idx, [255, 0, 255, 255]);
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
@@ -1904,11 +1906,11 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
-        add_windmills(&mut windowing, false);
-        set_triangle_color(&mut windowing, 0, [255, 0, 0, 255]);
-        set_triangle_color(&mut windowing, 249, [0, 255, 0, 255]);
-        set_triangle_color(&mut windowing, 499, [0, 0, 255, 255]);
-        set_triangle_color(&mut windowing, 999, [0, 0, 0, 255]);
+        let handles = add_windmills(&mut windowing, false);
+        set_triangle_color(&mut windowing, &handles[0], [255, 0, 0, 255]);
+        set_triangle_color(&mut windowing, &handles[249], [0, 255, 0, 255]);
+        set_triangle_color(&mut windowing, &handles[499], [0, 0, 255, 255]);
+        set_triangle_color(&mut windowing, &handles[999], [0, 0, 0, 255]);
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
@@ -2016,10 +2018,10 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
 
-        add_windmills(&mut windowing, false);
+        let handles = add_windmills(&mut windowing, false);
 
         b.iter(|| {
-            set_triangle_color(&mut windowing, 0, black_box([0, 0, 0, 255]));
+            set_triangle_color(&mut windowing, &handles[0], black_box([0, 0, 0, 255]));
         });
     }
 

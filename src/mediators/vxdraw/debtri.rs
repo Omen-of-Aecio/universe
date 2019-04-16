@@ -27,6 +27,8 @@ use std::mem::{size_of, transmute, ManuallyDrop};
 
 // ---
 
+pub struct DebugTriangleHandle(usize);
+
 #[derive(Clone, Copy)]
 pub struct DebugTriangle {
     pub origin: [(f32, f32); 3],
@@ -96,7 +98,7 @@ const TRI_BYTE_SIZE: usize = PTS_PER_TRI
 
 // ---
 
-pub fn add_to_triangles(s: &mut Windowing, triangle: DebugTriangle) -> usize {
+pub fn add_to_triangles(s: &mut Windowing, triangle: DebugTriangle) -> DebugTriangleHandle {
     let overrun = if let Some(ref mut debug_triangles) = s.debug_triangles {
         Some(
             (debug_triangles.triangles_count + 1) * TRI_BYTE_SIZE
@@ -139,9 +141,9 @@ pub fn add_to_triangles(s: &mut Windowing, triangle: DebugTriangle) -> usize {
                 .release_mapping_writer(data_target)
                 .expect("Couldn't release the mapping writer!");
         }
-        debug_triangles.triangles_count - 1
+        DebugTriangleHandle(debug_triangles.triangles_count - 1)
     } else {
-        0
+        unreachable![]
     }
 }
 
@@ -462,7 +464,8 @@ pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) 
     }
 }
 
-pub fn set_triangle_color(s: &mut Windowing, inst: usize, rgba: [u8; 4]) {
+pub fn set_triangle_color(s: &mut Windowing, inst: &DebugTriangleHandle, rgba: [u8; 4]) {
+    let inst = inst.0;
     let device = &s.device;
     if let Some(ref mut debug_triangles) = s.debug_triangles {
         device.wait_idle().expect("Unable to wait for device idle");

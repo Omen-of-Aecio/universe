@@ -124,7 +124,9 @@ pub struct ColoredTriangleList {
 }
 
 pub struct Windowing {
+    #[cfg(not(feature = "gl"))]
     pub window: winit::Window,
+
     pub events_loop: winit::EventsLoop,
 
     pub simple_textures: Vec<SingleTexture>,
@@ -175,6 +177,7 @@ pub struct Windowing {
     pub surf: <back::Backend as Backend>::Surface,
     pub format: gfx_hal::format::Format,
 
+    #[cfg(not(feature = "gl"))]
     pub vk_inst: ManuallyDrop<back::Instance>,
 }
 
@@ -286,6 +289,7 @@ impl Drop for Windowing {
 
             ManuallyDrop::drop(&mut self.queue_group);
             ManuallyDrop::drop(&mut self.device);
+            #[cfg(not(feature = "gl"))]
             ManuallyDrop::drop(&mut self.vk_inst);
         }
     }

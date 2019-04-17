@@ -54,44 +54,133 @@ pub enum ShowWindow {
     Enable,
 }
 
-pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windowing {
-    info![log, "vxdraw", "Initializing rendering"; "headless" => InDebug(&show)];
-    let events_loop = EventsLoop::new();
-
-    let window = WindowBuilder::new()
-        .with_visibility(show == ShowWindow::Enable)
-        .build(&events_loop)
-        .unwrap();
-
-    match show {
+#[cfg(not(feature = "gl"))]
+fn set_window_size(window: &mut winit::Window, show: ShowWindow) -> Extent2D {
+    let dpi_factor = window.get_hidpi_factor();
+    let (w, h): (u32, u32) = match show {
         ShowWindow::Headless1k => {
-            let dpi_factor = window.get_hidpi_factor();
             window.set_inner_size(LogicalSize {
                 width: 1000f64 / dpi_factor,
                 height: 1000f64 / dpi_factor,
             });
+            (1000, 1000)
         }
         ShowWindow::Headless2x1k => {
-            let dpi_factor = window.get_hidpi_factor();
             window.set_inner_size(LogicalSize {
                 width: 2000f64 / dpi_factor,
                 height: 1000f64 / dpi_factor,
             });
+            (2000, 1000)
         }
         ShowWindow::Headless1x2k => {
-            let dpi_factor = window.get_hidpi_factor();
             window.set_inner_size(LogicalSize {
                 width: 1000f64 / dpi_factor,
                 height: 2000f64 / dpi_factor,
             });
+            (1000, 2000)
         }
-        ShowWindow::Enable => {}
+        ShowWindow::Enable => {
+            window
+                .get_inner_size()
+                .unwrap()
+                .to_physical(dpi_factor)
+                .into()
+        }
+    };
+    Extent2D {
+        width: w,
+        height: h,
     }
+}
 
-    let version = 1;
-    let vk_inst = back::Instance::create("renderer", version);
-    let mut surf: <back::Backend as Backend>::Surface = vk_inst.create_surface(&window);
-    let mut adapters = vk_inst.enumerate_adapters();
+#[cfg(feature = "gl")]
+fn set_window_size(window: &mut glutin::GlWindow, show: ShowWindow) -> Extent2D {
+    let dpi_factor = window.get_hidpi_factor();
+    let (w, h): (u32, u32) = match show {
+        ShowWindow::Headless1k => {
+            window.set_inner_size(LogicalSize {
+                width: 1000f64 / dpi_factor,
+                height: 1000f64 / dpi_factor,
+            });
+            (1000, 1000)
+        }
+        ShowWindow::Headless2x1k => {
+            window.set_inner_size(LogicalSize {
+                width: 2000f64 / dpi_factor,
+                height: 1000f64 / dpi_factor,
+            });
+            (2000, 1000)
+        }
+        ShowWindow::Headless1x2k => {
+            window.set_inner_size(LogicalSize {
+                width: 1000f64 / dpi_factor,
+                height: 2000f64 / dpi_factor,
+            });
+            (1000, 2000)
+        }
+        ShowWindow::Enable => {
+            window
+                .get_inner_size()
+                .unwrap()
+                .to_physical(dpi_factor)
+                .into()
+        }
+    };
+    Extent2D {
+        width: w,
+        height: h,
+    }
+}
+
+pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windowing {
+    info![log, "vxdraw", "Initializing rendering"; "headless" => InDebug(&show)];
+    let events_loop = EventsLoop::new();
+
+    let window_builder = WindowBuilder::new()
+        .with_visibility(show == ShowWindow::Enable);
+
+    #[cfg(feature = "gl")]
+    let (mut adapters, mut surf, dims) = {
+        let mut window = {
+            let builder =
+                back::config_context(back::glutin::ContextBuilder::new(), format::Format::Rgba8Srgb, None)
+                    .with_vsync(true);
+            back::glutin::GlWindow::new(window_builder, builder, &events_loop).unwrap()
+        };
+
+        set_window_size(&mut window, show);
+        let dims = {
+            let dpi_factor = window.get_hidpi_factor();
+            info![log, "vxdraw", "Window DPI factor"; "factor" => dpi_factor];
+            let (w, h): (u32, u32) = window
+                .get_inner_size()
+                .unwrap()
+                .to_physical(dpi_factor)
+                .into();
+            Extent2D {
+                width: w,
+                height: h,
+            }
+        };
+
+        let surface = back::Surface::from_window(window);
+        let adapters = surface.enumerate_adapters();
+        (adapters, surface, dims)
+    };
+
+    #[cfg(not(feature = "gl"))]
+    let (window, vk_inst, mut adapters, mut surf, dims) = {
+        let mut window = window_builder.build(&events_loop).unwrap();
+        let version = 1;
+        let vk_inst = back::Instance::create("renderer", version);
+        let mut surf: <back::Backend as Backend>::Surface = vk_inst.create_surface(&window);
+        let mut adapters = vk_inst.enumerate_adapters();
+        let dims = set_window_size(&mut window, show);
+        let dpi_factor = window.get_hidpi_factor();
+        info![log, "vxdraw", "Window DPI factor"; "factor" => dpi_factor];
+        (window, vk_inst, adapters, surf, dims)
+    };
+
     let len = adapters.len();
     info![log, "vxdraw", "Adapters found"; "count" => len];
     for (idx, adap) in adapters.iter().enumerate() {
@@ -148,19 +237,6 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
     };
     info![log, "vxdraw", "Using swapchain images"; "count" => image_count];
 
-    let dims = {
-        let dpi_factor = window.get_hidpi_factor();
-        info![log, "vxdraw", "Window DPI factor"; "factor" => dpi_factor];
-        let (w, h): (u32, u32) = window
-            .get_inner_size()
-            .unwrap()
-            .to_physical(dpi_factor)
-            .into();
-        Extent2D {
-            width: w,
-            height: h,
-        }
-    };
     info![log, "vxdraw", "Swapchain size"; "extent" => InDebug(&dims)];
 
     let mut swap_config = SwapchainConfig::from_caps(&caps, format, dims);
@@ -176,34 +252,6 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
 
     let backbuffer_string = format!["{:#?}", backbuffer];
     info![log, "vxdraw", "Backbuffer information"; "backbuffers" => backbuffer_string];
-
-    let image_views: Vec<_> = match backbuffer {
-        Backbuffer::Images(ref images) => images
-            .iter()
-            .map(|image| unsafe {
-                device
-                    .create_image_view(
-                        &image,
-                        image::ViewKind::D2,
-                        format, // MUST be identical to the image's format
-                        Swizzle::NO,
-                        image::SubresourceRange {
-                            aspects: format::Aspects::COLOR,
-                            levels: 0..1,
-                            layers: 0..1,
-                        },
-                    )
-                    .map_err(|_| "Couldn't create the image_view for the image!")
-            })
-            .collect::<Result<Vec<_>, &str>>()
-            .unwrap(),
-        Backbuffer::Framebuffer(_) => unimplemented!("Can't handle framebuffer backbuffer!"),
-    };
-
-    {
-        let image_views = format!["{:?}", image_views];
-        info![log, "vxdraw", "Created image views"; "image views" => image_views];
-    }
 
     // NOTE: for curious people, the render_pass, used in both framebuffer creation AND command
     // buffer when drawing, only need to be _compatible_, which means the SAMPLE count and the
@@ -236,30 +284,64 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
                 .unwrap()
         }
     };
+
     {
         let rpfmt = format!["{:#?}", render_pass];
         info![log, "vxdraw", "Created render pass for framebuffers"; "renderpass" => rpfmt];
     }
 
-    let framebuffers: Vec<<back::Backend as Backend>::Framebuffer> = {
-        image_views
+    let (image_views, framebuffers) = match backbuffer {
+        Backbuffer::Images(ref images) => {
+            let image_views = images
             .iter()
-            .map(|image_view| unsafe {
+            .map(|image| unsafe {
                 device
-                    .create_framebuffer(
-                        &render_pass,
-                        vec![image_view],
-                        image::Extent {
-                            width: dims.width as u32,
-                            height: dims.height as u32,
-                            depth: 1,
+                    .create_image_view(
+                        &image,
+                        image::ViewKind::D2,
+                        format, // MUST be identical to the image's format
+                        Swizzle::NO,
+                        image::SubresourceRange {
+                            aspects: format::Aspects::COLOR,
+                            levels: 0..1,
+                            layers: 0..1,
                         },
                     )
-                    .map_err(|_| "Failed to create a framebuffer!")
+                    .map_err(|_| "Couldn't create the image_view for the image!")
             })
             .collect::<Result<Vec<_>, &str>>()
-            .unwrap()
+            .unwrap();
+            let framebuffers: Vec<<back::Backend as Backend>::Framebuffer> = {
+                image_views
+                    .iter()
+                    .map(|image_view| unsafe {
+                        device
+                            .create_framebuffer(
+                                &render_pass,
+                                vec![image_view],
+                                image::Extent {
+                                    width: dims.width as u32,
+                                    height: dims.height as u32,
+                                    depth: 1,
+                                },
+                            )
+                            .map_err(|_| "Failed to create a framebuffer!")
+                    })
+                    .collect::<Result<Vec<_>, &str>>()
+                    .unwrap()
+            };
+            (image_views, framebuffers)
+        }
+        #[cfg(not(feature = "gl"))]
+        Backbuffer::Framebuffer(_) => unimplemented![],
+        #[cfg(feature = "gl")]
+        Backbuffer::Framebuffer(fbo) => (Vec::new(), vec![fbo]),
     };
+
+    {
+        let image_views = format!["{:?}", image_views];
+        info![log, "vxdraw", "Created image views"; "image views" => image_views];
+    }
 
     let framebuffers_string = format!["{:#?}", framebuffers];
     info![log, "vxdraw", "Framebuffer information"; "framebuffers" => framebuffers_string];
@@ -526,7 +608,9 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         triangle_pipeline: ManuallyDrop::new(triangle_pipeline),
         triangle_pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
         triangle_render_pass: ManuallyDrop::new(triangle_render_pass),
+        #[cfg(not(feature = "gl"))]
         vk_inst: ManuallyDrop::new(vk_inst),
+        #[cfg(not(feature = "gl"))]
         window,
     };
     create_debug_triangle(&mut windowing, log);
@@ -1116,11 +1200,11 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
         s.device.destroy_shader_module(fs_module);
     }
 
-    let (
-        texture_vertex_buffer_indices,
-        texture_vertex_memory_indices,
-        texture_vertex_requirements_indices,
-    ) = make_index_buffer_with_data(s, &[0f32; 4 * 1000]);
+//     let (
+//         texture_vertex_buffer_indices,
+//         texture_vertex_memory_indices,
+//         texture_vertex_requirements_indices,
+//     ) = make_index_buffer_with_data(s, &[0f32; 4 * 1000]);
 
     s.simple_textures.push(SingleTexture {
         count: 0,
@@ -1576,7 +1660,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
                 0,
                 &(std::mem::transmute::<[f32; 4], [u32; 4]>([w as f32, 0.3, 93.0, 3.0])),
             );
-            let buffers: ArrayVec<[_; 1]> = [(pt_buffer, 0)].into();
+            let buffers: ArrayVec<[_; 1]> = [(&pt_buffer, 0)].into();
             enc.bind_vertex_buffers(0, buffers);
             enc.draw(0..6, 0..1);
         }

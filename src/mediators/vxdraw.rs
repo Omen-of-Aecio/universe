@@ -79,13 +79,11 @@ fn set_window_size(window: &mut winit::Window, show: ShowWindow) -> Extent2D {
             });
             (1000, 2000)
         }
-        ShowWindow::Enable => {
-            window
-                .get_inner_size()
-                .unwrap()
-                .to_physical(dpi_factor)
-                .into()
-        }
+        ShowWindow::Enable => window
+            .get_inner_size()
+            .unwrap()
+            .to_physical(dpi_factor)
+            .into(),
     };
     Extent2D {
         width: w,
@@ -118,13 +116,11 @@ fn set_window_size(window: &mut glutin::GlWindow, show: ShowWindow) -> Extent2D 
             });
             (1000, 2000)
         }
-        ShowWindow::Enable => {
-            window
-                .get_inner_size()
-                .unwrap()
-                .to_physical(dpi_factor)
-                .into()
-        }
+        ShowWindow::Enable => window
+            .get_inner_size()
+            .unwrap()
+            .to_physical(dpi_factor)
+            .into(),
     };
     Extent2D {
         width: w,
@@ -136,15 +132,17 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
     info![log, "vxdraw", "Initializing rendering"; "headless" => InDebug(&show)];
     let events_loop = EventsLoop::new();
 
-    let window_builder = WindowBuilder::new()
-        .with_visibility(show == ShowWindow::Enable);
+    let window_builder = WindowBuilder::new().with_visibility(show == ShowWindow::Enable);
 
     #[cfg(feature = "gl")]
     let (mut adapters, mut surf, dims) = {
         let mut window = {
-            let builder =
-                back::config_context(back::glutin::ContextBuilder::new(), format::Format::Rgba8Srgb, None)
-                    .with_vsync(true);
+            let builder = back::config_context(
+                back::glutin::ContextBuilder::new(),
+                format::Format::Rgba8Srgb,
+                None,
+            )
+            .with_vsync(true);
             back::glutin::GlWindow::new(window_builder, builder, &events_loop).unwrap()
         };
 
@@ -293,24 +291,24 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
     let (image_views, framebuffers) = match backbuffer {
         Backbuffer::Images(ref images) => {
             let image_views = images
-            .iter()
-            .map(|image| unsafe {
-                device
-                    .create_image_view(
-                        &image,
-                        image::ViewKind::D2,
-                        format, // MUST be identical to the image's format
-                        Swizzle::NO,
-                        image::SubresourceRange {
-                            aspects: format::Aspects::COLOR,
-                            levels: 0..1,
-                            layers: 0..1,
-                        },
-                    )
-                    .map_err(|_| "Couldn't create the image_view for the image!")
-            })
-            .collect::<Result<Vec<_>, &str>>()
-            .unwrap();
+                .iter()
+                .map(|image| unsafe {
+                    device
+                        .create_image_view(
+                            &image,
+                            image::ViewKind::D2,
+                            format, // MUST be identical to the image's format
+                            Swizzle::NO,
+                            image::SubresourceRange {
+                                aspects: format::Aspects::COLOR,
+                                levels: 0..1,
+                                layers: 0..1,
+                            },
+                        )
+                        .map_err(|_| "Couldn't create the image_view for the image!")
+                })
+                .collect::<Result<Vec<_>, &str>>()
+                .unwrap();
             let framebuffers: Vec<<back::Backend as Backend>::Framebuffer> = {
                 image_views
                     .iter()
@@ -370,209 +368,6 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         .map(|_| command_pool.acquire_command_buffer::<command::MultiShot>())
         .collect();
 
-    // triangle
-
-    pub const VERTEX_SOURCE: &str = "#version 450
-    #extension GL_ARG_separate_shader_objects : enable
-    layout (location = 0) in vec2 position;
-    out gl_PerVertex {
-        vec4 gl_Position;
-    };
-    layout(push_constant) uniform ColorBlock {
-        mat4 view;
-    } PushConstant;
-    void main()
-    {
-      gl_Position = PushConstant.view * vec4(position, 0.0, 1.0);
-    }";
-
-    pub const FRAGMENT_SOURCE: &str = "#version 450
-    #extension GL_ARG_separate_shader_objects : enable
-    layout(location = 0) out vec4 color;
-    void main()
-    {
-        color = vec4(1.0);
-    }";
-
-    let vs_module = {
-        let glsl = VERTEX_SOURCE;
-        let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
-            .unwrap()
-            .bytes()
-            .map(Result::unwrap)
-            .collect();
-        unsafe { device.create_shader_module(&spirv) }.unwrap()
-    };
-    let fs_module = {
-        let glsl = FRAGMENT_SOURCE;
-        let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Fragment)
-            .unwrap()
-            .bytes()
-            .map(Result::unwrap)
-            .collect();
-        unsafe { device.create_shader_module(&spirv) }.unwrap()
-    };
-    // Describe the shaders
-    const ENTRY_NAME: &str = "main";
-    let vs_module: <back::Backend as Backend>::ShaderModule = vs_module;
-    let (vs_entry, fs_entry) = (
-        pso::EntryPoint {
-            entry: ENTRY_NAME,
-            module: &vs_module,
-            specialization: pso::Specialization::default(),
-        },
-        pso::EntryPoint {
-            entry: ENTRY_NAME,
-            module: &fs_module,
-            specialization: pso::Specialization::default(),
-        },
-    );
-    let shader_entries = pso::GraphicsShaderSet {
-        vertex: vs_entry,
-        hull: None,
-        domain: None,
-        geometry: None,
-        fragment: Some(fs_entry),
-    };
-
-    let triangle_render_pass = {
-        let attachment = pass::Attachment {
-            format: Some(format),
-            samples: 1,
-            ops: pass::AttachmentOps::new(
-                pass::AttachmentLoadOp::Clear,
-                pass::AttachmentStoreOp::Store,
-            ),
-            stencil_ops: pass::AttachmentOps::DONT_CARE,
-            layouts: image::Layout::Undefined..image::Layout::Present,
-        };
-
-        let subpass = pass::SubpassDesc {
-            colors: &[(0, image::Layout::ColorAttachmentOptimal)],
-            depth_stencil: None,
-            inputs: &[],
-            resolves: &[],
-            preserves: &[],
-        };
-
-        unsafe { device.create_render_pass(&[attachment], &[subpass], &[]) }
-            .expect("Can't create render pass")
-    };
-
-    // ---
-
-    let input_assembler = InputAssemblerDesc::new(Primitive::TriangleList);
-
-    let vertex_buffers: Vec<VertexBufferDesc> = vec![VertexBufferDesc {
-        binding: 0,
-        stride: (size_of::<f32>() * 2) as u32,
-        rate: 0,
-    }];
-    let attributes: Vec<AttributeDesc> = vec![AttributeDesc {
-        location: 0,
-        binding: 0,
-        element: Element {
-            format: format::Format::Rg32Float,
-            offset: 0,
-        },
-    }];
-
-    let rasterizer = Rasterizer {
-        depth_clamping: false,
-        polygon_mode: PolygonMode::Fill,
-        cull_face: Face::NONE,
-        front_face: FrontFace::Clockwise,
-        depth_bias: None,
-        conservative: false,
-    };
-
-    let depth_stencil = DepthStencilDesc {
-        depth: DepthTest::Off,
-        depth_bounds: false,
-        stencil: StencilTest::Off,
-    };
-    let blender = {
-        let blend_state = BlendState::On {
-            color: BlendOp::Add {
-                src: Factor::One,
-                dst: Factor::Zero,
-            },
-            alpha: BlendOp::Add {
-                src: Factor::One,
-                dst: Factor::Zero,
-            },
-        };
-        BlendDesc {
-            logic_op: Some(LogicOp::Copy),
-            targets: vec![ColorBlendDesc(ColorMask::ALL, blend_state)],
-        }
-    };
-    let extent = image::Extent {
-        width: dims.width as u32,
-        height: dims.height as u32,
-        depth: 1,
-    }
-    .rect();
-    let baked_states = BakedStates {
-        viewport: Some(Viewport {
-            rect: extent,
-            depth: (0.0..1.0),
-        }),
-        scissor: Some(extent),
-        blend_color: None,
-        depth_bounds: None,
-    };
-    let bindings = Vec::<DescriptorSetLayoutBinding>::new();
-    let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
-    let triangle_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
-        vec![unsafe {
-            device
-                .create_descriptor_set_layout(bindings, immutable_samplers)
-                .expect("Couldn't make a DescriptorSetLayout")
-        }];
-    let mut push_constants = Vec::<(ShaderStageFlags, core::ops::Range<u32>)>::new();
-    push_constants.push((ShaderStageFlags::VERTEX, 0..16));
-    let triangle_pipeline_layout = unsafe {
-        device
-            .create_pipeline_layout(&triangle_descriptor_set_layouts, push_constants)
-            .expect("Couldn't create a pipeline layout")
-    };
-    // Describe the pipeline (rasterization, triangle interpretation)
-    let pipeline_desc = GraphicsPipelineDesc {
-        shaders: shader_entries,
-        rasterizer,
-        vertex_buffers,
-        attributes,
-        input_assembler,
-        blender,
-        depth_stencil,
-        multisampling: None,
-        baked_states,
-        layout: &triangle_pipeline_layout,
-        subpass: pass::Subpass {
-            index: 0,
-            main_pass: &triangle_render_pass,
-        },
-        flags: PipelineCreationFlags::empty(),
-        parent: BasePipeline::None,
-    };
-
-    let tr_pipe_fmt = format!["{:#?}", pipeline_desc];
-    info![log, "vxdraw", "Pipeline descriptor"; "pipeline" => tr_pipe_fmt];
-
-    let triangle_pipeline = unsafe {
-        device
-            .create_graphics_pipeline(&pipeline_desc, None)
-            .expect("Couldn't create a graphics pipeline!")
-    };
-
-    unsafe {
-        device.destroy_shader_module(vs_module);
-    }
-    unsafe {
-        device.destroy_shader_module(fs_module);
-    }
-
     let mut windowing = Windowing {
         acquire_image_semaphores,
         adapter,
@@ -602,12 +397,6 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         swapchain_prev_idx: 0,
         swapconfig: swap_config,
         simple_textures: vec![],
-        triangle_buffers: vec![],
-        triangle_descriptor_set_layouts,
-        triangle_memory: vec![],
-        triangle_pipeline: ManuallyDrop::new(triangle_pipeline),
-        triangle_pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
-        triangle_render_pass: ManuallyDrop::new(triangle_render_pass),
         #[cfg(not(feature = "gl"))]
         vk_inst: ManuallyDrop::new(vk_inst),
         #[cfg(not(feature = "gl"))]
@@ -1200,11 +989,11 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
         s.device.destroy_shader_module(fs_module);
     }
 
-//     let (
-//         texture_vertex_buffer_indices,
-//         texture_vertex_memory_indices,
-//         texture_vertex_requirements_indices,
-//     ) = make_index_buffer_with_data(s, &[0f32; 4 * 1000]);
+    //     let (
+    //         texture_vertex_buffer_indices,
+    //         texture_vertex_memory_indices,
+    //         texture_vertex_requirements_indices,
+    //     ) = make_index_buffer_with_data(s, &[0f32; 4 * 1000]);
 
     s.simple_textures.push(SingleTexture {
         count: 0,
@@ -1227,12 +1016,6 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
         render_pass: ManuallyDrop::new(triangle_render_pass),
     });
     s.simple_textures.len() - 1
-}
-
-pub fn add_triangle(s: &mut Windowing, triangle: &[f32; 6]) {
-    let (buffer, memory, _) = make_vertex_buffer_with_data_on_gpu(s, &triangle[..]);
-    s.triangle_buffers.push(buffer);
-    s.triangle_memory.push(memory);
 }
 
 pub fn collect_input(windowing: &mut Windowing) -> Vec<Event> {
@@ -1300,18 +1083,6 @@ fn draw_frame_internal<T>(
                 );
                 let ptr = view.as_ptr();
 
-                enc.bind_graphics_pipeline(&s.triangle_pipeline);
-                enc.push_graphics_constants(
-                    &s.triangle_pipeline_layout,
-                    ShaderStageFlags::VERTEX,
-                    0,
-                    &*(ptr as *const [u32; 16]),
-                );
-                for buffer_ref in &s.triangle_buffers {
-                    let buffers: ArrayVec<[_; 1]> = [(buffer_ref, 0)].into();
-                    enc.bind_vertex_buffers(0, buffers);
-                    enc.draw(0..3, 0..1);
-                }
                 for simple_tex in s.simple_textures.iter() {
                     enc.bind_graphics_pipeline(&simple_tex.pipeline);
                     enc.bind_graphics_descriptor_sets(
@@ -2105,7 +1876,7 @@ mod tests {
         let prspect = gen_perspective(&mut windowing);
 
         let tri = make_centered_equilateral_triangle();
-        add_triangle(&mut windowing, &tri);
+        add_to_triangles(&mut windowing, DebugTriangle::default());
         for i in 0..=360 {
             if i % 2 == 0 {
                 add_4_screencorners(&mut windowing);
@@ -2306,21 +2077,6 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
-
-        b.iter(|| {
-            draw_frame(&mut windowing, &mut logger, &prspect);
-        });
-    }
-
-    #[bench]
-    fn noninstanced_1k_triangles(b: &mut Bencher) {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
-        let tri = make_centered_equilateral_triangle();
-        for _ in 0..1000 {
-            add_triangle(&mut windowing, &tri);
-        }
 
         b.iter(|| {
             draw_frame(&mut windowing, &mut logger, &prspect);

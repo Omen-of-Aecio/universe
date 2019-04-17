@@ -130,23 +130,7 @@ pub struct Windowing {
     pub events_loop: winit::EventsLoop,
 
     pub simple_textures: Vec<SingleTexture>,
-    //
-    // pub texture_image: ManuallyDrop<<back::Backend as Backend>::Image>,
-    // pub texture_image_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
-    // pub texture_image_view: ManuallyDrop<<back::Backend as Backend>::ImageView>,
-    // pub texture_image_sampler: ManuallyDrop<<back::Backend as Backend>::Sampler>,
-    // pub texture_render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
-    // pub texture_pipeline: ManuallyDrop<<back::Backend as Backend>::GraphicsPipeline>,
-    // pub texture_pipeline_layout: ManuallyDrop<<back::Backend as Backend>::PipelineLayout>,
-    //
     pub debug_triangles: Option<ColoredTriangleList>,
-    //
-    pub triangle_buffers: Vec<<back::Backend as Backend>::Buffer>,
-    pub triangle_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout>,
-    pub triangle_memory: Vec<<back::Backend as Backend>::Memory>,
-    pub triangle_pipeline: ManuallyDrop<<back::Backend as Backend>::GraphicsPipeline>,
-    pub triangle_pipeline_layout: ManuallyDrop<<back::Backend as Backend>::PipelineLayout>,
-    pub triangle_render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
     //
     pub current_frame: usize,
     pub image_count: usize,
@@ -201,12 +185,6 @@ impl Drop for Windowing {
             for iv in self.image_views.drain(..) {
                 self.device.destroy_image_view(iv);
             }
-            for buff in self.triangle_buffers.drain(..) {
-                self.device.destroy_buffer(buff);
-            }
-            for mem in self.triangle_memory.drain(..) {
-                self.device.free_memory(mem);
-            }
         }
 
         unsafe {
@@ -237,15 +215,6 @@ impl Drop for Windowing {
                 .destroy_render_pass(ManuallyDrop::into_inner(read(&self.render_pass)));
             self.device
                 .destroy_swapchain(ManuallyDrop::into_inner(read(&self.swapchain)));
-
-            self.device
-                .destroy_render_pass(ManuallyDrop::into_inner(read(&self.triangle_render_pass)));
-            self.device
-                .destroy_graphics_pipeline(ManuallyDrop::into_inner(read(&self.triangle_pipeline)));
-            self.device
-                .destroy_pipeline_layout(ManuallyDrop::into_inner(read(
-                    &self.triangle_pipeline_layout,
-                )));
 
             for mut simple_tex in self.simple_textures.drain(..) {
                 self.device.destroy_buffer(ManuallyDrop::into_inner(read(
@@ -281,10 +250,6 @@ impl Drop for Windowing {
                     .destroy_sampler(ManuallyDrop::into_inner(read(&simple_tex.sampler)));
                 self.device
                     .destroy_image_view(ManuallyDrop::into_inner(read(&simple_tex.image_view)));
-            }
-
-            for dsl in self.triangle_descriptor_set_layouts.drain(..) {
-                self.device.destroy_descriptor_set_layout(dsl);
             }
 
             ManuallyDrop::drop(&mut self.queue_group);

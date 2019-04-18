@@ -74,10 +74,7 @@ const QUAD_BYTE_SIZE: usize = PTS_PER_QUAD
 
 pub fn quad_push(s: &mut Windowing, quad: Quad) -> QuadHandle {
     let overrun = if let Some(ref mut quads) = s.quads {
-        Some(
-            (quads.count + 1) * QUAD_BYTE_SIZE
-                > quads.capacity as usize,
-        )
+        Some((quads.count + 1) * QUAD_BYTE_SIZE > quads.capacity as usize)
     } else {
         None
     };
@@ -117,30 +114,23 @@ pub fn quad_push(s: &mut Windowing, quad: Quad) -> QuadHandle {
                 .release_mapping_writer(data_target)
                 .expect("Couldn't release the mapping writer!");
             let mut data_target = device
-                .acquire_mapping_writer(
-                    &quads.quads_memory,
-                    0..quads.memory_requirements.size,
-                )
+                .acquire_mapping_writer(&quads.quads_memory, 0..quads.memory_requirements.size)
                 .expect("Failed to acquire a memory writer!");
             let idx = quads.count * QUAD_BYTE_SIZE / size_of::<f32>();
 
-            for (i, point) in [
-                topleft,
-                bottomleft,
-                bottomright,
-                topright,
-            ].iter().enumerate()
+            for (i, point) in [topleft, bottomleft, bottomright, topright]
+                .iter()
+                .enumerate()
             {
-    // pub width: f32,
-    // pub height: f32,
-    // pub colors: [(u8, u8, u8, u8); 4],
-    // pub translation: (f32, f32),
-    // pub rotation: f32,
-    // pub scale: f32,
+                // pub width: f32,
+                // pub height: f32,
+                // pub colors: [(u8, u8, u8, u8); 4],
+                // pub translation: (f32, f32),
+                // pub rotation: f32,
+                // pub scale: f32,
                 let idx = i * 7;
 
-                data_target[idx..idx + 2]
-                    .copy_from_slice(&[point.0, point.1]);
+                data_target[idx..idx + 2].copy_from_slice(&[point.0, point.1]);
                 data_target[idx + 2..idx + 3].copy_from_slice(&transmute::<[u8; 4], [f32; 1]>([
                     quad.colors[i].0,
                     quad.colors[i].1,
@@ -329,20 +319,24 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
     };
 
     let depth_stencil = DepthStencilDesc {
-        depth: DepthTest::Off,
+        depth: pso::DepthTest::On {
+            fun: pso::Comparison::Less,
+            write: true,
+        },
         depth_bounds: false,
         stencil: StencilTest::Off,
     };
     let blender = {
         let blend_state = BlendState::On {
             color: BlendOp::Add {
-                src: Factor::One,
-                dst: Factor::Zero,
+                src: pso::Factor::SrcAlpha,
+                dst: pso::Factor::OneMinusSrcAlpha,
             },
-            alpha: BlendOp::Add {
-                src: Factor::One,
-                dst: Factor::Zero,
+            alpha: pso::BlendOp::Add {
+                src: pso::Factor::One,
+                dst: pso::Factor::OneMinusSrcAlpha,
             },
+            // alpha: pso::BlendOp::Max,
         };
         BlendDesc {
             logic_op: Some(LogicOp::Copy),
@@ -367,16 +361,30 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
             layouts: image::Layout::Undefined..image::Layout::Present,
         };
 
+        let depth = pass::Attachment {
+            format: Some(format::Format::D32Float),
+            samples: 1,
+            ops: pass::AttachmentOps::new(
+                pass::AttachmentLoadOp::Clear,
+                pass::AttachmentStoreOp::Store,
+            ),
+            stencil_ops: pass::AttachmentOps::DONT_CARE,
+            layouts: image::Layout::Undefined..image::Layout::DepthStencilAttachmentOptimal,
+        };
+
         let subpass = pass::SubpassDesc {
             colors: &[(0, image::Layout::ColorAttachmentOptimal)],
-            depth_stencil: None,
+            depth_stencil: Some(&(1, image::Layout::DepthStencilAttachmentOptimal)),
             inputs: &[],
             resolves: &[],
             preserves: &[],
         };
 
-        unsafe { s.device.create_render_pass(&[attachment], &[subpass], &[]) }
-            .expect("Can't create render pass")
+        unsafe {
+            s.device
+                .create_render_pass(&[attachment, depth], &[subpass], &[])
+        }
+        .expect("Can't create render pass")
     };
     let baked_states = BakedStates {
         viewport: Some(Viewport {
@@ -439,11 +447,8 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
     let (dtbuffer, dtmemory, dtreqs) =
         make_vertex_buffer_with_data(s, &[0.0f32; QUAD_BYTE_SIZE / 4 * 1000]);
 
-    let (
-        quads_buffer_indices,
-        quads_memory_indices,
-        quads_requirements_indices,
-    ) = make_index_buffer_with_data(s, &[0f32; 4 * 1000]);
+    let (quads_buffer_indices, quads_memory_indices, quads_requirements_indices) =
+        make_index_buffer_with_data(s, &[0f32; 4 * 1000]);
 
     let quads = ColoredQuadList {
         capacity: dtreqs.size,

@@ -114,6 +114,11 @@ pub struct Windowing {
     pub image_count: usize,
     pub render_area: gfx_hal::pso::Rect,
 
+    pub depth_images: Vec<<back::Backend as Backend>::Image>,
+    pub depth_image_views: Vec<<back::Backend as Backend>::ImageView>,
+    pub depth_image_requirements: Vec<gfx_hal::memory::Requirements>,
+    pub depth_image_memories: Vec<<back::Backend as Backend>::Memory>,
+
     pub frames_in_flight_fences: Vec<<back::Backend as Backend>::Fence>,
     pub acquire_image_semaphore_free: ManuallyDrop<<back::Backend as Backend>::Semaphore>,
     pub acquire_image_semaphores: Vec<<back::Backend as Backend>::Semaphore>,
@@ -169,6 +174,16 @@ impl Drop for Windowing {
             self.device.destroy_semaphore(ManuallyDrop::into_inner(read(
                 &self.acquire_image_semaphore_free,
             )));
+
+            for di in self.depth_images.drain(..) {
+                self.device.destroy_image(di);
+            }
+            for div in self.depth_image_views.drain(..) {
+                self.device.destroy_image_view(div);
+            }
+            for div in self.depth_image_memories.drain(..) {
+                self.device.free_memory(div);
+            }
         }
 
         unsafe {
@@ -201,17 +216,13 @@ impl Drop for Windowing {
                     self.device.destroy_descriptor_set_layout(dsl);
                 }
                 self.device
-                    .destroy_graphics_pipeline(ManuallyDrop::into_inner(read(
-                        &quads.pipeline,
-                    )));
+                    .destroy_graphics_pipeline(ManuallyDrop::into_inner(read(&quads.pipeline)));
                 self.device
                     .destroy_pipeline_layout(ManuallyDrop::into_inner(read(
                         &quads.pipeline_layout,
                     )));
                 self.device
-                    .destroy_render_pass(ManuallyDrop::into_inner(read(
-                        &quads.render_pass,
-                    )));
+                    .destroy_render_pass(ManuallyDrop::into_inner(read(&quads.render_pass)));
             }
 
             self.device.destroy_command_pool(

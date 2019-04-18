@@ -567,17 +567,30 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) ->
             stencil_ops: pass::AttachmentOps::DONT_CARE,
             layouts: image::Layout::Undefined..image::Layout::Present,
         };
+        let depth = pass::Attachment {
+            format: Some(format::Format::D32Float),
+            samples: 1,
+            ops: pass::AttachmentOps::new(
+                pass::AttachmentLoadOp::Clear,
+                pass::AttachmentStoreOp::Store,
+            ),
+            stencil_ops: pass::AttachmentOps::DONT_CARE,
+            layouts: image::Layout::Undefined..image::Layout::DepthStencilAttachmentOptimal,
+        };
 
         let subpass = pass::SubpassDesc {
             colors: &[(0, image::Layout::ColorAttachmentOptimal)],
-            depth_stencil: None,
+            depth_stencil: Some(&(1, image::Layout::DepthStencilAttachmentOptimal)),
             inputs: &[],
             resolves: &[],
             preserves: &[],
         };
 
-        unsafe { s.device.create_render_pass(&[attachment], &[subpass], &[]) }
-            .expect("Can't create render pass")
+        unsafe {
+            s.device
+                .create_render_pass(&[attachment, depth], &[subpass], &[])
+        }
+        .expect("Can't create render pass")
     };
     let baked_states = pso::BakedStates {
         viewport: Some(pso::Viewport {

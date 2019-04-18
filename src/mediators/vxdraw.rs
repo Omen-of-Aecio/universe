@@ -37,14 +37,14 @@ use winit::{dpi::LogicalSize, Event, EventsLoop, WindowBuilder};
 
 pub mod debtri;
 pub mod dyntex;
-pub mod strtex;
 pub mod quads;
+pub mod strtex;
 pub mod utils;
 
 use debtri::*;
 use dyntex::*;
-use strtex::{add_streaming_texture, streaming_texture_add_sprite};
 use quads::*;
+use strtex::{add_streaming_texture, streaming_texture_add_sprite};
 use utils::*;
 
 // ---
@@ -294,9 +294,20 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
             stencil_ops: pass::AttachmentOps::DONT_CARE,
             layouts: image::Layout::Undefined..image::Layout::Present,
         };
+        let depth = pass::Attachment {
+            format: Some(format::Format::D32Float),
+            samples: 1,
+            ops: pass::AttachmentOps::new(
+                pass::AttachmentLoadOp::Clear,
+                pass::AttachmentStoreOp::Store,
+            ),
+            stencil_ops: pass::AttachmentOps::DONT_CARE,
+            layouts: image::Layout::Undefined..image::Layout::DepthStencilAttachmentOptimal,
+        };
+
         let subpass = pass::SubpassDesc {
             colors: &[(0, image::Layout::ColorAttachmentOptimal)],
-            depth_stencil: None,
+            depth_stencil: Some(&(1, image::Layout::DepthStencilAttachmentOptimal)),
             inputs: &[],
             resolves: &[],
             preserves: &[],
@@ -304,7 +315,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         debug![log, "vxdraw", "Render pass info"; "color attachment" => InDebugPretty(&color_attachment); clone color_attachment];
         unsafe {
             device
-                .create_render_pass(&[color_attachment], &[subpass], &[])
+                .create_render_pass(&[color_attachment, depth], &[subpass], &[])
                 .map_err(|_| "Couldn't create a render pass!")
                 .unwrap()
         }
@@ -314,6 +325,11 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         let rpfmt = format!["{:#?}", render_pass];
         debug![log, "vxdraw", "Created render pass for framebuffers"; "renderpass" => rpfmt];
     }
+
+    let mut depth_images: Vec<<back::Backend as Backend>::Image> = vec![];
+    let mut depth_image_views: Vec<<back::Backend as Backend>::ImageView> = vec![];
+    let mut depth_image_memories: Vec<<back::Backend as Backend>::Memory> = vec![];
+    let mut depth_image_requirements: Vec<memory::Requirements> = vec![];
 
     let (image_views, framebuffers) = match backbuffer {
         Backbuffer::Images(ref images) => {
@@ -336,14 +352,63 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
                 })
                 .collect::<Result<Vec<_>, &str>>()
                 .unwrap();
+
+            unsafe {
+                for _ in &image_views {
+                    let mut depth_image = device
+                        .create_image(
+                            image::Kind::D2(dims.width, dims.height, 1, 1),
+                            1,
+                            format::Format::D32Float,
+                            image::Tiling::Optimal,
+                            image::Usage::DEPTH_STENCIL_ATTACHMENT,
+                            image::ViewCapabilities::empty(),
+                        )
+                        .expect("Unable to create depth image");
+                    let requirements = device.get_image_requirements(&depth_image);
+                    let memory_type_id = find_memory_type_id(
+                        &adapter,
+                        requirements,
+                        memory::Properties::DEVICE_LOCAL,
+                    );
+                    let memory = device
+                        .allocate_memory(memory_type_id, requirements.size)
+                        .expect("Couldn't allocate image memory!");
+                    device
+                        .bind_image_memory(&memory, 0, &mut depth_image)
+                        .expect("Couldn't bind the image memory!");
+                    let image_view = device
+                        .create_image_view(
+                            &depth_image,
+                            image::ViewKind::D2,
+                            format::Format::D32Float,
+                            format::Swizzle::NO,
+                            image::SubresourceRange {
+                                aspects: format::Aspects::DEPTH,
+                                levels: 0..1,
+                                layers: 0..1,
+                            },
+                        )
+                        .expect("Couldn't create the image view!");
+                    depth_images.push(depth_image);
+                    depth_image_views.push(image_view);
+                    depth_image_requirements.push(requirements);
+                    depth_image_memories.push(memory);
+                }
+            }
+            // pub image: ManuallyDrop<B::Image>,
+            // pub requirements: Requirements,
+            // pub memory: ManuallyDrop<B::Memory>,
+            // pub image_view: ManuallyDrop<B::ImageView>,
             let framebuffers: Vec<<back::Backend as Backend>::Framebuffer> = {
                 image_views
                     .iter()
-                    .map(|image_view| unsafe {
+                    .enumerate()
+                    .map(|(idx, image_view)| unsafe {
                         device
                             .create_framebuffer(
                                 &render_pass,
-                                vec![image_view],
+                                vec![image_view, &depth_image_views[idx]],
                                 image::Extent {
                                     width: dims.width as u32,
                                     height: dims.height as u32,
@@ -438,6 +503,10 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         streaming_textures: vec![],
         simple_textures: vec![],
         quads: None,
+        depth_images,
+        depth_image_views,
+        depth_image_requirements,
+        depth_image_memories,
         #[cfg(not(feature = "gl"))]
         vk_inst: ManuallyDrop::new(vk_inst),
         #[cfg(not(feature = "gl"))]
@@ -508,9 +577,10 @@ fn draw_frame_internal<T>(
 
         {
             let buffer = &mut s.command_buffers[s.current_frame];
-            let clear_values = [ClearValue::Color(ClearColor::Float([
-                1.0f32, 0.25, 0.5, 0.75,
-            ]))];
+            let clear_values = [
+                ClearValue::Color(ClearColor::Float([1.0f32, 0.25, 0.5, 0.75])),
+                ClearValue::DepthStencil(gfx_hal::command::ClearDepthStencil(1.0, 0)),
+            ];
             buffer.begin(false);
             for strtex in s.streaming_textures.iter() {
                 let image_barrier = memory::Barrier::Image {
@@ -615,8 +685,7 @@ fn draw_frame_internal<T>(
                         0,
                         &*(view.as_ptr() as *const [u32; 16]),
                     );
-                    let buffers: ArrayVec<[_; 1]> =
-                        [(&quads.quads_buffer, 0)].into();
+                    let buffers: ArrayVec<[_; 1]> = [(&quads.quads_buffer, 0)].into();
                     enc.bind_vertex_buffers(0, buffers);
                     enc.bind_index_buffer(gfx_hal::buffer::IndexBufferView {
                         buffer: &quads.quads_buffer_indices,
@@ -1032,6 +1101,8 @@ mod tests {
     use std::f32::consts::PI;
 
     static LOGO: &[u8] = include_bytes!["../../assets/images/logo.png"];
+    static FOREST: &[u8] = include_bytes!["../../assets/images/forest-light.png"];
+    static TREE: &[u8] = include_bytes!["../../assets/images/treetest.png"];
 
     // ---
 
@@ -1777,58 +1848,38 @@ mod tests {
     }
 
     #[test]
-    fn streaming_texture_world_with_minimap() {
+    fn three_layer_scene() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
-        let id = add_streaming_texture(&mut windowing, 800, 600, &mut logger);
+        let forest = add_texture(&mut windowing, FOREST, &mut logger);
+        let player = add_texture(&mut windowing, LOGO, &mut logger);
+        let tree = add_texture(&mut windowing, TREE, &mut logger);
 
-        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id, &mut logger);
-
-        streaming_texture_add_sprite(
+        add_sprite(&mut windowing, Sprite::default(), &forest, &mut logger);
+        add_sprite(
             &mut windowing,
-            strtex::Sprite {
-                scale: 0.2,
-                colors: [
-                    (127, 127, 127, 127),
-                    (127, 127, 127, 127),
-                    (127, 127, 127, 127),
-                    (127, 127, 127, 127),
-                ],
-                translation: (-0.8, -0.8),
-                ..strtex::Sprite::default()
+            Sprite {
+                scale: 0.4,
+                ..Sprite::default()
             },
-            id,
+            &player,
+            &mut logger,
+        );
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (-0.3, 0.0),
+                scale: 0.4,
+                ..Sprite::default()
+            },
+            &tree,
             &mut logger,
         );
 
-        strtex::streaming_texture_set_pixels_block(
-            &mut windowing,
-            id,
-            (50, 50),
-            (50, 50),
-            (0, 255, 0, 255),
-        );
-
-        strtex::streaming_texture_set_pixels_block(
-            &mut windowing,
-            id,
-            (500, 200),
-            (50, 80),
-            (255, 0, 0, 255),
-        );
-
-        strtex::streaming_texture_set_pixels_block(
-            &mut windowing,
-            id,
-            (75, 100),
-            (25, 50),
-            (0, 0, 255, 255),
-        );
-
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        assert_swapchain_eq(&mut windowing, "streaming_texture_blocks_off_by_one", img);
+        assert_swapchain_eq(&mut windowing, "three_layer_scene", img);
     }
 
     // ---

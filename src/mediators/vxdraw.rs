@@ -544,13 +544,12 @@ pub fn add_sprite(s: &mut Windowing, sprite: Sprite, texture: usize, log: &mut L
     tex.count - 1
 }
 
-pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
+pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) -> usize {
     let (texture_vertex_buffer, texture_vertex_memory, texture_vertex_requirements) =
         make_vertex_buffer_with_data(s, &[0f32; 9 * 4 * 1000]);
 
     let device = &s.device;
 
-    let img_data = include_bytes!["../../assets/images/logo.png"];
     let img = load_image::load_from_memory_with_format(&img_data[..], load_image::PNG)
         .unwrap()
         .to_rgba();
@@ -1566,6 +1565,8 @@ mod tests {
     use cgmath::{Deg, Vector3};
     use rand_pcg::Pcg64Mcg as random;
 
+    static LOGO: &[u8] = include_bytes!["../../assets/images/logo.png"];
+
     // ---
 
     fn add_windmills(windowing: &mut Windowing, rand_rotat: bool) -> Vec<DebugTriangleHandle> {
@@ -1962,7 +1963,7 @@ mod tests {
     fn simple_texture() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(&mut windowing, &mut logger);
+        let tex = add_texture(&mut windowing, LOGO, &mut logger);
         add_sprite(&mut windowing, Sprite::default(), tex, &mut logger);
 
         let prspect = gen_perspective(&mut windowing);
@@ -1974,7 +1975,7 @@ mod tests {
     fn colored_simple_texture() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(&mut windowing, &mut logger);
+        let tex = add_texture(&mut windowing, LOGO, &mut logger);
         add_sprite(
             &mut windowing,
             Sprite {
@@ -1999,7 +2000,7 @@ mod tests {
     fn many_sprites() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(&mut windowing, &mut logger);
+        let tex = add_texture(&mut windowing, LOGO, &mut logger);
         for i in 0..360 {
             add_sprite(
                 &mut windowing,
@@ -2059,7 +2060,7 @@ mod tests {
     fn bench_many_sprites(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(&mut windowing, &mut logger);
+        let tex = add_texture(&mut windowing, LOGO, &mut logger);
         for i in 0..500 {
             add_sprite(
                 &mut windowing,

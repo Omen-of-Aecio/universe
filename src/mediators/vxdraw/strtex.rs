@@ -30,6 +30,34 @@ use std::mem::{size_of, ManuallyDrop};
 
 // ---
 
+pub struct Sprite {
+    pub width: f32,
+    pub height: f32,
+    pub colors: [(u8, u8, u8, u8); 4],
+    pub uv_begin: (f32, f32),
+    pub uv_end: (f32, f32),
+    pub translation: (f32, f32),
+    pub rotation: f32,
+    pub scale: f32,
+}
+
+impl Default for Sprite {
+    fn default() -> Self {
+        Sprite {
+            width: 2.0,
+            height: 2.0,
+            colors: [(0, 0, 0, 255); 4],
+            uv_begin: (0.0, 0.0),
+            uv_end: (1.0, 1.0),
+            translation: (0.0, 0.0),
+            rotation: 0.0,
+            scale: 1.0,
+        }
+    }
+}
+
+// ---
+
 pub fn add_streaming_texture(
     s: &mut Windowing,
     w: usize,
@@ -436,7 +464,7 @@ pub fn add_streaming_texture(
     unsafe {
         let barrier_fence = s.device.create_fence(false).expect("unable to make fence");
         // TODO Use a proper command buffer here
-        s.device.wait_idle();
+        s.device.wait_idle().unwrap();
         let buffer = &mut s.command_buffers[s.current_frame];
         buffer.begin(false);
         {
@@ -463,11 +491,13 @@ pub fn add_streaming_texture(
         }
         buffer.finish();
         s.queue_group.queues[0].submit_nosemaphores(Some(&*buffer), Some(&barrier_fence));
-        s.device.wait_for_fence(&barrier_fence, u64::max_value());
+        s.device
+            .wait_for_fence(&barrier_fence, u64::max_value())
+            .unwrap();
         s.device.destroy_fence(barrier_fence);
     }
 
-    s.streaming_textures.push(StreamingTexture {
+    s.strtexs.push(StreamingTexture {
         count: 0,
 
         width: w as u32,
@@ -495,38 +525,12 @@ pub fn add_streaming_texture(
         pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
         render_pass: ManuallyDrop::new(triangle_render_pass),
     });
-    s.streaming_textures.len() - 1
-}
-
-pub struct Sprite {
-    pub width: f32,
-    pub height: f32,
-    pub colors: [(u8, u8, u8, u8); 4],
-    pub uv_begin: (f32, f32),
-    pub uv_end: (f32, f32),
-    pub translation: (f32, f32),
-    pub rotation: f32,
-    pub scale: f32,
-}
-
-impl Default for Sprite {
-    fn default() -> Self {
-        Sprite {
-            width: 2.0,
-            height: 2.0,
-            colors: [(0, 0, 0, 255); 4],
-            uv_begin: (0.0, 0.0),
-            uv_end: (1.0, 1.0),
-            translation: (0.0, 0.0),
-            rotation: 0.0,
-            scale: 1.0,
-        }
-    }
+    s.strtexs.len() - 1
 }
 
 /// Add a sprite (a rectangular view of a texture) to the system
 pub fn streaming_texture_add_sprite(s: &mut Windowing, sprite: Sprite, texture: usize) -> usize {
-    let tex = &mut s.streaming_textures[texture];
+    let tex = &mut s.strtexs[texture];
     let device = &s.device;
 
     // Derive xy from the sprite's initial UV
@@ -602,12 +606,14 @@ pub fn streaming_texture_add_sprite(s: &mut Windowing, sprite: Sprite, texture: 
     (tex.count - 1) as usize
 }
 
+// ---
+
 pub fn streaming_texture_set_pixels(
     s: &mut Windowing,
     id: usize,
     modifier: impl Iterator<Item = (u32, u32, (u8, u8, u8, u8))>,
 ) {
-    if let Some(ref strtex) = s.streaming_textures.get(id) {
+    if let Some(ref strtex) = s.strtexs.get(id) {
         unsafe {
             let foot = s.device.get_image_subresource_footprint(
                 &strtex.image_buffer,
@@ -657,7 +663,7 @@ pub fn streaming_texture_set_pixels_block(
     wh: (u32, u32),
     color: (u8, u8, u8, u8),
 ) {
-    if let Some(ref strtex) = s.streaming_textures.get(id) {
+    if let Some(ref strtex) = s.strtexs.get(id) {
         if start.0 + wh.0 > strtex.width || start.1 + wh.1 > strtex.height {
             return;
         }
@@ -726,7 +732,7 @@ pub fn streaming_texture_set_pixel(
     h: u32,
     color: (u8, u8, u8, u8),
 ) {
-    if let Some(ref strtex) = s.streaming_textures.get(id) {
+    if let Some(ref strtex) = s.strtexs.get(id) {
         if !(w < strtex.width && h < strtex.height) {
             return;
         }

@@ -606,7 +606,7 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions) 
         texture_vertex_requirements_indices,
     ) = make_index_buffer_with_data(s, &[0f32; 4 * 1000]);
 
-    s.simple_textures.push(SingleTexture {
+    s.dyntexs.push(SingleTexture {
         count: 0,
 
         texture_vertex_buffer: ManuallyDrop::new(texture_vertex_buffer),
@@ -630,12 +630,12 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions) 
         pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
         render_pass: ManuallyDrop::new(triangle_render_pass),
     });
-    TextureHandle(s.simple_textures.len() - 1)
+    TextureHandle(s.dyntexs.len() - 1)
 }
 
 /// Add a sprite (a rectangular view of a texture) to the system
 pub fn add_sprite(s: &mut Windowing, sprite: Sprite, texture: &TextureHandle) -> SpriteHandle {
-    let tex = &mut s.simple_textures[texture.0];
+    let tex = &mut s.dyntexs[texture.0];
     let device = &s.device;
 
     // Derive xy from the sprite's initial UV
@@ -719,7 +719,7 @@ pub fn add_sprite(s: &mut Windowing, sprite: Sprite, texture: &TextureHandle) ->
 /// Translate all sprites that depend on a given texture
 pub fn sprite_translate_all(s: &mut Windowing, tex: &TextureHandle, dxdy: (f32, f32)) {
     let device = &s.device;
-    if let Some(ref mut stex) = s.simple_textures.get(tex.0) {
+    if let Some(ref mut stex) = s.dyntexs.get(tex.0) {
         unsafe {
             device
                 .wait_for_fences(
@@ -754,17 +754,13 @@ pub fn sprite_translate_all(s: &mut Windowing, tex: &TextureHandle, dxdy: (f32, 
             for (i, prev_dxdy) in vertices.iter().enumerate() {
                 let mut idx = (i * 10 * 4) as usize;
                 let new_dxdy = (prev_dxdy.0 + dxdy.0, prev_dxdy.1 + dxdy.1);
-                data_target[idx + 5..idx + 7]
-                    .copy_from_slice(&[new_dxdy.0, new_dxdy.1]);
+                data_target[idx + 5..idx + 7].copy_from_slice(&[new_dxdy.0, new_dxdy.1]);
                 idx += 10;
-                data_target[idx + 5..idx + 7]
-                    .copy_from_slice(&[new_dxdy.0, new_dxdy.1]);
+                data_target[idx + 5..idx + 7].copy_from_slice(&[new_dxdy.0, new_dxdy.1]);
                 idx += 10;
-                data_target[idx + 5..idx + 7]
-                    .copy_from_slice(&[new_dxdy.0, new_dxdy.1]);
+                data_target[idx + 5..idx + 7].copy_from_slice(&[new_dxdy.0, new_dxdy.1]);
                 idx += 10;
-                data_target[idx + 5..idx + 7]
-                    .copy_from_slice(&[new_dxdy.0, new_dxdy.1]);
+                data_target[idx + 5..idx + 7].copy_from_slice(&[new_dxdy.0, new_dxdy.1]);
             }
             device
                 .release_mapping_writer(data_target)
@@ -776,7 +772,7 @@ pub fn sprite_translate_all(s: &mut Windowing, tex: &TextureHandle, dxdy: (f32, 
 /// Rotate all sprites that depend on a given texture
 pub fn sprite_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, tex: &TextureHandle, deg: T) {
     let device = &s.device;
-    if let Some(ref mut stex) = s.simple_textures.get(tex.0) {
+    if let Some(ref mut stex) = s.dyntexs.get(tex.0) {
         unsafe {
             device
                 .wait_for_fences(

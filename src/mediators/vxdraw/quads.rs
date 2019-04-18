@@ -12,18 +12,7 @@ use gfx_backend_gl as back;
 use gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 use gfx_backend_vulkan as back;
-use gfx_hal::{
-    device::Device,
-    format, image, pass,
-    pso::{
-        self, AttributeDesc, BakedStates, BasePipeline, BlendDesc, BlendOp, BlendState,
-        ColorBlendDesc, ColorMask, DepthStencilDesc, DepthTest, DescriptorSetLayoutBinding,
-        Element, Face, Factor, FrontFace, GraphicsPipelineDesc, InputAssemblerDesc, LogicOp,
-        PipelineCreationFlags, PolygonMode, Rasterizer, ShaderStageFlags, StencilTest,
-        VertexBufferDesc, Viewport,
-    },
-    Backend, Primitive,
-};
+use gfx_hal::{device::Device, format, image, pass, pso, Backend, Primitive};
 use logger::Logger;
 use std::io::Read;
 use std::mem::{size_of, transmute, ManuallyDrop};
@@ -60,17 +49,17 @@ impl Default for Quad {
 // ---
 
 const PTS_PER_QUAD: usize = 4;
-const XY_COMPNTS: usize = 3;
+const CART_CMPNTS: usize = 3;
 const COLOR_CMPNTS: usize = 4;
 const DELTA_CMPNTS: usize = 2;
 const ROT_CMPNTS: usize = 1;
 const SCALE_CMPNTS: usize = 1;
-const QUAD_BYTE_SIZE: usize = PTS_PER_QUAD
-    * (size_of::<f32>() * XY_COMPNTS
-        + size_of::<u8>() * COLOR_CMPNTS
-        + size_of::<f32>() * DELTA_CMPNTS
-        + size_of::<f32>() * ROT_CMPNTS
-        + size_of::<f32>() * SCALE_CMPNTS);
+const BYTES_PER_VTX: usize = size_of::<f32>() * CART_CMPNTS
+    + size_of::<u8>() * COLOR_CMPNTS
+    + size_of::<f32>() * DELTA_CMPNTS
+    + size_of::<f32>() * ROT_CMPNTS
+    + size_of::<f32>() * SCALE_CMPNTS;
+const QUAD_BYTE_SIZE: usize = PTS_PER_QUAD * BYTES_PER_VTX;
 
 // ---
 
@@ -253,76 +242,76 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
         geometry: None,
         fragment: Some(fs_entry),
     };
-    let input_assembler = InputAssemblerDesc::new(Primitive::TriangleList);
+    let input_assembler = pso::InputAssemblerDesc::new(Primitive::TriangleList);
 
-    let vertex_buffers: Vec<VertexBufferDesc> = vec![VertexBufferDesc {
+    let vertex_buffers: Vec<pso::VertexBufferDesc> = vec![pso::VertexBufferDesc {
         binding: 0,
-        stride: (QUAD_BYTE_SIZE / PTS_PER_QUAD) as u32,
+        stride: BYTES_PER_VTX as u32,
         rate: 0,
     }];
-    let attributes: Vec<AttributeDesc> = vec![
-        AttributeDesc {
+    let attributes: Vec<pso::AttributeDesc> = vec![
+        pso::AttributeDesc {
             location: 0,
             binding: 0,
-            element: Element {
+            element: pso::Element {
                 format: format::Format::Rgb32Float,
                 offset: 0,
             },
         },
-        AttributeDesc {
+        pso::AttributeDesc {
             location: 1,
             binding: 0,
-            element: Element {
+            element: pso::Element {
                 format: format::Format::Rgba8Unorm,
                 offset: 12,
             },
         },
-        AttributeDesc {
+        pso::AttributeDesc {
             location: 2,
             binding: 0,
-            element: Element {
+            element: pso::Element {
                 format: format::Format::Rg32Float,
                 offset: 16,
             },
         },
-        AttributeDesc {
+        pso::AttributeDesc {
             location: 3,
             binding: 0,
-            element: Element {
+            element: pso::Element {
                 format: format::Format::R32Float,
                 offset: 24,
             },
         },
-        AttributeDesc {
+        pso::AttributeDesc {
             location: 4,
             binding: 0,
-            element: Element {
+            element: pso::Element {
                 format: format::Format::R32Float,
                 offset: 28,
             },
         },
     ];
 
-    let rasterizer = Rasterizer {
+    let rasterizer = pso::Rasterizer {
         depth_clamping: false,
-        polygon_mode: PolygonMode::Fill,
-        cull_face: Face::NONE,
-        front_face: FrontFace::Clockwise,
+        polygon_mode: pso::PolygonMode::Fill,
+        cull_face: pso::Face::NONE,
+        front_face: pso::FrontFace::Clockwise,
         depth_bias: None,
         conservative: false,
     };
 
-    let depth_stencil = DepthStencilDesc {
+    let depth_stencil = pso::DepthStencilDesc {
         depth: pso::DepthTest::On {
             fun: pso::Comparison::Less,
             write: true,
         },
         depth_bounds: false,
-        stencil: StencilTest::Off,
+        stencil: pso::StencilTest::Off,
     };
     let blender = {
-        let blend_state = BlendState::On {
-            color: BlendOp::Add {
+        let blend_state = pso::BlendState::On {
+            color: pso::BlendOp::Add {
                 src: pso::Factor::SrcAlpha,
                 dst: pso::Factor::OneMinusSrcAlpha,
             },
@@ -331,9 +320,9 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
                 dst: pso::Factor::OneMinusSrcAlpha,
             },
         };
-        BlendDesc {
-            logic_op: Some(LogicOp::Copy),
-            targets: vec![ColorBlendDesc(ColorMask::ALL, blend_state)],
+        pso::BlendDesc {
+            logic_op: Some(pso::LogicOp::Copy),
+            targets: vec![pso::ColorBlendDesc(pso::ColorMask::ALL, blend_state)],
         }
     };
     let extent = image::Extent {
@@ -379,8 +368,8 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
         }
         .expect("Can't create render pass")
     };
-    let baked_states = BakedStates {
-        viewport: Some(Viewport {
+    let baked_states = pso::BakedStates {
+        viewport: Some(pso::Viewport {
             rect: extent,
             depth: (0.0..1.0),
         }),
@@ -388,7 +377,7 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
         blend_color: None,
         depth_bounds: None,
     };
-    let bindings = Vec::<DescriptorSetLayoutBinding>::new();
+    let bindings = Vec::<pso::DescriptorSetLayoutBinding>::new();
     let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
     let quad_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
         vec![unsafe {
@@ -396,8 +385,8 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
                 .create_descriptor_set_layout(bindings, immutable_samplers)
                 .expect("Couldn't make a DescriptorSetLayout")
         }];
-    let mut push_constants = Vec::<(ShaderStageFlags, core::ops::Range<u32>)>::new();
-    push_constants.push((ShaderStageFlags::VERTEX, 0..16));
+    let mut push_constants = Vec::<(pso::ShaderStageFlags, std::ops::Range<u32>)>::new();
+    push_constants.push((pso::ShaderStageFlags::VERTEX, 0..16));
 
     let quad_pipeline_layout = unsafe {
         s.device
@@ -406,7 +395,7 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
     };
 
     // Describe the pipeline (rasterization, quad interpretation)
-    let pipeline_desc = GraphicsPipelineDesc {
+    let pipeline_desc = pso::GraphicsPipelineDesc {
         shaders: shader_entries,
         rasterizer,
         vertex_buffers,
@@ -421,8 +410,8 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
             index: 0,
             main_pass: &quad_render_pass,
         },
-        flags: PipelineCreationFlags::empty(),
-        parent: BasePipeline::None,
+        flags: pso::PipelineCreationFlags::empty(),
+        parent: pso::BasePipeline::None,
     };
 
     let quad_pipeline = unsafe {

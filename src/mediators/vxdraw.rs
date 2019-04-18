@@ -500,8 +500,8 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         surf,
         swapchain: ManuallyDrop::new(swapchain),
         swapconfig: swap_config,
-        streaming_textures: vec![],
-        simple_textures: vec![],
+        strtexs: vec![],
+        dyntexs: vec![],
         quads: None,
         depth_images,
         depth_image_views,
@@ -570,7 +570,7 @@ fn draw_frame_internal<T>(
 
         {
             let current_frame = s.current_frame;
-            let texture_count = s.simple_textures.len();
+            let texture_count = s.dyntexs.len();
             let debugtris_cnt = s.debug_triangles.as_ref().map_or(0, |x| x.triangles_count);
             trace![log, "vxdraw", "Drawing frame"; "swapchain image" => swap_image, "flight" => current_frame, "textures" => texture_count, "debug triangles" => debugtris_cnt];
         }
@@ -582,7 +582,7 @@ fn draw_frame_internal<T>(
                 ClearValue::DepthStencil(gfx_hal::command::ClearDepthStencil(1.0, 0)),
             ];
             buffer.begin(false);
-            for strtex in s.streaming_textures.iter() {
+            for strtex in s.strtexs.iter() {
                 let image_barrier = memory::Barrier::Image {
                     states: (image::Access::empty(), image::Layout::General)
                         ..(
@@ -628,7 +628,7 @@ fn draw_frame_internal<T>(
                     clear_values.iter(),
                 );
 
-                for strtex in s.streaming_textures.iter() {
+                for strtex in s.strtexs.iter() {
                     enc.bind_graphics_pipeline(&strtex.pipeline);
                     enc.push_graphics_constants(
                         &strtex.pipeline_layout,
@@ -652,29 +652,28 @@ fn draw_frame_internal<T>(
                     enc.draw_indexed(0..strtex.count * 6, 0, 0..1);
                 }
 
-                for simple_tex in s.simple_textures.iter() {
-                    enc.bind_graphics_pipeline(&simple_tex.pipeline);
+                for dyntex in s.dyntexs.iter() {
+                    enc.bind_graphics_pipeline(&dyntex.pipeline);
                     enc.push_graphics_constants(
-                        &simple_tex.pipeline_layout,
+                        &dyntex.pipeline_layout,
                         ShaderStageFlags::VERTEX,
                         0,
                         &*(view.as_ptr() as *const [u32; 16]),
                     );
                     enc.bind_graphics_descriptor_sets(
-                        &simple_tex.pipeline_layout,
+                        &dyntex.pipeline_layout,
                         0,
-                        Some(&*simple_tex.descriptor_set),
+                        Some(&*dyntex.descriptor_set),
                         &[],
                     );
-                    let buffers: ArrayVec<[_; 1]> =
-                        [(&*simple_tex.texture_vertex_buffer, 0)].into();
+                    let buffers: ArrayVec<[_; 1]> = [(&*dyntex.texture_vertex_buffer, 0)].into();
                     enc.bind_vertex_buffers(0, buffers);
                     enc.bind_index_buffer(gfx_hal::buffer::IndexBufferView {
-                        buffer: &simple_tex.texture_vertex_buffer_indices,
+                        buffer: &dyntex.texture_vertex_buffer_indices,
                         offset: 0,
                         index_type: gfx_hal::IndexType::U16,
                     });
-                    enc.draw_indexed(0..simple_tex.count * 6, 0, 0..1);
+                    enc.draw_indexed(0..dyntex.count * 6, 0, 0..1);
                 }
 
                 if let Some(ref quads) = s.quads {
@@ -1493,7 +1492,7 @@ mod tests {
         let tree = add_texture(&mut windowing, TREE, TextureOptions::default());
         let logo = add_texture(&mut windowing, LOGO, TextureOptions::default());
 
-        let mut sprite = Sprite {
+        let sprite = Sprite {
             scale: 0.5,
             ..Sprite::default()
         };
@@ -1705,7 +1704,6 @@ mod tests {
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         assert_swapchain_eq(&mut windowing, "translated_texture", img);
     }
-
 
     #[test]
     fn rotated_texture() {

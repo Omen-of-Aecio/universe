@@ -103,8 +103,8 @@ pub struct Windowing {
 
     pub events_loop: winit::EventsLoop,
 
-    pub streaming_textures: Vec<StreamingTexture>,
-    pub simple_textures: Vec<SingleTexture>,
+    pub strtexs: Vec<StreamingTexture>,
+    pub dyntexs: Vec<SingleTexture>,
     pub quads: Option<ColoredQuadList>,
     pub debug_triangles: Option<ColoredTriangleList>,
     //
@@ -233,7 +233,7 @@ impl Drop for Windowing {
             self.device
                 .destroy_swapchain(ManuallyDrop::into_inner(read(&self.swapchain)));
 
-            for mut simple_tex in self.simple_textures.drain(..) {
+            for mut simple_tex in self.dyntexs.drain(..) {
                 self.device.destroy_buffer(ManuallyDrop::into_inner(read(
                     &simple_tex.texture_vertex_buffer_indices,
                 )));
@@ -275,7 +275,7 @@ impl Drop for Windowing {
                     .destroy_image_view(ManuallyDrop::into_inner(read(&simple_tex.image_view)));
             }
 
-            for mut strtex in self.streaming_textures.drain(..) {
+            for mut strtex in self.strtexs.drain(..) {
                 self.device.destroy_buffer(ManuallyDrop::into_inner(read(
                     &strtex.vertex_buffer_indices,
                 )));

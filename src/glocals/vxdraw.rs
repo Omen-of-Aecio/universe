@@ -79,6 +79,24 @@ pub struct ColoredTriangleList {
     pub render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
 }
 
+pub struct ColoredQuadList {
+    pub capacity: u64,
+    pub count: usize,
+
+    pub quads_buffer: <back::Backend as Backend>::Buffer,
+    pub quads_memory: <back::Backend as Backend>::Memory,
+    pub memory_requirements: gfx_hal::memory::Requirements,
+
+    pub quads_buffer_indices: <back::Backend as Backend>::Buffer,
+    pub quads_memory_indices: <back::Backend as Backend>::Memory,
+    pub quads_requirements_indices: gfx_hal::memory::Requirements,
+
+    pub descriptor_set: Vec<<back::Backend as Backend>::DescriptorSetLayout>,
+    pub pipeline: ManuallyDrop<<back::Backend as Backend>::GraphicsPipeline>,
+    pub pipeline_layout: ManuallyDrop<<back::Backend as Backend>::PipelineLayout>,
+    pub render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
+}
+
 pub struct Windowing {
     #[cfg(not(feature = "gl"))]
     pub window: winit::Window,
@@ -87,6 +105,7 @@ pub struct Windowing {
 
     pub streaming_textures: Vec<StreamingTexture>,
     pub simple_textures: Vec<SingleTexture>,
+    pub quads: Option<ColoredQuadList>,
     pub debug_triangles: Option<ColoredTriangleList>,
     //
     pub current_frame: usize,
@@ -170,6 +189,28 @@ impl Drop for Windowing {
                 self.device
                     .destroy_render_pass(ManuallyDrop::into_inner(read(
                         &debug_triangles.render_pass,
+                    )));
+            }
+
+            if let Some(mut quads) = self.quads.take() {
+                self.device.destroy_buffer(quads.quads_buffer);
+                self.device.free_memory(quads.quads_memory);
+                self.device.destroy_buffer(quads.quads_buffer_indices);
+                self.device.free_memory(quads.quads_memory_indices);
+                for dsl in quads.descriptor_set.drain(..) {
+                    self.device.destroy_descriptor_set_layout(dsl);
+                }
+                self.device
+                    .destroy_graphics_pipeline(ManuallyDrop::into_inner(read(
+                        &quads.pipeline,
+                    )));
+                self.device
+                    .destroy_pipeline_layout(ManuallyDrop::into_inner(read(
+                        &quads.pipeline_layout,
+                    )));
+                self.device
+                    .destroy_render_pass(ManuallyDrop::into_inner(read(
+                        &quads.render_pass,
                     )));
             }
 

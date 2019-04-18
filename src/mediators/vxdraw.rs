@@ -38,11 +38,13 @@ use winit::{dpi::LogicalSize, Event, EventsLoop, WindowBuilder};
 pub mod debtri;
 pub mod dyntex;
 pub mod strtex;
+pub mod quads;
 pub mod utils;
 
 use debtri::*;
 use dyntex::*;
 use strtex::{add_streaming_texture, streaming_texture_add_sprite};
+use quads::*;
 use utils::*;
 
 // ---
@@ -435,12 +437,14 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         swapconfig: swap_config,
         streaming_textures: vec![],
         simple_textures: vec![],
+        quads: None,
         #[cfg(not(feature = "gl"))]
         vk_inst: ManuallyDrop::new(vk_inst),
         #[cfg(not(feature = "gl"))]
         window,
     };
     create_debug_triangle(&mut windowing, log);
+    create_quad(&mut windowing, log);
     windowing
 }
 
@@ -601,6 +605,25 @@ fn draw_frame_internal<T>(
                         index_type: gfx_hal::IndexType::U16,
                     });
                     enc.draw_indexed(0..simple_tex.count * 6, 0, 0..1);
+                }
+
+                if let Some(ref quads) = s.quads {
+                    enc.bind_graphics_pipeline(&quads.pipeline);
+                    enc.push_graphics_constants(
+                        &quads.pipeline_layout,
+                        ShaderStageFlags::VERTEX,
+                        0,
+                        &*(view.as_ptr() as *const [u32; 16]),
+                    );
+                    let buffers: ArrayVec<[_; 1]> =
+                        [(&quads.quads_buffer, 0)].into();
+                    enc.bind_vertex_buffers(0, buffers);
+                    enc.bind_index_buffer(gfx_hal::buffer::IndexBufferView {
+                        buffer: &quads.quads_buffer_indices,
+                        offset: 0,
+                        index_type: gfx_hal::IndexType::U16,
+                    });
+                    enc.draw_indexed(0..quads.count as u32 * 6, 0, 0..1);
                 }
 
                 if let Some(ref debug_triangles) = s.debug_triangles {
@@ -1203,6 +1226,22 @@ mod tests {
         assert_swapchain_eq(&mut windowing, "simple_triangle", img);
     }
 
+    #[test]
+    fn simple_quad() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&mut windowing);
+        let tri = DebugTriangle::default();
+
+        let mut quad = Quad::default();
+        quad.colors[0].1 = 255;
+        quad.colors[3].1 = 255;
+
+        quad_push(&mut windowing, quad);
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "simple_quad", img);
+    }
     #[test]
     fn simple_triangle_change_color() {
         let mut logger = Logger::spawn_void();

@@ -374,10 +374,9 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         present_wait_semaphores.push(device.create_semaphore().expect("Can't create semaphore"));
     }
 
-    let mut acquire_image_semaphores = vec![];
-    for _ in 0..image_count {
-        acquire_image_semaphores.push(device.create_semaphore().expect("Can't create semaphore"));
-    }
+    let acquire_image_semaphores = (0..image_count)
+        .map(|_| device.create_semaphore().expect("Can't create semaphore"))
+        .collect::<Vec<_>>();
 
     {
         let count = frame_render_fences.len();
@@ -389,6 +388,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
             .create_command_pool_typed(&queue_group, pool::CommandPoolCreateFlags::RESET_INDIVIDUAL)
             .unwrap()
     };
+
     let command_buffers: Vec<_> = framebuffers
         .iter()
         .map(|_| command_pool.acquire_command_buffer::<command::MultiShot>())
@@ -396,6 +396,11 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
 
     let mut windowing = Windowing {
         acquire_image_semaphores,
+        acquire_image_semaphore_free: ManuallyDrop::new(
+            device
+                .create_semaphore()
+                .expect("Unable to create semaphore"),
+        ),
         adapter,
         backbuffer,
         command_buffers,
@@ -1072,13 +1077,14 @@ fn draw_frame_internal<T>(
     postproc: fn(&mut Windowing, gfx_hal::window::SwapImageIndex) -> T,
 ) -> T {
     let postproc_res = unsafe {
-        let image_index = s
+        let swap_image = s
             .swapchain
             .acquire_image(
                 u64::max_value(),
-                FrameSync::Semaphore(&s.acquire_image_semaphores[s.current_frame]),
+                FrameSync::Semaphore(&*s.acquire_image_semaphore_free),
             )
             .unwrap();
+
         s.device
             .wait_for_fence(&s.frame_render_fences[s.current_frame], u64::max_value())
             .unwrap();
@@ -1086,11 +1092,16 @@ fn draw_frame_internal<T>(
             .reset_fence(&s.frame_render_fences[s.current_frame])
             .unwrap();
 
+        core::mem::swap(
+            &mut *s.acquire_image_semaphore_free,
+            &mut s.acquire_image_semaphores[s.current_frame],
+        );
+
         {
             let current_frame = s.current_frame;
             let texture_count = s.simple_textures.len();
             let debugtris_cnt = s.debug_triangles.as_ref().map_or(0, |x| x.triangles_count);
-            trace![log, "vxdraw", "Drawing frame"; "swapchain image" => image_index, "flight" => current_frame, "textures" => texture_count, "debug triangles" => debugtris_cnt];
+            trace![log, "vxdraw", "Drawing frame"; "swapchain image" => swap_image, "flight" => current_frame, "textures" => texture_count, "debug triangles" => debugtris_cnt];
         }
 
         {
@@ -1102,7 +1113,7 @@ fn draw_frame_internal<T>(
             {
                 let mut enc = buffer.begin_render_pass_inline(
                     &s.render_pass,
-                    &s.framebuffers[image_index as usize],
+                    &s.framebuffers[swap_image as usize],
                     s.render_area,
                     clear_values.iter(),
                 );
@@ -1142,7 +1153,7 @@ fn draw_frame_internal<T>(
 
         let command_buffers = &s.command_buffers[s.current_frame];
         let wait_semaphores: ArrayVec<[_; 1]> = [(
-            &s.acquire_image_semaphores[s.current_frame],
+            &s.acquire_image_semaphores[swap_image as usize],
             PipelineStage::COLOR_ATTACHMENT_OUTPUT,
         )]
         .into();
@@ -1157,13 +1168,13 @@ fn draw_frame_internal<T>(
             s.queue_group.queues[0]
                 .submit(submission, Some(&s.frame_render_fences[s.current_frame]));
         }
-        let postproc_res = postproc(s, image_index);
+        let postproc_res = postproc(s, swap_image);
         let present_wait_semaphore = &s.present_wait_semaphores[s.current_frame];
         let present_wait_semaphores: ArrayVec<[_; 1]> = [present_wait_semaphore].into();
         s.swapchain
             .present(
                 &mut s.queue_group.queues[0],
-                image_index,
+                swap_image,
                 present_wait_semaphores,
             )
             .unwrap();

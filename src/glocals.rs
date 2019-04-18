@@ -139,6 +139,7 @@ pub struct Windowing {
     pub render_area: gfx_hal::pso::Rect,
 
     pub frame_render_fences: Vec<<back::Backend as Backend>::Fence>,
+    pub acquire_image_semaphore_free: ManuallyDrop<<back::Backend as Backend>::Semaphore>,
     pub acquire_image_semaphores: Vec<<back::Backend as Backend>::Semaphore>,
     pub present_wait_semaphores: Vec<<back::Backend as Backend>::Semaphore>,
     pub command_pool: ManuallyDrop<gfx_hal::pool::CommandPool<back::Backend, gfx_hal::Graphics>>,
@@ -186,6 +187,9 @@ impl Drop for Windowing {
             for iv in self.image_views.drain(..) {
                 self.device.destroy_image_view(iv);
             }
+            self.device.destroy_semaphore(ManuallyDrop::into_inner(read(
+                &self.acquire_image_semaphore_free,
+            )));
         }
 
         unsafe {

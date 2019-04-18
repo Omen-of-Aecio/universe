@@ -3,4 +3,4 @@
 	url = https://github.com/BourgondAries/universe-assets
 [submodule "crates/config"]
 	path = crates/config
-	url = git@github.com:Ploppz/config.git
+	url = https://github.com/Ploppz/config.git

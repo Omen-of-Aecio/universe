@@ -1302,7 +1302,6 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
-        let tri = DebugTriangle::default();
 
         let mut quad = Quad::default();
         quad.colors[0].1 = 255;
@@ -1432,6 +1431,54 @@ mod tests {
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         assert_swapchain_eq(&mut windowing, "a_bunch_of_quads", img);
+    }
+
+    #[test]
+    fn overlapping_quads_respect_z_order() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&mut windowing);
+        let mut quad = Quad { scale: 0.5,..Quad::default() };
+
+        for i in 0..4 {
+            quad.colors[i] = (0, 255, 0, 255);
+        }
+        quad.depth = 0.0;
+        quad.translation = (0.25, 0.25);
+        quad_push(&mut windowing, quad);
+
+        for i in 0..4 {
+            quad.colors[i] = (255, 0, 0, 255);
+        }
+        quad.depth = 0.5;
+        quad.translation = (0.0, 0.0);
+        quad_push(&mut windowing, quad);
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "overlapping_quads_respect_z_order", img);
+
+        // ---
+
+        pop_n_quads(&mut windowing, 2);
+
+        // ---
+
+        for i in 0..4 {
+            quad.colors[i] = (255, 0, 0, 255);
+        }
+        quad.depth = 0.5;
+        quad.translation = (0.0, 0.0);
+        quad_push(&mut windowing, quad);
+
+        for i in 0..4 {
+            quad.colors[i] = (0, 255, 0, 255);
+        }
+        quad.depth = 0.0;
+        quad.translation = (0.25, 0.25);
+        quad_push(&mut windowing, quad);
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "overlapping_quads_respect_z_order", img);
     }
 
     #[test]

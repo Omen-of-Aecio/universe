@@ -36,6 +36,7 @@ pub struct QuadHandle(usize);
 pub struct Quad {
     pub width: f32,
     pub height: f32,
+    pub depth: f32,
     pub colors: [(u8, u8, u8, u8); 4],
     pub translation: (f32, f32),
     pub rotation: f32,
@@ -47,6 +48,7 @@ impl Default for Quad {
         Quad {
             width: 2.0,
             height: 2.0,
+            depth: 0.0,
             colors: [(0, 0, 0, 255); 4],
             translation: (0.0, 0.0),
             rotation: 0.0,
@@ -58,7 +60,7 @@ impl Default for Quad {
 // ---
 
 const PTS_PER_QUAD: usize = 4;
-const XY_COMPNTS: usize = 2;
+const XY_COMPNTS: usize = 3;
 const COLOR_CMPNTS: usize = 4;
 const DELTA_CMPNTS: usize = 2;
 const ROT_CMPNTS: usize = 1;
@@ -88,10 +90,10 @@ pub fn quad_push(s: &mut Windowing, quad: Quad) -> QuadHandle {
         let width = quad.width;
         let height = quad.height;
 
-        let topleft = (-width / 2f32, -height / 2f32);
-        let topright = (width / 2f32, -height / 2f32);
-        let bottomleft = (-width / 2f32, height / 2f32);
-        let bottomright = (width / 2f32, height / 2f32);
+        let topleft = (-width / 2f32, -height / 2f32, quad.depth);
+        let topright = (width / 2f32, -height / 2f32, quad.depth);
+        let bottomleft = (-width / 2f32, height / 2f32, quad.depth);
+        let bottomright = (width / 2f32, height / 2f32, quad.depth);
 
         unsafe {
             let mut data_target = device
@@ -122,25 +124,19 @@ pub fn quad_push(s: &mut Windowing, quad: Quad) -> QuadHandle {
                 .iter()
                 .enumerate()
             {
-                // pub width: f32,
-                // pub height: f32,
-                // pub colors: [(u8, u8, u8, u8); 4],
-                // pub translation: (f32, f32),
-                // pub rotation: f32,
-                // pub scale: f32,
-                let idx = i * 7;
+                let idx = (i+quads.count*4) * 8;
 
-                data_target[idx..idx + 2].copy_from_slice(&[point.0, point.1]);
-                data_target[idx + 2..idx + 3].copy_from_slice(&transmute::<[u8; 4], [f32; 1]>([
+                data_target[idx..idx + 3].copy_from_slice(&[point.0, point.1, point.2]);
+                data_target[idx + 3..idx + 4].copy_from_slice(&transmute::<[u8; 4], [f32; 1]>([
                     quad.colors[i].0,
                     quad.colors[i].1,
                     quad.colors[i].2,
                     quad.colors[i].3,
                 ]));
-                data_target[idx + 3..idx + 5]
+                data_target[idx + 4..idx + 6]
                     .copy_from_slice(&[quad.translation.0, quad.translation.1]);
-                data_target[idx + 5..idx + 6].copy_from_slice(&[quad.rotation]);
-                data_target[idx + 6..idx + 7].copy_from_slice(&[quad.scale]);
+                data_target[idx + 6..idx + 7].copy_from_slice(&[quad.rotation]);
+                data_target[idx + 7..idx + 8].copy_from_slice(&[quad.scale]);
             }
             quads.count += 1;
             device
@@ -154,41 +150,39 @@ pub fn quad_push(s: &mut Windowing, quad: Quad) -> QuadHandle {
 }
 
 pub fn quad_pop(s: &mut Windowing) {
-    unimplemented![]
-    // if let Some(ref mut quads) = s.quads {
-    //     unsafe {
-    //         s.device
-    //             .wait_for_fences(
-    //                 &s.frames_in_flight_fences,
-    //                 gfx_hal::device::WaitFor::All,
-    //                 u64::max_value(),
-    //             )
-    //             .expect("Unable to wait for fences");
-    //     }
-    //     quads.count -= 1;
-    // }
+    if let Some(ref mut quads) = s.quads {
+        unsafe {
+            s.device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+        }
+        quads.count -= 1;
+    }
 }
 
 pub fn pop_n_quads(s: &mut Windowing, n: usize) {
-    unimplemented!()
-    // if let Some(ref mut quads) = s.quads {
-    //     unsafe {
-    //         s.device
-    //             .wait_for_fences(
-    //                 &s.frames_in_flight_fences,
-    //                 gfx_hal::device::WaitFor::All,
-    //                 u64::max_value(),
-    //             )
-    //             .expect("Unable to wait for fences");
-    //     }
-    //     quads.count -= n;
-    // }
+    if let Some(ref mut quads) = s.quads {
+        unsafe {
+            s.device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+        }
+        quads.count -= n;
+    }
 }
 
 pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
     pub const VERTEX_SOURCE: &str = "#version 450
     #extension GL_ARG_separate_shader_objects : enable
-    layout (location = 0) in vec2 position;
+    layout (location = 0) in vec3 position;
     layout (location = 1) in vec4 color;
     layout (location = 2) in vec2 dxdy;
     layout (location = 3) in float rotation;
@@ -205,8 +199,8 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
     };
     void main() {
         mat2 rotmatrix = mat2(cos(rotation), -sin(rotation), sin(rotation), cos(rotation));
-        vec2 pos = rotmatrix * scale * position;
-        gl_Position = push_constant.view * vec4(pos + dxdy, 0.0, 1.0);
+        vec2 pos = rotmatrix * scale * position.xy;
+        gl_Position = push_constant.view * vec4(pos + dxdy, position.z, 1.0);
         outcolor = color;
     }";
 
@@ -271,7 +265,7 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
             location: 0,
             binding: 0,
             element: Element {
-                format: format::Format::Rg32Float,
+                format: format::Format::Rgb32Float,
                 offset: 0,
             },
         },
@@ -280,7 +274,7 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
             binding: 0,
             element: Element {
                 format: format::Format::Rgba8Unorm,
-                offset: 8,
+                offset: 12,
             },
         },
         AttributeDesc {
@@ -288,7 +282,7 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
             binding: 0,
             element: Element {
                 format: format::Format::Rg32Float,
-                offset: 12,
+                offset: 16,
             },
         },
         AttributeDesc {
@@ -296,7 +290,7 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
             binding: 0,
             element: Element {
                 format: format::Format::R32Float,
-                offset: 20,
+                offset: 24,
             },
         },
         AttributeDesc {
@@ -304,7 +298,7 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
             binding: 0,
             element: Element {
                 format: format::Format::R32Float,
-                offset: 24,
+                offset: 28,
             },
         },
     ];
@@ -336,7 +330,6 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
                 src: pso::Factor::One,
                 dst: pso::Factor::OneMinusSrcAlpha,
             },
-            // alpha: pso::BlendOp::Max,
         };
         BlendDesc {
             logic_op: Some(LogicOp::Copy),

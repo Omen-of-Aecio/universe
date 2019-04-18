@@ -10,6 +10,10 @@ use gfx_backend_vulkan as back;
 use gfx_hal::{device::Device, Adapter, Backend};
 use std::mem::ManuallyDrop;
 
+/// A texture that host can read/write into directly, functions similarly to a sprite
+pub struct StreamingTexture {}
+
+/// Contains a single texture and associated sprites
 pub struct SingleTexture {
     pub count: u32,
 
@@ -91,6 +95,8 @@ pub struct Windowing {
     #[cfg(not(feature = "gl"))]
     pub vk_inst: ManuallyDrop<back::Instance>,
 }
+
+// ---
 
 impl Drop for Windowing {
     fn drop(&mut self) {

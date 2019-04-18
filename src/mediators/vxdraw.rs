@@ -936,6 +936,7 @@ mod tests {
     use test::{black_box, Bencher};
 
     use cgmath::{Deg, Vector3};
+    use rand::Rng;
     use rand_pcg::Pcg64Mcg as random;
     use std::f32::consts::PI;
 
@@ -944,7 +945,6 @@ mod tests {
     // ---
 
     fn add_windmills(windowing: &mut Windowing, rand_rotat: bool) -> Vec<DebugTriangleHandle> {
-        use rand::Rng;
         let mut rng = random::new(0);
         let mut debug_triangles = Vec::with_capacity(1000);
         for _ in 0..1000 {
@@ -1528,13 +1528,42 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let tex = add_texture(&mut windowing, LOGO, &mut logger);
-        for i in 0..500 {
+        for i in 0..1000 {
             add_sprite(
                 &mut windowing,
                 Sprite {
-                    uv_end: (0.05, 0.05),
                     rotation: ((i * 10) as f32 / 180f32 * PI),
                     scale: 0.5,
+                    ..Sprite::default()
+                },
+                &tex,
+                &mut logger,
+            );
+        }
+
+        let prspect = gen_perspective(&mut windowing);
+        b.iter(|| {
+            draw_frame(&mut windowing, &mut logger, &prspect);
+        });
+    }
+
+    #[bench]
+    fn bench_many_particles(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let tex = add_texture(&mut windowing, LOGO, &mut logger);
+        let mut rng = random::new(0);
+        for i in 0..1000 {
+            let (dx, dy) = (
+                rng.gen_range(-1.0f32, 1.0f32),
+                rng.gen_range(-1.0f32, 1.0f32),
+            );
+            add_sprite(
+                &mut windowing,
+                Sprite {
+                    translation: (dx, dy),
+                    rotation: ((i * 10) as f32 / 180f32 * PI),
+                    scale: 0.01,
                     ..Sprite::default()
                 },
                 &tex,

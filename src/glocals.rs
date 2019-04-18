@@ -96,6 +96,10 @@ pub struct SingleTexture {
     pub texture_vertex_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
     pub texture_vertex_requirements: gfx_hal::memory::Requirements,
 
+    pub texture_vertex_buffer_indices: ManuallyDrop<<back::Backend as Backend>::Buffer>,
+    pub texture_vertex_memory_indices: ManuallyDrop<<back::Backend as Backend>::Memory>,
+    pub texture_vertex_requirements_indices: gfx_hal::memory::Requirements,
+
     pub texture_image_buffer: ManuallyDrop<<back::Backend as Backend>::Image>,
     pub texture_image_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
 
@@ -222,6 +226,12 @@ impl Drop for Windowing {
                 .destroy_swapchain(ManuallyDrop::into_inner(read(&self.swapchain)));
 
             for mut simple_tex in self.simple_textures.drain(..) {
+                self.device.destroy_buffer(ManuallyDrop::into_inner(read(
+                    &simple_tex.texture_vertex_buffer_indices,
+                )));
+                self.device.free_memory(ManuallyDrop::into_inner(read(
+                    &simple_tex.texture_vertex_memory_indices,
+                )));
                 self.device.destroy_buffer(ManuallyDrop::into_inner(read(
                     &simple_tex.texture_vertex_buffer,
                 )));

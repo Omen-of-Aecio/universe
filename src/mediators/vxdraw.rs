@@ -474,19 +474,31 @@ pub fn add_sprite(s: &mut Windowing, sprite: Sprite, texture: usize, log: &mut L
     unsafe {
         let mut data_target = device
             .acquire_mapping_writer(
+                &tex.texture_vertex_memory_indices,
+                0..tex.texture_vertex_requirements_indices.size,
+            )
+            .expect("Failed to acquire a memory writer!");
+        let i = (tex.count * 6) as u16;
+        let j = (tex.count * 4) as u16;
+        data_target[i as usize..(i+6) as usize].copy_from_slice(&[j, j + 1, j + 2, j + 2, j + 3, j]);
+        device
+            .release_mapping_writer(data_target)
+            .expect("Couldn't release the mapping writer!");
+    }
+    unsafe {
+        let mut data_target = device
+            .acquire_mapping_writer(
                 &tex.texture_vertex_memory,
                 0..tex.texture_vertex_requirements.size,
             )
             .expect("Failed to acquire a memory writer!");
-        let idx = (tex.count * 6 * 8) as usize;
+        let idx = (tex.count * 4 * 8) as usize;
 
         for (i, (point, uv)) in [
             (topleft, topleft_uv),
             (bottomleft, bottomleft_uv),
             (bottomright, bottomright_uv),
-            (bottomright, bottomright_uv),
             (topright, topright_uv),
-            (topleft, topleft_uv),
         ]
         .iter()
         .enumerate()
@@ -511,7 +523,7 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
     #[rustfmt::skip]
     let (texture_vertex_buffer, texture_vertex_memory, texture_vertex_requirements) = make_vertex_buffer_with_data(
         s,
-        &[0f32; 8*6*1000]);
+        &[0f32; 8*4*1000]);
     // &[
     // -1.0f32, -1.0, // Original position
     // 0.0, 0.0,      // UV
@@ -1022,11 +1034,11 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
         s.device.destroy_shader_module(fs_module);
     }
 
-    //     let (
-    //         texture_vertex_buffer_indices,
-    //         texture_vertex_memory_indices,
-    //         texture_vertex_requirements_indices,
-    //     ) = make_index_buffer_with_data(s, &[0f32; 4 * 1000]);
+        let (
+            texture_vertex_buffer_indices,
+            texture_vertex_memory_indices,
+            texture_vertex_requirements_indices,
+        ) = make_index_buffer_with_data(s, &[0f32; 4 * 1000]);
 
     s.simple_textures.push(SingleTexture {
         count: 0,
@@ -1034,6 +1046,10 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
         texture_vertex_buffer: ManuallyDrop::new(texture_vertex_buffer),
         texture_vertex_memory: ManuallyDrop::new(texture_vertex_memory),
         texture_vertex_requirements,
+
+        texture_vertex_buffer_indices: ManuallyDrop::new(texture_vertex_buffer_indices),
+        texture_vertex_memory_indices: ManuallyDrop::new(texture_vertex_memory_indices),
+        texture_vertex_requirements_indices,
 
         texture_image_buffer: ManuallyDrop::new(the_image),
         texture_image_memory: ManuallyDrop::new(image_memory),
@@ -1134,7 +1150,12 @@ fn draw_frame_internal<T>(
                     let buffers: ArrayVec<[_; 1]> =
                         [(&*simple_tex.texture_vertex_buffer, 0)].into();
                     enc.bind_vertex_buffers(0, buffers);
-                    enc.draw(0..simple_tex.count * 6, 0..1);
+                    enc.bind_index_buffer(gfx_hal::buffer::IndexBufferView {
+                        buffer: &simple_tex.texture_vertex_buffer_indices,
+                        offset: 0,
+                        index_type: gfx_hal::IndexType::U16,
+                    });
+                    enc.draw_indexed(0..simple_tex.count * 6, 0, 0..1);
                 }
 
                 if let Some(ref debug_triangles) = s.debug_triangles {

@@ -525,12 +525,7 @@ impl Default for Sprite {
 }
 
 /// Add a sprite (a rectangular view of a texture) to the system
-pub fn streaming_texture_add_sprite(
-    s: &mut Windowing,
-    sprite: Sprite,
-    texture: usize,
-    log: &mut Logger<Log>,
-) -> usize {
+pub fn streaming_texture_add_sprite(s: &mut Windowing, sprite: Sprite, texture: usize) -> usize {
     let tex = &mut s.streaming_textures[texture];
     let device = &s.device;
 

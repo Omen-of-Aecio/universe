@@ -124,7 +124,7 @@ pub fn quad_push(s: &mut Windowing, quad: Quad) -> QuadHandle {
                 .iter()
                 .enumerate()
             {
-                let idx = (i+quads.count*4) * 8;
+                let idx = (i + quads.count * 4) * 8;
 
                 data_target[idx..idx + 3].copy_from_slice(&[point.0, point.1, point.2]);
                 data_target[idx + 3..idx + 4].copy_from_slice(&transmute::<[u8; 4], [f32; 1]>([

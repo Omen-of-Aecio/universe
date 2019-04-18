@@ -29,6 +29,9 @@ use std::mem::{size_of, ManuallyDrop};
 
 // ---
 
+/// A view into a texture
+///
+/// A sprite is a rectangular view into a texture.
 #[derive(Clone, Copy)]
 pub struct Sprite {
     pub width: f32,
@@ -58,149 +61,28 @@ impl Default for Sprite {
     }
 }
 
+/// A view into a texture
 pub struct SpriteHandle(usize);
+
+/// Handle to a texture
 pub struct TextureHandle(usize);
 
-/// Rotate all sprites that depend on a given texture
-pub fn sprite_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, tex: &TextureHandle, deg: T) {
-    let device = &s.device;
-    if let Some(ref mut stex) = s.simple_textures.get(tex.0) {
-        unsafe {
-            device
-                .wait_for_fences(
-                    &s.frames_in_flight_fences,
-                    gfx_hal::device::WaitFor::All,
-                    u64::max_value(),
-                )
-                .expect("Unable to wait for fences");
-        }
-        unsafe {
-            let data_reader = device
-                .acquire_mapping_reader::<f32>(
-                    &stex.texture_vertex_memory,
-                    0..stex.texture_vertex_requirements.size,
-                )
-                .expect("Failed to acquire a memory writer!");
-            let mut vertices = Vec::<f32>::with_capacity(stex.count as usize);
-            for i in 0..stex.count {
-                let idx = (i * 10 * 4) as usize;
-                let rotation = &data_reader[idx + 7..idx + 8];
-                vertices.push(rotation[0]);
-            }
-            device.release_mapping_reader(data_reader);
+#[derive(Clone, Copy)]
+pub struct TextureOptions {
+    /// Perform depth testing (and fragment culling) when drawing sprites from this texture
+    pub depth_test: bool,
+}
 
-            let mut data_target = device
-                .acquire_mapping_writer::<f32>(
-                    &stex.texture_vertex_memory,
-                    0..stex.texture_vertex_requirements.size,
-                )
-                .expect("Failed to acquire a memory writer!");
-
-            for (i, vert) in vertices.iter().enumerate() {
-                let mut idx = (i * 10 * 4) as usize;
-                data_target[idx + 7..idx + 8].copy_from_slice(&[*vert + deg.into().0]);
-                idx += 10;
-                data_target[idx + 7..idx + 8].copy_from_slice(&[*vert + deg.into().0]);
-                idx += 10;
-                data_target[idx + 7..idx + 8].copy_from_slice(&[*vert + deg.into().0]);
-                idx += 10;
-                data_target[idx + 7..idx + 8].copy_from_slice(&[*vert + deg.into().0]);
-            }
-            device
-                .release_mapping_writer(data_target)
-                .expect("Couldn't release the mapping writer!");
-        }
+impl Default for TextureOptions {
+    fn default() -> Self {
+        Self { depth_test: true }
     }
 }
 
-/// Add a sprite (a rectangular view of a texture) to the system
-pub fn add_sprite(
-    s: &mut Windowing,
-    sprite: Sprite,
-    texture: &TextureHandle,
-    log: &mut Logger<Log>,
-) -> SpriteHandle {
-    let tex = &mut s.simple_textures[texture.0];
-    let device = &s.device;
-
-    // Derive xy from the sprite's initial UV
-    let uv_a = sprite.uv_begin;
-    let uv_b = sprite.uv_end;
-
-    let width = sprite.width;
-    let height = sprite.height;
-
-    let topleft = (-width / 2f32, -height / 2f32);
-    let topleft_uv = uv_a;
-
-    let topright = (width / 2f32, -height / 2f32);
-    let topright_uv = (uv_b.0, uv_a.1);
-
-    let bottomleft = (-width / 2f32, height / 2f32);
-    let bottomleft_uv = (uv_a.0, uv_b.1);
-
-    let bottomright = (width / 2f32, height / 2f32);
-    let bottomright_uv = (uv_b.0, uv_b.1);
-
-    unsafe {
-        let mut data_target = device
-            .acquire_mapping_writer(
-                &tex.texture_vertex_memory_indices,
-                0..tex.texture_vertex_requirements_indices.size,
-            )
-            .expect("Failed to acquire a memory writer!");
-        let ver = (tex.count * 6) as u16;
-        let ind = (tex.count * 4) as u16;
-        data_target[ver as usize..(ver + 6) as usize].copy_from_slice(&[
-            ind,
-            ind + 1,
-            ind + 2,
-            ind + 2,
-            ind + 3,
-            ind,
-        ]);
-        device
-            .release_mapping_writer(data_target)
-            .expect("Couldn't release the mapping writer!");
-    }
-    unsafe {
-        let mut data_target = device
-            .acquire_mapping_writer(
-                &tex.texture_vertex_memory,
-                0..tex.texture_vertex_requirements.size,
-            )
-            .expect("Failed to acquire a memory writer!");
-        let idx = (tex.count * 4 * 10) as usize;
-
-        for (i, (point, uv)) in [
-            (topleft, topleft_uv),
-            (bottomleft, bottomleft_uv),
-            (bottomright, bottomright_uv),
-            (topright, topright_uv),
-        ]
-        .iter()
-        .enumerate()
-        {
-            let idx = idx + i * 10;
-            data_target[idx..idx + 3].copy_from_slice(&[point.0, point.1, sprite.depth]);
-            data_target[idx + 3..idx + 5].copy_from_slice(&[uv.0, uv.1]);
-            data_target[idx + 5..idx + 7]
-                .copy_from_slice(&[sprite.translation.0, sprite.translation.1]);
-            data_target[idx + 7..idx + 8].copy_from_slice(&[sprite.rotation]);
-            data_target[idx + 8..idx + 9].copy_from_slice(&[sprite.scale]);
-            data_target[idx + 9..idx + 10]
-                .copy_from_slice(&[std::mem::transmute::<_, f32>(sprite.colors[i])]);
-        }
-        tex.count += 1;
-        device
-            .release_mapping_writer(data_target)
-            .expect("Couldn't release the mapping writer!");
-    }
-    SpriteHandle((tex.count - 1) as usize)
-}
+// ---
 
 /// Add a texture to the system
-pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>, depth: bool) -> TextureHandle {
+pub fn add_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions) -> TextureHandle {
     let (texture_vertex_buffer, texture_vertex_memory, texture_vertex_requirements) =
         make_vertex_buffer_with_data(s, &[0f32; 10 * 4 * 1000]);
 
@@ -457,7 +339,6 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>, de
             specialization: pso::Specialization::default(),
         },
     );
-    debug![log, "vxdraw", "After making"];
     let shader_entries = pso::GraphicsShaderSet {
         vertex: vs_entry,
         hull: None,
@@ -533,7 +414,7 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>, de
     };
 
     let depth_stencil = pso::DepthStencilDesc {
-        depth: if depth {
+        depth: if options.depth_test {
             pso::DepthTest::On {
                 fun: pso::Comparison::Less,
                 write: true,
@@ -750,4 +631,137 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>, de
         render_pass: ManuallyDrop::new(triangle_render_pass),
     });
     TextureHandle(s.simple_textures.len() - 1)
+}
+
+/// Add a sprite (a rectangular view of a texture) to the system
+pub fn add_sprite(s: &mut Windowing, sprite: Sprite, texture: &TextureHandle) -> SpriteHandle {
+    let tex = &mut s.simple_textures[texture.0];
+    let device = &s.device;
+
+    // Derive xy from the sprite's initial UV
+    let uv_a = sprite.uv_begin;
+    let uv_b = sprite.uv_end;
+
+    let width = sprite.width;
+    let height = sprite.height;
+
+    let topleft = (-width / 2f32, -height / 2f32);
+    let topleft_uv = uv_a;
+
+    let topright = (width / 2f32, -height / 2f32);
+    let topright_uv = (uv_b.0, uv_a.1);
+
+    let bottomleft = (-width / 2f32, height / 2f32);
+    let bottomleft_uv = (uv_a.0, uv_b.1);
+
+    let bottomright = (width / 2f32, height / 2f32);
+    let bottomright_uv = (uv_b.0, uv_b.1);
+
+    unsafe {
+        let mut data_target = device
+            .acquire_mapping_writer(
+                &tex.texture_vertex_memory_indices,
+                0..tex.texture_vertex_requirements_indices.size,
+            )
+            .expect("Failed to acquire a memory writer!");
+        let ver = (tex.count * 6) as u16;
+        let ind = (tex.count * 4) as u16;
+        data_target[ver as usize..(ver + 6) as usize].copy_from_slice(&[
+            ind,
+            ind + 1,
+            ind + 2,
+            ind + 2,
+            ind + 3,
+            ind,
+        ]);
+        device
+            .release_mapping_writer(data_target)
+            .expect("Couldn't release the mapping writer!");
+    }
+    unsafe {
+        let mut data_target = device
+            .acquire_mapping_writer(
+                &tex.texture_vertex_memory,
+                0..tex.texture_vertex_requirements.size,
+            )
+            .expect("Failed to acquire a memory writer!");
+        let idx = (tex.count * 4 * 10) as usize;
+
+        for (i, (point, uv)) in [
+            (topleft, topleft_uv),
+            (bottomleft, bottomleft_uv),
+            (bottomright, bottomright_uv),
+            (topright, topright_uv),
+        ]
+        .iter()
+        .enumerate()
+        {
+            let idx = idx + i * 10;
+            data_target[idx..idx + 3].copy_from_slice(&[point.0, point.1, sprite.depth]);
+            data_target[idx + 3..idx + 5].copy_from_slice(&[uv.0, uv.1]);
+            data_target[idx + 5..idx + 7]
+                .copy_from_slice(&[sprite.translation.0, sprite.translation.1]);
+            data_target[idx + 7..idx + 8].copy_from_slice(&[sprite.rotation]);
+            data_target[idx + 8..idx + 9].copy_from_slice(&[sprite.scale]);
+            data_target[idx + 9..idx + 10]
+                .copy_from_slice(&[std::mem::transmute::<_, f32>(sprite.colors[i])]);
+        }
+        tex.count += 1;
+        device
+            .release_mapping_writer(data_target)
+            .expect("Couldn't release the mapping writer!");
+    }
+    SpriteHandle((tex.count - 1) as usize)
+}
+
+/// Rotate all sprites that depend on a given texture
+pub fn sprite_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, tex: &TextureHandle, deg: T) {
+    let device = &s.device;
+    if let Some(ref mut stex) = s.simple_textures.get(tex.0) {
+        unsafe {
+            device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+        }
+        unsafe {
+            let data_reader = device
+                .acquire_mapping_reader::<f32>(
+                    &stex.texture_vertex_memory,
+                    0..stex.texture_vertex_requirements.size,
+                )
+                .expect("Failed to acquire a memory writer!");
+            let mut vertices = Vec::<f32>::with_capacity(stex.count as usize);
+            for i in 0..stex.count {
+                let idx = (i * 10 * 4) as usize;
+                let rotation = &data_reader[idx + 7..idx + 8];
+                vertices.push(rotation[0]);
+            }
+            device.release_mapping_reader(data_reader);
+
+            let mut data_target = device
+                .acquire_mapping_writer::<f32>(
+                    &stex.texture_vertex_memory,
+                    0..stex.texture_vertex_requirements.size,
+                )
+                .expect("Failed to acquire a memory writer!");
+
+            for (i, vert) in vertices.iter().enumerate() {
+                let mut idx = (i * 10 * 4) as usize;
+                data_target[idx + 7..idx + 8].copy_from_slice(&[*vert + deg.into().0]);
+                idx += 10;
+                data_target[idx + 7..idx + 8].copy_from_slice(&[*vert + deg.into().0]);
+                idx += 10;
+                data_target[idx + 7..idx + 8].copy_from_slice(&[*vert + deg.into().0]);
+                idx += 10;
+                data_target[idx + 7..idx + 8].copy_from_slice(&[*vert + deg.into().0]);
+            }
+            device
+                .release_mapping_writer(data_target)
+                .expect("Couldn't release the mapping writer!");
+        }
+    }
 }

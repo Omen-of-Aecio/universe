@@ -9,7 +9,7 @@ cd "$DIR.."
 DIR="${DIR%/*}"
 DIR="${DIR##*/}"
 
-mkdir -p _build/libs
+mkdir -p _build/crates
 
 has_failed=0
 
@@ -24,7 +24,7 @@ else
 fi
 set -e
 
-for library in libs/*; do
+for library in crates/*; do
     if [ -f "$library"/.benchmark-ignore ]; then
         echo "IGNORE: $library"
         continue

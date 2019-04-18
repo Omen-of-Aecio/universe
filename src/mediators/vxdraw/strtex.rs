@@ -716,7 +716,7 @@ pub fn streaming_texture_set_pixel(
     color: (u8, u8, u8, u8),
 ) {
     if let Some(ref strtex) = s.streaming_textures.get(id) {
-        if w > strtex.width || h > strtex.height {
+        if !(w < strtex.width && h < strtex.height) {
             return;
         }
         unsafe {

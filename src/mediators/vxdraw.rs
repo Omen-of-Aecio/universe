@@ -37,10 +37,12 @@ use winit::{dpi::LogicalSize, Event, EventsLoop, WindowBuilder};
 
 pub mod debtri;
 pub mod dyntex;
+pub mod strtex;
 pub mod utils;
 
 use debtri::*;
 use dyntex::*;
+use strtex::{add_streaming_texture, streaming_texture_add_sprite};
 use utils::*;
 
 // ---
@@ -428,6 +430,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         surf,
         swapchain: ManuallyDrop::new(swapchain),
         swapconfig: swap_config,
+        streaming_textures: vec![],
         simple_textures: vec![],
         #[cfg(not(feature = "gl"))]
         vk_inst: ManuallyDrop::new(vk_inst),
@@ -509,6 +512,32 @@ fn draw_frame_internal<T>(
                     s.render_area,
                     clear_values.iter(),
                 );
+
+                for strtex in s.streaming_textures.iter() {
+                    enc.bind_graphics_pipeline(&strtex.pipeline);
+                    enc.push_graphics_constants(
+                        &strtex.pipeline_layout,
+                        ShaderStageFlags::VERTEX,
+                        0,
+                        &*(view.as_ptr() as *const [u32; 16]),
+                    );
+                    enc.bind_graphics_descriptor_sets(
+                        &strtex.pipeline_layout,
+                        0,
+                        Some(&*strtex.descriptor_set),
+                        &[],
+                    );
+                    let buffers: ArrayVec<[_; 1]> =
+                        [(&*strtex.vertex_buffer, 0)].into();
+                    enc.bind_vertex_buffers(0, buffers);
+                    // enc.draw(0..6, 0..1);
+                    enc.bind_index_buffer(gfx_hal::buffer::IndexBufferView {
+                        buffer: &strtex.vertex_buffer_indices,
+                        offset: 0,
+                        index_type: gfx_hal::IndexType::U16,
+                    });
+                    enc.draw_indexed(0..strtex.count*6, 0, 0..1);
+                }
 
                 for simple_tex in s.simple_textures.iter() {
                     enc.bind_graphics_pipeline(&simple_tex.pipeline);
@@ -1519,6 +1548,18 @@ mod tests {
         add_windmills(&mut windowing, true);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         assert_swapchain_eq(&mut windowing, "windmills_given_initial_rotation", img);
+    }
+
+    #[test]
+    fn streaming_texture() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&mut windowing);
+
+        let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id, &mut logger);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "streaming_texture", img);
     }
 
     // ---

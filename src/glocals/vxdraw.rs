@@ -11,7 +11,30 @@ use gfx_hal::{device::Device, Adapter, Backend};
 use std::mem::ManuallyDrop;
 
 /// A texture that host can read/write into directly, functions similarly to a sprite
-pub struct StreamingTexture {}
+pub struct StreamingTexture {
+    pub count: u32,
+
+    pub vertex_buffer: ManuallyDrop<<back::Backend as Backend>::Buffer>,
+    pub vertex_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
+    pub vertex_requirements: gfx_hal::memory::Requirements,
+
+    pub vertex_buffer_indices: ManuallyDrop<<back::Backend as Backend>::Buffer>,
+    pub vertex_memory_indices: ManuallyDrop<<back::Backend as Backend>::Memory>,
+    pub vertex_requirements_indices: gfx_hal::memory::Requirements,
+
+    pub image_buffer: ManuallyDrop<<back::Backend as Backend>::Image>,
+    pub image_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
+
+    pub sampler: ManuallyDrop<<back::Backend as Backend>::Sampler>,
+    pub image_view: ManuallyDrop<<back::Backend as Backend>::ImageView>,
+    pub descriptor_pool: ManuallyDrop<<back::Backend as Backend>::DescriptorPool>,
+
+    pub descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout>,
+    pub pipeline: ManuallyDrop<<back::Backend as Backend>::GraphicsPipeline>,
+    pub pipeline_layout: ManuallyDrop<<back::Backend as Backend>::PipelineLayout>,
+    pub render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
+    pub descriptor_set: ManuallyDrop<<back::Backend as Backend>::DescriptorSet>,
+}
 
 /// Contains a single texture and associated sprites
 pub struct SingleTexture {
@@ -58,6 +81,7 @@ pub struct Windowing {
 
     pub events_loop: winit::EventsLoop,
 
+    pub streaming_textures: Vec<StreamingTexture>,
     pub simple_textures: Vec<SingleTexture>,
     pub debug_triangles: Option<ColoredTriangleList>,
     //
@@ -193,6 +217,49 @@ impl Drop for Windowing {
                 self.device
                     .destroy_image_view(ManuallyDrop::into_inner(read(&simple_tex.image_view)));
             }
+
+            for mut strtex in self.streaming_textures.drain(..) {
+                self.device.destroy_buffer(ManuallyDrop::into_inner(read(
+                    &strtex.vertex_buffer_indices,
+                )));
+                self.device.free_memory(ManuallyDrop::into_inner(read(
+                    &strtex.vertex_memory_indices,
+                )));
+                self.device.destroy_buffer(ManuallyDrop::into_inner(read(
+                    &strtex.vertex_buffer,
+                )));
+                self.device.free_memory(ManuallyDrop::into_inner(read(
+                    &strtex.vertex_memory,
+                )));
+                self.device.destroy_image(ManuallyDrop::into_inner(read(
+                    &strtex.image_buffer,
+                )));
+                self.device.free_memory(ManuallyDrop::into_inner(read(
+                    &strtex.image_memory,
+                )));
+                self.device
+                    .destroy_render_pass(ManuallyDrop::into_inner(read(&strtex.render_pass)));
+                self.device
+                    .destroy_pipeline_layout(ManuallyDrop::into_inner(read(
+                        &strtex.pipeline_layout,
+                    )));
+                self.device
+                    .destroy_graphics_pipeline(ManuallyDrop::into_inner(read(
+                        &strtex.pipeline,
+                    )));
+                for dsl in strtex.descriptor_set_layouts.drain(..) {
+                    self.device.destroy_descriptor_set_layout(dsl);
+                }
+                self.device
+                    .destroy_descriptor_pool(ManuallyDrop::into_inner(read(
+                        &strtex.descriptor_pool,
+                    )));
+                self.device
+                    .destroy_sampler(ManuallyDrop::into_inner(read(&strtex.sampler)));
+                self.device
+                    .destroy_image_view(ManuallyDrop::into_inner(read(&strtex.image_view)));
+            }
+
 
             ManuallyDrop::drop(&mut self.queue_group);
             ManuallyDrop::drop(&mut self.device);

@@ -56,8 +56,11 @@ pub fn add_streaming_texture(
 
     let requirements = unsafe { device.get_image_requirements(&the_image) };
     let image_memory = unsafe {
-        let memory_type_id =
-            find_memory_type_id(&s.adapter, requirements, memory::Properties::CPU_VISIBLE | memory::Properties::COHERENT);
+        let memory_type_id = find_memory_type_id(
+            &s.adapter,
+            requirements,
+            memory::Properties::CPU_VISIBLE | memory::Properties::COHERENT,
+        );
         device
             .allocate_memory(memory_type_id, requirements.size)
             .expect("Unable to allocate")
@@ -359,10 +362,7 @@ pub fn add_streaming_texture(
                 set: &descriptor_set,
                 binding: 0,
                 array_offset: 0,
-                descriptors: Some(pso::Descriptor::Image(
-                    &image_view,
-                    image::Layout::General,
-                )),
+                descriptors: Some(pso::Descriptor::Image(&image_view, image::Layout::General)),
             },
             pso::DescriptorSetWrite {
                 set: &descriptor_set,

@@ -531,10 +531,7 @@ fn draw_frame_internal<T>(
                 // Submit automatically makes host writes available for the device
                 let image_barrier = memory::Barrier::Image {
                     states: (image::Access::empty(), image::Layout::ShaderReadOnlyOptimal)
-                        ..(
-                            image::Access::empty(),
-                            image::Layout::General,
-                        ),
+                        ..(image::Access::empty(), image::Layout::General),
                     target: &*strtex.image_buffer,
                     families: None,
                     range: image::SubresourceRange {
@@ -1744,10 +1741,28 @@ mod tests {
     fn streaming_texture_world_with_minimap() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&mut windowing);
 
         let id = add_streaming_texture(&mut windowing, 800, 600, &mut logger);
+
         streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id, &mut logger);
-        streaming_texture_add_sprite(&mut windowing, strtex::Sprite { scale: 0.1, translation: (-1.0, -1.0),.. strtex::Sprite::default() }, id, &mut logger);
+
+        streaming_texture_add_sprite(
+            &mut windowing,
+            strtex::Sprite {
+                scale: 0.2,
+                colors: [
+                    (127, 127, 127, 127),
+                    (127, 127, 127, 127),
+                    (127, 127, 127, 127),
+                    (127, 127, 127, 127),
+                ],
+                translation: (-0.8, -0.8),
+                ..strtex::Sprite::default()
+            },
+            id,
+            &mut logger,
+        );
 
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
@@ -1755,6 +1770,14 @@ mod tests {
             (50, 50),
             (50, 50),
             (0, 255, 0, 255),
+        );
+
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (500, 200),
+            (50, 80),
+            (255, 0, 0, 255),
         );
 
         strtex::streaming_texture_set_pixels_block(

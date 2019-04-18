@@ -1,4 +1,5 @@
 use super::utils::*;
+use super::utils::*;
 use crate::glocals::{
     vxdraw::{StreamingTexture, Windowing},
     Log,
@@ -26,63 +27,17 @@ use gfx_hal::{
 use logger::{debug, Logger};
 use std::io::Read;
 use std::mem::{size_of, ManuallyDrop};
-use super::utils::*;
 
 // ---
 
-pub fn add_streaming_texture(s: &mut Windowing, w: usize, h: usize, log: &mut Logger<Log>) -> usize {
+pub fn add_streaming_texture(
+    s: &mut Windowing,
+    w: usize,
+    h: usize,
+    log: &mut Logger<Log>,
+) -> usize {
     let (texture_vertex_buffer, texture_vertex_memory, vertex_requirements) =
         make_vertex_buffer_with_data(s, &[0f32; 9 * 4 * 1000]);
-        // make_vertex_buffer_with_data(s,
-    // layout(location = 0) in vec2 v_pos;
-    // layout(location = 1) in vec2 v_uv;
-    // layout(location = 2) in vec2 v_dxdy;
-    // layout(location = 3) in float rotation;
-    // layout(location = 4) in float scale;
-    // layout(location = 5) in vec4 color;
-        // &[
-        //     -1.0f32, -1.0,
-        //     0.0, 0.0,
-        //     0.0, 0.0,
-        //     0.0,
-        //     1.0,
-        //     0.0,
-
-        //     -1.0f32, 1.0,
-        //     0.0, 1.0,
-        //     0.0, 0.0,
-        //     0.0,
-        //     1.0,
-        //     0.0,
-
-        //     1.0f32, 1.0,
-        //     1.0, 1.0,
-        //     0.0, 0.0,
-        //     0.0,
-        //     1.0,
-        //     0.0,
-
-        //     1.0f32, 1.0,
-        //     1.0, 1.0,
-        //     0.0, 0.0,
-        //     0.0,
-        //     1.0,
-        //     0.0,
-
-        //     1.0f32, -1.0,
-        //     1.0, -1.0,
-        //     0.0, 0.0,
-        //     0.0,
-        //     1.0,
-        //     0.0,
-
-        //     -1.0f32, -1.0,
-        //     -1.0, -1.0,
-        //     0.0, 0.0,
-        //     0.0,
-        //     1.0,
-        //     0.0,
-        // ]);
 
     let device = &s.device;
 
@@ -100,7 +55,7 @@ pub fn add_streaming_texture(s: &mut Windowing, w: usize, h: usize, log: &mut Lo
     };
 
     let requirements = unsafe { device.get_image_requirements(&the_image) };
-    let mut image_memory = unsafe {
+    let image_memory = unsafe {
         let memory_type_id =
             find_memory_type_id(&s.adapter, requirements, memory::Properties::CPU_VISIBLE);
         device
@@ -459,14 +414,14 @@ pub fn add_streaming_texture(s: &mut Windowing, w: usize, h: usize, log: &mut Lo
         s.device.destroy_shader_module(fs_module);
     }
 
-    let (
-        vertex_buffer_indices,
-        vertex_memory_indices,
-        vertex_requirements_indices,
-    ) = make_index_buffer_with_data(s, &[0f32; 4 * 1000]);
+    let (vertex_buffer_indices, vertex_memory_indices, vertex_requirements_indices) =
+        make_index_buffer_with_data(s, &[0f32; 4 * 1000]);
 
     s.streaming_textures.push(StreamingTexture {
         count: 0,
+
+        width: w as u32,
+        height: h as u32,
 
         vertex_buffer: ManuallyDrop::new(texture_vertex_buffer),
         vertex_memory: ManuallyDrop::new(texture_vertex_memory),
@@ -492,6 +447,7 @@ pub fn add_streaming_texture(s: &mut Windowing, w: usize, h: usize, log: &mut Lo
     });
     s.streaming_textures.len() - 1
 }
+
 pub struct Sprite {
     pub width: f32,
     pub height: f32,
@@ -570,10 +526,7 @@ pub fn streaming_texture_add_sprite(
     }
     unsafe {
         let mut data_target = device
-            .acquire_mapping_writer(
-                &tex.vertex_memory,
-                0..tex.vertex_requirements.size,
-            )
+            .acquire_mapping_writer(&tex.vertex_memory, 0..tex.vertex_requirements.size)
             .expect("Failed to acquire a memory writer!");
         let idx = (tex.count * 4 * 9) as usize;
 
@@ -604,80 +557,171 @@ pub fn streaming_texture_add_sprite(
     (tex.count - 1) as usize
 }
 
-
-pub fn streaming_texture_set_pixels(s: &mut Windowing, id: usize, modifier: impl Iterator<Item = (u32, u32, (u8, u8, u8, u8))>) {
+pub fn streaming_texture_set_pixels(
+    s: &mut Windowing,
+    id: usize,
+    modifier: impl Iterator<Item = (u32, u32, (u8, u8, u8, u8))>,
+) {
     if let Some(ref strtex) = s.streaming_textures.get(id) {
         unsafe {
-            let foot = s.device.get_image_subresource_footprint(&strtex.image_buffer, image::Subresource {
-                aspects: format::Aspects::COLOR,
-                level: 0,
-                layer: 0,
-            });
+            let foot = s.device.get_image_subresource_footprint(
+                &strtex.image_buffer,
+                image::Subresource {
+                    aspects: format::Aspects::COLOR,
+                    level: 0,
+                    layer: 0,
+                },
+            );
             for item in modifier {
                 let w = item.0;
                 let h = item.1;
                 let color = item.2;
 
+                if w > strtex.width || h > strtex.height {
+                    continue;
+                }
+
                 let access = foot.row_pitch * h as u64 + (w * 4) as u64;
                 let align = align_top(Alignment(strtex.image_requirements.alignment), access + 4);
-                let mut target = s.device.acquire_mapping_writer(&*strtex.image_memory, access..align).expect("unable to acquire mapping writer");
+
+                s.device
+                    .wait_for_fences(
+                        &s.frames_in_flight_fences,
+                        gfx_hal::device::WaitFor::All,
+                        u64::max_value(),
+                    )
+                    .expect("Unable to wait for fences");
+
+                let mut target = s
+                    .device
+                    .acquire_mapping_writer(&*strtex.image_memory, access..align)
+                    .expect("unable to acquire mapping writer");
                 target[0..4].copy_from_slice(&[color.0, color.1, color.2, color.3]);
-                s.device.release_mapping_writer(target);
+                s.device
+                    .release_mapping_writer(target)
+                    .expect("Unable to release mapping writer");
             }
         }
     }
 }
 
-pub fn streaming_texture_set_pixels_block(s: &mut Windowing, id: usize, start: (u32, u32), stop: (u32, u32), color: (u8, u8, u8, u8)) {
+pub fn streaming_texture_set_pixels_block(
+    s: &mut Windowing,
+    id: usize,
+    start: (u32, u32),
+    wh: (u32, u32),
+    color: (u8, u8, u8, u8),
+) {
     if let Some(ref strtex) = s.streaming_textures.get(id) {
+        if start.0 + wh.0 > strtex.width || start.1 + wh.1 > strtex.height {
+            return;
+        }
         unsafe {
-            let foot = s.device.get_image_subresource_footprint(&strtex.image_buffer, image::Subresource {
-                aspects: format::Aspects::COLOR,
-                level: 0,
-                layer: 0,
-            });
+            let foot = s.device.get_image_subresource_footprint(
+                &strtex.image_buffer,
+                image::Subresource {
+                    aspects: format::Aspects::COLOR,
+                    level: 0,
+                    layer: 0,
+                },
+            );
 
             // Vulkan 01390, Size must be a multiple of DeviceLimits:nonCoherentAtomSize, or offset
             // plus size = size of memory, if it's not VK_WHOLE_SIZE
             let access_begin = foot.row_pitch * start.1 as u64 + (start.0 * 4) as u64;
-            let access_end = foot.row_pitch * stop.1 as u64 + (stop.0 * 4) as u64;
-            let mut align = align_top(Alignment(s.device_limits.non_coherent_atom_size as u64), access_end + 4);
-            if align > strtex.image_requirements.size {
-                align = strtex.image_requirements.size;
-            }
-            let mut target = s.device.acquire_mapping_writer::<u8>(&*strtex.image_memory, access_begin..align).expect("unable to acquire mapping writer");
+            let access_end = foot.row_pitch
+                * (start.1 + if wh.1 == 0 { 0 } else { wh.1 - 1 }) as u64
+                + ((start.0 + wh.0) * 4) as u64;
+
+            debug_assert![access_end <= strtex.image_requirements.size];
+
+            let aligned = perfect_mapping_alignment(Align {
+                access_offset: access_begin,
+                how_many_bytes_you_need: access_end - access_begin,
+                non_coherent_atom_size: s.device_limits.non_coherent_atom_size as u64,
+                memory_size: strtex.image_requirements.size,
+            });
+
+            s.device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+
+            let mut target = s
+                .device
+                .acquire_mapping_writer::<u8>(&*strtex.image_memory, aligned.begin..aligned.end)
+                .expect("unable to acquire mapping writer");
+
             let mut colbuff = vec![];
-            for _ in start.0..stop.0 {
+            for _ in start.0..start.0 + wh.0 {
                 colbuff.extend(&[color.0, color.1, color.2, color.3]);
             }
-            for idx in start.1..stop.1 {
+
+            for idx in start.1..start.1 + wh.1 {
                 let idx = (idx - start.1) as usize;
                 let pitch = foot.row_pitch as usize;
-                target[idx*pitch..idx*pitch+(stop.0-start.0) as usize*4].copy_from_slice(&colbuff);
+                target[aligned.index_offset as usize + idx * pitch
+                    ..aligned.index_offset as usize + idx * pitch + (wh.0) as usize * 4]
+                    .copy_from_slice(&colbuff);
             }
-            s.device.release_mapping_writer(target);
+            s.device
+                .release_mapping_writer(target)
+                .expect("Unable to release mapping writer");
         }
     }
 }
 
-pub fn streaming_texture_set_pixel(s: &mut Windowing, id: usize, w: u32, h: u32, color: (u8, u8, u8, u8)) {
+pub fn streaming_texture_set_pixel(
+    s: &mut Windowing,
+    id: usize,
+    w: u32,
+    h: u32,
+    color: (u8, u8, u8, u8),
+) {
     if let Some(ref strtex) = s.streaming_textures.get(id) {
+        if w > strtex.width || h > strtex.height {
+            return;
+        }
         unsafe {
-            let foot = s.device.get_image_subresource_footprint(&strtex.image_buffer, image::Subresource {
-                aspects: format::Aspects::COLOR,
-                level: 0,
-                layer: 0,
-            });
+            let foot = s.device.get_image_subresource_footprint(
+                &strtex.image_buffer,
+                image::Subresource {
+                    aspects: format::Aspects::COLOR,
+                    level: 0,
+                    layer: 0,
+                },
+            );
             let access = foot.row_pitch * h as u64 + (w * 4) as u64;
-            let boffset = access % s.device_limits.non_coherent_atom_size as u64;
-            let end = access + 4;
-            let mut align = align_top(Alignment(s.device_limits.non_coherent_atom_size as u64), access + 4);
-            if align > strtex.image_requirements.size {
-                align = strtex.image_requirements.size;
-            }
-            let mut target = s.device.acquire_mapping_writer(&*strtex.image_memory, access-boffset..align).expect("unable to acquire mapping writer");
-            target[boffset as usize..(boffset+4) as usize].copy_from_slice(&[color.0, color.1, color.2, color.3]);
-            s.device.release_mapping_writer(target);
+
+            let aligned = perfect_mapping_alignment(Align {
+                access_offset: access,
+                how_many_bytes_you_need: 4,
+                non_coherent_atom_size: s.device_limits.non_coherent_atom_size as u64,
+                memory_size: strtex.image_requirements.size,
+            });
+
+            s.device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+
+            let mut target = s
+                .device
+                .acquire_mapping_writer(&*strtex.image_memory, aligned.begin..aligned.end)
+                .expect("unable to acquire mapping writer");
+
+            target[aligned.index_offset as usize..(aligned.index_offset + 4) as usize]
+                .copy_from_slice(&[color.0, color.1, color.2, color.3]);
+
+            s.device
+                .release_mapping_writer(target)
+                .expect("Unable to release mapping writer");
         }
     }
 }

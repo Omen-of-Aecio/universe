@@ -14,6 +14,9 @@ use std::mem::ManuallyDrop;
 pub struct StreamingTexture {
     pub count: u32,
 
+    pub width: u32,
+    pub height: u32,
+
     pub vertex_buffer: ManuallyDrop<<back::Backend as Backend>::Buffer>,
     pub vertex_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
     pub vertex_requirements: gfx_hal::memory::Requirements,
@@ -227,18 +230,14 @@ impl Drop for Windowing {
                 self.device.free_memory(ManuallyDrop::into_inner(read(
                     &strtex.vertex_memory_indices,
                 )));
-                self.device.destroy_buffer(ManuallyDrop::into_inner(read(
-                    &strtex.vertex_buffer,
-                )));
-                self.device.free_memory(ManuallyDrop::into_inner(read(
-                    &strtex.vertex_memory,
-                )));
-                self.device.destroy_image(ManuallyDrop::into_inner(read(
-                    &strtex.image_buffer,
-                )));
-                self.device.free_memory(ManuallyDrop::into_inner(read(
-                    &strtex.image_memory,
-                )));
+                self.device
+                    .destroy_buffer(ManuallyDrop::into_inner(read(&strtex.vertex_buffer)));
+                self.device
+                    .free_memory(ManuallyDrop::into_inner(read(&strtex.vertex_memory)));
+                self.device
+                    .destroy_image(ManuallyDrop::into_inner(read(&strtex.image_buffer)));
+                self.device
+                    .free_memory(ManuallyDrop::into_inner(read(&strtex.image_memory)));
                 self.device
                     .destroy_render_pass(ManuallyDrop::into_inner(read(&strtex.render_pass)));
                 self.device
@@ -246,9 +245,7 @@ impl Drop for Windowing {
                         &strtex.pipeline_layout,
                     )));
                 self.device
-                    .destroy_graphics_pipeline(ManuallyDrop::into_inner(read(
-                        &strtex.pipeline,
-                    )));
+                    .destroy_graphics_pipeline(ManuallyDrop::into_inner(read(&strtex.pipeline)));
                 for dsl in strtex.descriptor_set_layouts.drain(..) {
                     self.device.destroy_descriptor_set_layout(dsl);
                 }
@@ -261,7 +258,6 @@ impl Drop for Windowing {
                 self.device
                     .destroy_image_view(ManuallyDrop::into_inner(read(&strtex.image_view)));
             }
-
 
             ManuallyDrop::drop(&mut self.queue_group);
             ManuallyDrop::drop(&mut self.device);

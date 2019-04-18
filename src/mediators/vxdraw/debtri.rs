@@ -152,14 +152,30 @@ pub fn debug_triangle_push(s: &mut Windowing, triangle: DebugTriangle) -> DebugT
 
 pub fn debug_triangle_pop(s: &mut Windowing) {
     if let Some(ref mut debug_triangles) = s.debug_triangles {
-        s.device.wait_idle().expect("device idle");
+        unsafe {
+            s.device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+        }
         debug_triangles.triangles_count -= 1;
     }
 }
 
 pub fn pop_n_triangles(s: &mut Windowing, n: usize) {
     if let Some(ref mut debug_triangles) = s.debug_triangles {
-        s.device.wait_idle().expect("device idle");
+        unsafe {
+            s.device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+        }
         debug_triangles.triangles_count -= n;
     }
 }
@@ -429,7 +445,15 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
 pub fn debug_triangle_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
     let device = &s.device;
     if let Some(ref mut debug_triangles) = s.debug_triangles {
-        device.wait_idle().expect("Unable to wait for device idle");
+        unsafe {
+            device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+        }
         unsafe {
             let data_reader = device
                 .acquire_mapping_reader::<f32>(
@@ -471,7 +495,15 @@ pub fn set_triangle_color(s: &mut Windowing, inst: &DebugTriangleHandle, rgba: [
     let inst = inst.0;
     let device = &s.device;
     if let Some(ref mut debug_triangles) = s.debug_triangles {
-        device.wait_idle().expect("Unable to wait for device idle");
+        unsafe {
+            device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+        }
         unsafe {
             let mut data_target = device
                 .acquire_mapping_writer::<f32>(

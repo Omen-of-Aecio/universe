@@ -62,7 +62,15 @@ pub struct TextureHandle(usize);
 pub fn sprite_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, tex: &TextureHandle, deg: T) {
     let device = &s.device;
     if let Some(ref mut stex) = s.simple_textures.get(tex.0) {
-        device.wait_idle().expect("Unable to wait for device idle");
+        unsafe {
+            device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+        }
         unsafe {
             let data_reader = device
                 .acquire_mapping_reader::<f32>(

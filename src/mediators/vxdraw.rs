@@ -1331,7 +1331,7 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let tex = add_texture(&mut windowing, LOGO, &mut logger);
-        add_sprite(&mut windowing, Sprite::default(), tex, &mut logger);
+        add_sprite(&mut windowing, Sprite::default(), &tex, &mut logger);
 
         let prspect = gen_perspective(&mut windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
@@ -1354,7 +1354,7 @@ mod tests {
                 ],
                 ..Sprite::default()
             },
-            tex,
+            &tex,
             &mut logger,
         );
 
@@ -1376,7 +1376,7 @@ mod tests {
                     scale: 0.5,
                     ..Sprite::default()
                 },
-                tex,
+                &tex,
                 &mut logger,
             );
         }
@@ -1437,7 +1437,7 @@ mod tests {
                     scale: 0.5,
                     ..Sprite::default()
                 },
-                tex,
+                &tex,
                 &mut logger,
             );
         }

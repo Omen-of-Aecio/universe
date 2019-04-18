@@ -51,9 +51,17 @@ impl Default for Sprite {
     }
 }
 
+pub struct SpriteHandle(usize);
+pub struct TextureHandle(usize);
+
 /// Add a sprite (a rectangular view of a texture) to the system
-pub fn add_sprite(s: &mut Windowing, sprite: Sprite, texture: usize, log: &mut Logger<Log>) -> u32 {
-    let tex = &mut s.simple_textures[texture];
+pub fn add_sprite(
+    s: &mut Windowing,
+    sprite: Sprite,
+    texture: &TextureHandle,
+    log: &mut Logger<Log>,
+) -> SpriteHandle {
+    let tex = &mut s.simple_textures[texture.0];
     let device = &s.device;
 
     // Derive xy from the sprite's initial UV
@@ -129,11 +137,11 @@ pub fn add_sprite(s: &mut Windowing, sprite: Sprite, texture: usize, log: &mut L
             .release_mapping_writer(data_target)
             .expect("Couldn't release the mapping writer!");
     }
-    tex.count - 1
+    SpriteHandle((tex.count - 1) as usize)
 }
 
 /// Add a texture to the system
-pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) -> usize {
+pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) -> TextureHandle {
     let (texture_vertex_buffer, texture_vertex_memory, texture_vertex_requirements) =
         make_vertex_buffer_with_data(s, &[0f32; 9 * 4 * 1000]);
 
@@ -657,5 +665,5 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) ->
         pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
         render_pass: ManuallyDrop::new(triangle_render_pass),
     });
-    s.simple_textures.len() - 1
+    TextureHandle(s.simple_textures.len() - 1)
 }

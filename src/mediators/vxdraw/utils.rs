@@ -498,7 +498,7 @@ pub fn copy_image_to_rgb(
     }
 }
 
-pub struct Alignment(u64);
+pub struct Alignment(pub u64);
 pub fn align_top(alignment: Alignment, value: u64) -> u64 {
     if value % alignment.0 != 0 {
         let alig = value + (alignment.0 - value % alignment.0);

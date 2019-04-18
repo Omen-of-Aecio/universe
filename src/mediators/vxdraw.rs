@@ -1558,6 +1558,12 @@ mod tests {
 
         let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
         streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id, &mut logger);
+
+        strtex::streaming_texture_set_pixels_block(&mut windowing, id, (0, 0), (500, 500), (255, 0, 0, 255));
+        strtex::streaming_texture_set_pixels_block(&mut windowing, id, (500, 0), (1000, 1000), (0, 255, 0, 255));
+        strtex::streaming_texture_set_pixels_block(&mut windowing, id, (0, 500), (500, 1000), (0, 0, 255, 255));
+        strtex::streaming_texture_set_pixels_block(&mut windowing, id, (500, 500), (1000, 1000), (0, 0, 0, 0));
+
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         assert_swapchain_eq(&mut windowing, "streaming_texture", img);
     }

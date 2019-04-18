@@ -26,6 +26,7 @@ use gfx_hal::{
 use logger::{debug, Logger};
 use std::io::Read;
 use std::mem::{size_of, ManuallyDrop};
+use super::utils::*;
 
 // ---
 
@@ -126,15 +127,6 @@ pub fn add_streaming_texture(s: &mut Windowing, w: usize, h: usize, log: &mut Lo
             )
             .expect("Couldn't create the image view!")
     };
-
-    unsafe {
-        let mut target = device.acquire_mapping_writer(&mut image_memory, 0..requirements.size).expect("unable to acquire mapping writer");
-        target[0..requirements.size as usize].copy_from_slice(&vec![127u8; requirements.size as usize]);
-        device.release_mapping_writer(target);
-        let mut target = device.acquire_mapping_writer(&mut image_memory, 0..requirements.size).expect("unable to acquire mapping writer");
-        target[0..requirements.size as usize / 2].copy_from_slice(&vec![255u8; requirements.size as usize / 2]);
-        device.release_mapping_writer(target);
-    }
 
     let sampler = unsafe {
         s.device
@@ -486,6 +478,7 @@ pub fn add_streaming_texture(s: &mut Windowing, w: usize, h: usize, log: &mut Lo
 
         image_buffer: ManuallyDrop::new(the_image),
         image_memory: ManuallyDrop::new(image_memory),
+        image_requirements: requirements,
 
         descriptor_pool: ManuallyDrop::new(descriptor_pool),
         image_view: ManuallyDrop::new(image_view),
@@ -611,7 +604,70 @@ pub fn streaming_texture_add_sprite(
     (tex.count - 1) as usize
 }
 
+
+pub fn streaming_texture_set_pixels(s: &mut Windowing, id: usize, modifier: impl Iterator<Item = (u32, u32, (u8, u8, u8, u8))>) {
+    if let Some(ref strtex) = s.streaming_textures.get(id) {
+        unsafe {
+            let foot = s.device.get_image_subresource_footprint(&strtex.image_buffer, image::Subresource {
+                aspects: format::Aspects::COLOR,
+                level: 0,
+                layer: 0,
+            });
+            for item in modifier {
+                let w = item.0;
+                let h = item.1;
+                let color = item.2;
+
+                let access = foot.row_pitch * h as u64 + (w * 4) as u64;
+                let align = align_top(Alignment(strtex.image_requirements.alignment), access + 4);
+                let mut target = s.device.acquire_mapping_writer(&*strtex.image_memory, access..align).expect("unable to acquire mapping writer");
+                target[0..4].copy_from_slice(&[color.0, color.1, color.2, color.3]);
+                s.device.release_mapping_writer(target);
+            }
+        }
+    }
+}
+
+pub fn streaming_texture_set_pixels_block(s: &mut Windowing, id: usize, start: (u32, u32), stop: (u32, u32), color: (u8, u8, u8, u8)) {
+    if let Some(ref strtex) = s.streaming_textures.get(id) {
+        unsafe {
+            let foot = s.device.get_image_subresource_footprint(&strtex.image_buffer, image::Subresource {
+                aspects: format::Aspects::COLOR,
+                level: 0,
+                layer: 0,
+            });
+
+            let access_begin = foot.row_pitch * start.1 as u64 + (start.0 * 4) as u64;
+            let access_end = foot.row_pitch * stop.1 as u64 + (stop.0 * 4) as u64;
+            let align = align_top(Alignment(strtex.image_requirements.alignment), access_end + 4);
+            let mut target = s.device.acquire_mapping_writer::<u8>(&*strtex.image_memory, access_begin..align).expect("unable to acquire mapping writer");
+            let mut colbuff = vec![];
+            for _ in start.0..stop.0 {
+                colbuff.extend(&[color.0, color.1, color.2, color.3]);
+            }
+            for idx in start.1..stop.1 {
+                let idx = (idx - start.1) as usize;
+                let pitch = foot.row_pitch as usize;
+                target[idx*pitch..idx*pitch+(stop.0-start.0) as usize*4].copy_from_slice(&colbuff);
+            }
+            s.device.release_mapping_writer(target);
+        }
+    }
+}
+
 pub fn streaming_texture_set_pixel(s: &mut Windowing, id: usize, w: u32, h: u32, color: (u8, u8, u8, u8)) {
-    if let Some(strtex) = s.streaming_textures.get(id) {
+    if let Some(ref strtex) = s.streaming_textures.get(id) {
+        unsafe {
+            let foot = s.device.get_image_subresource_footprint(&strtex.image_buffer, image::Subresource {
+                aspects: format::Aspects::COLOR,
+                level: 0,
+                layer: 0,
+            });
+            let access = foot.row_pitch * h as u64 + (w * 4) as u64;
+            let align = align_top(Alignment(strtex.image_requirements.alignment), access + 4);
+            let mut target = s.device.acquire_mapping_writer(&*strtex.image_memory, access..align).expect("unable to acquire mapping writer");
+            target[0..4].copy_from_slice(&[color.0, color.1, color.2, color.3]);
+            s.device.release_mapping_writer(target);
+        }
     }
 }

@@ -24,6 +24,7 @@ pub struct StreamingTexture {
 
     pub image_buffer: ManuallyDrop<<back::Backend as Backend>::Image>,
     pub image_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
+    pub image_requirements: gfx_hal::memory::Requirements,
 
     pub sampler: ManuallyDrop<<back::Backend as Backend>::Sampler>,
     pub image_view: ManuallyDrop<<back::Backend as Backend>::ImageView>,

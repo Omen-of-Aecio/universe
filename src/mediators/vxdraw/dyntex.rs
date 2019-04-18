@@ -1,5 +1,8 @@
 use super::utils::*;
-use crate::glocals::{Log, SingleTexture, Windowing};
+use crate::glocals::{
+    vxdraw::{SingleTexture, Windowing},
+    Log,
+};
 use ::image as load_image;
 use cgmath::Rad;
 #[cfg(feature = "dx12")]

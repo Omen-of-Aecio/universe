@@ -1,5 +1,8 @@
 use super::utils::*;
-use crate::glocals::{ColoredTriangleList, Log, Windowing};
+use crate::glocals::{
+    vxdraw::{ColoredTriangleList, Windowing},
+    Log,
+};
 use cgmath::Rad;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;

@@ -1,4 +1,4 @@
-use crate::glocals::{Log, Windowing};
+use crate::glocals::{vxdraw::Windowing, Log};
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
 #[cfg(feature = "gl")]
@@ -1356,7 +1356,6 @@ mod tests {
         assert_swapchain_eq(&mut windowing, "simple_texture_adheres_to_view", img);
     }
 
-
     #[test]
     fn colored_simple_texture() {
         let mut logger = Logger::spawn_void();
@@ -1450,11 +1449,17 @@ mod tests {
         }
         {
             let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1x2k);
-            assert_eq![Matrix4::from_nonuniform_scale(1.0, 0.5, 1.0), gen_perspective(&mut windowing)];
+            assert_eq![
+                Matrix4::from_nonuniform_scale(1.0, 0.5, 1.0),
+                gen_perspective(&mut windowing)
+            ];
         }
         {
             let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
-            assert_eq![Matrix4::from_nonuniform_scale(0.5, 1.0, 1.0), gen_perspective(&mut windowing)];
+            assert_eq![
+                Matrix4::from_nonuniform_scale(0.5, 1.0, 1.0),
+                gen_perspective(&mut windowing)
+            ];
         }
     }
 

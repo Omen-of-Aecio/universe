@@ -1,4 +1,4 @@
-use crate::glocals::Windowing;
+use crate::glocals::vxdraw::Windowing;
 use cgmath::prelude::*;
 use cgmath::{Matrix4, Vector2};
 #[cfg(feature = "dx12")]
@@ -296,9 +296,9 @@ pub fn gen_perspective(s: &mut Windowing) -> Matrix4<f32> {
     let w_over_h = size.width as f32 / size.height as f32;
     let h_over_w = size.height as f32 / size.width as f32;
     if w_over_h >= 1.0 {
-        Matrix4::from_nonuniform_scale(1.0/w_over_h, 1.0, 1.0)
+        Matrix4::from_nonuniform_scale(1.0 / w_over_h, 1.0, 1.0)
     } else {
-        Matrix4::from_nonuniform_scale(1.0, 1.0/h_over_w, 1.0)
+        Matrix4::from_nonuniform_scale(1.0, 1.0 / h_over_w, 1.0)
     }
 }
 

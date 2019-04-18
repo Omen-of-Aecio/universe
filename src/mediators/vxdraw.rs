@@ -931,6 +931,7 @@ mod tests {
 
     use cgmath::{Deg, Vector3};
     use rand_pcg::Pcg64Mcg as random;
+    use std::f32::consts::PI;
 
     static LOGO: &[u8] = include_bytes!["../../assets/images/logo.png"];
 
@@ -938,7 +939,6 @@ mod tests {
 
     fn add_windmills(windowing: &mut Windowing, rand_rotat: bool) -> Vec<DebugTriangleHandle> {
         use rand::Rng;
-        use std::f32::consts::PI;
         let mut rng = random::new(0);
         let mut debug_triangles = Vec::with_capacity(1000);
         for _ in 0..1000 {
@@ -1364,6 +1364,65 @@ mod tests {
     }
 
     #[test]
+    fn rotated_texture() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let tex = add_texture(&mut windowing, LOGO, &mut logger);
+
+        let base = Sprite {
+            width: 1.0,
+            height: 1.0,
+            ..Sprite::default()
+        };
+
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (-0.5, -0.5),
+                rotation: 0.0,
+                ..base
+            },
+            &tex,
+            &mut logger,
+        );
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (0.5, -0.5),
+                rotation: PI / 4.0,
+                ..base
+            },
+            &tex,
+            &mut logger,
+        );
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (-0.5, 0.5),
+                rotation: PI / 2.0,
+                ..base
+            },
+            &tex,
+            &mut logger,
+        );
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (0.5, 0.5),
+                rotation: PI,
+                ..base
+            },
+            &tex,
+            &mut logger,
+        );
+        sprite_rotate_all(&mut windowing, &tex, Deg(90.0));
+
+        let prspect = gen_perspective(&mut windowing);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "rotated_texture", img);
+    }
+
+    #[test]
     fn many_sprites() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
@@ -1372,7 +1431,7 @@ mod tests {
             add_sprite(
                 &mut windowing,
                 Sprite {
-                    rotation: ((i * 10) as f32 / 180f32 * 3.14),
+                    rotation: ((i * 10) as f32 / 180f32 * PI),
                     scale: 0.5,
                     ..Sprite::default()
                 },
@@ -1433,7 +1492,7 @@ mod tests {
                 &mut windowing,
                 Sprite {
                     uv_end: (0.05, 0.05),
-                    rotation: ((i * 10) as f32 / 180f32 * 3.14),
+                    rotation: ((i * 10) as f32 / 180f32 * PI),
                     scale: 0.5,
                     ..Sprite::default()
                 },

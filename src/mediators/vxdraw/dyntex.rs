@@ -1,6 +1,7 @@
 use super::utils::*;
 use crate::glocals::{Log, SingleTexture, Windowing};
 use ::image as load_image;
+use cgmath::Rad;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
 #[cfg(feature = "gl")]
@@ -53,6 +54,50 @@ impl Default for Sprite {
 
 pub struct SpriteHandle(usize);
 pub struct TextureHandle(usize);
+
+/// Rotate all sprites that depend on a given texture
+pub fn sprite_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, tex: &TextureHandle, deg: T) {
+    let device = &s.device;
+    if let Some(ref mut stex) = s.simple_textures.get(tex.0) {
+        device.wait_idle().expect("Unable to wait for device idle");
+        unsafe {
+            let data_reader = device
+                .acquire_mapping_reader::<f32>(
+                    &stex.texture_vertex_memory,
+                    0..stex.texture_vertex_requirements.size,
+                )
+                .expect("Failed to acquire a memory writer!");
+            let mut vertices = Vec::<f32>::with_capacity(stex.count as usize);
+            for i in 0..stex.count {
+                let idx = (i * 9 * 4) as usize;
+                let rotation = &data_reader[idx + 6..idx + 7];
+                vertices.push(rotation[0]);
+            }
+            device.release_mapping_reader(data_reader);
+
+            let mut data_target = device
+                .acquire_mapping_writer::<f32>(
+                    &stex.texture_vertex_memory,
+                    0..stex.texture_vertex_requirements.size,
+                )
+                .expect("Failed to acquire a memory writer!");
+
+            for (i, vert) in vertices.iter().enumerate() {
+                let mut idx = (i * 9 * 4) as usize;
+                data_target[idx + 6..idx + 7].copy_from_slice(&[*vert + deg.into().0]);
+                idx += 9;
+                data_target[idx + 6..idx + 7].copy_from_slice(&[*vert + deg.into().0]);
+                idx += 9;
+                data_target[idx + 6..idx + 7].copy_from_slice(&[*vert + deg.into().0]);
+                idx += 9;
+                data_target[idx + 6..idx + 7].copy_from_slice(&[*vert + deg.into().0]);
+            }
+            device
+                .release_mapping_writer(data_target)
+                .expect("Couldn't release the mapping writer!");
+        }
+    }
+}
 
 /// Add a sprite (a rectangular view of a texture) to the system
 pub fn add_sprite(

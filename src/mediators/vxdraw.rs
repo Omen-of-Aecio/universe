@@ -528,25 +528,6 @@ fn draw_frame_internal<T>(
                     memory::Dependencies::empty(),
                     &[image_barrier],
                 );
-                // let image_barrier = memory::Barrier::Image {
-                //     states: (image::Access::SHADER_READ, image::Layout::ShaderReadOnlyOptimal)
-                //         ..(
-                //             image::Access::HOST_READ | image::Access::HOST_WRITE,
-                //             image::Layout::General,
-                //         ),
-                //     target: &*strtex.image_buffer,
-                //     families: None,
-                //     range: image::SubresourceRange {
-                //         aspects: format::Aspects::COLOR,
-                //         levels: 0..1,
-                //         layers: 0..1,
-                //     },
-                // };
-                // buffer.pipeline_barrier(
-                //     PipelineStage::FRAGMENT_SHADER..PipelineStage::HOST,
-                //     memory::Dependencies::empty(),
-                //     &[image_barrier],
-                // );
                 // Submit automatically makes host writes available for the device
                 let image_barrier = memory::Barrier::Image {
                     states: (image::Access::empty(), image::Layout::ShaderReadOnlyOptimal)
@@ -1757,6 +1738,35 @@ mod tests {
                 (0, 255, 0, 255),
             );
         }
+    }
+
+    #[test]
+    fn streaming_texture_world_with_minimap() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+
+        let id = add_streaming_texture(&mut windowing, 800, 600, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite { scale: 0.1, translation: (-1.0, -1.0),.. strtex::Sprite::default() }, id, &mut logger);
+
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (50, 50),
+            (50, 50),
+            (0, 255, 0, 255),
+        );
+
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (75, 100),
+            (25, 50),
+            (0, 0, 255, 255),
+        );
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "streaming_texture_blocks_off_by_one", img);
     }
 
     // ---

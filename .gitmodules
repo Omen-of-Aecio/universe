@@ -1,6 +1,6 @@
 [submodule "assets"]
 	path = assets
 	url = https://github.com/BourgondAries/universe-assets
-[submodule "libs/config"]
-	path = libs/config
-	url = https://github.com/Ploppz/config
+[submodule "crates/config"]
+	path = crates/config
+	url = git@github.com:Ploppz/config.git

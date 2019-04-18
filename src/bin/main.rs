@@ -10,25 +10,23 @@ use universe::{glocals::*, *};
 
 // ---
 
-fn parse_command_line_arguments<'a>(s: &mut clap::ArgMatches<'a>) {
-    *s = {
-        App::new("Universe")
-            .version("0.1.0")
-            .author(crate_authors!["\n"])
-            .arg(
-                Arg::with_name("connect")
-                    .short("c")
-                    .help("Run client and connect to specified server of form `ipaddress:port`")
-                    .takes_value(true),
-            )
-            .arg(
-                Arg::with_name("host")
-                    .short("h")
-                    .help("Host a server on a port")
-                    .takes_value(true),
-            )
-            .get_matches()
-    };
+fn parse_command_line_arguments<'a>() -> clap::ArgMatches<'a> {
+    App::new("Universe")
+        .version("0.1.0")
+        .author(crate_authors!["\n"])
+        .arg(
+            Arg::with_name("connect")
+                .short("c")
+                .help("Run client and connect to specified server of form `ipaddress:port`")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("host")
+                .short("h")
+                .help("Host a server on a port")
+                .takes_value(true),
+        )
+        .get_matches()
 }
 
 fn run_client_or_server(s: &mut glocals::Main) {
@@ -78,7 +76,7 @@ fn wait_for_threads_to_exit(s: glocals::Main) {
 
 fn main() {
     let mut s = glocals::Main::default();
-    parse_command_line_arguments(&mut s.commandline);
+    s.commandline = parse_command_line_arguments();
     run_client_or_server(&mut s);
     wait_for_threads_to_exit(s);
 }

@@ -5,8 +5,8 @@ use std::f32::consts::PI;
 
 use geometry::grid2d::Grid;
 
-static VERT_SRC: &str = include_str!("../../shaders/proc1.vert");
-static FRAG_SRC: &str = include_str!("../../shaders/proc1.frag");
+static VERT_SRC: &str = include_str!("../../shaders/proc1_gl.vert");
+static FRAG_SRC: &str = include_str!("../../shaders/proc1_gl.frag");
 pub fn proc1(tiles: &mut Grid<u8>, display: &glium::Display) {
     let mut rng = rand::thread_rng();
 

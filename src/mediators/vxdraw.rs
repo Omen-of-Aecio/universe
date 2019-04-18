@@ -1645,6 +1645,69 @@ mod tests {
     }
 
     #[test]
+    fn translated_texture() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let tex = add_texture(
+            &mut windowing,
+            LOGO,
+            TextureOptions {
+                depth_test: false,
+                ..TextureOptions::default()
+            },
+        );
+
+        let base = Sprite {
+            width: 1.0,
+            height: 1.0,
+            ..Sprite::default()
+        };
+
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (-0.5, -0.5),
+                rotation: 0.0,
+                ..base
+            },
+            &tex,
+        );
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (0.5, -0.5),
+                rotation: PI / 4.0,
+                ..base
+            },
+            &tex,
+        );
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (-0.5, 0.5),
+                rotation: PI / 2.0,
+                ..base
+            },
+            &tex,
+        );
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (0.5, 0.5),
+                rotation: PI,
+                ..base
+            },
+            &tex,
+        );
+        sprite_translate_all(&mut windowing, &tex, (0.25, 0.35));
+
+        let prspect = gen_perspective(&mut windowing);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "translated_texture", img);
+    }
+
+
+    #[test]
     fn rotated_texture() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);

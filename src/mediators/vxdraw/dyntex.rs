@@ -714,6 +714,65 @@ pub fn add_sprite(s: &mut Windowing, sprite: Sprite, texture: &TextureHandle) ->
     SpriteHandle((tex.count - 1) as usize)
 }
 
+// ---
+
+/// Translate all sprites that depend on a given texture
+pub fn sprite_translate_all(s: &mut Windowing, tex: &TextureHandle, dxdy: (f32, f32)) {
+    let device = &s.device;
+    if let Some(ref mut stex) = s.simple_textures.get(tex.0) {
+        unsafe {
+            device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+        }
+        unsafe {
+            let data_reader = device
+                .acquire_mapping_reader::<f32>(
+                    &stex.texture_vertex_memory,
+                    0..stex.texture_vertex_requirements.size,
+                )
+                .expect("Failed to acquire a memory writer!");
+            let mut vertices = Vec::with_capacity(stex.count as usize);
+            for i in 0..stex.count {
+                let idx = (i * 10 * 4) as usize;
+                let translation = &data_reader[idx + 5..idx + 7];
+                vertices.push((translation[0], translation[1]));
+            }
+            device.release_mapping_reader(data_reader);
+
+            let mut data_target = device
+                .acquire_mapping_writer::<f32>(
+                    &stex.texture_vertex_memory,
+                    0..stex.texture_vertex_requirements.size,
+                )
+                .expect("Failed to acquire a memory writer!");
+
+            for (i, prev_dxdy) in vertices.iter().enumerate() {
+                let mut idx = (i * 10 * 4) as usize;
+                let new_dxdy = (prev_dxdy.0 + dxdy.0, prev_dxdy.1 + dxdy.1);
+                data_target[idx + 5..idx + 7]
+                    .copy_from_slice(&[new_dxdy.0, new_dxdy.1]);
+                idx += 10;
+                data_target[idx + 5..idx + 7]
+                    .copy_from_slice(&[new_dxdy.0, new_dxdy.1]);
+                idx += 10;
+                data_target[idx + 5..idx + 7]
+                    .copy_from_slice(&[new_dxdy.0, new_dxdy.1]);
+                idx += 10;
+                data_target[idx + 5..idx + 7]
+                    .copy_from_slice(&[new_dxdy.0, new_dxdy.1]);
+            }
+            device
+                .release_mapping_writer(data_target)
+                .expect("Couldn't release the mapping writer!");
+        }
+    }
+}
+
 /// Rotate all sprites that depend on a given texture
 pub fn sprite_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, tex: &TextureHandle, deg: T) {
     let device = &s.device;

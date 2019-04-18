@@ -376,6 +376,10 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) ->
     layout(location = 0) out vec2 f_uv;
     layout(location = 1) out vec4 f_color;
 
+    layout(push_constant) uniform PushConstant {
+        mat4 view;
+    } push_constant;
+
     out gl_PerVertex {
         vec4 gl_Position;
     };
@@ -385,7 +389,7 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) ->
         vec2 pos = rotmatrix * scale * v_pos;
         f_uv = v_uv;
         f_color = color;
-        gl_Position = vec4(pos + v_dxdy, 0.0, 1.0);
+        gl_Position = push_constant.view * vec4(pos + v_dxdy, 0.0, 1.0);
     }";
 
     const FRAGMENT_SOURCE_TEXTURE: &str = "#version 450
@@ -640,7 +644,8 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) ->
         ]);
     }
 
-    let push_constants = Vec::<(pso::ShaderStageFlags, core::ops::Range<u32>)>::new();
+    let mut push_constants = Vec::<(pso::ShaderStageFlags, core::ops::Range<u32>)>::new();
+    push_constants.push((pso::ShaderStageFlags::VERTEX, 0..16));
     let triangle_pipeline_layout = unsafe {
         s.device
             .create_pipeline_layout(&triangle_descriptor_set_layouts, push_constants)

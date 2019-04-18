@@ -293,8 +293,13 @@ pub fn make_centered_equilateral_triangle() -> [f32; 6] {
 
 pub fn gen_perspective(s: &mut Windowing) -> Matrix4<f32> {
     let size = s.swapconfig.extent;
-    let pval = Vector2::new(size.height as f32, size.width as f32).normalize();
-    Matrix4::from_nonuniform_scale(pval.x as f32, pval.y as f32, 1.0)
+    let w_over_h = size.width as f32 / size.height as f32;
+    let h_over_w = size.height as f32 / size.width as f32;
+    if w_over_h >= 1.0 {
+        Matrix4::from_nonuniform_scale(1.0/w_over_h, 1.0, 1.0)
+    } else {
+        Matrix4::from_nonuniform_scale(1.0, 1.0/h_over_w, 1.0)
+    }
 }
 
 pub fn copy_image_to_rgb(

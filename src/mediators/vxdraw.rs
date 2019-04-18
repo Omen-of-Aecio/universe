@@ -512,6 +512,12 @@ fn draw_frame_internal<T>(
 
                 for simple_tex in s.simple_textures.iter() {
                     enc.bind_graphics_pipeline(&simple_tex.pipeline);
+                    enc.push_graphics_constants(
+                        &simple_tex.pipeline_layout,
+                        ShaderStageFlags::VERTEX,
+                        0,
+                        &*(view.as_ptr() as *const [u32; 16]),
+                    );
                     enc.bind_graphics_descriptor_sets(
                         &simple_tex.pipeline_layout,
                         0,
@@ -1339,6 +1345,19 @@ mod tests {
     }
 
     #[test]
+    fn simple_texture_adheres_to_view() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
+        let tex = add_texture(&mut windowing, LOGO, &mut logger);
+        add_sprite(&mut windowing, Sprite::default(), &tex, &mut logger);
+
+        let prspect = gen_perspective(&mut windowing);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "simple_texture_adheres_to_view", img);
+    }
+
+
+    #[test]
     fn colored_simple_texture() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
@@ -1420,6 +1439,23 @@ mod tests {
         let prspect = gen_perspective(&mut windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         assert_swapchain_eq(&mut windowing, "rotated_texture", img);
+    }
+
+    #[test]
+    fn correct_perspective() {
+        let mut logger = Logger::spawn_void();
+        {
+            let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+            assert_eq![Matrix4::identity(), gen_perspective(&mut windowing)];
+        }
+        {
+            let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1x2k);
+            assert_eq![Matrix4::from_nonuniform_scale(1.0, 0.5, 1.0), gen_perspective(&mut windowing)];
+        }
+        {
+            let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
+            assert_eq![Matrix4::from_nonuniform_scale(0.5, 1.0, 1.0), gen_perspective(&mut windowing)];
+        }
     }
 
     #[test]

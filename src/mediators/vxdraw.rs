@@ -441,11 +441,27 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
 pub struct Sprite {
     width: f32,
     height: f32,
+    colors: [(u8, u8, u8, u8); 4],
     uv_begin: (f32, f32),
     uv_end: (f32, f32),
     translation: (f32, f32),
     rotation: f32,
     scale: f32,
+}
+
+impl Default for Sprite {
+    fn default() -> Self {
+        Sprite {
+            width: 2.0,
+            height: 2.0,
+            colors: [(0, 0, 0, 255); 4],
+            uv_begin: (0.0, 0.0),
+            uv_end: (1.0, 1.0),
+            translation: (0.0, 0.0),
+            rotation: 0.0,
+            scale: 1.0,
+        }
+    }
 }
 
 pub fn add_sprite(s: &mut Windowing, sprite: Sprite, texture: usize, log: &mut Logger<Log>) -> u32 {
@@ -480,7 +496,14 @@ pub fn add_sprite(s: &mut Windowing, sprite: Sprite, texture: usize, log: &mut L
             .expect("Failed to acquire a memory writer!");
         let i = (tex.count * 6) as u16;
         let j = (tex.count * 4) as u16;
-        data_target[i as usize..(i+6) as usize].copy_from_slice(&[j, j + 1, j + 2, j + 2, j + 3, j]);
+        data_target[i as usize..(i + 6) as usize].copy_from_slice(&[
+            j,
+            j + 1,
+            j + 2,
+            j + 2,
+            j + 3,
+            j,
+        ]);
         device
             .release_mapping_writer(data_target)
             .expect("Couldn't release the mapping writer!");
@@ -492,7 +515,7 @@ pub fn add_sprite(s: &mut Windowing, sprite: Sprite, texture: usize, log: &mut L
                 0..tex.texture_vertex_requirements.size,
             )
             .expect("Failed to acquire a memory writer!");
-        let idx = (tex.count * 4 * 8) as usize;
+        let idx = (tex.count * 4 * 9) as usize;
 
         for (i, (point, uv)) in [
             (topleft, topleft_uv),
@@ -503,13 +526,15 @@ pub fn add_sprite(s: &mut Windowing, sprite: Sprite, texture: usize, log: &mut L
         .iter()
         .enumerate()
         {
-            let idx = idx + i * 8;
+            let idx = idx + i * 9;
             data_target[idx..idx + 2].copy_from_slice(&[point.0, point.1]);
             data_target[idx + 2..idx + 4].copy_from_slice(&[uv.0, uv.1]);
             data_target[idx + 4..idx + 6]
                 .copy_from_slice(&[sprite.translation.0, sprite.translation.1]);
             data_target[idx + 6..idx + 7].copy_from_slice(&[sprite.rotation]);
             data_target[idx + 7..idx + 8].copy_from_slice(&[sprite.scale]);
+            data_target[idx + 8..idx + 9]
+                .copy_from_slice(&[std::mem::transmute::<_, f32>(sprite.colors[i])]);
         }
         tex.count += 1;
         device
@@ -520,43 +545,8 @@ pub fn add_sprite(s: &mut Windowing, sprite: Sprite, texture: usize, log: &mut L
 }
 
 pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
-    #[rustfmt::skip]
-    let (texture_vertex_buffer, texture_vertex_memory, texture_vertex_requirements) = make_vertex_buffer_with_data(
-        s,
-        &[0f32; 8*4*1000]);
-    // &[
-    // -1.0f32, -1.0, // Original position
-    // 0.0, 0.0,      // UV
-    // 0.0, 0.0,      // DX DY
-    // 0.0,           // Rot
-    // 0.0,           // Scale
-
-    // -1.0f32, 1.0,
-    // 0.0, 1.0,
-    // 0.0, 0.0,
-    // 0.0,
-
-    // 1.0f32, 1.0,
-    // 1.0f32, 1.0,
-    // 0.0, 0.0,
-    // 0.0,
-
-    // 1.0f32, 1.0,
-    // 1.0f32, 1.0,
-    // 0.0, 0.0,
-    // 0.0,
-
-    // 1.0f32, -1.0,
-    // 1.0f32, 0.0,
-    // 0.0, 0.0,
-    // 0.0,
-
-    // -1.0f32, -1.0,
-    // 0.0f32, 0.0,
-    // 0.0, 0.0,
-    // 0.0,
-    // ],
-    // );
+    let (texture_vertex_buffer, texture_vertex_memory, texture_vertex_requirements) =
+        make_vertex_buffer_with_data(s, &[0f32; 9 * 4 * 1000]);
 
     let device = &s.device;
 
@@ -740,8 +730,10 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
     layout(location = 2) in vec2 v_dxdy;
     layout(location = 3) in float rotation;
     layout(location = 4) in float scale;
+    layout(location = 5) in vec4 color;
 
     layout(location = 0) out vec2 f_uv;
+    layout(location = 1) out vec4 f_color;
 
     out gl_PerVertex {
         vec4 gl_Position;
@@ -751,6 +743,7 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
         mat2 rotmatrix = mat2(cos(rotation), -sin(rotation), sin(rotation), cos(rotation));
         vec2 pos = rotmatrix * scale * v_pos;
         f_uv = v_uv;
+        f_color = color;
         gl_Position = vec4(pos + v_dxdy, 0.0, 1.0);
     }";
 
@@ -758,6 +751,8 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
     #extension GL_ARB_separate_shader_objects : enable
 
     layout(location = 0) in vec2 f_uv;
+    layout(location = 1) in vec4 f_color;
+
     layout(location = 0) out vec4 color;
 
     layout(set = 0, binding = 0) uniform texture2D f_texture;
@@ -765,6 +760,8 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
 
     void main() {
         color = texture(sampler2D(f_texture, f_sampler), f_uv);
+        color.a *= f_color.a;
+        color.rgb += f_color.rgb;
     }";
 
     let vs_module = {
@@ -813,7 +810,7 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
 
     let vertex_buffers: Vec<VertexBufferDesc> = vec![VertexBufferDesc {
         binding: 0,
-        stride: (size_of::<f32>() * (2 + 2 + 2 + 2)) as u32,
+        stride: (size_of::<f32>() * (2 + 2 + 2 + 2 + 1)) as u32,
         rate: 0,
     }];
     let attributes: Vec<AttributeDesc> = vec![
@@ -855,6 +852,14 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
             element: Element {
                 format: format::Format::R32Float,
                 offset: 28,
+            },
+        },
+        AttributeDesc {
+            location: 5,
+            binding: 0,
+            element: Element {
+                format: format::Format::Rgba8Unorm,
+                offset: 32,
             },
         },
     ];
@@ -1034,11 +1039,11 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
         s.device.destroy_shader_module(fs_module);
     }
 
-        let (
-            texture_vertex_buffer_indices,
-            texture_vertex_memory_indices,
-            texture_vertex_requirements_indices,
-        ) = make_index_buffer_with_data(s, &[0f32; 4 * 1000]);
+    let (
+        texture_vertex_buffer_indices,
+        texture_vertex_memory_indices,
+        texture_vertex_requirements_indices,
+    ) = make_index_buffer_with_data(s, &[0f32; 4 * 1000]);
 
     s.simple_textures.push(SingleTexture {
         count: 0,
@@ -1958,16 +1963,28 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let tex = add_texture(&mut windowing, &mut logger);
+        add_sprite(&mut windowing, Sprite::default(), tex, &mut logger);
+
+        let prspect = gen_perspective(&mut windowing);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "simple_texture", img);
+    }
+
+    #[test]
+    fn colored_simple_texture() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let tex = add_texture(&mut windowing, &mut logger);
         add_sprite(
             &mut windowing,
             Sprite {
-                width: 2f32,
-                height: 2f32,
-                uv_begin: (0.0, 0.0),
-                uv_end: (1.0, 1.0),
-                translation: (0.0, 0.0),
-                rotation: 0.0,
-                scale: 1.0,
+                colors: [
+                    (255, 1, 2, 255),
+                    (0, 255, 0, 255),
+                    (0, 0, 255, 100),
+                    (255, 2, 1, 0),
+                ],
+                ..Sprite::default()
             },
             tex,
             &mut logger,
@@ -1975,7 +1992,7 @@ mod tests {
 
         let prspect = gen_perspective(&mut windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        assert_swapchain_eq(&mut windowing, "simple_texture", img);
+        assert_swapchain_eq(&mut windowing, "colored_simple_texture", img);
     }
 
     #[test]
@@ -1987,13 +2004,9 @@ mod tests {
             add_sprite(
                 &mut windowing,
                 Sprite {
-                    width: 2f32,
-                    height: 2f32,
-                    uv_begin: (0.0, 0.0),
-                    uv_end: (1.0, 1.0),
-                    translation: (0.0, 0.0),
                     rotation: ((i * 10) as f32 / 180f32 * 3.14),
                     scale: 0.5,
+                    ..Sprite::default()
                 },
                 tex,
                 &mut logger,
@@ -2051,13 +2064,10 @@ mod tests {
             add_sprite(
                 &mut windowing,
                 Sprite {
-                    width: 2f32,
-                    height: 2f32,
-                    uv_begin: (0.0, 0.0),
                     uv_end: (0.05, 0.05),
-                    translation: (0.0, 0.0),
                     rotation: ((i * 10) as f32 / 180f32 * 3.14),
                     scale: 0.5,
+                    ..Sprite::default()
                 },
                 tex,
                 &mut logger,

@@ -366,6 +366,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
     debug![log, "vxdraw", "Framebuffer information"; "framebuffers" => framebuffers_string];
 
     let max_frames_in_flight = 3;
+    assert![max_frames_in_flight > 0];
 
     let mut frames_in_flight_fences = vec![];
     let mut present_wait_semaphores = vec![];
@@ -1085,6 +1086,11 @@ fn draw_frame_internal<T>(
             )
             .unwrap();
 
+        core::mem::swap(
+            &mut *s.acquire_image_semaphore_free,
+            &mut s.acquire_image_semaphores[swap_image as usize],
+        );
+
         s.device
             .wait_for_fence(
                 &s.frames_in_flight_fences[s.current_frame],
@@ -1095,11 +1101,6 @@ fn draw_frame_internal<T>(
         s.device
             .reset_fence(&s.frames_in_flight_fences[s.current_frame])
             .unwrap();
-
-        core::mem::swap(
-            &mut *s.acquire_image_semaphore_free,
-            &mut s.acquire_image_semaphores[s.current_frame],
-        );
 
         {
             let current_frame = s.current_frame;
@@ -1991,7 +1992,7 @@ mod tests {
 
         add_windmills(&mut windowing, false);
         for _ in 0..30 {
-            rotate_to_triangles(&mut windowing, Deg(-1.0f32));
+            debug_triangle_rotate_all(&mut windowing, Deg(-1.0f32));
         }
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
@@ -2000,7 +2001,7 @@ mod tests {
 
         add_windmills(&mut windowing, false);
         for _ in 0..30 {
-            rotate_to_triangles(&mut windowing, Deg(-1.0f32));
+            debug_triangle_rotate_all(&mut windowing, Deg(-1.0f32));
             draw_frame(&mut windowing, &mut logger, &prspect);
         }
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
@@ -2096,7 +2097,7 @@ mod tests {
         add_windmills(&mut windowing, false);
 
         b.iter(|| {
-            rotate_to_triangles(&mut windowing, Deg(1.0f32));
+            debug_triangle_rotate_all(&mut windowing, Deg(1.0f32));
             draw_frame(&mut windowing, &mut logger, &prspect);
         });
     }
@@ -2109,7 +2110,7 @@ mod tests {
         add_windmills(&mut windowing, false);
 
         b.iter(|| {
-            rotate_to_triangles(&mut windowing, Deg(1.0f32));
+            debug_triangle_rotate_all(&mut windowing, Deg(1.0f32));
         });
     }
 

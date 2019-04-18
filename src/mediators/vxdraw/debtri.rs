@@ -423,7 +423,7 @@ pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
     s.debug_triangles = Some(debug_triangles);
 }
 
-pub fn rotate_to_triangles<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
+pub fn debug_triangle_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
     let device = &s.device;
     if let Some(ref mut debug_triangles) = s.debug_triangles {
         device.wait_idle().expect("Unable to wait for device idle");

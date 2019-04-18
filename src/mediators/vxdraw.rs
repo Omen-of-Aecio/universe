@@ -31,7 +31,7 @@ use gfx_hal::{
     window::{Extent2D, PresentMode::*, Surface, Swapchain},
     Backbuffer, Backend, FrameSync, Instance, Primitive, SwapchainConfig,
 };
-use logger::{debug, info, log, trace, warn, InDebug, InDebugPretty, InHex, Logger};
+use logger::{debug, info, trace, warn, InDebug, InDebugPretty, Logger};
 use std::io::Read;
 use std::iter::once;
 use std::mem::{size_of, ManuallyDrop};
@@ -129,9 +129,18 @@ fn set_window_size(window: &mut glutin::GlWindow, show: ShowWindow) -> Extent2D 
 }
 
 pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windowing {
-    info![log, "vxdraw", "Initializing rendering"; "headless" => InDebug(&show)];
-    let events_loop = EventsLoop::new();
+    #[cfg(feature = "gl")]
+    static BACKEND: &str = "OpenGL";
+    #[cfg(feature = "vulkan")]
+    static BACKEND: &str = "Vulkan";
+    #[cfg(feature = "metal")]
+    static BACKEND: &str = "Metal";
+    #[cfg(feature = "dx12")]
+    static BACKEND: &str = "Dx12";
 
+    info![log, "vxdraw", "Initializing rendering"; "show" => InDebug(&show), "backend" => BACKEND];
+
+    let events_loop = EventsLoop::new();
     let window_builder = WindowBuilder::new().with_visibility(show == ShowWindow::Enable);
 
     #[cfg(feature = "gl")]
@@ -149,7 +158,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         set_window_size(&mut window, show);
         let dims = {
             let dpi_factor = window.get_hidpi_factor();
-            info![log, "vxdraw", "Window DPI factor"; "factor" => dpi_factor];
+            debug![log, "vxdraw", "Window DPI factor"; "factor" => dpi_factor];
             let (w, h): (u32, u32) = window
                 .get_inner_size()
                 .unwrap()
@@ -171,21 +180,27 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         let mut window = window_builder.build(&events_loop).unwrap();
         let version = 1;
         let vk_inst = back::Instance::create("renderer", version);
-        let mut surf: <back::Backend as Backend>::Surface = vk_inst.create_surface(&window);
-        let mut adapters = vk_inst.enumerate_adapters();
+        let surf: <back::Backend as Backend>::Surface = vk_inst.create_surface(&window);
+        let adapters = vk_inst.enumerate_adapters();
         let dims = set_window_size(&mut window, show);
         let dpi_factor = window.get_hidpi_factor();
-        info![log, "vxdraw", "Window DPI factor"; "factor" => dpi_factor];
+        debug![log, "vxdraw", "Window DPI factor"; "factor" => dpi_factor];
         (window, vk_inst, adapters, surf, dims)
     };
 
-    let len = adapters.len();
-    info![log, "vxdraw", "Adapters found"; "count" => len];
+    // ---
+
+    {
+        let len = adapters.len();
+        debug![log, "vxdraw", "Adapters found"; "count" => len];
+    }
+
     for (idx, adap) in adapters.iter().enumerate() {
         let info = adap.info.clone();
         let limits = adap.physical_device.limits();
-        info![log, "vxdraw", "Adapter found"; "idx" => idx, "info" => InDebugPretty(&info), "device limits" => InDebugPretty(&limits)];
+        debug![log, "vxdraw", "Adapter found"; "idx" => idx, "info" => InDebugPretty(&info), "device limits" => InDebugPretty(&limits)];
     }
+
     // TODO Find appropriate adapter, I've never seen a case where we have 2+ adapters, that time
     // will come one day
     let adapter = adapters.remove(0);
@@ -193,18 +208,12 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         .open_with::<_, gfx_hal::Graphics>(1, |family| surf.supports_queue_family(family))
         .expect("Unable to find device supporting graphics");
 
-    let (caps, formats, present_modes, _composite_alpha) =
+    let (caps, formats, present_modes, composite_alpha) =
         surf.compatibility(&adapter.physical_device);
 
-    if !caps.usage.contains(image::Usage::TRANSFER_SRC) {
-        warn![
-            log,
-            "vxdraw", "Surface does not support TRANSFER_SRC, may fail during testing"
-        ];
-    }
-
-    info![log, "vxdraw", "Surface capabilities"; "capabilities" => InDebugPretty(&caps); clone caps];
-    info![log, "vxdraw", "Formats available"; "formats" => InDebugPretty(&formats); clone formats];
+    debug![log, "vxdraw", "Surface capabilities"; "capabilities" => InDebugPretty(&caps); clone caps];
+    debug![log, "vxdraw", "Formats available"; "formats" => InDebugPretty(&formats); clone formats];
+    debug![log, "vxdraw", "Composition"; "alpha" => InDebugPretty(&composite_alpha); clone composite_alpha];
     let format = formats.map_or(format::Format::Rgba8Srgb, |formats| {
         formats
             .iter()
@@ -213,8 +222,8 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
             .unwrap_or(formats[0])
     });
 
-    info![log, "vxdraw", "Format chosen"; "format" => InDebugPretty(&format); clone format];
-    info![log, "vxdraw", "Available present modes"; "modes" => InDebugPretty(&present_modes); clone present_modes];
+    debug![log, "vxdraw", "Format chosen"; "format" => InDebugPretty(&format); clone format];
+    debug![log, "vxdraw", "Available present modes"; "modes" => InDebugPretty(&present_modes); clone present_modes];
 
     // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPresentModeKHR.html
     // VK_PRESENT_MODE_FIFO_KHR ... This is the only value of presentMode that is required to be supported
@@ -226,30 +235,42 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
             .ok_or("No PresentMode values specified!")
             .unwrap()
     };
-    info![log, "vxdraw", "Using best possible present mode"; "mode" => InDebug(&present_mode)];
+    debug![log, "vxdraw", "Using best possible present mode"; "mode" => InDebug(&present_mode)];
 
     let image_count = if present_mode == Mailbox {
-        (caps.image_count.end - 1).min(3)
+        (caps.image_count.end - 1)
+            .min(3)
+            .max(caps.image_count.start)
     } else {
-        (caps.image_count.end - 1).min(2)
+        (caps.image_count.end - 1)
+            .min(2)
+            .max(caps.image_count.start)
     };
-    info![log, "vxdraw", "Using swapchain images"; "count" => image_count];
+    debug![log, "vxdraw", "Using swapchain images"; "count" => image_count];
 
-    info![log, "vxdraw", "Swapchain size"; "extent" => InDebug(&dims)];
+    debug![log, "vxdraw", "Swapchain size"; "extent" => InDebug(&dims)];
 
     let mut swap_config = SwapchainConfig::from_caps(&caps, format, dims);
     swap_config.present_mode = present_mode;
     swap_config.image_count = image_count;
     swap_config.extent = dims;
-    swap_config.image_usage |= gfx_hal::image::Usage::TRANSFER_SRC;
-    info![log, "vxdraw", "Swapchain final configuration"; "swapchain" => InDebugPretty(&swap_config); clone swap_config];
+    if caps.usage.contains(image::Usage::TRANSFER_SRC) {
+        swap_config.image_usage |= gfx_hal::image::Usage::TRANSFER_SRC;
+    } else {
+        warn![
+            log,
+            "vxdraw", "Surface does not support TRANSFER_SRC, may fail during testing"
+        ];
+    }
+
+    debug![log, "vxdraw", "Swapchain final configuration"; "swapchain" => InDebugPretty(&swap_config); clone swap_config];
 
     let (swapchain, backbuffer) =
         unsafe { device.create_swapchain(&mut surf, swap_config.clone(), None) }
             .expect("Unable to create swapchain");
 
     let backbuffer_string = format!["{:#?}", backbuffer];
-    info![log, "vxdraw", "Backbuffer information"; "backbuffers" => backbuffer_string];
+    debug![log, "vxdraw", "Backbuffer information"; "backbuffers" => backbuffer_string];
 
     // NOTE: for curious people, the render_pass, used in both framebuffer creation AND command
     // buffer when drawing, only need to be _compatible_, which means the SAMPLE count and the
@@ -274,7 +295,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
             resolves: &[],
             preserves: &[],
         };
-        info![log, "vxdraw", "Render pass info"; "color attachment" => InDebugPretty(&color_attachment); clone color_attachment];
+        debug![log, "vxdraw", "Render pass info"; "color attachment" => InDebugPretty(&color_attachment); clone color_attachment];
         unsafe {
             device
                 .create_render_pass(&[color_attachment], &[subpass], &[])
@@ -285,7 +306,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
 
     {
         let rpfmt = format!["{:#?}", render_pass];
-        info![log, "vxdraw", "Created render pass for framebuffers"; "renderpass" => rpfmt];
+        debug![log, "vxdraw", "Created render pass for framebuffers"; "renderpass" => rpfmt];
     }
 
     let (image_views, framebuffers) = match backbuffer {
@@ -338,24 +359,28 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
 
     {
         let image_views = format!["{:?}", image_views];
-        info![log, "vxdraw", "Created image views"; "image views" => image_views];
+        debug![log, "vxdraw", "Created image views"; "image views" => image_views];
     }
 
     let framebuffers_string = format!["{:#?}", framebuffers];
-    info![log, "vxdraw", "Framebuffer information"; "framebuffers" => framebuffers_string];
+    debug![log, "vxdraw", "Framebuffer information"; "framebuffers" => framebuffers_string];
+
+    let max_frames_in_flight = 2;
 
     let mut frame_render_fences = vec![];
     let mut acquire_image_semaphores = vec![];
     let mut present_wait_semaphores = vec![];
-    for _ in 0..image_count {
+    for _ in 0..max_frames_in_flight {
         frame_render_fences.push(device.create_fence(true).expect("Can't create fence"));
-        acquire_image_semaphores.push(device.create_semaphore().expect("Can't create semaphore"));
         present_wait_semaphores.push(device.create_semaphore().expect("Can't create semaphore"));
+    }
+    for _ in 0..image_count {
+        acquire_image_semaphores.push(device.create_semaphore().expect("Can't create semaphore"));
     }
 
     {
         let count = frame_render_fences.len();
-        info![log, "vxdraw", "Allocated fences and semaphores"; "count" => count];
+        debug![log, "vxdraw", "Allocated fences and semaphores"; "count" => count];
     }
 
     let mut command_pool = unsafe {
@@ -375,6 +400,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         command_buffers,
         command_pool: ManuallyDrop::new(command_pool),
         current_frame: 0,
+        max_frames_in_flight,
         debug_triangles: None,
         device: ManuallyDrop::new(device),
         events_loop,
@@ -394,7 +420,6 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         render_pass: ManuallyDrop::new(render_pass),
         surf,
         swapchain: ManuallyDrop::new(swapchain),
-        swapchain_prev_idx: 0,
         swapconfig: swap_config,
         simple_textures: vec![],
         #[cfg(not(feature = "gl"))]
@@ -448,23 +473,24 @@ pub fn add_sprite(s: &mut Windowing, sprite: Sprite, texture: usize, log: &mut L
             .expect("Failed to acquire a memory writer!");
         let idx = (tex.count * 6 * 8) as usize;
 
-        for (i, (idx, point, uv)) in [
-            (idx, topleft, topleft_uv),
-            (idx + 8, bottomleft, bottomleft_uv),
-            (idx + 16, bottomright, bottomright_uv),
-            (idx + 24, bottomright, bottomright_uv),
-            (idx + 32, topright, topright_uv),
-            (idx + 40, topleft, topleft_uv),
+        for (i, (point, uv)) in [
+            (topleft, topleft_uv),
+            (bottomleft, bottomleft_uv),
+            (bottomright, bottomright_uv),
+            (bottomright, bottomright_uv),
+            (topright, topright_uv),
+            (topleft, topleft_uv),
         ]
         .iter()
         .enumerate()
         {
-            data_target[*idx..*idx + 2].copy_from_slice(&[point.0, point.1]);
-            data_target[*idx + 2..*idx + 4].copy_from_slice(&[uv.0, uv.1]);
-            data_target[*idx + 4..*idx + 6]
+            let idx = idx + i * 8;
+            data_target[idx..idx + 2].copy_from_slice(&[point.0, point.1]);
+            data_target[idx + 2..idx + 4].copy_from_slice(&[uv.0, uv.1]);
+            data_target[idx + 4..idx + 6]
                 .copy_from_slice(&[sprite.translation.0, sprite.translation.1]);
-            data_target[*idx + 6..*idx + 7].copy_from_slice(&[sprite.rotation]);
-            data_target[*idx + 7..*idx + 8].copy_from_slice(&[sprite.scale]);
+            data_target[idx + 6..idx + 7].copy_from_slice(&[sprite.rotation]);
+            data_target[idx + 7..idx + 8].copy_from_slice(&[sprite.scale]);
         }
         tex.count += 1;
         device
@@ -756,7 +782,7 @@ pub fn add_texture(s: &mut Windowing, log: &mut Logger<Log>) -> usize {
             specialization: pso::Specialization::default(),
         },
     );
-    info![log, "vxdraw", "After making"];
+    debug![log, "vxdraw", "After making"];
     let shader_entries = pso::GraphicsShaderSet {
         vertex: vs_entry,
         hull: None,
@@ -1035,38 +1061,36 @@ pub fn draw_frame_copy_framebuffer(
 }
 
 pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &Matrix4<f32>) {
-    draw_frame_internal(s, log, view, |_| {});
+    draw_frame_internal(s, log, view, |_, _| {});
 }
 
 fn draw_frame_internal<T>(
     s: &mut Windowing,
     log: &mut Logger<Log>,
     view: &Matrix4<f32>,
-    postproc: fn(&mut Windowing) -> T,
+    postproc: fn(&mut Windowing, gfx_hal::window::SwapImageIndex) -> T,
 ) -> T {
-    let frame_render_fence = &s.frame_render_fences[s.current_frame];
-    let acquire_image_semaphore = &s.acquire_image_semaphores[s.current_frame];
-    let frame = s.current_frame;
-    trace![log, "vxdraw", "Current frame"; "frame" => frame];
-
-    let image_index;
     let postproc_res = unsafe {
-        image_index = s
+        let image_index = s
             .swapchain
             .acquire_image(
                 u64::max_value(),
-                FrameSync::Semaphore(acquire_image_semaphore),
+                FrameSync::Semaphore(&s.acquire_image_semaphores[s.current_frame]),
             )
             .unwrap();
-        trace![log, "vxdraw", "Acquired image index"; "index" => image_index];
-        assert_eq![image_index as usize, s.current_frame];
-        s.swapchain_prev_idx = image_index;
-        trace![log, "vxdraw", "Waiting for fence"];
         s.device
-            .wait_for_fence(frame_render_fence, u64::max_value())
+            .wait_for_fence(&s.frame_render_fences[s.current_frame], u64::max_value())
             .unwrap();
-        trace![log, "vxdraw", "Resetting fence"];
-        s.device.reset_fence(frame_render_fence).unwrap();
+        s.device
+            .reset_fence(&s.frame_render_fences[s.current_frame])
+            .unwrap();
+
+        {
+            let current_frame = s.current_frame;
+            let texture_count = s.simple_textures.len();
+            let debugtris_cnt = s.debug_triangles.as_ref().map_or(0, |x| x.triangles_count);
+            trace![log, "vxdraw", "Drawing frame"; "swapchain image" => image_index, "flight" => current_frame, "textures" => texture_count, "debug triangles" => debugtris_cnt];
+        }
 
         {
             let buffer = &mut s.command_buffers[s.current_frame];
@@ -1077,11 +1101,10 @@ fn draw_frame_internal<T>(
             {
                 let mut enc = buffer.begin_render_pass_inline(
                     &s.render_pass,
-                    &s.framebuffers[s.current_frame],
+                    &s.framebuffers[image_index as usize],
                     s.render_area,
                     clear_values.iter(),
                 );
-                let ptr = view.as_ptr();
 
                 for simple_tex in s.simple_textures.iter() {
                     enc.bind_graphics_pipeline(&simple_tex.pipeline);
@@ -1096,6 +1119,7 @@ fn draw_frame_internal<T>(
                     enc.bind_vertex_buffers(0, buffers);
                     enc.draw(0..simple_tex.count * 6, 0..1);
                 }
+
                 if let Some(ref debug_triangles) = s.debug_triangles {
                     enc.bind_graphics_pipeline(&debug_triangles.pipeline);
                     let ratio =
@@ -1109,7 +1133,6 @@ fn draw_frame_internal<T>(
                     let count = debug_triangles.triangles_count;
                     let buffers: ArrayVec<[_; 1]> = [(&debug_triangles.triangles_buffer, 0)].into();
                     enc.bind_vertex_buffers(0, buffers);
-                    trace![log, "vxdraw", "mesh count"; "count" => count];
                     enc.draw(0..(count * 3) as u32, 0..1);
                 }
             }
@@ -1118,12 +1141,12 @@ fn draw_frame_internal<T>(
 
         let command_buffers = &s.command_buffers[s.current_frame];
         let wait_semaphores: ArrayVec<[_; 1]> = [(
-            acquire_image_semaphore,
+            &s.acquire_image_semaphores[s.current_frame],
             PipelineStage::COLOR_ATTACHMENT_OUTPUT,
         )]
         .into();
         {
-            let present_wait_semaphore = &s.present_wait_semaphores[frame];
+            let present_wait_semaphore = &s.present_wait_semaphores[s.current_frame];
             let signal_semaphores: ArrayVec<[_; 1]> = [present_wait_semaphore].into();
             // yes, you have to write it twice like this. yes, it's silly.
             let submission = Submission {
@@ -1131,10 +1154,11 @@ fn draw_frame_internal<T>(
                 wait_semaphores,
                 signal_semaphores,
             };
-            s.queue_group.queues[0].submit(submission, Some(frame_render_fence));
+            s.queue_group.queues[0]
+                .submit(submission, Some(&s.frame_render_fences[s.current_frame]));
         }
-        let postproc_res = postproc(s);
-        let present_wait_semaphore = &s.present_wait_semaphores[frame];
+        let postproc_res = postproc(s, image_index);
+        let present_wait_semaphore = &s.present_wait_semaphores[s.current_frame];
         let present_wait_semaphores: ArrayVec<[_; 1]> = [present_wait_semaphore].into();
         s.swapchain
             .present(
@@ -1145,7 +1169,7 @@ fn draw_frame_internal<T>(
             .unwrap();
         postproc_res
     };
-    s.current_frame = (s.current_frame + 1) % s.image_count;
+    s.current_frame = (s.current_frame + 1) % s.max_frames_in_flight;
     postproc_res
 }
 
@@ -1645,7 +1669,7 @@ mod tests {
 
     #[test]
     fn setup_and_teardown_draw_clear() {
-        let mut logger = Logger::spawn();
+        let mut logger = Logger::spawn_void();
         logger.set_colorize(true);
         logger.set_log_level(64);
 
@@ -1875,7 +1899,7 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
-        let tri = make_centered_equilateral_triangle();
+        let _tri = make_centered_equilateral_triangle();
         add_to_triangles(&mut windowing, DebugTriangle::default());
         for i in 0..=360 {
             if i % 2 == 0 {

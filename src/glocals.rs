@@ -133,6 +133,8 @@ pub struct Windowing {
     pub debug_triangles: Option<ColoredTriangleList>,
     //
     pub current_frame: usize,
+    pub max_frames_in_flight: usize,
+
     pub image_count: usize,
     pub render_area: gfx_hal::pso::Rect,
 
@@ -153,7 +155,6 @@ pub struct Windowing {
     pub image_views: Vec<<back::Backend as Backend>::ImageView>,
     pub render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
     pub queue_group: ManuallyDrop<gfx_hal::QueueGroup<back::Backend, gfx_hal::Graphics>>,
-    pub swapchain_prev_idx: u32,
     pub swapchain: ManuallyDrop<<back::Backend as Backend>::Swapchain>,
     pub swapconfig: gfx_hal::window::SwapchainConfig,
     pub device: ManuallyDrop<back::Device>,

@@ -21,7 +21,7 @@ use gfx_hal::{
     },
     Backend, Primitive,
 };
-use logger::{info, InDebugPretty, Logger};
+use logger::Logger;
 use std::io::Read;
 use std::mem::{size_of, transmute, ManuallyDrop};
 

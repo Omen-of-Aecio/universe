@@ -297,7 +297,10 @@ pub fn gen_perspective(s: &mut Windowing) -> Matrix4<f32> {
     Matrix4::from_nonuniform_scale(pval.x as f32, pval.y as f32, 1.0)
 }
 
-pub fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
+pub fn copy_image_to_rgb(
+    s: &mut Windowing,
+    image_index: gfx_hal::window::SwapImageIndex,
+) -> Vec<u8> {
     let width = s.swapconfig.extent.width;
     let height = s.swapconfig.extent.height;
 
@@ -324,7 +327,7 @@ pub fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
                     gfx_hal::image::Access::TRANSFER_READ,
                     image::Layout::TransferSrcOptimal,
                 ),
-            target: &images[s.swapchain_prev_idx as usize],
+            target: &images[image_index as usize],
             families: None,
             range: image::SubresourceRange {
                 aspects: format::Aspects::COLOR,
@@ -352,7 +355,7 @@ pub fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
             &[image_barrier, dstbarrier],
         );
         cmd_buffer.blit_image(
-            &images[s.swapchain_prev_idx as usize],
+            &images[image_index as usize],
             image::Layout::TransferSrcOptimal,
             &imgbuf,
             image::Layout::General,
@@ -385,7 +388,7 @@ pub fn copy_image_to_rgb(s: &mut Windowing) -> Vec<u8> {
                 gfx_hal::image::Access::TRANSFER_READ,
                 image::Layout::TransferSrcOptimal,
             )..(gfx_hal::image::Access::empty(), image::Layout::Present),
-            target: &images[s.swapchain_prev_idx as usize],
+            target: &images[image_index as usize],
             families: None,
             range: image::SubresourceRange {
                 aspects: format::Aspects::COLOR,

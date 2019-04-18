@@ -669,9 +669,14 @@ pub fn streaming_texture_set_pixel(s: &mut Windowing, id: usize, w: u32, h: u32,
                 layer: 0,
             });
             let access = foot.row_pitch * h as u64 + (w * 4) as u64;
-            let align = align_top(Alignment(strtex.image_requirements.alignment), access + 4);
-            let mut target = s.device.acquire_mapping_writer(&*strtex.image_memory, access..align).expect("unable to acquire mapping writer");
-            target[0..4].copy_from_slice(&[color.0, color.1, color.2, color.3]);
+            let boffset = access % s.device_limits.non_coherent_atom_size as u64;
+            let end = access + 4;
+            let mut align = align_top(Alignment(s.device_limits.non_coherent_atom_size as u64), access + 4);
+            if align > strtex.image_requirements.size {
+                align = strtex.image_requirements.size;
+            }
+            let mut target = s.device.acquire_mapping_writer(&*strtex.image_memory, access-boffset..align).expect("unable to acquire mapping writer");
+            target[boffset as usize..(boffset+4) as usize].copy_from_slice(&[color.0, color.1, color.2, color.3]);
             s.device.release_mapping_writer(target);
         }
     }

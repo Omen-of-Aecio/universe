@@ -1726,4 +1726,21 @@ mod tests {
         });
     }
 
+    #[bench]
+    fn bench_streaming_texture_set_single_pixel(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&mut windowing);
+
+        let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id, &mut logger);
+
+        b.iter(|| {
+            for i in 0..50 {
+                for j in 0..50 {
+                    strtex::streaming_texture_set_pixel(&mut windowing, id, i, j, (255, 0, 0, 255));
+                }
+            }
+        });
+    }
 }

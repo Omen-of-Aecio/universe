@@ -1482,6 +1482,24 @@ mod tests {
     }
 
     #[test]
+    fn overlapping_dyntex_respect_z_order() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&mut windowing);
+
+        let tree = add_texture(&mut windowing, TREE, &mut logger, true);
+        let logo = add_texture(&mut windowing, LOGO, &mut logger, true);
+
+        let mut sprite = Sprite { scale: 0.5,..Sprite::default() };
+
+        let sprite_tree = add_sprite(&mut windowing, Sprite { depth: 0.5,..sprite }, &tree, &mut logger);
+        let sprite_logo = add_sprite(&mut windowing, Sprite { depth: 0.6, translation: (0.25, 0.25),..sprite }, &logo, &mut logger);
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "overlapping_dyntex_respect_z_order", img);
+    }
+
+    #[test]
     fn generate_map() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
@@ -1561,7 +1579,7 @@ mod tests {
     fn simple_texture() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(&mut windowing, LOGO, &mut logger);
+        let tex = add_texture(&mut windowing, LOGO, &mut logger, true);
         add_sprite(&mut windowing, Sprite::default(), &tex, &mut logger);
 
         let prspect = gen_perspective(&mut windowing);
@@ -1573,7 +1591,7 @@ mod tests {
     fn simple_texture_adheres_to_view() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
-        let tex = add_texture(&mut windowing, LOGO, &mut logger);
+        let tex = add_texture(&mut windowing, LOGO, &mut logger, true);
         add_sprite(&mut windowing, Sprite::default(), &tex, &mut logger);
 
         let prspect = gen_perspective(&mut windowing);
@@ -1585,7 +1603,7 @@ mod tests {
     fn colored_simple_texture() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(&mut windowing, LOGO, &mut logger);
+        let tex = add_texture(&mut windowing, LOGO, &mut logger, true);
         add_sprite(
             &mut windowing,
             Sprite {
@@ -1610,7 +1628,7 @@ mod tests {
     fn rotated_texture() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(&mut windowing, LOGO, &mut logger);
+        let tex = add_texture(&mut windowing, LOGO, &mut logger, false);
 
         let base = Sprite {
             width: 1.0,
@@ -1692,7 +1710,7 @@ mod tests {
     fn many_sprites() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(&mut windowing, LOGO, &mut logger);
+        let tex = add_texture(&mut windowing, LOGO, &mut logger, false);
         for i in 0..360 {
             add_sprite(
                 &mut windowing,
@@ -1900,9 +1918,9 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
-        let forest = add_texture(&mut windowing, FOREST, &mut logger);
-        let player = add_texture(&mut windowing, LOGO, &mut logger);
-        let tree = add_texture(&mut windowing, TREE, &mut logger);
+        let forest = add_texture(&mut windowing, FOREST, &mut logger, false);
+        let player = add_texture(&mut windowing, LOGO, &mut logger, false);
+        let tree = add_texture(&mut windowing, TREE, &mut logger, false);
 
         add_sprite(&mut windowing, Sprite::default(), &forest, &mut logger);
         add_sprite(
@@ -1935,7 +1953,7 @@ mod tests {
     fn bench_many_sprites(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(&mut windowing, LOGO, &mut logger);
+        let tex = add_texture(&mut windowing, LOGO, &mut logger, true);
         for i in 0..1000 {
             add_sprite(
                 &mut windowing,
@@ -1959,7 +1977,7 @@ mod tests {
     fn bench_many_particles(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(&mut windowing, LOGO, &mut logger);
+        let tex = add_texture(&mut windowing, LOGO, &mut logger, true);
         let mut rng = random::new(0);
         for i in 0..1000 {
             let (dx, dy) = (

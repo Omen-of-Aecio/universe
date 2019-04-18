@@ -29,9 +29,11 @@ use std::mem::{size_of, ManuallyDrop};
 
 // ---
 
+#[derive(Clone, Copy)]
 pub struct Sprite {
     pub width: f32,
     pub height: f32,
+    pub depth: f32,
     pub colors: [(u8, u8, u8, u8); 4],
     pub uv_begin: (f32, f32),
     pub uv_end: (f32, f32),
@@ -45,6 +47,7 @@ impl Default for Sprite {
         Sprite {
             width: 2.0,
             height: 2.0,
+            depth: 0.0,
             colors: [(0, 0, 0, 255); 4],
             uv_begin: (0.0, 0.0),
             uv_end: (1.0, 1.0),
@@ -80,8 +83,8 @@ pub fn sprite_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, tex: &Text
                 .expect("Failed to acquire a memory writer!");
             let mut vertices = Vec::<f32>::with_capacity(stex.count as usize);
             for i in 0..stex.count {
-                let idx = (i * 9 * 4) as usize;
-                let rotation = &data_reader[idx + 6..idx + 7];
+                let idx = (i * 10 * 4) as usize;
+                let rotation = &data_reader[idx + 7..idx + 8];
                 vertices.push(rotation[0]);
             }
             device.release_mapping_reader(data_reader);
@@ -94,14 +97,14 @@ pub fn sprite_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, tex: &Text
                 .expect("Failed to acquire a memory writer!");
 
             for (i, vert) in vertices.iter().enumerate() {
-                let mut idx = (i * 9 * 4) as usize;
-                data_target[idx + 6..idx + 7].copy_from_slice(&[*vert + deg.into().0]);
-                idx += 9;
-                data_target[idx + 6..idx + 7].copy_from_slice(&[*vert + deg.into().0]);
-                idx += 9;
-                data_target[idx + 6..idx + 7].copy_from_slice(&[*vert + deg.into().0]);
-                idx += 9;
-                data_target[idx + 6..idx + 7].copy_from_slice(&[*vert + deg.into().0]);
+                let mut idx = (i * 10 * 4) as usize;
+                data_target[idx + 7..idx + 8].copy_from_slice(&[*vert + deg.into().0]);
+                idx += 10;
+                data_target[idx + 7..idx + 8].copy_from_slice(&[*vert + deg.into().0]);
+                idx += 10;
+                data_target[idx + 7..idx + 8].copy_from_slice(&[*vert + deg.into().0]);
+                idx += 10;
+                data_target[idx + 7..idx + 8].copy_from_slice(&[*vert + deg.into().0]);
             }
             device
                 .release_mapping_writer(data_target)
@@ -167,7 +170,7 @@ pub fn add_sprite(
                 0..tex.texture_vertex_requirements.size,
             )
             .expect("Failed to acquire a memory writer!");
-        let idx = (tex.count * 4 * 9) as usize;
+        let idx = (tex.count * 4 * 10) as usize;
 
         for (i, (point, uv)) in [
             (topleft, topleft_uv),
@@ -178,14 +181,14 @@ pub fn add_sprite(
         .iter()
         .enumerate()
         {
-            let idx = idx + i * 9;
-            data_target[idx..idx + 2].copy_from_slice(&[point.0, point.1]);
-            data_target[idx + 2..idx + 4].copy_from_slice(&[uv.0, uv.1]);
-            data_target[idx + 4..idx + 6]
+            let idx = idx + i * 10;
+            data_target[idx..idx + 3].copy_from_slice(&[point.0, point.1, sprite.depth]);
+            data_target[idx + 3..idx + 5].copy_from_slice(&[uv.0, uv.1]);
+            data_target[idx + 5..idx + 7]
                 .copy_from_slice(&[sprite.translation.0, sprite.translation.1]);
-            data_target[idx + 6..idx + 7].copy_from_slice(&[sprite.rotation]);
-            data_target[idx + 7..idx + 8].copy_from_slice(&[sprite.scale]);
-            data_target[idx + 8..idx + 9]
+            data_target[idx + 7..idx + 8].copy_from_slice(&[sprite.rotation]);
+            data_target[idx + 8..idx + 9].copy_from_slice(&[sprite.scale]);
+            data_target[idx + 9..idx + 10]
                 .copy_from_slice(&[std::mem::transmute::<_, f32>(sprite.colors[i])]);
         }
         tex.count += 1;
@@ -197,9 +200,9 @@ pub fn add_sprite(
 }
 
 /// Add a texture to the system
-pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) -> TextureHandle {
+pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>, depth: bool) -> TextureHandle {
     let (texture_vertex_buffer, texture_vertex_memory, texture_vertex_requirements) =
-        make_vertex_buffer_with_data(s, &[0f32; 9 * 4 * 1000]);
+        make_vertex_buffer_with_data(s, &[0f32; 10 * 4 * 1000]);
 
     let device = &s.device;
 
@@ -377,7 +380,7 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) ->
     const VERTEX_SOURCE_TEXTURE: &str = "#version 450
     #extension GL_ARB_separate_shader_objects : enable
 
-    layout(location = 0) in vec2 v_pos;
+    layout(location = 0) in vec3 v_pos;
     layout(location = 1) in vec2 v_uv;
     layout(location = 2) in vec2 v_dxdy;
     layout(location = 3) in float rotation;
@@ -397,10 +400,10 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) ->
 
     void main() {
         mat2 rotmatrix = mat2(cos(rotation), -sin(rotation), sin(rotation), cos(rotation));
-        vec2 pos = rotmatrix * scale * v_pos;
+        vec2 pos = rotmatrix * scale * v_pos.xy;
         f_uv = v_uv;
         f_color = color;
-        gl_Position = push_constant.view * vec4(pos + v_dxdy, 0.0, 1.0);
+        gl_Position = push_constant.view * vec4(pos + v_dxdy, v_pos.z, 1.0);
     }";
 
     const FRAGMENT_SOURCE_TEXTURE: &str = "#version 450
@@ -466,7 +469,7 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) ->
 
     let vertex_buffers: Vec<pso::VertexBufferDesc> = vec![pso::VertexBufferDesc {
         binding: 0,
-        stride: (size_of::<f32>() * (2 + 2 + 2 + 2 + 1)) as u32,
+        stride: (size_of::<f32>() * (3 + 2 + 2 + 2 + 1)) as u32,
         rate: 0,
     }];
     let attributes: Vec<pso::AttributeDesc> = vec![
@@ -474,7 +477,7 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) ->
             location: 0,
             binding: 0,
             element: pso::Element {
-                format: format::Format::Rg32Float,
+                format: format::Format::Rgb32Float,
                 offset: 0,
             },
         },
@@ -483,7 +486,7 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) ->
             binding: 0,
             element: pso::Element {
                 format: format::Format::Rg32Float,
-                offset: 8,
+                offset: 12,
             },
         },
         pso::AttributeDesc {
@@ -491,7 +494,7 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) ->
             binding: 0,
             element: pso::Element {
                 format: format::Format::Rg32Float,
-                offset: 16,
+                offset: 20,
             },
         },
         pso::AttributeDesc {
@@ -499,7 +502,7 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) ->
             binding: 0,
             element: pso::Element {
                 format: format::Format::R32Float,
-                offset: 24,
+                offset: 28,
             },
         },
         pso::AttributeDesc {
@@ -507,7 +510,7 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) ->
             binding: 0,
             element: pso::Element {
                 format: format::Format::R32Float,
-                offset: 28,
+                offset: 32,
             },
         },
         pso::AttributeDesc {
@@ -515,7 +518,7 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) ->
             binding: 0,
             element: pso::Element {
                 format: format::Format::Rgba8Unorm,
-                offset: 32,
+                offset: 36,
             },
         },
     ];
@@ -530,7 +533,14 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], log: &mut Logger<Log>) ->
     };
 
     let depth_stencil = pso::DepthStencilDesc {
-        depth: pso::DepthTest::Off,
+        depth: if depth {
+            pso::DepthTest::On {
+                fun: pso::Comparison::Less,
+                write: true,
+            }
+        } else {
+            pso::DepthTest::Off
+        },
         depth_bounds: false,
         stencil: pso::StencilTest::Off,
     };

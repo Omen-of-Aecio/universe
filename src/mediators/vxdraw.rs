@@ -365,15 +365,16 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
     let framebuffers_string = format!["{:#?}", framebuffers];
     debug![log, "vxdraw", "Framebuffer information"; "framebuffers" => framebuffers_string];
 
-    let max_frames_in_flight = 2;
+    let max_frames_in_flight = 3;
 
     let mut frame_render_fences = vec![];
-    let mut acquire_image_semaphores = vec![];
     let mut present_wait_semaphores = vec![];
     for _ in 0..max_frames_in_flight {
         frame_render_fences.push(device.create_fence(true).expect("Can't create fence"));
         present_wait_semaphores.push(device.create_semaphore().expect("Can't create semaphore"));
     }
+
+    let mut acquire_image_semaphores = vec![];
     for _ in 0..image_count {
         acquire_image_semaphores.push(device.create_semaphore().expect("Can't create semaphore"));
     }
@@ -1148,7 +1149,6 @@ fn draw_frame_internal<T>(
         {
             let present_wait_semaphore = &s.present_wait_semaphores[s.current_frame];
             let signal_semaphores: ArrayVec<[_; 1]> = [present_wait_semaphore].into();
-            // yes, you have to write it twice like this. yes, it's silly.
             let submission = Submission {
                 command_buffers: once(command_buffers),
                 wait_semaphores,
@@ -1541,7 +1541,7 @@ mod tests {
             }
             tri.scale = scale;
             tri.translation = (dx, dy);
-            debug_triangles.push(add_to_triangles(windowing, tri));
+            debug_triangles.push(debug_triangle_push(windowing, tri));
         }
         debug_triangles
     }
@@ -1551,19 +1551,19 @@ mod tests {
     }
 
     fn add_4_screencorners(windowing: &mut Windowing) {
-        add_to_triangles(
+        debug_triangle_push(
             windowing,
             DebugTriangle::from([-1.0f32, -1.0, 0.0, -1.0, -1.0, 0.0]),
         );
-        add_to_triangles(
+        debug_triangle_push(
             windowing,
             DebugTriangle::from([-1.0f32, 1.0, 0.0, 1.0, -1.0, 0.0]),
         );
-        add_to_triangles(
+        debug_triangle_push(
             windowing,
             DebugTriangle::from([1.0f32, -1.0, 0.0, -1.0, 1.0, 0.0]),
         );
-        add_to_triangles(
+        debug_triangle_push(
             windowing,
             DebugTriangle::from([1.0f32, 1.0, 0.0, 1.0, 1.0, 0.0]),
         );
@@ -1709,7 +1709,7 @@ mod tests {
         let prspect = gen_perspective(&mut windowing);
         let tri = DebugTriangle::default();
 
-        add_to_triangles(&mut windowing, tri);
+        debug_triangle_push(&mut windowing, tri);
         add_4_screencorners(&mut windowing);
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
@@ -1724,7 +1724,7 @@ mod tests {
         let prspect = gen_perspective(&mut windowing);
         let tri = DebugTriangle::default();
 
-        let idx = add_to_triangles(&mut windowing, tri);
+        let idx = debug_triangle_push(&mut windowing, tri);
         set_triangle_color(&mut windowing, &idx, [255, 0, 255, 255]);
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
@@ -1742,7 +1742,7 @@ mod tests {
             for j in [-1f32, 1f32].iter() {
                 let mut tri = DebugTriangle::default();
                 tri.translation = (*i, *j);
-                let _idx = add_to_triangles(&mut windowing, tri);
+                let _idx = debug_triangle_push(&mut windowing, tri);
             }
         }
 
@@ -1761,7 +1761,7 @@ mod tests {
             for j in [-1f32, 1f32].iter() {
                 let mut tri = DebugTriangle::default();
                 tri.translation = (*i, *j);
-                let _idx = add_to_triangles(&mut windowing, tri);
+                let _idx = debug_triangle_push(&mut windowing, tri);
             }
         }
 
@@ -1780,7 +1780,7 @@ mod tests {
             let mut tri = DebugTriangle::default();
             tri.translation = ((i as f32).cos(), (i as f32).sin());
             tri.scale = 0.1f32;
-            let _idx = add_to_triangles(&mut windowing, tri);
+            let _idx = debug_triangle_push(&mut windowing, tri);
         }
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
@@ -1802,7 +1802,7 @@ mod tests {
         for j in 0..31 {
             for i in 0..31 {
                 tri.translation = (trans + i as f32 * 2.0 * radi, trans + j as f32 * 2.0 * radi);
-                add_to_triangles(&mut windowing, tri);
+                debug_triangle_push(&mut windowing, tri);
             }
         }
 
@@ -1829,8 +1829,8 @@ mod tests {
                     (trans + i as f32 * 2.0 * radi, trans + j as f32 * 2.0 * radi);
                 bottomleft.translation =
                     (trans + i as f32 * 2.0 * radi, trans + j as f32 * 2.0 * radi);
-                add_to_triangles(&mut windowing, topright);
-                add_to_triangles(&mut windowing, bottomleft);
+                debug_triangle_push(&mut windowing, topright);
+                debug_triangle_push(&mut windowing, bottomleft);
             }
         }
 
@@ -1900,7 +1900,7 @@ mod tests {
         let prspect = gen_perspective(&mut windowing);
 
         let _tri = make_centered_equilateral_triangle();
-        add_to_triangles(&mut windowing, DebugTriangle::default());
+        debug_triangle_push(&mut windowing, DebugTriangle::default());
         for i in 0..=360 {
             if i % 2 == 0 {
                 add_4_screencorners(&mut windowing);
@@ -2037,7 +2037,7 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
-        add_to_triangles(&mut windowing, DebugTriangle::default());
+        debug_triangle_push(&mut windowing, DebugTriangle::default());
         add_4_screencorners(&mut windowing);
 
         b.iter(|| {

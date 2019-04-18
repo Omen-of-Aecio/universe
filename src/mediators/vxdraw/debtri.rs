@@ -98,7 +98,7 @@ const TRI_BYTE_SIZE: usize = PTS_PER_TRI
 
 // ---
 
-pub fn add_to_triangles(s: &mut Windowing, triangle: DebugTriangle) -> DebugTriangleHandle {
+pub fn debug_triangle_push(s: &mut Windowing, triangle: DebugTriangle) -> DebugTriangleHandle {
     let overrun = if let Some(ref mut debug_triangles) = s.debug_triangles {
         Some(
             (debug_triangles.triangles_count + 1) * TRI_BYTE_SIZE
@@ -147,7 +147,7 @@ pub fn add_to_triangles(s: &mut Windowing, triangle: DebugTriangle) -> DebugTria
     }
 }
 
-pub fn pop_to_triangles(s: &mut Windowing) {
+pub fn debug_triangle_pop(s: &mut Windowing) {
     if let Some(ref mut debug_triangles) = s.debug_triangles {
         s.device.wait_idle().expect("device idle");
         debug_triangles.triangles_count -= 1;

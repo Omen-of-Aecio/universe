@@ -210,6 +210,8 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         .open_with::<_, gfx_hal::Graphics>(1, |family| surf.supports_queue_family(family))
         .expect("Unable to find device supporting graphics");
 
+    let phys_dev_limits = adapter.physical_device.limits();
+
     let (caps, formats, present_modes, composite_alpha) =
         surf.compatibility(&adapter.physical_device);
 
@@ -412,6 +414,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         max_frames_in_flight,
         debug_triangles: None,
         device: ManuallyDrop::new(device),
+        device_limits: phys_dev_limits,
         events_loop,
         frames_in_flight_fences,
         framebuffers,
@@ -1708,4 +1711,19 @@ mod tests {
             super::generate_map(&mut windowing, 1000, 1000, &mut logger);
         });
     }
+
+    #[bench]
+    fn bench_streaming_texture_set_500x500_area(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&mut windowing);
+
+        let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id, &mut logger);
+
+        b.iter(|| {
+            strtex::streaming_texture_set_pixels_block(&mut windowing, id, (0, 0), (500, 500), (255, 0, 0, 255));
+        });
+    }
+
 }

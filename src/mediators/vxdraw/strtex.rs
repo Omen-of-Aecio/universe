@@ -93,7 +93,7 @@ pub fn add_streaming_texture(s: &mut Windowing, w: usize, h: usize, log: &mut Lo
                 1,
                 format::Format::Rgba8Srgb,
                 image::Tiling::Linear,
-                image::Usage::STORAGE | image::Usage::SAMPLED,
+                image::Usage::SAMPLED,
                 image::ViewCapabilities::empty(),
             )
             .expect("Couldn't create the image!")
@@ -637,9 +637,14 @@ pub fn streaming_texture_set_pixels_block(s: &mut Windowing, id: usize, start: (
                 layer: 0,
             });
 
+            // Vulkan 01390, Size must be a multiple of DeviceLimits:nonCoherentAtomSize, or offset
+            // plus size = size of memory, if it's not VK_WHOLE_SIZE
             let access_begin = foot.row_pitch * start.1 as u64 + (start.0 * 4) as u64;
             let access_end = foot.row_pitch * stop.1 as u64 + (stop.0 * 4) as u64;
-            let align = align_top(Alignment(strtex.image_requirements.alignment), access_end + 4);
+            let mut align = align_top(Alignment(s.device_limits.non_coherent_atom_size as u64), access_end + 4);
+            if align > strtex.image_requirements.size {
+                align = strtex.image_requirements.size;
+            }
             let mut target = s.device.acquire_mapping_writer::<u8>(&*strtex.image_memory, access_begin..align).expect("unable to acquire mapping writer");
             let mut colbuff = vec![];
             for _ in start.0..stop.0 {

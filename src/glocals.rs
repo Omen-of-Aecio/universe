@@ -138,7 +138,7 @@ pub struct Windowing {
     pub image_count: usize,
     pub render_area: gfx_hal::pso::Rect,
 
-    pub frame_render_fences: Vec<<back::Backend as Backend>::Fence>,
+    pub frames_in_flight_fences: Vec<<back::Backend as Backend>::Fence>,
     pub acquire_image_semaphore_free: ManuallyDrop<<back::Backend as Backend>::Semaphore>,
     pub acquire_image_semaphores: Vec<<back::Backend as Backend>::Semaphore>,
     pub present_wait_semaphores: Vec<<back::Backend as Backend>::Semaphore>,
@@ -172,7 +172,7 @@ impl Drop for Windowing {
         let _ = self.device.wait_idle();
 
         unsafe {
-            for fence in self.frame_render_fences.drain(..) {
+            for fence in self.frames_in_flight_fences.drain(..) {
                 self.device.destroy_fence(fence);
             }
             for sema in self.acquire_image_semaphores.drain(..) {

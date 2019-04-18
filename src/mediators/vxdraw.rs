@@ -367,10 +367,10 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
 
     let max_frames_in_flight = 3;
 
-    let mut frame_render_fences = vec![];
+    let mut frames_in_flight_fences = vec![];
     let mut present_wait_semaphores = vec![];
     for _ in 0..max_frames_in_flight {
-        frame_render_fences.push(device.create_fence(true).expect("Can't create fence"));
+        frames_in_flight_fences.push(device.create_fence(true).expect("Can't create fence"));
         present_wait_semaphores.push(device.create_semaphore().expect("Can't create semaphore"));
     }
 
@@ -379,7 +379,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         .collect::<Vec<_>>();
 
     {
-        let count = frame_render_fences.len();
+        let count = frames_in_flight_fences.len();
         debug![log, "vxdraw", "Allocated fences and semaphores"; "count" => count];
     }
 
@@ -410,7 +410,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         debug_triangles: None,
         device: ManuallyDrop::new(device),
         events_loop,
-        frame_render_fences,
+        frames_in_flight_fences,
         framebuffers,
         format,
         image_count: image_count as usize,
@@ -1086,10 +1086,14 @@ fn draw_frame_internal<T>(
             .unwrap();
 
         s.device
-            .wait_for_fence(&s.frame_render_fences[s.current_frame], u64::max_value())
+            .wait_for_fence(
+                &s.frames_in_flight_fences[s.current_frame],
+                u64::max_value(),
+            )
             .unwrap();
+
         s.device
-            .reset_fence(&s.frame_render_fences[s.current_frame])
+            .reset_fence(&s.frames_in_flight_fences[s.current_frame])
             .unwrap();
 
         core::mem::swap(
@@ -1165,8 +1169,10 @@ fn draw_frame_internal<T>(
                 wait_semaphores,
                 signal_semaphores,
             };
-            s.queue_group.queues[0]
-                .submit(submission, Some(&s.frame_render_fences[s.current_frame]));
+            s.queue_group.queues[0].submit(
+                submission,
+                Some(&s.frames_in_flight_fences[s.current_frame]),
+            );
         }
         let postproc_res = postproc(s, swap_image);
         let present_wait_semaphore = &s.present_wait_semaphores[s.current_frame];

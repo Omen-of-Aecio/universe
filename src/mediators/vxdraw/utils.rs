@@ -313,7 +313,10 @@ pub fn copy_image_to_rgb(
     };
     unsafe {
         s.device
-            .wait_for_fence(&s.frame_render_fences[s.current_frame], u64::max_value())
+            .wait_for_fence(
+                &s.frames_in_flight_fences[s.current_frame],
+                u64::max_value(),
+            )
             .expect("Unable to wait for fence");
     }
     unsafe {

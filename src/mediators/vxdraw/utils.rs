@@ -498,6 +498,30 @@ pub fn copy_image_to_rgb(
     }
 }
 
+pub struct Align {
+    pub access_offset: u64,
+    pub how_many_bytes_you_need: u64,
+    pub non_coherent_atom_size: u64,
+    pub memory_size: u64,
+}
+pub struct AlignResult {
+    pub begin: u64,
+    pub end: u64,
+    pub index_offset: u64,
+}
+pub fn perfect_mapping_alignment(align: Align) -> AlignResult {
+    let begin = align.access_offset - align.access_offset % align.non_coherent_atom_size;
+    let end = align_top(
+        Alignment(align.non_coherent_atom_size),
+        align.access_offset + align.how_many_bytes_you_need,
+    );
+    let index_offset = align.access_offset - begin;
+    AlignResult {
+        begin,
+        end,
+        index_offset,
+    }
+}
 pub struct Alignment(pub u64);
 pub fn align_top(alignment: Alignment, value: u64) -> u64 {
     if value % alignment.0 != 0 {

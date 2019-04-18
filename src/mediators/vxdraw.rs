@@ -508,6 +508,66 @@ fn draw_frame_internal<T>(
                 1.0f32, 0.25, 0.5, 0.75,
             ]))];
             buffer.begin(false);
+            for strtex in s.streaming_textures.iter() {
+                let image_barrier = memory::Barrier::Image {
+                    states: (image::Access::empty(), image::Layout::General)
+                        ..(
+                            image::Access::SHADER_READ,
+                            image::Layout::ShaderReadOnlyOptimal,
+                        ),
+                    target: &*strtex.image_buffer,
+                    families: None,
+                    range: image::SubresourceRange {
+                        aspects: format::Aspects::COLOR,
+                        levels: 0..1,
+                        layers: 0..1,
+                    },
+                };
+                buffer.pipeline_barrier(
+                    PipelineStage::TOP_OF_PIPE..PipelineStage::FRAGMENT_SHADER,
+                    memory::Dependencies::empty(),
+                    &[image_barrier],
+                );
+                // let image_barrier = memory::Barrier::Image {
+                //     states: (image::Access::SHADER_READ, image::Layout::ShaderReadOnlyOptimal)
+                //         ..(
+                //             image::Access::HOST_READ | image::Access::HOST_WRITE,
+                //             image::Layout::General,
+                //         ),
+                //     target: &*strtex.image_buffer,
+                //     families: None,
+                //     range: image::SubresourceRange {
+                //         aspects: format::Aspects::COLOR,
+                //         levels: 0..1,
+                //         layers: 0..1,
+                //     },
+                // };
+                // buffer.pipeline_barrier(
+                //     PipelineStage::FRAGMENT_SHADER..PipelineStage::HOST,
+                //     memory::Dependencies::empty(),
+                //     &[image_barrier],
+                // );
+                // Submit automatically makes host writes available for the device
+                let image_barrier = memory::Barrier::Image {
+                    states: (image::Access::empty(), image::Layout::ShaderReadOnlyOptimal)
+                        ..(
+                            image::Access::empty(),
+                            image::Layout::General,
+                        ),
+                    target: &*strtex.image_buffer,
+                    families: None,
+                    range: image::SubresourceRange {
+                        aspects: format::Aspects::COLOR,
+                        levels: 0..1,
+                        layers: 0..1,
+                    },
+                };
+                buffer.pipeline_barrier(
+                    PipelineStage::FRAGMENT_SHADER..PipelineStage::HOST,
+                    memory::Dependencies::empty(),
+                    &[image_barrier],
+                );
+            }
             {
                 let mut enc = buffer.begin_render_pass_inline(
                     &s.render_pass,
@@ -530,16 +590,14 @@ fn draw_frame_internal<T>(
                         Some(&*strtex.descriptor_set),
                         &[],
                     );
-                    let buffers: ArrayVec<[_; 1]> =
-                        [(&*strtex.vertex_buffer, 0)].into();
+                    let buffers: ArrayVec<[_; 1]> = [(&*strtex.vertex_buffer, 0)].into();
                     enc.bind_vertex_buffers(0, buffers);
-                    // enc.draw(0..6, 0..1);
                     enc.bind_index_buffer(gfx_hal::buffer::IndexBufferView {
                         buffer: &strtex.vertex_buffer_indices,
                         offset: 0,
                         index_type: gfx_hal::IndexType::U16,
                     });
-                    enc.draw_indexed(0..strtex.count*6, 0, 0..1);
+                    enc.draw_indexed(0..strtex.count * 6, 0, 0..1);
                 }
 
                 for simple_tex in s.simple_textures.iter() {
@@ -1554,7 +1612,7 @@ mod tests {
     }
 
     #[test]
-    fn streaming_texture() {
+    fn streaming_texture_blocks() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
@@ -1562,13 +1620,143 @@ mod tests {
         let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
         streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id, &mut logger);
 
-        strtex::streaming_texture_set_pixels_block(&mut windowing, id, (0, 0), (500, 500), (255, 0, 0, 255));
-        strtex::streaming_texture_set_pixels_block(&mut windowing, id, (500, 0), (1000, 1000), (0, 255, 0, 255));
-        strtex::streaming_texture_set_pixels_block(&mut windowing, id, (0, 500), (500, 1000), (0, 0, 255, 255));
-        strtex::streaming_texture_set_pixels_block(&mut windowing, id, (500, 500), (1000, 1000), (0, 0, 0, 0));
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (0, 0),
+            (500, 500),
+            (255, 0, 0, 255),
+        );
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (500, 0),
+            (500, 500),
+            (0, 255, 0, 255),
+        );
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (0, 500),
+            (500, 500),
+            (0, 0, 255, 255),
+        );
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (500, 500),
+            (500, 500),
+            (0, 0, 0, 0),
+        );
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        assert_swapchain_eq(&mut windowing, "streaming_texture", img);
+        assert_swapchain_eq(&mut windowing, "streaming_texture_blocks", img);
+    }
+
+    #[test]
+    fn streaming_texture_blocks_off_by_one() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&mut windowing);
+
+        let id = add_streaming_texture(&mut windowing, 10, 1, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id, &mut logger);
+
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (0, 0),
+            (10, 1),
+            (0, 255, 0, 255),
+        );
+
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (3, 0),
+            (1, 1),
+            (0, 0, 255, 255),
+        );
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "streaming_texture_blocks_off_by_one", img);
+
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (3, 0),
+            (0, 1),
+            (255, 0, 255, 255),
+        );
+
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (3, 0),
+            (0, 0),
+            (255, 0, 255, 255),
+        );
+
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (3, 0),
+            (1, 0),
+            (255, 0, 255, 255),
+        );
+
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (30, 0),
+            (800, 0),
+            (255, 0, 255, 255),
+        );
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        assert_swapchain_eq(&mut windowing, "streaming_texture_blocks_off_by_one", img);
+    }
+
+    #[test]
+    fn streaming_texture_weird_pixel_accesses() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+
+        let id = add_streaming_texture(&mut windowing, 20, 20, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id, &mut logger);
+
+        let mut rng = random::new(0);
+
+        for _ in 0..1000 {
+            let x = rng.gen_range(0, 30);
+            let y = rng.gen_range(0, 30);
+
+            strtex::streaming_texture_set_pixel(&mut windowing, id, x, y, (0, 255, 0, 255));
+        }
+    }
+
+    #[test]
+    fn streaming_texture_weird_block_accesses() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+
+        let id = add_streaming_texture(&mut windowing, 64, 64, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id, &mut logger);
+
+        let mut rng = random::new(0);
+
+        for _ in 0..1000 {
+            let start = (rng.gen_range(0, 100), rng.gen_range(0, 100));
+            let wh = (rng.gen_range(0, 100), rng.gen_range(0, 100));
+
+            strtex::streaming_texture_set_pixels_block(
+                &mut windowing,
+                id,
+                start,
+                wh,
+                (0, 255, 0, 255),
+            );
+        }
     }
 
     // ---
@@ -1716,14 +1904,58 @@ mod tests {
     fn bench_streaming_texture_set_500x500_area(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
 
         let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
         streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id, &mut logger);
 
         b.iter(|| {
-            strtex::streaming_texture_set_pixels_block(&mut windowing, id, (0, 0), (500, 500), (255, 0, 0, 255));
+            strtex::streaming_texture_set_pixels_block(
+                &mut windowing,
+                id,
+                (0, 0),
+                (500, 500),
+                (255, 0, 0, 255),
+            );
         });
     }
 
+    #[bench]
+    fn bench_streaming_texture_set_single_pixel(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+
+        let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id, &mut logger);
+
+        b.iter(|| {
+            strtex::streaming_texture_set_pixel(
+                &mut windowing,
+                id,
+                black_box(1),
+                black_box(2),
+                (255, 0, 0, 255),
+            );
+        });
+    }
+
+    #[bench]
+    fn bench_streaming_texture_set_single_pixel_while_drawing(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&mut windowing);
+
+        let id = add_streaming_texture(&mut windowing, 50, 50, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id, &mut logger);
+
+        b.iter(|| {
+            strtex::streaming_texture_set_pixel(
+                &mut windowing,
+                id,
+                black_box(1),
+                black_box(2),
+                (255, 0, 0, 255),
+            );
+            draw_frame(&mut windowing, &mut logger, &prspect);
+        });
+    }
 }

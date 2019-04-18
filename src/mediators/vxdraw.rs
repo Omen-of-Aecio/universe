@@ -510,7 +510,7 @@ fn draw_frame_internal<T>(
             buffer.begin(false);
             for strtex in s.streaming_textures.iter() {
                 let image_barrier = memory::Barrier::Image {
-                    states: (image::Access::empty(), image::Layout::Undefined)
+                    states: (image::Access::empty(), image::Layout::General)
                         ..(
                             image::Access::SHADER_READ,
                             image::Layout::ShaderReadOnlyOptimal,
@@ -525,6 +525,45 @@ fn draw_frame_internal<T>(
                 };
                 buffer.pipeline_barrier(
                     PipelineStage::TOP_OF_PIPE..PipelineStage::FRAGMENT_SHADER,
+                    memory::Dependencies::empty(),
+                    &[image_barrier],
+                );
+                // let image_barrier = memory::Barrier::Image {
+                //     states: (image::Access::SHADER_READ, image::Layout::ShaderReadOnlyOptimal)
+                //         ..(
+                //             image::Access::HOST_READ | image::Access::HOST_WRITE,
+                //             image::Layout::General,
+                //         ),
+                //     target: &*strtex.image_buffer,
+                //     families: None,
+                //     range: image::SubresourceRange {
+                //         aspects: format::Aspects::COLOR,
+                //         levels: 0..1,
+                //         layers: 0..1,
+                //     },
+                // };
+                // buffer.pipeline_barrier(
+                //     PipelineStage::FRAGMENT_SHADER..PipelineStage::HOST,
+                //     memory::Dependencies::empty(),
+                //     &[image_barrier],
+                // );
+                // Submit automatically makes host writes available for the device
+                let image_barrier = memory::Barrier::Image {
+                    states: (image::Access::empty(), image::Layout::ShaderReadOnlyOptimal)
+                        ..(
+                            image::Access::empty(),
+                            image::Layout::General,
+                        ),
+                    target: &*strtex.image_buffer,
+                    families: None,
+                    range: image::SubresourceRange {
+                        aspects: format::Aspects::COLOR,
+                        levels: 0..1,
+                        layers: 0..1,
+                    },
+                };
+                buffer.pipeline_barrier(
+                    PipelineStage::FRAGMENT_SHADER..PipelineStage::HOST,
                     memory::Dependencies::empty(),
                     &[image_barrier],
                 );

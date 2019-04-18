@@ -57,7 +57,7 @@ pub fn add_streaming_texture(
     let requirements = unsafe { device.get_image_requirements(&the_image) };
     let image_memory = unsafe {
         let memory_type_id =
-            find_memory_type_id(&s.adapter, requirements, memory::Properties::CPU_VISIBLE);
+            find_memory_type_id(&s.adapter, requirements, memory::Properties::CPU_VISIBLE | memory::Properties::COHERENT);
         device
             .allocate_memory(memory_type_id, requirements.size)
             .expect("Unable to allocate")
@@ -361,7 +361,7 @@ pub fn add_streaming_texture(
                 array_offset: 0,
                 descriptors: Some(pso::Descriptor::Image(
                     &image_view,
-                    image::Layout::ShaderReadOnlyOptimal,
+                    image::Layout::General,
                 )),
             },
             pso::DescriptorSetWrite {
@@ -416,6 +416,40 @@ pub fn add_streaming_texture(
 
     let (vertex_buffer_indices, vertex_memory_indices, vertex_requirements_indices) =
         make_index_buffer_with_data(s, &[0f32; 4 * 1000]);
+
+    unsafe {
+        let barrier_fence = s.device.create_fence(false).expect("unable to make fence");
+        // TODO Use a proper command buffer here
+        s.device.wait_idle();
+        let buffer = &mut s.command_buffers[s.current_frame];
+        buffer.begin(false);
+        {
+            let image_barrier = memory::Barrier::Image {
+                states: (image::Access::empty(), image::Layout::Undefined)
+                    ..(
+                        // image::Access::HOST_READ | image::Access::HOST_WRITE,
+                        image::Access::empty(),
+                        image::Layout::General,
+                    ),
+                target: &the_image,
+                families: None,
+                range: image::SubresourceRange {
+                    aspects: format::Aspects::COLOR,
+                    levels: 0..1,
+                    layers: 0..1,
+                },
+            };
+            buffer.pipeline_barrier(
+                pso::PipelineStage::TOP_OF_PIPE..pso::PipelineStage::HOST,
+                memory::Dependencies::empty(),
+                &[image_barrier],
+            );
+        }
+        buffer.finish();
+        s.queue_group.queues[0].submit_nosemaphores(Some(&*buffer), Some(&barrier_fence));
+        s.device.wait_for_fence(&barrier_fence, u64::max_value());
+        s.device.destroy_fence(barrier_fence);
+    }
 
     s.streaming_textures.push(StreamingTexture {
         count: 0,

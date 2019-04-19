@@ -479,7 +479,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         command_pool: ManuallyDrop::new(command_pool),
         current_frame: 0,
         max_frames_in_flight,
-        debug_triangles: None,
+        debtris: None,
         device: ManuallyDrop::new(device),
         device_limits: phys_dev_limits,
         events_loop,
@@ -571,7 +571,7 @@ fn draw_frame_internal<T>(
         {
             let current_frame = s.current_frame;
             let texture_count = s.dyntexs.len();
-            let debugtris_cnt = s.debug_triangles.as_ref().map_or(0, |x| x.triangles_count);
+            let debugtris_cnt = s.debtris.as_ref().map_or(0, |x| x.triangles_count);
             trace![log, "vxdraw", "Drawing frame"; "swapchain image" => swap_image, "flight" => current_frame, "textures" => texture_count, "debug triangles" => debugtris_cnt];
         }
 
@@ -694,18 +694,18 @@ fn draw_frame_internal<T>(
                     enc.draw_indexed(0..quads.count as u32 * 6, 0, 0..1);
                 }
 
-                if let Some(ref debug_triangles) = s.debug_triangles {
-                    enc.bind_graphics_pipeline(&debug_triangles.pipeline);
+                if let Some(ref debtris) = s.debtris {
+                    enc.bind_graphics_pipeline(&debtris.pipeline);
                     let ratio =
                         s.swapconfig.extent.width as f32 / s.swapconfig.extent.height as f32;
                     enc.push_graphics_constants(
-                        &debug_triangles.pipeline_layout,
+                        &debtris.pipeline_layout,
                         ShaderStageFlags::VERTEX,
                         0,
                         &(std::mem::transmute::<f32, [u32; 1]>(ratio)),
                     );
-                    let count = debug_triangles.triangles_count;
-                    let buffers: ArrayVec<[_; 1]> = [(&debug_triangles.triangles_buffer, 0)].into();
+                    let count = debtris.triangles_count;
+                    let buffers: ArrayVec<[_; 1]> = [(&debtris.triangles_buffer, 0)].into();
                     enc.bind_vertex_buffers(0, buffers);
                     enc.draw(0..(count * 3) as u32, 0..1);
                 }
@@ -1107,7 +1107,7 @@ mod tests {
 
     fn add_windmills(windowing: &mut Windowing, rand_rotat: bool) -> Vec<DebugTriangleHandle> {
         let mut rng = random::new(0);
-        let mut debug_triangles = Vec::with_capacity(1000);
+        let mut debtris = Vec::with_capacity(1000);
         for _ in 0..1000 {
             let mut tri = DebugTriangle::default();
             let (dx, dy) = (
@@ -1120,9 +1120,9 @@ mod tests {
             }
             tri.scale = scale;
             tri.translation = (dx, dy);
-            debug_triangles.push(debtri::push(windowing, tri));
+            debtris.push(debtri::push(windowing, tri));
         }
-        debug_triangles
+        debtris
     }
 
     fn remove_windmills(windowing: &mut Windowing) {

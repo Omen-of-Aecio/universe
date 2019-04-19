@@ -365,7 +365,7 @@ pub fn create_debug_triangle(s: &mut Windowing) {
     let (dtbuffer, dtmemory, dtreqs) =
         make_vertex_buffer_with_data(s, &[0.0f32; TRI_BYTE_SIZE / 4 * 1000]);
 
-    let debug_triangles = ColoredTriangleList {
+    let debtris = ColoredTriangleList {
         capacity: dtreqs.size,
         triangles_count: 0,
         triangles_buffer: dtbuffer,
@@ -377,18 +377,15 @@ pub fn create_debug_triangle(s: &mut Windowing) {
         pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
         render_pass: ManuallyDrop::new(triangle_render_pass),
     };
-    s.debug_triangles = Some(debug_triangles);
+    s.debtris = Some(debtris);
 }
 
 /// Add a new debug triangle to the renderer
 ///
 /// The new triangle will be drawn upon the next invocation of `draw_frame`
 pub fn push(s: &mut Windowing, triangle: DebugTriangle) -> DebugTriangleHandle {
-    let overrun = if let Some(ref mut debug_triangles) = s.debug_triangles {
-        Some(
-            (debug_triangles.triangles_count + 1) * TRI_BYTE_SIZE
-                > debug_triangles.capacity as usize,
-        )
+    let overrun = if let Some(ref mut debtris) = s.debtris {
+        Some((debtris.triangles_count + 1) * TRI_BYTE_SIZE > debtris.capacity as usize)
     } else {
         None
     };
@@ -396,16 +393,13 @@ pub fn push(s: &mut Windowing, triangle: DebugTriangle) -> DebugTriangleHandle {
         // TODO Do reallocation here
         assert_eq![false, overrun];
     }
-    if let Some(ref mut debug_triangles) = s.debug_triangles {
+    if let Some(ref mut debtris) = s.debtris {
         let device = &s.device;
         unsafe {
             let mut data_target = device
-                .acquire_mapping_writer(
-                    &debug_triangles.triangles_memory,
-                    0..debug_triangles.capacity,
-                )
+                .acquire_mapping_writer(&debtris.triangles_memory, 0..debtris.capacity)
                 .expect("Failed to acquire a memory writer!");
-            let idx = debug_triangles.triangles_count * TRI_BYTE_SIZE / size_of::<f32>();
+            let idx = debtris.triangles_count * TRI_BYTE_SIZE / size_of::<f32>();
 
             for (i, idx) in [idx, idx + 7, idx + 14].iter().enumerate() {
                 data_target[*idx..*idx + 2]
@@ -421,12 +415,12 @@ pub fn push(s: &mut Windowing, triangle: DebugTriangle) -> DebugTriangleHandle {
                 data_target[*idx + 5..*idx + 6].copy_from_slice(&[triangle.rotation]);
                 data_target[*idx + 6..*idx + 7].copy_from_slice(&[triangle.scale]);
             }
-            debug_triangles.triangles_count += 1;
+            debtris.triangles_count += 1;
             device
                 .release_mapping_writer(data_target)
                 .expect("Couldn't release the mapping writer!");
         }
-        DebugTriangleHandle(debug_triangles.triangles_count - 1)
+        DebugTriangleHandle(debtris.triangles_count - 1)
     } else {
         unreachable![]
     }
@@ -434,7 +428,7 @@ pub fn push(s: &mut Windowing, triangle: DebugTriangle) -> DebugTriangleHandle {
 
 /// Remove the last added debug triangle from rendering
 pub fn pop(s: &mut Windowing) {
-    if let Some(ref mut debug_triangles) = s.debug_triangles {
+    if let Some(ref mut debtris) = s.debtris {
         unsafe {
             s.device
                 .wait_for_fences(
@@ -444,14 +438,13 @@ pub fn pop(s: &mut Windowing) {
                 )
                 .expect("Unable to wait for fences");
         }
-        debug_triangles.triangles_count =
-            debug_triangles.triangles_count.checked_sub(1).unwrap_or(0);
+        debtris.triangles_count = debtris.triangles_count.checked_sub(1).unwrap_or(0);
     }
 }
 
 /// Remove the last N added debug triangle from rendering
 pub fn pop_many(s: &mut Windowing, n: usize) {
-    if let Some(ref mut debug_triangles) = s.debug_triangles {
+    if let Some(ref mut debtris) = s.debtris {
         unsafe {
             s.device
                 .wait_for_fences(
@@ -461,15 +454,151 @@ pub fn pop_many(s: &mut Windowing, n: usize) {
                 )
                 .expect("Unable to wait for fences");
         }
-        debug_triangles.triangles_count =
-            debug_triangles.triangles_count.checked_sub(n).unwrap_or(0);
+        debtris.triangles_count = debtris.triangles_count.checked_sub(n).unwrap_or(0);
     }
 }
+
+// ---
+
+pub fn set_position<T: Copy + Into<Rad<f32>>>(
+    s: &mut Windowing,
+    inst: &DebugTriangleHandle,
+    pos: (f32, f32),
+) {
+    let inst = inst.0;
+    let device = &s.device;
+    if let Some(ref mut debtris) = s.debtris {
+        unsafe {
+            device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+        }
+        unsafe {
+            let mut data_target = device
+                .acquire_mapping_writer::<f32>(&debtris.triangles_memory, 0..debtris.capacity)
+                .expect("Failed to acquire a memory writer!");
+
+            let mut idx = inst * TRI_BYTE_SIZE / size_of::<f32>();
+            data_target[idx + 3..idx + 5].copy_from_slice(&[pos.0, pos.1]);
+            idx += 7;
+            data_target[idx + 3..idx + 5].copy_from_slice(&[pos.0, pos.1]);
+            idx += 7;
+            data_target[idx + 3..idx + 5].copy_from_slice(&[pos.0, pos.1]);
+            device
+                .release_mapping_writer(data_target)
+                .expect("Couldn't release the mapping writer!");
+        }
+    }
+}
+
+pub fn set_scale(s: &mut Windowing, inst: &DebugTriangleHandle, scale: f32) {
+    let inst = inst.0;
+    let device = &s.device;
+    if let Some(ref mut debtris) = s.debtris {
+        unsafe {
+            device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+        }
+        unsafe {
+            let mut data_target = device
+                .acquire_mapping_writer::<f32>(&debtris.triangles_memory, 0..debtris.capacity)
+                .expect("Failed to acquire a memory writer!");
+
+            let mut idx = inst * TRI_BYTE_SIZE / size_of::<f32>();
+            data_target[idx + 6..idx + 7].copy_from_slice(&[scale]);
+            idx += 7;
+            data_target[idx + 6..idx + 7].copy_from_slice(&[scale]);
+            idx += 7;
+            data_target[idx + 6..idx + 7].copy_from_slice(&[scale]);
+            device
+                .release_mapping_writer(data_target)
+                .expect("Couldn't release the mapping writer!");
+        }
+    }
+}
+pub fn set_rotation<T: Copy + Into<Rad<f32>>>(
+    s: &mut Windowing,
+    inst: &DebugTriangleHandle,
+    deg: T,
+) {
+    let inst = inst.0;
+    let device = &s.device;
+    if let Some(ref mut debtris) = s.debtris {
+        unsafe {
+            device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+        }
+        unsafe {
+            let mut data_target = device
+                .acquire_mapping_writer::<f32>(&debtris.triangles_memory, 0..debtris.capacity)
+                .expect("Failed to acquire a memory writer!");
+
+            let mut idx = inst * TRI_BYTE_SIZE / size_of::<f32>();
+            let rot = deg.into().0;
+            data_target[idx + 5..idx + 6].copy_from_slice(&[rot]);
+            idx += 7;
+            data_target[idx + 5..idx + 6].copy_from_slice(&[rot]);
+            idx += 7;
+            data_target[idx + 5..idx + 6].copy_from_slice(&[rot]);
+            device
+                .release_mapping_writer(data_target)
+                .expect("Couldn't release the mapping writer!");
+        }
+    }
+}
+
+pub fn set_color(s: &mut Windowing, inst: &DebugTriangleHandle, rgba: [u8; 4]) {
+    let inst = inst.0;
+    let device = &s.device;
+    if let Some(ref mut debtris) = s.debtris {
+        unsafe {
+            device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+        }
+        unsafe {
+            let mut data_target = device
+                .acquire_mapping_writer::<f32>(&debtris.triangles_memory, 0..debtris.capacity)
+                .expect("Failed to acquire a memory writer!");
+
+            let mut idx = inst * TRI_BYTE_SIZE / size_of::<f32>();
+            let rgba = &transmute::<[u8; 4], [f32; 1]>(rgba);
+            data_target[idx + 2..idx + 3].copy_from_slice(rgba);
+            idx += 7;
+            data_target[idx + 2..idx + 3].copy_from_slice(rgba);
+            idx += 7;
+            data_target[idx + 2..idx + 3].copy_from_slice(rgba);
+            device
+                .release_mapping_writer(data_target)
+                .expect("Couldn't release the mapping writer!");
+        }
+    }
+}
+
+// ---
 
 /// Rotate all debug triangles
 pub fn rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
     let device = &s.device;
-    if let Some(ref mut debug_triangles) = s.debug_triangles {
+    if let Some(ref mut debtris) = s.debtris {
         unsafe {
             device
                 .wait_for_fences(
@@ -481,13 +610,10 @@ pub fn rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
         }
         unsafe {
             let data_reader = device
-                .acquire_mapping_reader::<f32>(
-                    &debug_triangles.triangles_memory,
-                    0..debug_triangles.capacity,
-                )
+                .acquire_mapping_reader::<f32>(&debtris.triangles_memory, 0..debtris.capacity)
                 .expect("Failed to acquire a memory writer!");
-            let mut vertices = Vec::<f32>::with_capacity(debug_triangles.triangles_count);
-            for i in 0..debug_triangles.triangles_count {
+            let mut vertices = Vec::<f32>::with_capacity(debtris.triangles_count);
+            for i in 0..debtris.triangles_count {
                 let idx = i * TRI_BYTE_SIZE / size_of::<f32>();
                 let rotation = &data_reader[idx + 5..idx + 6];
                 vertices.push(rotation[0]);
@@ -495,10 +621,7 @@ pub fn rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
             device.release_mapping_reader(data_reader);
 
             let mut data_target = device
-                .acquire_mapping_writer::<f32>(
-                    &debug_triangles.triangles_memory,
-                    0..debug_triangles.capacity,
-                )
+                .acquire_mapping_writer::<f32>(&debtris.triangles_memory, 0..debtris.capacity)
                 .expect("Failed to acquire a memory writer!");
 
             for (i, vert) in vertices.iter().enumerate() {
@@ -509,41 +632,6 @@ pub fn rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
                 idx += 7;
                 data_target[idx + 5..idx + 6].copy_from_slice(&[*vert + deg.into().0]);
             }
-            device
-                .release_mapping_writer(data_target)
-                .expect("Couldn't release the mapping writer!");
-        }
-    }
-}
-
-pub fn set_color(s: &mut Windowing, inst: &DebugTriangleHandle, rgba: [u8; 4]) {
-    let inst = inst.0;
-    let device = &s.device;
-    if let Some(ref mut debug_triangles) = s.debug_triangles {
-        unsafe {
-            device
-                .wait_for_fences(
-                    &s.frames_in_flight_fences,
-                    gfx_hal::device::WaitFor::All,
-                    u64::max_value(),
-                )
-                .expect("Unable to wait for fences");
-        }
-        unsafe {
-            let mut data_target = device
-                .acquire_mapping_writer::<f32>(
-                    &debug_triangles.triangles_memory,
-                    0..debug_triangles.capacity,
-                )
-                .expect("Failed to acquire a memory writer!");
-
-            let mut idx = inst * TRI_BYTE_SIZE / size_of::<f32>();
-            let rgba = &transmute::<[u8; 4], [f32; 1]>(rgba);
-            data_target[idx + 2..idx + 3].copy_from_slice(rgba);
-            idx += 7;
-            data_target[idx + 2..idx + 3].copy_from_slice(rgba);
-            idx += 7;
-            data_target[idx + 2..idx + 3].copy_from_slice(rgba);
             device
                 .release_mapping_writer(data_target)
                 .expect("Couldn't release the mapping writer!");

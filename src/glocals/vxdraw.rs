@@ -106,7 +106,7 @@ pub struct Windowing {
     pub strtexs: Vec<StreamingTexture>,
     pub dyntexs: Vec<SingleTexture>,
     pub quads: Option<ColoredQuadList>,
-    pub debug_triangles: Option<ColoredTriangleList>,
+    pub debtris: Option<ColoredTriangleList>,
     //
     pub current_frame: usize,
     pub max_frames_in_flight: usize,
@@ -187,24 +187,20 @@ impl Drop for Windowing {
         }
 
         unsafe {
-            if let Some(mut debug_triangles) = self.debug_triangles.take() {
-                self.device.destroy_buffer(debug_triangles.triangles_buffer);
-                self.device.free_memory(debug_triangles.triangles_memory);
-                for dsl in debug_triangles.descriptor_set.drain(..) {
+            if let Some(mut debtris) = self.debtris.take() {
+                self.device.destroy_buffer(debtris.triangles_buffer);
+                self.device.free_memory(debtris.triangles_memory);
+                for dsl in debtris.descriptor_set.drain(..) {
                     self.device.destroy_descriptor_set_layout(dsl);
                 }
                 self.device
-                    .destroy_graphics_pipeline(ManuallyDrop::into_inner(read(
-                        &debug_triangles.pipeline,
-                    )));
+                    .destroy_graphics_pipeline(ManuallyDrop::into_inner(read(&debtris.pipeline)));
                 self.device
                     .destroy_pipeline_layout(ManuallyDrop::into_inner(read(
-                        &debug_triangles.pipeline_layout,
+                        &debtris.pipeline_layout,
                     )));
                 self.device
-                    .destroy_render_pass(ManuallyDrop::into_inner(read(
-                        &debug_triangles.render_pass,
-                    )));
+                    .destroy_render_pass(ManuallyDrop::into_inner(read(&debtris.render_pass)));
             }
 
             if let Some(mut quads) = self.quads.take() {

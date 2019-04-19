@@ -1,7 +1,9 @@
 use crate::glocals::*;
 use crate::mediators::{
+    vxdraw,
     does_line_collide_with_grid::*, random_map_generator, render_grid, render_polygon,
 };
+use cgmath::*;
 use benchmarker::Benchmarker;
 use geometry::{boxit::Boxit, cam::Camera, grid2d::Grid, vec::Vec2};
 use glium::{
@@ -343,14 +345,7 @@ pub fn entry_point_client(s: &mut Main) {
             .push(render_polygon::create_render_polygon(&client.display));
 
         client.logger.set_log_level(196);
-        if let Some(ref mut windowing) = s.windowing {
-            super::vxdraw::debtri::push(windowing, super::vxdraw::debtri::DebugTriangle::default());
-        }
         loop {
-            if let Some(ref mut windowing) = s.windowing {
-                let persp = super::vxdraw::utils::gen_perspective(windowing);
-                super::vxdraw::draw_frame(windowing, &mut client.logger, &persp);
-            }
             s.time = Instant::now();
             let xform = if let Some(ref mut rx) = s.config_change_recv {
                 match rx.try_recv() {
@@ -434,4 +429,111 @@ fn client_tick(s: &mut Client) {
                 .error("cli", "OpenGL context has already been swapped");
         }
     }
+}
+
+pub fn entry_point_client_vulkan(s: &mut Main) {
+    // play_song(s);
+    if let Some(ref mut client) = s.client {
+        client.logger.info("cli", "Creating grid");
+        initialize_grid(&mut client.game.grid);
+        client.game.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
+        random_map_generator::proc1(&mut client.game.grid, &client.display);
+        create_black_square_around_player(&mut client.game.grid);
+        // let size = s.game.grid.get_size();
+        // for i in 0 .. size.0 {
+        //     *s.game.grid.get_mut(i, 800).unwrap() = 255;
+        //     *s.game.grid.get_mut(i, 0).unwrap() = 255;
+        //     *s.game.grid.get_mut(40, i).unwrap() = 255;
+        //     *s.game.grid.get_mut(600, i).unwrap() = 255;
+        // }
+        // *s.game.grid.get_mut(100, 1).unwrap() = 255;
+        client.game.grid_render = Some(render_grid::create_grid_u8_render_data(
+            &client.display,
+            &client.game.grid,
+        ));
+        client
+            .game
+            .players
+            .push(render_polygon::create_render_polygon(&client.display));
+
+        client.logger.set_log_level(196);
+        let tex = vxdraw::strtex::push_texture(&mut s.windowing.as_mut().unwrap(), 1000, 1000, &mut client.logger);
+        vxdraw::strtex::generate_map2(&mut s.windowing.as_mut().unwrap(), &tex, [1.0, 2.0, 4.0]);
+        vxdraw::strtex::push_sprite(&mut s.windowing.as_mut().unwrap(), &tex, vxdraw::strtex::Sprite {
+            width: 10.0,
+            height: 10.0,
+            ..vxdraw::strtex::Sprite::default()
+        });
+        loop {
+            if let Some(ref mut windowing) = s.windowing {
+                let persp = super::vxdraw::utils::gen_perspective(windowing);
+                let scale = Matrix4::from_scale(client.game.cam.zoom);
+                let center = client.game.cam.center;
+                // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
+                super::vxdraw::draw_frame(windowing, &mut client.logger, &(persp * scale));
+            }
+            s.time = Instant::now();
+            let xform = if let Some(ref mut rx) = s.config_change_recv {
+                match rx.try_recv() {
+                    Ok(msg) => Some(msg),
+                    Err(_) => None,
+                }
+            } else {
+                None
+            };
+            if let Some(xform) = xform {
+                xform(&mut s.config);
+            }
+            client_tick_vulkan(client);
+            if let Some(ref mut network) = s.network {
+                s.timers.network_timer.update(s.time, network);
+            }
+            if client.should_exit {
+                break;
+            }
+        }
+    }
+}
+
+fn client_tick_vulkan(s: &mut Client) {
+    // ---
+    s.logic_benchmarker.start();
+    // ---
+
+    collect_input(s);
+    toggle_camera_mode(s);
+    let movement = move_player_according_to_input(&s.input);
+    check_for_collision_and_move_players_according_to_movement_vector(
+        &s.game.grid,
+        &mut s.game.players,
+        movement,
+    );
+    move_camera_according_to_input(s);
+    set_camera(s);
+    set_gravity(s);
+    set_smooth(s);
+    apply_gravity_to_players(s);
+    maybe_fire_bullets(s);
+    update_bullets(&mut s.game.bullets);
+    remove_bullets_outside_camera(&mut s.logger, &mut s.game.bullets, &s.game.cam);
+
+    // ---
+    stop_benchmark(
+        &mut s.logic_benchmarker,
+        &mut s.logger,
+        "Logic time spent (100-frame average)",
+    );
+    // ---
+
+    // ---
+    s.drawing_benchmarker.start();
+    // ---
+
+    // ---
+    stop_benchmark(
+        &mut s.drawing_benchmarker,
+        &mut s.logger,
+        "Drawing time spent (100-frame average)",
+    );
+    // ---
 }

@@ -77,6 +77,7 @@ fn run_client_or_server(s: &mut glocals::Main) {
             display: glutin::WindowBuilder::new()
                 .with_dimensions(1024, 768)
                 .with_title("Universe")
+                .with_visibility(true)
                 .build_glium()
                 .unwrap(),
             input: input::Input::default(),
@@ -85,7 +86,7 @@ fn run_client_or_server(s: &mut glocals::Main) {
             drawing_benchmarker: Benchmarker::new(99),
         };
         s.client = Some(client);
-        mediators::client::entry_point_client(s);
+        mediators::client::entry_point_client_vulkan(s);
     } else if let Some(_port) = commandline.value_of("host") {
         s.server = Some(Server::default());
         mediators::server::entry_point_server(s);

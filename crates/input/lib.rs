@@ -30,14 +30,14 @@ impl Input {
         self.mouse_in_previous_frame.1 = self.mouse.1;
     }
 
-    pub fn register_key(&mut self, input: &Event) {
+    pub fn register_key(&mut self, input: &KeyboardInput) {
         match *input {
-            // KeyboardInput(ElementState::Pressed, _, Some(keycode)) => {
-            //     self.register_key_down(keycode)
-            // }
-            // KeyboardInput(ElementState::Released, _, Some(keycode)) => {
-            //     self.register_key_up(keycode)
-            // }
+            KeyboardInput { state: ElementState::Pressed, virtual_keycode: Some(keycode),.. } => {
+                self.register_key_down(keycode)
+            }
+            KeyboardInput { state: ElementState::Released, virtual_keycode: Some(keycode), .. } => {
+                self.register_key_up(keycode)
+            }
             _ => (), // Do nothing. Should probably log the error.
         }
     }

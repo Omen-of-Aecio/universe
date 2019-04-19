@@ -19,24 +19,6 @@ fn initialize_grid(s: &mut Grid<u8>) {
     s.resize(1000, 1000);
 }
 
-    // CursorMoved {
-    //     device_id: DeviceId,
-
-    //     /// (x,y) coords in pixels relative to the top-left corner of the window. Because the range of this data is
-    //     /// limited by the display area and it may have been transformed by the OS to implement effects such as cursor
-    //     /// acceleration, it should not be used to implement non-cursor-like interactions such as 3D camera control.
-    //     position: LogicalPosition,
-    //     modifiers: ModifiersState
-    // },
-
-    // /// The cursor has entered the window.
-    // CursorEntered { device_id: DeviceId },
-
-    // /// The cursor has left the window.
-    // CursorLeft { device_id: DeviceId },
-
-    // /// A mouse wheel movement or touchpad scroll occurred.
-    // MouseWheel { device_id: DeviceId, delta: MouseScrollDelta, phase: TouchPhase, modifiers: ModifiersState },
 pub fn collect_input_vk(client: &mut Client) {
     if let Some(ref mut windowing) = client.windowing {
         for event in super::vxdraw::collect_input(windowing) {
@@ -44,15 +26,7 @@ pub fn collect_input_vk(client: &mut Client) {
                 Event::WindowEvent { window_id, event } => {
                     match event {
                         WindowEvent::KeyboardInput { device_id, input } => {
-                            if let Some(keycode) = input.virtual_keycode {
-                                match keycode {
-                                    VirtualKeyCode::Escape => {
-                                        client.should_exit = true;
-                                    }
-                                    _ => {
-                                    }
-                                }
-                            }
+                            client.input.register_key(&input);
                         }
                         WindowEvent::MouseWheel { device_id, delta, phase, modifiers } => {
                             match delta {
@@ -62,9 +36,9 @@ pub fn collect_input_vk(client: &mut Client) {
                                 _ => {}
                             }
                         }
-                        // WindowEvent::CursorMoved { device_id, position, modifiers } => {
-                        //     client.input.register_mouse_input(state, button);
-                        // }
+                        WindowEvent::MouseInput { state, button, .. } => {
+                            client.input.register_mouse_input(state, button);
+                        }
                         _ => {}
                     }
                 }
@@ -585,9 +559,9 @@ fn client_tick_vulkan(s: &mut Client) {
         let center = s.game.cam.center;
         // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
         let trans =
-            Matrix4::from_translation(Vector3::new(-center.x / 1000.0, center.y / 1000.0, 0.0));
+            Matrix4::from_translation(Vector3::new(-center.x / 10.0, center.y / 10.0, 0.0));
         // info![client.logger, "main", "Okay wth"; "trans" => InDebug(&trans); clone trans];
-        super::vxdraw::draw_frame(windowing, &mut s.logger, &(persp * trans * scale));
+        super::vxdraw::draw_frame(windowing, &mut s.logger, &(persp * scale * trans));
     }
 
     // ---
@@ -597,4 +571,6 @@ fn client_tick_vulkan(s: &mut Client) {
         "Drawing time spent (100-frame average)",
     );
     // ---
+
+    std::thread::sleep(std::time::Duration::new(0, 8_000_000));
 }

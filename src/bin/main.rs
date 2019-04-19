@@ -78,7 +78,7 @@ fn run_client_or_server(s: &mut glocals::Main) {
             display: glutin::WindowBuilder::new()
                 .with_dimensions(1024, 768)
                 .with_title("Universe")
-                .with_visibility(true)
+                .with_visibility(false)
                 .build_glium()
                 .unwrap(),
             input: input::Input::default(),

@@ -33,6 +33,7 @@ use std::mem::{size_of, ManuallyDrop};
 pub struct Sprite {
     pub width: f32,
     pub height: f32,
+    pub depth: f32,
     pub colors: [(u8, u8, u8, u8); 4],
     pub uv_begin: (f32, f32),
     pub uv_end: (f32, f32),
@@ -46,6 +47,7 @@ impl Default for Sprite {
         Sprite {
             width: 2.0,
             height: 2.0,
+            depth: 0.0,
             colors: [(0, 0, 0, 255); 4],
             uv_begin: (0.0, 0.0),
             uv_end: (1.0, 1.0),
@@ -126,7 +128,7 @@ pub fn add_streaming_texture(
     const VERTEX_SOURCE_TEXTURE: &str = "#version 450
     #extension GL_ARB_separate_shader_objects : enable
 
-    layout(location = 0) in vec2 v_pos;
+    layout(location = 0) in vec3 v_pos;
     layout(location = 1) in vec2 v_uv;
     layout(location = 2) in vec2 v_dxdy;
     layout(location = 3) in float rotation;
@@ -146,10 +148,10 @@ pub fn add_streaming_texture(
 
     void main() {
         mat2 rotmatrix = mat2(cos(rotation), -sin(rotation), sin(rotation), cos(rotation));
-        vec2 pos = rotmatrix * scale * v_pos;
+        vec2 pos = rotmatrix * scale * v_pos.xy;
         f_uv = v_uv;
         f_color = color;
-        gl_Position = push_constant.view * vec4(pos + v_dxdy, 0.0, 1.0);
+        gl_Position = push_constant.view * vec4(pos + v_dxdy, v_pos.z, 1.0);
     }";
 
     const FRAGMENT_SOURCE_TEXTURE: &str = "#version 450
@@ -215,7 +217,7 @@ pub fn add_streaming_texture(
 
     let vertex_buffers: Vec<pso::VertexBufferDesc> = vec![pso::VertexBufferDesc {
         binding: 0,
-        stride: (size_of::<f32>() * (2 + 2 + 2 + 2 + 1)) as u32,
+        stride: (size_of::<f32>() * (3 + 2 + 2 + 2 + 1)) as u32,
         rate: 0,
     }];
     let attributes: Vec<pso::AttributeDesc> = vec![
@@ -232,7 +234,7 @@ pub fn add_streaming_texture(
             binding: 0,
             element: pso::Element {
                 format: format::Format::Rg32Float,
-                offset: 8,
+                offset: 12,
             },
         },
         pso::AttributeDesc {
@@ -240,7 +242,7 @@ pub fn add_streaming_texture(
             binding: 0,
             element: pso::Element {
                 format: format::Format::Rg32Float,
-                offset: 16,
+                offset: 20,
             },
         },
         pso::AttributeDesc {
@@ -248,7 +250,7 @@ pub fn add_streaming_texture(
             binding: 0,
             element: pso::Element {
                 format: format::Format::R32Float,
-                offset: 24,
+                offset: 28,
             },
         },
         pso::AttributeDesc {
@@ -256,7 +258,7 @@ pub fn add_streaming_texture(
             binding: 0,
             element: pso::Element {
                 format: format::Format::R32Float,
-                offset: 28,
+                offset: 32,
             },
         },
         pso::AttributeDesc {
@@ -264,7 +266,7 @@ pub fn add_streaming_texture(
             binding: 0,
             element: pso::Element {
                 format: format::Format::Rgba8Unorm,
-                offset: 32,
+                offset: 36,
             },
         },
     ];
@@ -577,7 +579,7 @@ pub fn streaming_texture_add_sprite(s: &mut Windowing, sprite: Sprite, texture: 
         let mut data_target = device
             .acquire_mapping_writer(&tex.vertex_memory, 0..tex.vertex_requirements.size)
             .expect("Failed to acquire a memory writer!");
-        let idx = (tex.count * 4 * 9) as usize;
+        let idx = (tex.count * 4 * 10) as usize;
 
         for (i, (point, uv)) in [
             (topleft, topleft_uv),
@@ -588,14 +590,14 @@ pub fn streaming_texture_add_sprite(s: &mut Windowing, sprite: Sprite, texture: 
         .iter()
         .enumerate()
         {
-            let idx = idx + i * 9;
-            data_target[idx..idx + 2].copy_from_slice(&[point.0, point.1]);
-            data_target[idx + 2..idx + 4].copy_from_slice(&[uv.0, uv.1]);
-            data_target[idx + 4..idx + 6]
+            let idx = idx + i * 10;
+            data_target[idx..idx + 3].copy_from_slice(&[point.0, point.1, sprite.depth]);
+            data_target[idx + 3..idx + 5].copy_from_slice(&[uv.0, uv.1]);
+            data_target[idx + 5..idx + 7]
                 .copy_from_slice(&[sprite.translation.0, sprite.translation.1]);
-            data_target[idx + 6..idx + 7].copy_from_slice(&[sprite.rotation]);
-            data_target[idx + 7..idx + 8].copy_from_slice(&[sprite.scale]);
-            data_target[idx + 8..idx + 9]
+            data_target[idx + 7..idx + 8].copy_from_slice(&[sprite.rotation]);
+            data_target[idx + 8..idx + 9].copy_from_slice(&[sprite.scale]);
+            data_target[idx + 9..idx + 10]
                 .copy_from_slice(&[std::mem::transmute::<_, f32>(sprite.colors[i])]);
         }
         tex.count += 1;

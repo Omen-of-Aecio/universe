@@ -3,7 +3,6 @@ use crate::glocals::{
     vxdraw::{StreamingTexture, Windowing},
     Log,
 };
-use ::image as load_image;
 use arrayvec::ArrayVec;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
@@ -70,7 +69,7 @@ pub fn push_texture(s: &mut Windowing, w: usize, h: usize, log: &mut Logger<Log>
                 1,
                 format::Format::Rgba8Srgb,
                 image::Tiling::Linear,
-                image::Usage::SAMPLED,
+                image::Usage::SAMPLED | image::Usage::TRANSFER_DST,
                 image::ViewCapabilities::empty(),
             )
             .expect("Couldn't create the image!")
@@ -771,9 +770,11 @@ pub fn streaming_texture_set_pixel(
     }
 }
 
-pub fn generate_map(s: &mut Windowing, w: u32, h: u32) -> usize {
+pub fn generate_map2(s: &mut Windowing, blitid: usize) {
     static VERTEX_SOURCE: &str = include_str!("../../../shaders/proc1.vert");
     static FRAGMENT_SOURCE: &str = include_str!("../../../shaders/proc1.frag");
+    let w = s.strtexs[blitid].width;
+    let h = s.strtexs[blitid].height;
     let vs_module = {
         let glsl = VERTEX_SOURCE;
         let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
@@ -964,7 +965,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32) -> usize {
                 1,
                 format::Format::Rgba8Srgb,
                 image::Tiling::Linear,
-                image::Usage::COLOR_ATTACHMENT | image::Usage::TRANSFER_DST | image::Usage::SAMPLED,
+                image::Usage::COLOR_ATTACHMENT | image::Usage::TRANSFER_SRC | image::Usage::SAMPLED,
                 image::ViewCapabilities::empty(),
             )
             .expect("Unable to create image");
@@ -1069,32 +1070,48 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32) -> usize {
         s.device
             .wait_for_fence(&upload_fence, u64::max_value())
             .expect("Unable to wait for fence");
+        s.device
+            .reset_fence(&upload_fence)
+            .expect("Unable to wait for fence");
+
+        cmd_buffer.begin();
+        cmd_buffer.blit_image(
+            &image,
+            image::Layout::General,
+            &s.strtexs[blitid].image_buffer,
+            image::Layout::General,
+            image::Filter::Nearest,
+            once(command::ImageBlit {
+                src_subresource: image::SubresourceLayers {
+                    aspects: format::Aspects::COLOR,
+                    level: 0,
+                    layers: 0..1,
+                },
+                src_bounds: image::Offset { x: 0, y: 0, z: 0 }..image::Offset {
+                    x: w as i32,
+                    y: w as i32,
+                    z: 1,
+                },
+                dst_subresource: image::SubresourceLayers {
+                    aspects: format::Aspects::COLOR,
+                    level: 0,
+                    layers: 0..1,
+                },
+                dst_bounds: image::Offset { x: 0, y: 0, z: 0 }..image::Offset {
+                    x: w as i32,
+                    y: h as i32,
+                    z: 1,
+                },
+            }),
+        );
+        cmd_buffer.finish();
+        s.queue_group.queues[0].submit_nosemaphores(Some(&cmd_buffer), Some(&upload_fence));
+        s.device
+            .wait_for_fence(&upload_fence, u64::max_value())
+            .expect("Unable to wait for fence");
+
         s.device.destroy_fence(upload_fence);
         s.command_pool.free(once(cmd_buffer));
-
-        let footprint = s.device.get_image_subresource_footprint(
-            &image,
-            image::Subresource {
-                aspects: format::Aspects::COLOR,
-                level: 0,
-                layer: 0,
-            },
-        );
-
-        let map = s
-            .device
-            .acquire_mapping_reader(&memory, footprint.slice)
-            .expect("Mapped memory");
-
-        let pixel_size = size_of::<load_image::Rgba<u8>>() as u32;
-        let row_size = pixel_size * w;
-
-        let mut result: Vec<u8> = Vec::new();
-        for y in 0..h as usize {
-            let dest_base = y * footprint.row_pitch as usize;
-            result.extend(map[dest_base..dest_base + row_size as usize].iter());
-        }
-        s.device.release_mapping_reader(map);
 
         s.device.destroy_buffer(pt_buffer);
         s.device.free_memory(pt_memory);
@@ -1109,7 +1126,6 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32) -> usize {
         s.device.destroy_image(image);
         s.device.free_memory(memory);
     }
-    0
 }
 
 #[cfg(feature = "gfx_tests")]
@@ -1120,6 +1136,19 @@ mod tests {
     use rand::Rng;
     use rand_pcg::Pcg64Mcg as random;
     use test::{black_box, Bencher};
+
+    #[test]
+    fn generate_map_randomly() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let id = push_texture(&mut windowing, 1000, 1000, &mut logger);
+        push_sprite(&mut windowing, Sprite::default(), id);
+        generate_map2(&mut windowing, id);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        utils::assert_swapchain_eq(&mut windowing, "generate_map_randomly", img);
+    }
 
     #[test]
     fn streaming_texture_blocks() {

@@ -63,7 +63,7 @@ const QUAD_BYTE_SIZE: usize = PTS_PER_QUAD * BYTES_PER_VTX;
 
 // ---
 
-pub fn quad_push(s: &mut Windowing, quad: Quad) -> QuadHandle {
+pub fn push(s: &mut Windowing, quad: Quad) -> QuadHandle {
     let overrun = if let Some(ref mut quads) = s.quads {
         Some((quads.count + 1) * QUAD_BYTE_SIZE > quads.capacity as usize)
     } else {
@@ -107,7 +107,6 @@ pub fn quad_push(s: &mut Windowing, quad: Quad) -> QuadHandle {
             let mut data_target = device
                 .acquire_mapping_writer(&quads.quads_memory, 0..quads.memory_requirements.size)
                 .expect("Failed to acquire a memory writer!");
-            let idx = quads.count * QUAD_BYTE_SIZE / size_of::<f32>();
 
             for (i, point) in [topleft, bottomleft, bottomright, topright]
                 .iter()
@@ -452,87 +451,193 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
 }
 
 pub fn quad_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
-    unimplemented![]
-    // let device = &s.device;
-    // if let Some(ref mut quads) = s.quads {
-    //     unsafe {
-    //         device
-    //             .wait_for_fences(
-    //                 &s.frames_in_flight_fences,
-    //                 gfx_hal::device::WaitFor::All,
-    //                 u64::max_value(),
-    //             )
-    //             .expect("Unable to wait for fences");
-    //     }
-    //     unsafe {
-    //         let data_reader = device
-    //             .acquire_mapping_reader::<f32>(
-    //                 &quads.quads_memory,
-    //                 0..quads.capacity,
-    //             )
-    //             .expect("Failed to acquire a memory writer!");
-    //         let mut vertices = Vec::<f32>::with_capacity(quads.count);
-    //         for i in 0..quads.count {
-    //             let idx = i * QUAD_BYTE_SIZE / size_of::<f32>();
-    //             let rotation = &data_reader[idx + 5..idx + 6];
-    //             vertices.push(rotation[0]);
-    //         }
-    //         device.release_mapping_reader(data_reader);
+    let device = &s.device;
+    if let Some(ref mut quads) = s.quads {
+        unsafe {
+            device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+        }
+        unsafe {
+            let data_reader = device
+                .acquire_mapping_reader::<f32>(
+                    &quads.quads_memory,
+                    0..quads.capacity,
+                )
+                .expect("Failed to acquire a memory writer!");
+            let mut vertices = Vec::<f32>::with_capacity(quads.count);
+            for i in 0..quads.count {
+                let idx = i * QUAD_BYTE_SIZE / size_of::<f32>();
+                let rotation = &data_reader[idx + 5..idx + 6];
+                vertices.push(rotation[0]);
+            }
+            device.release_mapping_reader(data_reader);
 
-    //         let mut data_target = device
-    //             .acquire_mapping_writer::<f32>(
-    //                 &quads.quads_memory,
-    //                 0..quads.capacity,
-    //             )
-    //             .expect("Failed to acquire a memory writer!");
+            let mut data_target = device
+                .acquire_mapping_writer::<f32>(
+                    &quads.quads_memory,
+                    0..quads.capacity,
+                )
+                .expect("Failed to acquire a memory writer!");
 
-    //         for (i, vert) in vertices.iter().enumerate() {
-    //             let mut idx = i * QUAD_BYTE_SIZE / size_of::<f32>();
-    //             data_target[idx + 5..idx + 6].copy_from_slice(&[*vert + deg.into().0]);
-    //             idx += 7;
-    //             data_target[idx + 5..idx + 6].copy_from_slice(&[*vert + deg.into().0]);
-    //             idx += 7;
-    //             data_target[idx + 5..idx + 6].copy_from_slice(&[*vert + deg.into().0]);
-    //         }
-    //         device
-    //             .release_mapping_writer(data_target)
-    //             .expect("Couldn't release the mapping writer!");
-    //     }
-    // }
+            for (i, vert) in vertices.iter().enumerate() {
+                let mut idx = i * QUAD_BYTE_SIZE / size_of::<f32>();
+                data_target[idx + 6..idx + 7].copy_from_slice(&[*vert + deg.into().0]);
+                idx += 7;
+                data_target[idx + 6..idx + 7].copy_from_slice(&[*vert + deg.into().0]);
+                idx += 7;
+                data_target[idx + 6..idx + 7].copy_from_slice(&[*vert + deg.into().0]);
+                idx += 7;
+                data_target[idx + 6..idx + 7].copy_from_slice(&[*vert + deg.into().0]);
+            }
+            device
+                .release_mapping_writer(data_target)
+                .expect("Couldn't release the mapping writer!");
+        }
+    }
 }
 
 pub fn set_quad_color(s: &mut Windowing, inst: &QuadHandle, rgba: [u8; 4]) {
-    unimplemented![]
-    // let inst = inst.0;
-    // let device = &s.device;
-    // if let Some(ref mut quads) = s.quads.get(inst.0) {
-    //     unsafe {
-    //         device
-    //             .wait_for_fences(
-    //                 &s.frames_in_flight_fences,
-    //                 gfx_hal::device::WaitFor::All,
-    //                 u64::max_value(),
-    //             )
-    //             .expect("Unable to wait for fences");
-    //     }
-    //     unsafe {
-    //         let mut data_target = device
-    //             .acquire_mapping_writer::<f32>(
-    //                 &quads.quads_memory,
-    //                 0..quads.capacity,
-    //             )
-    //             .expect("Failed to acquire a memory writer!");
+    let inst = inst.0;
+    let device = &s.device;
+    if let Some(ref mut quads) = s.quads {
+        unsafe {
+            device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+        }
+        unsafe {
+            let mut data_target = device
+                .acquire_mapping_writer::<f32>(
+                    &quads.quads_memory,
+                    0..quads.capacity,
+                )
+                .expect("Failed to acquire a memory writer!");
 
-    //         let mut idx = inst * QUAD_BYTE_SIZE / size_of::<f32>();
-    //         let rgba = &transmute::<[u8; 4], [f32; 1]>(rgba);
-    //         data_target[idx + 2..idx + 3].copy_from_slice(rgba);
-    //         idx += 7;
-    //         data_target[idx + 2..idx + 3].copy_from_slice(rgba);
-    //         idx += 7;
-    //         data_target[idx + 2..idx + 3].copy_from_slice(rgba);
-    //         device
-    //             .release_mapping_writer(data_target)
-    //             .expect("Couldn't release the mapping writer!");
-    //     }
-    // }
+            let mut idx = inst * QUAD_BYTE_SIZE / size_of::<f32>();
+            let rgba = &transmute::<[u8; 4], [f32; 1]>(rgba);
+            data_target[idx + 3..idx + 4].copy_from_slice(rgba);
+            idx += 7;
+            data_target[idx + 3..idx + 4].copy_from_slice(rgba);
+            idx += 7;
+            data_target[idx + 3..idx + 4].copy_from_slice(rgba);
+            idx += 7;
+            data_target[idx + 3..idx + 4].copy_from_slice(rgba);
+            device
+                .release_mapping_writer(data_target)
+                .expect("Couldn't release the mapping writer!");
+        }
+    }
+}
+
+// ---
+
+#[cfg(feature = "gfx_tests")]
+#[cfg(test)]
+mod tests {
+
+    use crate::mediators::vxdraw::*;
+
+    #[test]
+    fn simple_quad() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let mut quad = quads::Quad::default();
+        quad.colors[0].1 = 255;
+        quad.colors[3].1 = 255;
+
+        quads::push(&mut windowing, quad);
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        tests::assert_swapchain_eq(&mut windowing, "simple_quad", img);
+    }
+
+    #[test]
+    fn a_bunch_of_quads() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let mut topright = DebugTriangle::from([-1.0, -1.0, 1.0, 1.0, 1.0, -1.0]);
+        let mut bottomleft = DebugTriangle::from([-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]);
+        topright.scale = 0.1;
+        bottomleft.scale = 0.1;
+        let radi = 0.1;
+        let trans = -1f32 + radi;
+
+        for j in 0..10 {
+            for i in 0..10 {
+                topright.translation =
+                    (trans + i as f32 * 2.0 * radi, trans + j as f32 * 2.0 * radi);
+                bottomleft.translation =
+                    (trans + i as f32 * 2.0 * radi, trans + j as f32 * 2.0 * radi);
+                debtri::push(&mut windowing, topright);
+                debtri::push(&mut windowing, bottomleft);
+            }
+        }
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        tests::assert_swapchain_eq(&mut windowing, "a_bunch_of_quads", img);
+    }
+
+    #[test]
+    fn overlapping_quads_respect_z_order() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+        let mut quad = quads::Quad {
+            scale: 0.5,
+            ..quads::Quad::default()
+        };
+
+        for i in 0..4 {
+            quad.colors[i] = (0, 255, 0, 255);
+        }
+        quad.depth = 0.0;
+        quad.translation = (0.25, 0.25);
+        quads::push(&mut windowing, quad);
+
+        for i in 0..4 {
+            quad.colors[i] = (255, 0, 0, 255);
+        }
+        quad.depth = 0.5;
+        quad.translation = (0.0, 0.0);
+        quads::push(&mut windowing, quad);
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        tests::assert_swapchain_eq(&mut windowing, "overlapping_quads_respect_z_order", img);
+
+        // ---
+
+        quads::pop_n_quads(&mut windowing, 2);
+
+        // ---
+
+        for i in 0..4 {
+            quad.colors[i] = (255, 0, 0, 255);
+        }
+        quad.depth = 0.5;
+        quad.translation = (0.0, 0.0);
+        quads::push(&mut windowing, quad);
+
+        for i in 0..4 {
+            quad.colors[i] = (0, 255, 0, 255);
+        }
+        quad.depth = 0.0;
+        quad.translation = (0.25, 0.25);
+        quads::push(&mut windowing, quad);
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        tests::assert_swapchain_eq(&mut windowing, "overlapping_quads_respect_z_order", img);
+    }
 }

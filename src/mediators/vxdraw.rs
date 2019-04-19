@@ -43,7 +43,6 @@ pub mod utils;
 
 use debtri::{DebugTriangle, DebugTriangleHandle};
 use dyntex::*;
-use quads::*;
 use strtex::{add_streaming_texture, streaming_texture_add_sprite};
 use utils::*;
 
@@ -513,7 +512,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         window,
     };
     debtri::create_debug_triangle(&mut windowing);
-    create_quad(&mut windowing, log);
+    quads::create_quad(&mut windowing, log);
     windowing
 }
 
@@ -1148,7 +1147,7 @@ mod tests {
         );
     }
 
-    fn assert_swapchain_eq(windowing: &mut Windowing, name: &str, rgb: Vec<u8>) {
+    pub fn assert_swapchain_eq(windowing: &mut Windowing, name: &str, rgb: Vec<u8>) {
         use load_image::ImageDecoder;
         std::fs::create_dir_all("_build/vxdraw_results").expect("Unable to create directories");
 
@@ -1307,21 +1306,6 @@ mod tests {
     }
 
     #[test]
-    fn simple_quad() {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&windowing);
-
-        let mut quad = Quad::default();
-        quad.colors[0].1 = 255;
-        quad.colors[3].1 = 255;
-
-        quad_push(&mut windowing, quad);
-
-        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        assert_swapchain_eq(&mut windowing, "simple_quad", img);
-    }
-    #[test]
     fn simple_triangle_change_color() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
@@ -1412,85 +1396,6 @@ mod tests {
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         assert_swapchain_eq(&mut windowing, "triangle_in_corner", img);
-    }
-
-    #[test]
-    fn a_bunch_of_quads() {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&windowing);
-
-        let mut topright = DebugTriangle::from([-1.0, -1.0, 1.0, 1.0, 1.0, -1.0]);
-        let mut bottomleft = DebugTriangle::from([-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]);
-        topright.scale = 0.1;
-        bottomleft.scale = 0.1;
-        let radi = 0.1;
-        let trans = -1f32 + radi;
-
-        for j in 0..10 {
-            for i in 0..10 {
-                topright.translation =
-                    (trans + i as f32 * 2.0 * radi, trans + j as f32 * 2.0 * radi);
-                bottomleft.translation =
-                    (trans + i as f32 * 2.0 * radi, trans + j as f32 * 2.0 * radi);
-                debtri::push(&mut windowing, topright);
-                debtri::push(&mut windowing, bottomleft);
-            }
-        }
-
-        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        assert_swapchain_eq(&mut windowing, "a_bunch_of_quads", img);
-    }
-
-    #[test]
-    fn overlapping_quads_respect_z_order() {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&windowing);
-        let mut quad = Quad {
-            scale: 0.5,
-            ..Quad::default()
-        };
-
-        for i in 0..4 {
-            quad.colors[i] = (0, 255, 0, 255);
-        }
-        quad.depth = 0.0;
-        quad.translation = (0.25, 0.25);
-        quad_push(&mut windowing, quad);
-
-        for i in 0..4 {
-            quad.colors[i] = (255, 0, 0, 255);
-        }
-        quad.depth = 0.5;
-        quad.translation = (0.0, 0.0);
-        quad_push(&mut windowing, quad);
-
-        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        assert_swapchain_eq(&mut windowing, "overlapping_quads_respect_z_order", img);
-
-        // ---
-
-        pop_n_quads(&mut windowing, 2);
-
-        // ---
-
-        for i in 0..4 {
-            quad.colors[i] = (255, 0, 0, 255);
-        }
-        quad.depth = 0.5;
-        quad.translation = (0.0, 0.0);
-        quad_push(&mut windowing, quad);
-
-        for i in 0..4 {
-            quad.colors[i] = (0, 255, 0, 255);
-        }
-        quad.depth = 0.0;
-        quad.translation = (0.25, 0.25);
-        quad_push(&mut windowing, quad);
-
-        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        assert_swapchain_eq(&mut windowing, "overlapping_quads_respect_z_order", img);
     }
 
     #[test]

@@ -2046,12 +2046,31 @@ mod tests {
         let prspect = gen_perspective(&mut windowing);
 
         let strtex1 = add_streaming_texture(&mut windowing, 10, 10, &mut logger);
-        strtex::streaming_texture_set_pixels_block(&mut windowing, strtex1, (0, 0), (9, 9), (255, 255, 0, 255));
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            strtex1,
+            (0, 0),
+            (9, 9),
+            (255, 255, 0, 255),
+        );
         strtex::streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), strtex1);
 
         let strtex2 = add_streaming_texture(&mut windowing, 10, 10, &mut logger);
-        strtex::streaming_texture_set_pixels_block(&mut windowing, strtex2, (1, 1), (9, 9), (0, 255, 255, 255));
-        strtex::streaming_texture_add_sprite(&mut windowing, strtex::Sprite { depth: 0.1,..strtex::Sprite::default() }, strtex2);
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            strtex2,
+            (1, 1),
+            (9, 9),
+            (0, 255, 255, 255),
+        );
+        strtex::streaming_texture_add_sprite(
+            &mut windowing,
+            strtex::Sprite {
+                depth: 0.1,
+                ..strtex::Sprite::default()
+            },
+            strtex2,
+        );
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         assert_swapchain_eq(&mut windowing, "streaming_texture_z_ordering", img);

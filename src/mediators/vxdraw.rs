@@ -1128,7 +1128,7 @@ mod tests {
         debtri::pop_many(windowing, 1000);
     }
 
-    fn add_4_screencorners(windowing: &mut Windowing) {
+    pub fn add_4_screencorners(windowing: &mut Windowing) {
         debtri::push(
             windowing,
             DebugTriangle::from([-1.0f32, -1.0, 0.0, -1.0, -1.0, 0.0]),
@@ -1288,114 +1288,6 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         collect_input(&mut windowing);
-    }
-
-    #[test]
-    fn simple_triangle() {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&windowing);
-        let tri = DebugTriangle::default();
-
-        debtri::push(&mut windowing, tri);
-        add_4_screencorners(&mut windowing);
-
-        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-
-        assert_swapchain_eq(&mut windowing, "simple_triangle", img);
-    }
-
-    #[test]
-    fn simple_triangle_change_color() {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&windowing);
-        let tri = DebugTriangle::default();
-
-        let idx = debtri::push(&mut windowing, tri);
-        debtri::set_color(&mut windowing, &idx, [255, 0, 255, 255]);
-
-        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-
-        assert_swapchain_eq(&mut windowing, "simple_triangle_change_color", img);
-    }
-
-    #[test]
-    fn debug_triangle_corners_widescreen() {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
-        let prspect = gen_perspective(&windowing);
-
-        for i in [-1f32, 1f32].iter() {
-            for j in [-1f32, 1f32].iter() {
-                let mut tri = DebugTriangle::default();
-                tri.translation = (*i, *j);
-                let _idx = debtri::push(&mut windowing, tri);
-            }
-        }
-
-        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-
-        assert_swapchain_eq(&mut windowing, "debug_triangle_corners_widescreen", img);
-    }
-
-    #[test]
-    fn debug_triangle_corners_tallscreen() {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1x2k);
-        let prspect = gen_perspective(&windowing);
-
-        for i in [-1f32, 1f32].iter() {
-            for j in [-1f32, 1f32].iter() {
-                let mut tri = DebugTriangle::default();
-                tri.translation = (*i, *j);
-                let _idx = debtri::push(&mut windowing, tri);
-            }
-        }
-
-        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-
-        assert_swapchain_eq(&mut windowing, "debug_triangle_corners_tallscreen", img);
-    }
-
-    #[test]
-    fn circle_of_triangles() {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
-        let prspect = gen_perspective(&windowing);
-
-        for i in 0..360 {
-            let mut tri = DebugTriangle::default();
-            tri.translation = ((i as f32).cos(), (i as f32).sin());
-            tri.scale = 0.1f32;
-            let _idx = debtri::push(&mut windowing, tri);
-        }
-
-        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-
-        assert_swapchain_eq(&mut windowing, "circle_of_triangles", img);
-    }
-
-    #[test]
-    fn triangle_in_corner() {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&windowing);
-
-        let mut tri = DebugTriangle::default();
-        tri.scale = 0.1f32;
-        let radi = tri.radius();
-
-        let trans = -1f32 + radi;
-        for j in 0..31 {
-            for i in 0..31 {
-                tri.translation = (trans + i as f32 * 2.0 * radi, trans + j as f32 * 2.0 * radi);
-                debtri::push(&mut windowing, tri);
-            }
-        }
-
-        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        assert_swapchain_eq(&mut windowing, "triangle_in_corner", img);
     }
 
     #[test]

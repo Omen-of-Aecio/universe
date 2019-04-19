@@ -464,10 +464,7 @@ pub fn quad_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
         }
         unsafe {
             let data_reader = device
-                .acquire_mapping_reader::<f32>(
-                    &quads.quads_memory,
-                    0..quads.capacity,
-                )
+                .acquire_mapping_reader::<f32>(&quads.quads_memory, 0..quads.capacity)
                 .expect("Failed to acquire a memory writer!");
             let mut vertices = Vec::<f32>::with_capacity(quads.count);
             for i in 0..quads.count {
@@ -478,10 +475,7 @@ pub fn quad_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
             device.release_mapping_reader(data_reader);
 
             let mut data_target = device
-                .acquire_mapping_writer::<f32>(
-                    &quads.quads_memory,
-                    0..quads.capacity,
-                )
+                .acquire_mapping_writer::<f32>(&quads.quads_memory, 0..quads.capacity)
                 .expect("Failed to acquire a memory writer!");
 
             for (i, vert) in vertices.iter().enumerate() {
@@ -516,10 +510,7 @@ pub fn set_quad_color(s: &mut Windowing, inst: &QuadHandle, rgba: [u8; 4]) {
         }
         unsafe {
             let mut data_target = device
-                .acquire_mapping_writer::<f32>(
-                    &quads.quads_memory,
-                    0..quads.capacity,
-                )
+                .acquire_mapping_writer::<f32>(&quads.quads_memory, 0..quads.capacity)
                 .expect("Failed to acquire a memory writer!");
 
             let mut idx = inst * QUAD_BYTE_SIZE / size_of::<f32>();
@@ -543,7 +534,6 @@ pub fn set_quad_color(s: &mut Windowing, inst: &QuadHandle, rgba: [u8; 4]) {
 #[cfg(feature = "gfx_tests")]
 #[cfg(test)]
 mod tests {
-
     use crate::mediators::vxdraw::*;
 
     #[test]

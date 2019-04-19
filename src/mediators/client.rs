@@ -343,7 +343,14 @@ pub fn entry_point_client(s: &mut Main) {
             .push(render_polygon::create_render_polygon(&client.display));
 
         client.logger.set_log_level(196);
+        if let Some(ref mut windowing) = s.windowing {
+            super::vxdraw::debtri::push(windowing, super::vxdraw::debtri::DebugTriangle::default());
+        }
         loop {
+            if let Some(ref mut windowing) = s.windowing {
+                let persp = super::vxdraw::utils::gen_perspective(windowing);
+                super::vxdraw::draw_frame(windowing, &mut client.logger, &persp);
+            }
             s.time = Instant::now();
             let xform = if let Some(ref mut rx) = s.config_change_recv {
                 match rx.try_recv() {

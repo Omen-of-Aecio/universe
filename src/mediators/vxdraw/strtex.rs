@@ -616,6 +616,20 @@ pub fn streaming_texture_set_pixels(
                     layer: 0,
                 },
             );
+
+            s.device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+
+            let mut target = s
+                .device
+                .acquire_mapping_writer(&*strtex.image_memory, 0..strtex.image_requirements.size)
+                .expect("unable to acquire mapping writer");
+
             for item in modifier {
                 let w = item.0;
                 let h = item.1;
@@ -627,31 +641,12 @@ pub fn streaming_texture_set_pixels(
 
                 let access = foot.row_pitch * u64::from(h) + u64::from(w * 4);
 
-                let aligned = perfect_mapping_alignment(Align {
-                    access_offset: access,
-                    how_many_bytes_you_need: 4,
-                    non_coherent_atom_size: s.device_limits.non_coherent_atom_size as u64,
-                    memory_size: strtex.image_requirements.size,
-                });
-
-                s.device
-                    .wait_for_fences(
-                        &s.frames_in_flight_fences,
-                        gfx_hal::device::WaitFor::All,
-                        u64::max_value(),
-                    )
-                    .expect("Unable to wait for fences");
-
-                let mut target = s
-                    .device
-                    .acquire_mapping_writer(&*strtex.image_memory, aligned.begin..aligned.end)
-                    .expect("unable to acquire mapping writer");
-                target[aligned.index_offset as usize..(aligned.index_offset + 4) as usize]
+                target[access as usize..(access + 4) as usize]
                     .copy_from_slice(&[color.0, color.1, color.2, color.3]);
-                s.device
-                    .release_mapping_writer(target)
-                    .expect("Unable to release mapping writer");
             }
+            s.device
+                .release_mapping_writer(target)
+                .expect("Unable to release mapping writer");
         }
     }
 }
@@ -1014,6 +1009,26 @@ mod tests {
                 (0, 0),
                 (500, 500),
                 (255, 0, 0, 255),
+            );
+        });
+    }
+
+    #[bench]
+    fn bench_streaming_texture_set_500x500_area_using_iterator(b: &mut Bencher) {
+        use itertools::Itertools;
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+
+        let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
+
+        b.iter(|| {
+            strtex::streaming_texture_set_pixels(
+                &mut windowing,
+                id,
+                (0..500)
+                    .cartesian_product(0..500)
+                    .map(|(x, y)| (x, y, (255, 0, 0, 255))),
             );
         });
     }

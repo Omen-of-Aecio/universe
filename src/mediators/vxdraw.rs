@@ -392,10 +392,6 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
                     depth_image_memories.push(memory);
                 }
             }
-            // pub image: ManuallyDrop<B::Image>,
-            // pub requirements: Requirements,
-            // pub memory: ManuallyDrop<B::Memory>,
-            // pub image_view: ManuallyDrop<B::ImageView>,
             let framebuffers: Vec<<back::Backend as Backend>::Framebuffer> = {
                 image_views
                     .iter()
@@ -765,7 +761,6 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32) -> Vec<u8> {
             .collect();
         unsafe { s.device.create_shader_module(&spirv) }.unwrap()
     };
-    // Describe the shaders
     const ENTRY_NAME: &str = "main";
     let vs_module: <back::Backend as Backend>::ShaderModule = vs_module;
     let (vs_entry, fs_entry) = (
@@ -788,6 +783,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32) -> Vec<u8> {
         geometry: None,
         fragment: Some(fs_entry),
     };
+
     let input_assembler = InputAssemblerDesc::new(Primitive::TriangleList);
 
     let vertex_buffers: Vec<VertexBufferDesc> = vec![VertexBufferDesc {
@@ -795,6 +791,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32) -> Vec<u8> {
         stride: 8u32,
         rate: 0,
     }];
+
     let attributes: Vec<AttributeDesc> = vec![AttributeDesc {
         location: 0,
         binding: 0,
@@ -818,6 +815,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32) -> Vec<u8> {
         depth_bounds: false,
         stencil: StencilTest::Off,
     };
+
     let blender = {
         let blend_state = BlendState::On {
             color: BlendOp::Add {
@@ -834,6 +832,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32) -> Vec<u8> {
             targets: vec![ColorBlendDesc(ColorMask::ALL, blend_state)],
         }
     };
+
     let extent = image::Extent {
         // width: s.swapconfig.extent.width,
         // height: s.swapconfig.extent.height,
@@ -842,6 +841,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32) -> Vec<u8> {
         depth: 1,
     }
     .rect();
+
     let mapgen_render_pass = {
         let attachment = pass::Attachment {
             format: Some(format::Format::Rgba8Srgb),
@@ -865,6 +865,7 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32) -> Vec<u8> {
         unsafe { s.device.create_render_pass(&[attachment], &[subpass], &[]) }
             .expect("Can't create render pass")
     };
+
     let baked_states = BakedStates {
         viewport: Some(Viewport {
             rect: extent,

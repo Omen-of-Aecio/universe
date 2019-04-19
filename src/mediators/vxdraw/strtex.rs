@@ -3,6 +3,8 @@ use crate::glocals::{
     vxdraw::{StreamingTexture, Windowing},
     Log,
 };
+use ::image as load_image;
+use arrayvec::ArrayVec;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
 #[cfg(feature = "gl")]
@@ -12,6 +14,7 @@ use gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 use gfx_backend_vulkan as back;
 use gfx_hal::{
+    command,
     device::Device,
     format, image, memory, pass,
     pso::{self, DescriptorPool},
@@ -19,6 +22,7 @@ use gfx_hal::{
 };
 use logger::{debug, Logger};
 use std::io::Read;
+use std::iter::once;
 use std::mem::{size_of, ManuallyDrop};
 
 // ---
@@ -53,12 +57,7 @@ impl Default for Sprite {
 
 // ---
 
-pub fn add_streaming_texture(
-    s: &mut Windowing,
-    w: usize,
-    h: usize,
-    log: &mut Logger<Log>,
-) -> usize {
+pub fn push_texture(s: &mut Windowing, w: usize, h: usize, log: &mut Logger<Log>) -> usize {
     let (texture_vertex_buffer, texture_vertex_memory, vertex_requirements) =
         make_vertex_buffer_with_data(s, &[0f32; 9 * 4 * 1000]);
 
@@ -522,7 +521,7 @@ pub fn add_streaming_texture(
 }
 
 /// Add a sprite (a rectangular view of a texture) to the system
-pub fn streaming_texture_add_sprite(s: &mut Windowing, sprite: Sprite, texture: usize) -> usize {
+pub fn push_sprite(s: &mut Windowing, sprite: Sprite, texture: usize) -> usize {
     let tex = &mut s.strtexs[texture];
     let device = &s.device;
 
@@ -772,6 +771,347 @@ pub fn streaming_texture_set_pixel(
     }
 }
 
+pub fn generate_map(s: &mut Windowing, w: u32, h: u32) -> usize {
+    static VERTEX_SOURCE: &str = include_str!("../../../shaders/proc1.vert");
+    static FRAGMENT_SOURCE: &str = include_str!("../../../shaders/proc1.frag");
+    let vs_module = {
+        let glsl = VERTEX_SOURCE;
+        let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
+            .unwrap()
+            .bytes()
+            .map(Result::unwrap)
+            .collect();
+        unsafe { s.device.create_shader_module(&spirv) }.unwrap()
+    };
+    let fs_module = {
+        let glsl = FRAGMENT_SOURCE;
+        let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Fragment)
+            .unwrap()
+            .bytes()
+            .map(Result::unwrap)
+            .collect();
+        unsafe { s.device.create_shader_module(&spirv) }.unwrap()
+    };
+    const ENTRY_NAME: &str = "main";
+    let vs_module: <back::Backend as Backend>::ShaderModule = vs_module;
+    let (vs_entry, fs_entry) = (
+        pso::EntryPoint {
+            entry: ENTRY_NAME,
+            module: &vs_module,
+            specialization: pso::Specialization::default(),
+        },
+        pso::EntryPoint {
+            entry: ENTRY_NAME,
+            module: &fs_module,
+            specialization: pso::Specialization::default(),
+        },
+    );
+
+    let shader_entries = pso::GraphicsShaderSet {
+        vertex: vs_entry,
+        hull: None,
+        domain: None,
+        geometry: None,
+        fragment: Some(fs_entry),
+    };
+
+    let input_assembler = pso::InputAssemblerDesc::new(Primitive::TriangleList);
+
+    let vertex_buffers: Vec<pso::VertexBufferDesc> = vec![pso::VertexBufferDesc {
+        binding: 0,
+        stride: 8u32,
+        rate: 0,
+    }];
+
+    let attributes: Vec<pso::AttributeDesc> = vec![pso::AttributeDesc {
+        location: 0,
+        binding: 0,
+        element: pso::Element {
+            format: format::Format::Rg32Float,
+            offset: 0,
+        },
+    }];
+
+    let rasterizer = pso::Rasterizer {
+        depth_clamping: false,
+        polygon_mode: pso::PolygonMode::Fill,
+        cull_face: pso::Face::NONE,
+        front_face: pso::FrontFace::CounterClockwise,
+        depth_bias: None,
+        conservative: false,
+    };
+
+    let depth_stencil = pso::DepthStencilDesc {
+        depth: pso::DepthTest::Off,
+        depth_bounds: false,
+        stencil: pso::StencilTest::Off,
+    };
+
+    let blender = {
+        let blend_state = pso::BlendState::On {
+            color: pso::BlendOp::Add {
+                src: pso::Factor::One,
+                dst: pso::Factor::Zero,
+            },
+            alpha: pso::BlendOp::Add {
+                src: pso::Factor::One,
+                dst: pso::Factor::Zero,
+            },
+        };
+        pso::BlendDesc {
+            logic_op: Some(pso::LogicOp::Copy),
+            targets: vec![pso::ColorBlendDesc(pso::ColorMask::ALL, blend_state)],
+        }
+    };
+
+    let extent = image::Extent {
+        // width: s.swapconfig.extent.width,
+        // height: s.swapconfig.extent.height,
+        width: w,
+        height: h,
+        depth: 1,
+    }
+    .rect();
+
+    let mapgen_render_pass = {
+        let attachment = pass::Attachment {
+            format: Some(format::Format::Rgba8Srgb),
+            samples: 1,
+            ops: pass::AttachmentOps::new(
+                pass::AttachmentLoadOp::Clear,
+                pass::AttachmentStoreOp::Store,
+            ),
+            stencil_ops: pass::AttachmentOps::DONT_CARE,
+            layouts: image::Layout::General..image::Layout::General,
+        };
+
+        let subpass = pass::SubpassDesc {
+            colors: &[(0, image::Layout::General)],
+            depth_stencil: None,
+            inputs: &[],
+            resolves: &[],
+            preserves: &[],
+        };
+
+        unsafe { s.device.create_render_pass(&[attachment], &[subpass], &[]) }
+            .expect("Can't create render pass")
+    };
+
+    let baked_states = pso::BakedStates {
+        viewport: Some(pso::Viewport {
+            rect: extent,
+            depth: (0.0..1.0),
+        }),
+        scissor: Some(extent),
+        blend_color: None,
+        depth_bounds: None,
+    };
+    let bindings = Vec::<pso::DescriptorSetLayoutBinding>::new();
+    let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
+    let mut mapgen_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
+        vec![unsafe {
+            s.device
+                .create_descriptor_set_layout(bindings, immutable_samplers)
+                .expect("Couldn't make a DescriptorSetLayout")
+        }];
+    let mut push_constants = Vec::<(pso::ShaderStageFlags, core::ops::Range<u32>)>::new();
+    push_constants.push((pso::ShaderStageFlags::FRAGMENT, 0..4));
+
+    let mapgen_pipeline_layout = unsafe {
+        s.device
+            .create_pipeline_layout(&mapgen_descriptor_set_layouts, push_constants)
+            .expect("Couldn't create a pipeline layout")
+    };
+
+    // Describe the pipeline (rasterization, mapgen interpretation)
+    let pipeline_desc = pso::GraphicsPipelineDesc {
+        shaders: shader_entries,
+        rasterizer,
+        vertex_buffers,
+        attributes,
+        input_assembler,
+        blender,
+        depth_stencil,
+        multisampling: None,
+        baked_states,
+        layout: &mapgen_pipeline_layout,
+        subpass: pass::Subpass {
+            index: 0,
+            main_pass: &mapgen_render_pass,
+        },
+        flags: pso::PipelineCreationFlags::empty(),
+        parent: pso::BasePipeline::None,
+    };
+
+    let mapgen_pipeline = unsafe {
+        s.device
+            .create_graphics_pipeline(&pipeline_desc, None)
+            .expect("Couldn't create a graphics pipeline!")
+    };
+
+    unsafe {
+        s.device.destroy_shader_module(vs_module);
+        s.device.destroy_shader_module(fs_module);
+    }
+
+    // ---
+
+    unsafe {
+        let mut image = s
+            .device
+            .create_image(
+                image::Kind::D2(w, h, 1, 1),
+                1,
+                format::Format::Rgba8Srgb,
+                image::Tiling::Linear,
+                image::Usage::COLOR_ATTACHMENT | image::Usage::TRANSFER_DST | image::Usage::SAMPLED,
+                image::ViewCapabilities::empty(),
+            )
+            .expect("Unable to create image");
+        let requirements = s.device.get_image_requirements(&image);
+        let memory_type_id =
+            find_memory_type_id(&s.adapter, requirements, memory::Properties::CPU_VISIBLE);
+        let memory = s
+            .device
+            .allocate_memory(memory_type_id, requirements.size)
+            .expect("Unable to allocate memory");
+        let image_view = {
+            s.device
+                .bind_image_memory(&memory, 0, &mut image)
+                .expect("Unable to bind memory");
+
+            s.device
+                .create_image_view(
+                    &image,
+                    image::ViewKind::D2,
+                    format::Format::Rgba8Srgb,
+                    format::Swizzle::NO,
+                    image::SubresourceRange {
+                        aspects: format::Aspects::COLOR,
+                        levels: 0..1,
+                        layers: 0..1,
+                    },
+                )
+                .expect("Couldn't create the image view!")
+        };
+
+        let framebuffer = s
+            .device
+            .create_framebuffer(
+                &mapgen_render_pass,
+                vec![&image_view],
+                image::Extent {
+                    width: w,
+                    height: h,
+                    depth: 1,
+                },
+            )
+            .expect("fbo");
+
+        #[rustfmt::skip]
+        let (pt_buffer, pt_memory, _) = make_vertex_buffer_with_data(
+            s,
+            &[
+                -1.0, -1.0,
+                1.0, -1.0,
+                1.0, 1.0,
+                1.0, 1.0,
+                -1.0, 1.0,
+                -1.0, -1.0,
+            ],
+        );
+
+        let mut cmd_buffer = s.command_pool.acquire_command_buffer::<command::OneShot>();
+        let clear_values = [command::ClearValue::Color(command::ClearColor::Float([
+            1.0f32, 0.25, 0.5, 0.75,
+        ]))];
+        cmd_buffer.begin();
+        {
+            let image_barrier = memory::Barrier::Image {
+                states: (image::Access::empty(), image::Layout::Undefined)
+                    ..(image::Access::SHADER_WRITE, image::Layout::General),
+                target: &image,
+                families: None,
+                range: image::SubresourceRange {
+                    aspects: format::Aspects::COLOR,
+                    levels: 0..1,
+                    layers: 0..1,
+                },
+            };
+            cmd_buffer.pipeline_barrier(
+                pso::PipelineStage::TOP_OF_PIPE..pso::PipelineStage::FRAGMENT_SHADER,
+                memory::Dependencies::empty(),
+                &[image_barrier],
+            );
+            let mut enc = cmd_buffer.begin_render_pass_inline(
+                &mapgen_render_pass,
+                &framebuffer,
+                extent,
+                clear_values.iter(),
+            );
+            enc.bind_graphics_pipeline(&mapgen_pipeline);
+            enc.push_graphics_constants(
+                &mapgen_pipeline_layout,
+                pso::ShaderStageFlags::FRAGMENT,
+                0,
+                &(std::mem::transmute::<[f32; 4], [u32; 4]>([w as f32, 0.3, 93.0, 3.0])),
+            );
+            let buffers: ArrayVec<[_; 1]> = [(&pt_buffer, 0)].into();
+            enc.bind_vertex_buffers(0, buffers);
+            enc.draw(0..6, 0..1);
+        }
+        cmd_buffer.finish();
+        let upload_fence = s
+            .device
+            .create_fence(false)
+            .expect("Couldn't create an upload fence!");
+        s.queue_group.queues[0].submit_nosemaphores(Some(&cmd_buffer), Some(&upload_fence));
+        s.device
+            .wait_for_fence(&upload_fence, u64::max_value())
+            .expect("Unable to wait for fence");
+        s.device.destroy_fence(upload_fence);
+        s.command_pool.free(once(cmd_buffer));
+
+        let footprint = s.device.get_image_subresource_footprint(
+            &image,
+            image::Subresource {
+                aspects: format::Aspects::COLOR,
+                level: 0,
+                layer: 0,
+            },
+        );
+
+        let map = s
+            .device
+            .acquire_mapping_reader(&memory, footprint.slice)
+            .expect("Mapped memory");
+
+        let pixel_size = size_of::<load_image::Rgba<u8>>() as u32;
+        let row_size = pixel_size * w;
+
+        let mut result: Vec<u8> = Vec::new();
+        for y in 0..h as usize {
+            let dest_base = y * footprint.row_pitch as usize;
+            result.extend(map[dest_base..dest_base + row_size as usize].iter());
+        }
+        s.device.release_mapping_reader(map);
+
+        s.device.destroy_buffer(pt_buffer);
+        s.device.free_memory(pt_memory);
+        s.device.destroy_pipeline_layout(mapgen_pipeline_layout);
+        s.device.destroy_graphics_pipeline(mapgen_pipeline);
+        for desc_set_layout in mapgen_descriptor_set_layouts.drain(..) {
+            s.device.destroy_descriptor_set_layout(desc_set_layout);
+        }
+        s.device.destroy_render_pass(mapgen_render_pass);
+        s.device.destroy_framebuffer(framebuffer);
+        s.device.destroy_image_view(image_view);
+        s.device.destroy_image(image);
+        s.device.free_memory(memory);
+    }
+    0
+}
+
 #[cfg(feature = "gfx_tests")]
 #[cfg(test)]
 mod tests {
@@ -787,8 +1127,8 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&windowing);
 
-        let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
-        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
+        let id = push_texture(&mut windowing, 1000, 1000, &mut logger);
+        push_sprite(&mut windowing, strtex::Sprite::default(), id);
 
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
@@ -829,8 +1169,8 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&windowing);
 
-        let id = add_streaming_texture(&mut windowing, 10, 1, &mut logger);
-        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
+        let id = push_texture(&mut windowing, 10, 1, &mut logger);
+        push_sprite(&mut windowing, strtex::Sprite::default(), id);
 
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
@@ -892,8 +1232,8 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
 
-        let id = add_streaming_texture(&mut windowing, 20, 20, &mut logger);
-        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
+        let id = push_texture(&mut windowing, 20, 20, &mut logger);
+        push_sprite(&mut windowing, strtex::Sprite::default(), id);
 
         let mut rng = random::new(0);
 
@@ -915,8 +1255,8 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
 
-        let id = add_streaming_texture(&mut windowing, 64, 64, &mut logger);
-        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
+        let id = push_texture(&mut windowing, 64, 64, &mut logger);
+        push_sprite(&mut windowing, strtex::Sprite::default(), id);
 
         let mut rng = random::new(0);
 
@@ -940,7 +1280,7 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&windowing);
 
-        let strtex1 = add_streaming_texture(&mut windowing, 10, 10, &mut logger);
+        let strtex1 = push_texture(&mut windowing, 10, 10, &mut logger);
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
             strtex1,
@@ -948,9 +1288,9 @@ mod tests {
             (9, 9),
             (255, 255, 0, 255),
         );
-        strtex::streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), strtex1);
+        strtex::push_sprite(&mut windowing, strtex::Sprite::default(), strtex1);
 
-        let strtex2 = add_streaming_texture(&mut windowing, 10, 10, &mut logger);
+        let strtex2 = push_texture(&mut windowing, 10, 10, &mut logger);
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
             strtex2,
@@ -958,7 +1298,7 @@ mod tests {
             (9, 9),
             (0, 255, 255, 255),
         );
-        strtex::streaming_texture_add_sprite(
+        strtex::push_sprite(
             &mut windowing,
             strtex::Sprite {
                 depth: 0.1,
@@ -979,8 +1319,8 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&windowing);
 
-        let id = add_streaming_texture(&mut windowing, 50, 50, &mut logger);
-        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
+        let id = push_texture(&mut windowing, 50, 50, &mut logger);
+        push_sprite(&mut windowing, strtex::Sprite::default(), id);
 
         b.iter(|| {
             strtex::streaming_texture_set_pixel(
@@ -999,8 +1339,8 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
 
-        let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
-        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
+        let id = push_texture(&mut windowing, 1000, 1000, &mut logger);
+        push_sprite(&mut windowing, strtex::Sprite::default(), id);
 
         b.iter(|| {
             strtex::streaming_texture_set_pixels_block(
@@ -1019,8 +1359,8 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
 
-        let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
-        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
+        let id = push_texture(&mut windowing, 1000, 1000, &mut logger);
+        push_sprite(&mut windowing, strtex::Sprite::default(), id);
 
         b.iter(|| {
             strtex::streaming_texture_set_pixels(
@@ -1038,8 +1378,8 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
 
-        let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
-        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
+        let id = push_texture(&mut windowing, 1000, 1000, &mut logger);
+        push_sprite(&mut windowing, strtex::Sprite::default(), id);
 
         b.iter(|| {
             strtex::streaming_texture_set_pixel(

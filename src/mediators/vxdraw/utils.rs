@@ -507,7 +507,7 @@ pub struct Align {
 pub struct AlignResult {
     pub begin: u64,
     pub end: u64,
-    pub index_offset: u64,
+    pub index_offset: usize,
 }
 pub fn perfect_mapping_alignment(align: Align) -> AlignResult {
     let begin = align.access_offset - align.access_offset % align.non_coherent_atom_size;
@@ -515,7 +515,7 @@ pub fn perfect_mapping_alignment(align: Align) -> AlignResult {
         Alignment(align.non_coherent_atom_size),
         align.access_offset + align.how_many_bytes_you_need,
     );
-    let index_offset = align.access_offset - begin;
+    let index_offset = (align.access_offset - begin) as usize;
     AlignResult {
         begin,
         end,

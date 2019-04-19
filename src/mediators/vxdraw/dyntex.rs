@@ -58,7 +58,7 @@ impl Default for Sprite {
 }
 
 /// A view into a texture
-pub struct SpriteHandle(usize);
+pub struct SpriteHandle(usize, usize);
 
 /// Handle to a texture
 pub struct TextureHandle(usize);
@@ -78,7 +78,19 @@ impl Default for TextureOptions {
 // ---
 
 /// Add a texture to the system
-pub fn add_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions) -> TextureHandle {
+///
+/// You use a texture to create sprites. Sprites are rectangular views into the texture. Sprites
+/// based on different texures are drawn in the order in which the textures were allocated, that
+/// means that the first texture's sprites are drawn first, then, the second texture's sprites,and
+/// so on.
+///
+/// Each texture has options (See `TextureOptions`). This decides how the derivative sprites are
+/// draw.
+///
+/// Note: Alpha blending with depth testing will make foreground transparency not be transparent.
+/// To make sure transparency works correctly you can turn off the depth test for foreground
+/// objects and ensure that the foreground texture is allocated last.
+pub fn push_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions) -> TextureHandle {
     let (texture_vertex_buffer, texture_vertex_memory, texture_vertex_requirements) =
         make_vertex_buffer_with_data(s, &[0f32; 10 * 4 * 1000]);
 
@@ -628,7 +640,7 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions) 
 }
 
 /// Add a sprite (a rectangular view of a texture) to the system
-pub fn add_sprite(s: &mut Windowing, sprite: Sprite, texture: &TextureHandle) -> SpriteHandle {
+pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -> SpriteHandle {
     let tex = &mut s.dyntexs[texture.0];
     let device = &s.device;
 
@@ -705,7 +717,7 @@ pub fn add_sprite(s: &mut Windowing, sprite: Sprite, texture: &TextureHandle) ->
             .release_mapping_writer(data_target)
             .expect("Couldn't release the mapping writer!");
     }
-    SpriteHandle((tex.count - 1) as usize)
+    SpriteHandle(texture.0, (tex.count - 1) as usize)
 }
 
 // ---
@@ -815,6 +827,98 @@ pub fn sprite_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, tex: &Text
     }
 }
 
+pub fn set_uv(s: &mut Windowing, handle: &SpriteHandle, uv_begin: (f32, f32), uv_end: (f32, f32)) {
+    if let Some(ref mut stex) = s.dyntexs.get(handle.0) {
+        if handle.1 < stex.count as usize {
+            let device = &s.device;
+            let aligned = perfect_mapping_alignment(Align {
+                access_offset: (handle.1 * 4 * 10 * 4) as u64,
+                how_many_bytes_you_need: 40 * 4,
+                non_coherent_atom_size: s.device_limits.non_coherent_atom_size as u64,
+                memory_size: stex.texture_vertex_requirements.size,
+            });
+
+            unsafe {
+                device
+                    .wait_for_fences(
+                        &s.frames_in_flight_fences,
+                        gfx_hal::device::WaitFor::All,
+                        u64::max_value(),
+                    )
+                    .expect("Unable to wait for fences");
+                let mut data_target = device
+                    .acquire_mapping_writer::<f32>(
+                        &stex.texture_vertex_memory,
+                        aligned.begin..aligned.end,
+                    )
+                    .expect("Failed to acquire a memory writer!");
+
+                let mut idx = aligned.index_offset / 4;
+
+                data_target[idx + 3..idx + 5].copy_from_slice(&[uv_begin.0, uv_begin.1]);
+                idx += 10;
+                data_target[idx + 3..idx + 5].copy_from_slice(&[uv_begin.0, uv_end.1]);
+                idx += 10;
+                data_target[idx + 3..idx + 5].copy_from_slice(&[uv_end.0, uv_end.1]);
+                idx += 10;
+                data_target[idx + 3..idx + 5].copy_from_slice(&[uv_end.0, uv_begin.1]);
+
+                device
+                    .release_mapping_writer(data_target)
+                    .expect("Couldn't release the mapping writer!");
+            }
+        }
+    }
+}
+
+pub fn set_uvs(
+    s: &mut Windowing,
+    handles: &[SpriteHandle],
+    mut uvs: impl Iterator<Item = ((f32, f32), (f32, f32))>,
+) {
+    if let Some(ref mut stex) = s.dyntexs.get(handles[0].0) {
+        let device = &s.device;
+        let current_texture_handle = handles[0].0;
+        unsafe {
+            device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+            let mut data_target = device
+                .acquire_mapping_writer::<f32>(
+                    &stex.texture_vertex_memory,
+                    0..stex.texture_vertex_requirements.size,
+                )
+                .expect("Failed to acquire a memory writer!");
+            for handle in handles {
+                if handle.0 != current_texture_handle {
+                    panic![];
+                }
+                if handle.1 < stex.count as usize {
+                    let mut idx = (handle.1 * 4 * 10) as usize;
+                    if let Some((uv_begin, uv_end)) = uvs.next() {
+                        data_target[idx + 3..idx + 5].copy_from_slice(&[uv_begin.0, uv_begin.1]);
+                        idx += 10;
+                        data_target[idx + 3..idx + 5].copy_from_slice(&[uv_begin.0, uv_end.1]);
+                        idx += 10;
+                        data_target[idx + 3..idx + 5].copy_from_slice(&[uv_end.0, uv_end.1]);
+                        idx += 10;
+                        data_target[idx + 3..idx + 5].copy_from_slice(&[uv_end.0, uv_begin.1]);
+                    } else {
+                        break;
+                    }
+                }
+            }
+            device
+                .release_mapping_writer(data_target)
+                .expect("Couldn't release the mapping writer!");
+        }
+    }
+}
+
 #[cfg(feature = "gfx_tests")]
 #[cfg(test)]
 mod tests {
@@ -826,9 +930,14 @@ mod tests {
     use std::f32::consts::PI;
     use test::Bencher;
 
+    // ---
+
     static LOGO: &[u8] = include_bytes!["../../../assets/images/logo.png"];
     static FOREST: &[u8] = include_bytes!["../../../assets/images/forest-light.png"];
     static TREE: &[u8] = include_bytes!["../../../assets/images/treetest.png"];
+    static FIREBALL: &[u8] = include_bytes!["../../../assets/images/Fireball_68x9.png"];
+
+    // ---
 
     #[test]
     fn overlapping_dyntex_respect_z_order() {
@@ -836,30 +945,30 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&windowing);
 
-        let tree = add_texture(&mut windowing, TREE, TextureOptions::default());
-        let logo = add_texture(&mut windowing, LOGO, TextureOptions::default());
+        let tree = push_texture(&mut windowing, TREE, TextureOptions::default());
+        let logo = push_texture(&mut windowing, LOGO, TextureOptions::default());
 
         let sprite = Sprite {
             scale: 0.5,
             ..Sprite::default()
         };
 
-        add_sprite(
+        push_sprite(
             &mut windowing,
+            &tree,
             Sprite {
                 depth: 0.5,
                 ..sprite
             },
-            &tree,
         );
-        add_sprite(
+        push_sprite(
             &mut windowing,
+            &logo,
             Sprite {
                 depth: 0.6,
                 translation: (0.25, 0.25),
                 ..sprite
             },
-            &logo,
         );
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
@@ -870,8 +979,8 @@ mod tests {
     fn simple_texture() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(&mut windowing, LOGO, TextureOptions::default());
-        add_sprite(&mut windowing, Sprite::default(), &tex);
+        let tex = push_texture(&mut windowing, LOGO, TextureOptions::default());
+        push_sprite(&mut windowing, &tex, Sprite::default());
 
         let prspect = gen_perspective(&windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
@@ -882,8 +991,8 @@ mod tests {
     fn simple_texture_adheres_to_view() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
-        let tex = add_texture(&mut windowing, LOGO, TextureOptions::default());
-        add_sprite(&mut windowing, Sprite::default(), &tex);
+        let tex = push_texture(&mut windowing, LOGO, TextureOptions::default());
+        push_sprite(&mut windowing, &tex, Sprite::default());
 
         let prspect = gen_perspective(&windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
@@ -894,9 +1003,10 @@ mod tests {
     fn colored_simple_texture() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(&mut windowing, LOGO, TextureOptions::default());
-        add_sprite(
+        let tex = push_texture(&mut windowing, LOGO, TextureOptions::default());
+        push_sprite(
             &mut windowing,
+            &tex,
             Sprite {
                 colors: [
                     (255, 1, 2, 255),
@@ -906,7 +1016,6 @@ mod tests {
                 ],
                 ..Sprite::default()
             },
-            &tex,
         );
 
         let prspect = gen_perspective(&windowing);
@@ -918,7 +1027,7 @@ mod tests {
     fn translated_texture() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(
+        let tex = push_texture(
             &mut windowing,
             LOGO,
             TextureOptions {
@@ -933,41 +1042,41 @@ mod tests {
             ..Sprite::default()
         };
 
-        add_sprite(
+        push_sprite(
             &mut windowing,
+            &tex,
             Sprite {
                 translation: (-0.5, -0.5),
                 rotation: 0.0,
                 ..base
             },
-            &tex,
         );
-        add_sprite(
+        push_sprite(
             &mut windowing,
+            &tex,
             Sprite {
                 translation: (0.5, -0.5),
                 rotation: PI / 4.0,
                 ..base
             },
-            &tex,
         );
-        add_sprite(
+        push_sprite(
             &mut windowing,
+            &tex,
             Sprite {
                 translation: (-0.5, 0.5),
                 rotation: PI / 2.0,
                 ..base
             },
-            &tex,
         );
-        add_sprite(
+        push_sprite(
             &mut windowing,
+            &tex,
             Sprite {
                 translation: (0.5, 0.5),
                 rotation: PI,
                 ..base
             },
-            &tex,
         );
         sprite_translate_all(&mut windowing, &tex, (0.25, 0.35));
 
@@ -980,7 +1089,7 @@ mod tests {
     fn rotated_texture() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(
+        let tex = push_texture(
             &mut windowing,
             LOGO,
             TextureOptions {
@@ -995,41 +1104,41 @@ mod tests {
             ..Sprite::default()
         };
 
-        add_sprite(
+        push_sprite(
             &mut windowing,
+            &tex,
             Sprite {
                 translation: (-0.5, -0.5),
                 rotation: 0.0,
                 ..base
             },
-            &tex,
         );
-        add_sprite(
+        push_sprite(
             &mut windowing,
+            &tex,
             Sprite {
                 translation: (0.5, -0.5),
                 rotation: PI / 4.0,
                 ..base
             },
-            &tex,
         );
-        add_sprite(
+        push_sprite(
             &mut windowing,
+            &tex,
             Sprite {
                 translation: (-0.5, 0.5),
                 rotation: PI / 2.0,
                 ..base
             },
-            &tex,
         );
-        add_sprite(
+        push_sprite(
             &mut windowing,
+            &tex,
             Sprite {
                 translation: (0.5, 0.5),
                 rotation: PI,
                 ..base
             },
-            &tex,
         );
         sprite_rotate_all(&mut windowing, &tex, Deg(90.0));
 
@@ -1042,7 +1151,7 @@ mod tests {
     fn many_sprites() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(
+        let tex = push_texture(
             &mut windowing,
             LOGO,
             TextureOptions {
@@ -1051,14 +1160,14 @@ mod tests {
             },
         );
         for i in 0..360 {
-            add_sprite(
+            push_sprite(
                 &mut windowing,
+                &tex,
                 Sprite {
                     rotation: ((i * 10) as f32 / 180f32 * PI),
                     scale: 0.5,
                     ..Sprite::default()
                 },
-                &tex,
             );
         }
 
@@ -1077,27 +1186,27 @@ mod tests {
             depth_test: false,
             ..TextureOptions::default()
         };
-        let forest = add_texture(&mut windowing, FOREST, options);
-        let player = add_texture(&mut windowing, LOGO, options);
-        let tree = add_texture(&mut windowing, TREE, options);
+        let forest = push_texture(&mut windowing, FOREST, options);
+        let player = push_texture(&mut windowing, LOGO, options);
+        let tree = push_texture(&mut windowing, TREE, options);
 
-        add_sprite(&mut windowing, Sprite::default(), &forest);
-        add_sprite(
+        push_sprite(&mut windowing, &forest, Sprite::default());
+        push_sprite(
             &mut windowing,
+            &player,
             Sprite {
                 scale: 0.4,
                 ..Sprite::default()
             },
-            &player,
         );
-        add_sprite(
+        push_sprite(
             &mut windowing,
+            &tree,
             Sprite {
                 translation: (-0.3, 0.0),
                 scale: 0.4,
                 ..Sprite::default()
             },
-            &tree,
         );
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
@@ -1108,16 +1217,16 @@ mod tests {
     fn bench_many_sprites(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(&mut windowing, LOGO, TextureOptions::default());
+        let tex = push_texture(&mut windowing, LOGO, TextureOptions::default());
         for i in 0..1000 {
-            add_sprite(
+            push_sprite(
                 &mut windowing,
+                &tex,
                 Sprite {
                     rotation: ((i * 10) as f32 / 180f32 * PI),
                     scale: 0.5,
                     ..Sprite::default()
                 },
-                &tex,
             );
         }
 
@@ -1131,27 +1240,89 @@ mod tests {
     fn bench_many_particles(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(&mut windowing, LOGO, TextureOptions::default());
+        let tex = push_texture(&mut windowing, LOGO, TextureOptions::default());
         let mut rng = random::new(0);
         for i in 0..1000 {
             let (dx, dy) = (
                 rng.gen_range(-1.0f32, 1.0f32),
                 rng.gen_range(-1.0f32, 1.0f32),
             );
-            add_sprite(
+            push_sprite(
                 &mut windowing,
+                &tex,
                 Sprite {
                     translation: (dx, dy),
                     rotation: ((i * 10) as f32 / 180f32 * PI),
                     scale: 0.01,
                     ..Sprite::default()
                 },
-                &tex,
             );
         }
 
         let prspect = gen_perspective(&windowing);
         b.iter(|| {
+            draw_frame(&mut windowing, &mut logger, &prspect);
+        });
+    }
+
+    #[bench]
+    fn animated_fireballs_20x20(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Enable);
+        let prspect = gen_perspective(&windowing);
+
+        let fireball_texture = push_texture(
+            &mut windowing,
+            FIREBALL,
+            TextureOptions {
+                depth_test: false,
+                ..TextureOptions::default()
+            },
+        );
+
+        let mut fireballs = vec![];
+        for idx in -10..10 {
+            for jdx in -10..10 {
+                fireballs.push(push_sprite(
+                    &mut windowing,
+                    &fireball_texture,
+                    Sprite {
+                        width: 0.68,
+                        height: 0.09,
+                        rotation: idx as f32 / 18.0 + jdx as f32 / 16.0,
+                        translation: (idx as f32 / 10.0, jdx as f32 / 10.0),
+                        ..Sprite::default()
+                    },
+                ));
+            }
+        }
+
+        let width_elems = 10;
+        let height_elems = 6;
+
+        let mut counter = 0;
+
+        b.iter(|| {
+            let width_elem = counter % width_elems;
+            let height_elem = counter / width_elems;
+            let uv_begin = (
+                width_elem as f32 / width_elems as f32,
+                height_elem as f32 / height_elems as f32,
+            );
+            let uv_end = (
+                (width_elem + 1) as f32 / width_elems as f32,
+                (height_elem + 1) as f32 / height_elems as f32,
+            );
+            counter += 1;
+            if counter > width_elems * height_elems {
+                counter = 0;
+            }
+
+            set_uvs(
+                &mut windowing,
+                &fireballs,
+                (0..fireballs.len()).map(|_| (uv_begin, uv_end)),
+            );
             draw_frame(&mut windowing, &mut logger, &prspect);
         });
     }

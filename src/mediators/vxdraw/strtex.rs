@@ -26,6 +26,12 @@ use std::mem::{size_of, ManuallyDrop};
 
 // ---
 
+/// A view into a texture
+pub struct SpriteHandle(usize, usize);
+
+/// Handle to a texture
+pub struct TextureHandle(usize);
+
 pub struct Sprite {
     pub width: f32,
     pub height: f32,
@@ -56,7 +62,7 @@ impl Default for Sprite {
 
 // ---
 
-pub fn push_texture(s: &mut Windowing, w: usize, h: usize, log: &mut Logger<Log>) -> usize {
+pub fn push_texture(s: &mut Windowing, w: usize, h: usize, log: &mut Logger<Log>) -> TextureHandle {
     let (texture_vertex_buffer, texture_vertex_memory, vertex_requirements) =
         make_vertex_buffer_with_data(s, &[0f32; 9 * 4 * 1000]);
 
@@ -516,12 +522,12 @@ pub fn push_texture(s: &mut Windowing, w: usize, h: usize, log: &mut Logger<Log>
         pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
         render_pass: ManuallyDrop::new(triangle_render_pass),
     });
-    s.strtexs.len() - 1
+    TextureHandle(s.strtexs.len() - 1)
 }
 
 /// Add a sprite (a rectangular view of a texture) to the system
-pub fn push_sprite(s: &mut Windowing, sprite: Sprite, texture: usize) -> usize {
-    let tex = &mut s.strtexs[texture];
+pub fn push_sprite(s: &mut Windowing, handle: &TextureHandle, sprite: Sprite) -> SpriteHandle {
+    let tex = &mut s.strtexs[handle.0];
     let device = &s.device;
 
     // Derive xy from the sprite's initial UV
@@ -594,17 +600,17 @@ pub fn push_sprite(s: &mut Windowing, sprite: Sprite, texture: usize) -> usize {
             .release_mapping_writer(data_target)
             .expect("Couldn't release the mapping writer!");
     }
-    (tex.count - 1) as usize
+    SpriteHandle(handle.0, (tex.count - 1) as usize)
 }
 
 // ---
 
 pub fn streaming_texture_set_pixels(
     s: &mut Windowing,
-    id: usize,
+    id: &TextureHandle,
     modifier: impl Iterator<Item = (u32, u32, (u8, u8, u8, u8))>,
 ) {
-    if let Some(ref strtex) = s.strtexs.get(id) {
+    if let Some(ref strtex) = s.strtexs.get(id.0) {
         unsafe {
             let foot = s.device.get_image_subresource_footprint(
                 &strtex.image_buffer,
@@ -651,12 +657,12 @@ pub fn streaming_texture_set_pixels(
 
 pub fn streaming_texture_set_pixels_block(
     s: &mut Windowing,
-    id: usize,
+    id: &TextureHandle,
     start: (u32, u32),
     wh: (u32, u32),
     color: (u8, u8, u8, u8),
 ) {
-    if let Some(ref strtex) = s.strtexs.get(id) {
+    if let Some(ref strtex) = s.strtexs.get(id.0) {
         if start.0 + wh.0 > strtex.width || start.1 + wh.1 > strtex.height {
             return;
         }
@@ -720,12 +726,12 @@ pub fn streaming_texture_set_pixels_block(
 
 pub fn streaming_texture_set_pixel(
     s: &mut Windowing,
-    id: usize,
+    id: &TextureHandle,
     w: u32,
     h: u32,
     color: (u8, u8, u8, u8),
 ) {
-    if let Some(ref strtex) = s.strtexs.get(id) {
+    if let Some(ref strtex) = s.strtexs.get(id.0) {
         if !(w < strtex.width && h < strtex.height) {
             return;
         }
@@ -770,11 +776,11 @@ pub fn streaming_texture_set_pixel(
     }
 }
 
-pub fn generate_map2(s: &mut Windowing, blitid: usize, seed: [f32; 3]) {
+pub fn generate_map2(s: &mut Windowing, blitid: &TextureHandle, seed: [f32; 3]) {
     static VERTEX_SOURCE: &str = include_str!("../../../shaders/proc1.vert");
     static FRAGMENT_SOURCE: &str = include_str!("../../../shaders/proc1.frag");
-    let w = s.strtexs[blitid].width;
-    let h = s.strtexs[blitid].height;
+    let w = s.strtexs[blitid.0].width;
+    let h = s.strtexs[blitid.0].height;
     let vs_module = {
         let glsl = VERTEX_SOURCE;
         let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
@@ -1078,7 +1084,7 @@ pub fn generate_map2(s: &mut Windowing, blitid: usize, seed: [f32; 3]) {
         cmd_buffer.blit_image(
             &image,
             image::Layout::General,
-            &s.strtexs[blitid].image_buffer,
+            &s.strtexs[blitid.0].image_buffer,
             image::Layout::General,
             image::Filter::Nearest,
             once(command::ImageBlit {
@@ -1144,8 +1150,8 @@ mod tests {
         let prspect = gen_perspective(&windowing);
 
         let id = push_texture(&mut windowing, 1000, 1000, &mut logger);
-        push_sprite(&mut windowing, Sprite::default(), id);
-        generate_map2(&mut windowing, id, [0.0, 0.0, 0.0]);
+        push_sprite(&mut windowing, &id, Sprite::default());
+        generate_map2(&mut windowing, &id, [0.0, 0.0, 0.0]);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         utils::assert_swapchain_eq(&mut windowing, "generate_map_randomly", img);
     }
@@ -1157,32 +1163,32 @@ mod tests {
         let prspect = gen_perspective(&windowing);
 
         let id = push_texture(&mut windowing, 1000, 1000, &mut logger);
-        push_sprite(&mut windowing, strtex::Sprite::default(), id);
+        push_sprite(&mut windowing, &id, strtex::Sprite::default());
 
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
-            id,
+            &id,
             (0, 0),
             (500, 500),
             (255, 0, 0, 255),
         );
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
-            id,
+            &id,
             (500, 0),
             (500, 500),
             (0, 255, 0, 255),
         );
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
-            id,
+            &id,
             (0, 500),
             (500, 500),
             (0, 0, 255, 255),
         );
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
-            id,
+            &id,
             (500, 500),
             (500, 500),
             (0, 0, 0, 0),
@@ -1199,11 +1205,11 @@ mod tests {
         let prspect = gen_perspective(&windowing);
 
         let id = push_texture(&mut windowing, 10, 1, &mut logger);
-        push_sprite(&mut windowing, strtex::Sprite::default(), id);
+        push_sprite(&mut windowing, &id, strtex::Sprite::default());
 
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
-            id,
+            &id,
             (0, 0),
             (10, 1),
             (0, 255, 0, 255),
@@ -1211,7 +1217,7 @@ mod tests {
 
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
-            id,
+            &id,
             (3, 0),
             (1, 1),
             (0, 0, 255, 255),
@@ -1222,7 +1228,7 @@ mod tests {
 
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
-            id,
+            &id,
             (3, 0),
             (0, 1),
             (255, 0, 255, 255),
@@ -1230,7 +1236,7 @@ mod tests {
 
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
-            id,
+            &id,
             (3, 0),
             (0, 0),
             (255, 0, 255, 255),
@@ -1238,7 +1244,7 @@ mod tests {
 
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
-            id,
+            &id,
             (3, 0),
             (1, 0),
             (255, 0, 255, 255),
@@ -1246,7 +1252,7 @@ mod tests {
 
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
-            id,
+            &id,
             (30, 0),
             (800, 0),
             (255, 0, 255, 255),
@@ -1262,7 +1268,7 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
 
         let id = push_texture(&mut windowing, 20, 20, &mut logger);
-        push_sprite(&mut windowing, strtex::Sprite::default(), id);
+        push_sprite(&mut windowing, &id, strtex::Sprite::default());
 
         let mut rng = random::new(0);
 
@@ -1270,10 +1276,10 @@ mod tests {
             let x = rng.gen_range(0, 30);
             let y = rng.gen_range(0, 30);
 
-            strtex::streaming_texture_set_pixel(&mut windowing, id, x, y, (0, 255, 0, 255));
+            strtex::streaming_texture_set_pixel(&mut windowing, &id, x, y, (0, 255, 0, 255));
             strtex::streaming_texture_set_pixels(
                 &mut windowing,
-                id,
+                &id,
                 once((x, y, (0, 255, 0, 255))),
             );
         }
@@ -1285,7 +1291,7 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
 
         let id = push_texture(&mut windowing, 64, 64, &mut logger);
-        push_sprite(&mut windowing, strtex::Sprite::default(), id);
+        push_sprite(&mut windowing, &id, strtex::Sprite::default());
 
         let mut rng = random::new(0);
 
@@ -1295,7 +1301,7 @@ mod tests {
 
             strtex::streaming_texture_set_pixels_block(
                 &mut windowing,
-                id,
+                &id,
                 start,
                 wh,
                 (0, 255, 0, 255),
@@ -1312,28 +1318,28 @@ mod tests {
         let strtex1 = push_texture(&mut windowing, 10, 10, &mut logger);
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
-            strtex1,
+            &strtex1,
             (0, 0),
             (9, 9),
             (255, 255, 0, 255),
         );
-        strtex::push_sprite(&mut windowing, strtex::Sprite::default(), strtex1);
+        strtex::push_sprite(&mut windowing, &strtex1, strtex::Sprite::default());
 
         let strtex2 = push_texture(&mut windowing, 10, 10, &mut logger);
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
-            strtex2,
+            &strtex2,
             (1, 1),
             (9, 9),
             (0, 255, 255, 255),
         );
         strtex::push_sprite(
             &mut windowing,
+            &strtex2,
             strtex::Sprite {
                 depth: 0.1,
                 ..strtex::Sprite::default()
             },
-            strtex2,
         );
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
@@ -1349,12 +1355,12 @@ mod tests {
         let prspect = gen_perspective(&windowing);
 
         let id = push_texture(&mut windowing, 50, 50, &mut logger);
-        push_sprite(&mut windowing, strtex::Sprite::default(), id);
+        push_sprite(&mut windowing, &id, strtex::Sprite::default());
 
         b.iter(|| {
             strtex::streaming_texture_set_pixel(
                 &mut windowing,
-                id,
+                &id,
                 black_box(1),
                 black_box(2),
                 (255, 0, 0, 255),
@@ -1369,12 +1375,12 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
 
         let id = push_texture(&mut windowing, 1000, 1000, &mut logger);
-        push_sprite(&mut windowing, strtex::Sprite::default(), id);
+        push_sprite(&mut windowing, &id, strtex::Sprite::default());
 
         b.iter(|| {
             strtex::streaming_texture_set_pixels_block(
                 &mut windowing,
-                id,
+                &id,
                 (0, 0),
                 (500, 500),
                 (255, 0, 0, 255),
@@ -1389,12 +1395,12 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
 
         let id = push_texture(&mut windowing, 1000, 1000, &mut logger);
-        push_sprite(&mut windowing, strtex::Sprite::default(), id);
+        push_sprite(&mut windowing, &id, strtex::Sprite::default());
 
         b.iter(|| {
             strtex::streaming_texture_set_pixels(
                 &mut windowing,
-                id,
+                &id,
                 (0..500)
                     .cartesian_product(0..500)
                     .map(|(x, y)| (x, y, (255, 0, 0, 255))),
@@ -1408,12 +1414,12 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
 
         let id = push_texture(&mut windowing, 1000, 1000, &mut logger);
-        push_sprite(&mut windowing, strtex::Sprite::default(), id);
+        push_sprite(&mut windowing, &id, strtex::Sprite::default());
 
         b.iter(|| {
             strtex::streaming_texture_set_pixel(
                 &mut windowing,
-                id,
+                &id,
                 black_box(1),
                 black_box(2),
                 (255, 0, 0, 255),

@@ -1268,7 +1268,7 @@ mod tests {
     #[bench]
     fn animated_fireballs_20x20(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Enable);
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&windowing);
 
         let fireball_texture = push_texture(

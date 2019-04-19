@@ -1164,7 +1164,7 @@ mod tests {
             let rot =
                 prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(i as f32));
             draw_frame(&mut windowing, &mut logger, &rot);
-            std::thread::sleep(std::time::Duration::new(0, 80_000_000));
+            // std::thread::sleep(std::time::Duration::new(0, 80_000_000));
         }
     }
 

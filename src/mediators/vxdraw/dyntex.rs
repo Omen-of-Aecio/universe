@@ -816,3 +816,292 @@ pub fn sprite_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, tex: &Text
         }
     }
 }
+
+#[cfg(feature = "gfx_tests")]
+#[cfg(test)]
+mod tests {
+    use crate::mediators::vxdraw::*;
+    use cgmath::{Deg, Vector3};
+    use rand::Rng;
+    use rand_pcg::Pcg64Mcg as random;
+    use std::f32::consts::PI;
+
+    static LOGO: &[u8] = include_bytes!["../../../assets/images/logo.png"];
+    static FOREST: &[u8] = include_bytes!["../../../assets/images/forest-light.png"];
+    static TREE: &[u8] = include_bytes!["../../../assets/images/treetest.png"];
+
+    #[test]
+    fn overlapping_dyntex_respect_z_order() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let tree = add_texture(&mut windowing, TREE, TextureOptions::default());
+        let logo = add_texture(&mut windowing, LOGO, TextureOptions::default());
+
+        let sprite = Sprite {
+            scale: 0.5,
+            ..Sprite::default()
+        };
+
+        let sprite_tree = add_sprite(
+            &mut windowing,
+            Sprite {
+                depth: 0.5,
+                ..sprite
+            },
+            &tree,
+        );
+        let sprite_logo = add_sprite(
+            &mut windowing,
+            Sprite {
+                depth: 0.6,
+                translation: (0.25, 0.25),
+                ..sprite
+            },
+            &logo,
+        );
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        tests::assert_swapchain_eq(&mut windowing, "overlapping_dyntex_respect_z_order", img);
+    }
+
+    #[test]
+    fn simple_texture() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let tex = add_texture(&mut windowing, LOGO, TextureOptions::default());
+        add_sprite(&mut windowing, Sprite::default(), &tex);
+
+        let prspect = gen_perspective(&windowing);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        tests::assert_swapchain_eq(&mut windowing, "simple_texture", img);
+    }
+
+    #[test]
+    fn simple_texture_adheres_to_view() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
+        let tex = add_texture(&mut windowing, LOGO, TextureOptions::default());
+        add_sprite(&mut windowing, Sprite::default(), &tex);
+
+        let prspect = gen_perspective(&windowing);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        tests::assert_swapchain_eq(&mut windowing, "simple_texture_adheres_to_view", img);
+    }
+
+    #[test]
+    fn colored_simple_texture() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let tex = add_texture(&mut windowing, LOGO, TextureOptions::default());
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                colors: [
+                    (255, 1, 2, 255),
+                    (0, 255, 0, 255),
+                    (0, 0, 255, 100),
+                    (255, 2, 1, 0),
+                ],
+                ..Sprite::default()
+            },
+            &tex,
+        );
+
+        let prspect = gen_perspective(&windowing);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        tests::assert_swapchain_eq(&mut windowing, "colored_simple_texture", img);
+    }
+
+    #[test]
+    fn translated_texture() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let tex = add_texture(
+            &mut windowing,
+            LOGO,
+            TextureOptions {
+                depth_test: false,
+                ..TextureOptions::default()
+            },
+        );
+
+        let base = Sprite {
+            width: 1.0,
+            height: 1.0,
+            ..Sprite::default()
+        };
+
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (-0.5, -0.5),
+                rotation: 0.0,
+                ..base
+            },
+            &tex,
+        );
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (0.5, -0.5),
+                rotation: PI / 4.0,
+                ..base
+            },
+            &tex,
+        );
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (-0.5, 0.5),
+                rotation: PI / 2.0,
+                ..base
+            },
+            &tex,
+        );
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (0.5, 0.5),
+                rotation: PI,
+                ..base
+            },
+            &tex,
+        );
+        sprite_translate_all(&mut windowing, &tex, (0.25, 0.35));
+
+        let prspect = gen_perspective(&windowing);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        tests::assert_swapchain_eq(&mut windowing, "translated_texture", img);
+    }
+
+    #[test]
+    fn rotated_texture() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let tex = add_texture(
+            &mut windowing,
+            LOGO,
+            TextureOptions {
+                depth_test: false,
+                ..TextureOptions::default()
+            },
+        );
+
+        let base = Sprite {
+            width: 1.0,
+            height: 1.0,
+            ..Sprite::default()
+        };
+
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (-0.5, -0.5),
+                rotation: 0.0,
+                ..base
+            },
+            &tex,
+        );
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (0.5, -0.5),
+                rotation: PI / 4.0,
+                ..base
+            },
+            &tex,
+        );
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (-0.5, 0.5),
+                rotation: PI / 2.0,
+                ..base
+            },
+            &tex,
+        );
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (0.5, 0.5),
+                rotation: PI,
+                ..base
+            },
+            &tex,
+        );
+        sprite_rotate_all(&mut windowing, &tex, Deg(90.0));
+
+        let prspect = gen_perspective(&windowing);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        tests::assert_swapchain_eq(&mut windowing, "rotated_texture", img);
+    }
+
+    #[test]
+    fn many_sprites() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let tex = add_texture(
+            &mut windowing,
+            LOGO,
+            TextureOptions {
+                depth_test: false,
+                ..TextureOptions::default()
+            },
+        );
+        for i in 0..360 {
+            add_sprite(
+                &mut windowing,
+                Sprite {
+                    rotation: ((i * 10) as f32 / 180f32 * PI),
+                    scale: 0.5,
+                    ..Sprite::default()
+                },
+                &tex,
+            );
+        }
+
+        let prspect = gen_perspective(&windowing);
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        tests::assert_swapchain_eq(&mut windowing, "many_sprites", img);
+    }
+
+    #[test]
+    fn three_layer_scene() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let options = TextureOptions {
+            depth_test: false,
+            ..TextureOptions::default()
+        };
+        let forest = add_texture(&mut windowing, FOREST, options);
+        let player = add_texture(&mut windowing, LOGO, options);
+        let tree = add_texture(&mut windowing, TREE, options);
+
+        add_sprite(&mut windowing, Sprite::default(), &forest);
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                scale: 0.4,
+                ..Sprite::default()
+            },
+            &player,
+        );
+        add_sprite(
+            &mut windowing,
+            Sprite {
+                translation: (-0.3, 0.0),
+                scale: 0.4,
+                ..Sprite::default()
+            },
+            &tree,
+        );
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        tests::assert_swapchain_eq(&mut windowing, "three_layer_scene", img);
+    }
+
+}

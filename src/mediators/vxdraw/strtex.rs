@@ -772,3 +772,197 @@ pub fn streaming_texture_set_pixel(
         }
     }
 }
+
+#[cfg(feature = "gfx_tests")]
+#[cfg(test)]
+mod tests {
+    use crate::mediators::vxdraw::*;
+    use cgmath::{Deg, Vector3};
+    use rand::Rng;
+    use rand_pcg::Pcg64Mcg as random;
+
+    #[test]
+    fn streaming_texture_blocks() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
+
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (0, 0),
+            (500, 500),
+            (255, 0, 0, 255),
+        );
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (500, 0),
+            (500, 500),
+            (0, 255, 0, 255),
+        );
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (0, 500),
+            (500, 500),
+            (0, 0, 255, 255),
+        );
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (500, 500),
+            (500, 500),
+            (0, 0, 0, 0),
+        );
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        tests::assert_swapchain_eq(&mut windowing, "streaming_texture_blocks", img);
+    }
+
+    #[test]
+    fn streaming_texture_blocks_off_by_one() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let id = add_streaming_texture(&mut windowing, 10, 1, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
+
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (0, 0),
+            (10, 1),
+            (0, 255, 0, 255),
+        );
+
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (3, 0),
+            (1, 1),
+            (0, 0, 255, 255),
+        );
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        tests::assert_swapchain_eq(&mut windowing, "streaming_texture_blocks_off_by_one", img);
+
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (3, 0),
+            (0, 1),
+            (255, 0, 255, 255),
+        );
+
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (3, 0),
+            (0, 0),
+            (255, 0, 255, 255),
+        );
+
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (3, 0),
+            (1, 0),
+            (255, 0, 255, 255),
+        );
+
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            id,
+            (30, 0),
+            (800, 0),
+            (255, 0, 255, 255),
+        );
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        tests::assert_swapchain_eq(&mut windowing, "streaming_texture_blocks_off_by_one", img);
+    }
+
+    #[test]
+    fn streaming_texture_weird_pixel_accesses() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+
+        let id = add_streaming_texture(&mut windowing, 20, 20, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
+
+        let mut rng = random::new(0);
+
+        for _ in 0..1000 {
+            let x = rng.gen_range(0, 30);
+            let y = rng.gen_range(0, 30);
+
+            strtex::streaming_texture_set_pixel(&mut windowing, id, x, y, (0, 255, 0, 255));
+        }
+    }
+
+    #[test]
+    fn streaming_texture_weird_block_accesses() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+
+        let id = add_streaming_texture(&mut windowing, 64, 64, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
+
+        let mut rng = random::new(0);
+
+        for _ in 0..1000 {
+            let start = (rng.gen_range(0, 100), rng.gen_range(0, 100));
+            let wh = (rng.gen_range(0, 100), rng.gen_range(0, 100));
+
+            strtex::streaming_texture_set_pixels_block(
+                &mut windowing,
+                id,
+                start,
+                wh,
+                (0, 255, 0, 255),
+            );
+        }
+    }
+
+    #[test]
+    fn streaming_texture_respects_z_ordering() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let strtex1 = add_streaming_texture(&mut windowing, 10, 10, &mut logger);
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            strtex1,
+            (0, 0),
+            (9, 9),
+            (255, 255, 0, 255),
+        );
+        strtex::streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), strtex1);
+
+        let strtex2 = add_streaming_texture(&mut windowing, 10, 10, &mut logger);
+        strtex::streaming_texture_set_pixels_block(
+            &mut windowing,
+            strtex2,
+            (1, 1),
+            (9, 9),
+            (0, 255, 255, 255),
+        );
+        strtex::streaming_texture_add_sprite(
+            &mut windowing,
+            strtex::Sprite {
+                depth: 0.1,
+                ..strtex::Sprite::default()
+            },
+            strtex2,
+        );
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        tests::assert_swapchain_eq(&mut windowing, "streaming_texture_z_ordering", img);
+    }
+}

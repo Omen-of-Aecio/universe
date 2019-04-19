@@ -298,7 +298,7 @@ pub fn create_quad(s: &mut Windowing) {
 
     let depth_stencil = pso::DepthStencilDesc {
         depth: pso::DepthTest::On {
-            fun: pso::Comparison::Less,
+            fun: pso::Comparison::LessEqual,
             write: true,
         },
         depth_bounds: false,

@@ -12,7 +12,7 @@ use glium::{
     Surface,
 };
 use input::Input;
-use logger::{debug, Logger};
+use logger::{debug, info, InDebug, Logger};
 use std::time::Instant;
 
 fn initialize_grid(s: &mut Grid<u8>) {
@@ -460,17 +460,21 @@ pub fn entry_point_client_vulkan(s: &mut Main) {
         let tex = vxdraw::strtex::push_texture(&mut s.windowing.as_mut().unwrap(), 1000, 1000, &mut client.logger);
         vxdraw::strtex::generate_map2(&mut s.windowing.as_mut().unwrap(), &tex, [1.0, 2.0, 4.0]);
         vxdraw::strtex::push_sprite(&mut s.windowing.as_mut().unwrap(), &tex, vxdraw::strtex::Sprite {
-            width: 10.0,
-            height: 10.0,
+            width: 100.0,
+            height: 100.0,
             ..vxdraw::strtex::Sprite::default()
         });
+        vxdraw::quads::push(&mut s.windowing.as_mut().unwrap(), vxdraw::quads::Quad { colors: [(255, 0, 0, 255); 4], width: 20.3, height: 20.3,..vxdraw::quads::Quad::default()});
+        // vxdraw::debtri::push(&mut s.windowing.as_mut().unwrap(), vxdraw::debtri::DebugTriangle::default());
         loop {
             if let Some(ref mut windowing) = s.windowing {
                 let persp = super::vxdraw::utils::gen_perspective(windowing);
                 let scale = Matrix4::from_scale(client.game.cam.zoom);
                 let center = client.game.cam.center;
                 // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
-                super::vxdraw::draw_frame(windowing, &mut client.logger, &(persp * scale));
+                let trans = Matrix4::from_translation(Vector3::new(-center.x / 1000.0, center.y / 1000.0, 0.0));
+                // info![client.logger, "main", "Okay wth"; "trans" => InDebug(&trans); clone trans];
+                super::vxdraw::draw_frame(windowing, &mut client.logger, &(persp * trans * scale));
             }
             s.time = Instant::now();
             let xform = if let Some(ref mut rx) = s.config_change_recv {

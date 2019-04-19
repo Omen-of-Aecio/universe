@@ -1,8 +1,5 @@
 use super::utils::*;
-use crate::glocals::{
-    vxdraw::{ColoredTriangleList, Windowing},
-    Log,
-};
+use crate::glocals::vxdraw::{ColoredTriangleList, Windowing};
 use cgmath::Rad;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
@@ -12,19 +9,7 @@ use gfx_backend_gl as back;
 use gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 use gfx_backend_vulkan as back;
-use gfx_hal::{
-    device::Device,
-    format, image, pass,
-    pso::{
-        self, AttributeDesc, BakedStates, BasePipeline, BlendDesc, BlendOp, BlendState,
-        ColorBlendDesc, ColorMask, DepthStencilDesc, DepthTest, DescriptorSetLayoutBinding,
-        Element, Face, Factor, FrontFace, GraphicsPipelineDesc, InputAssemblerDesc, LogicOp,
-        PipelineCreationFlags, PolygonMode, Rasterizer, ShaderStageFlags, StencilTest,
-        VertexBufferDesc, Viewport,
-    },
-    Backend, Primitive,
-};
-use logger::Logger;
+use gfx_hal::{device::Device, format, image, pass, pso, Backend, Primitive};
 use std::io::Read;
 use std::mem::{size_of, transmute, ManuallyDrop};
 
@@ -55,6 +40,7 @@ impl From<[f32; 6]> for DebugTriangle {
 }
 
 impl Default for DebugTriangle {
+    /// Creates a default equilateral RGB triangle without opacity or rotation
     fn default() -> Self {
         let origin = make_centered_equilateral_triangle();
         DebugTriangle {
@@ -72,6 +58,10 @@ impl Default for DebugTriangle {
 }
 
 impl DebugTriangle {
+    /// Compute the circle that contains the entire triangle regardless of rotation
+    ///
+    /// Useful when making sure triangles do not touch by adding both their radii together and
+    /// using that to space triangles.
     pub fn radius(&self) -> f32 {
         (self.origin[0].0.powi(2) + self.origin[0].1.powi(2))
             .sqrt()
@@ -87,21 +77,313 @@ impl DebugTriangle {
 // ---
 
 const PTS_PER_TRI: usize = 3;
-const XY_COMPNTS: usize = 2;
+const CART_CMPNTS: usize = 2;
 const COLOR_CMPNTS: usize = 4;
 const DELTA_CMPNTS: usize = 2;
 const ROT_CMPNTS: usize = 1;
 const SCALE_CMPNTS: usize = 1;
-const TRI_BYTE_SIZE: usize = PTS_PER_TRI
-    * (size_of::<f32>() * XY_COMPNTS
-        + size_of::<u8>() * COLOR_CMPNTS
-        + size_of::<f32>() * DELTA_CMPNTS
-        + size_of::<f32>() * ROT_CMPNTS
-        + size_of::<f32>() * SCALE_CMPNTS);
+const BYTES_PER_VTX: usize = size_of::<f32>() * CART_CMPNTS
+    + size_of::<u8>() * COLOR_CMPNTS
+    + size_of::<f32>() * DELTA_CMPNTS
+    + size_of::<f32>() * ROT_CMPNTS
+    + size_of::<f32>() * SCALE_CMPNTS;
+const TRI_BYTE_SIZE: usize = PTS_PER_TRI * BYTES_PER_VTX;
 
 // ---
 
-pub fn debug_triangle_push(s: &mut Windowing, triangle: DebugTriangle) -> DebugTriangleHandle {
+// TODO Remove the dependency on Windowing, just use Device
+pub fn create_debug_triangle(s: &mut Windowing) {
+    pub const VERTEX_SOURCE: &str = "#version 450
+    #extension GL_ARG_separate_shader_objects : enable
+    layout (location = 0) in vec2 position;
+    layout (location = 1) in vec4 color;
+    layout (location = 2) in vec2 dxdy;
+    layout (location = 3) in float rotation;
+    layout (location = 4) in float scale;
+
+    layout(push_constant) uniform PushConstant {
+        float w_over_h;
+    } push_constant;
+
+    layout (location = 0) out vec4 outcolor;
+    out gl_PerVertex {
+        vec4 gl_Position;
+    };
+
+    void main() {
+        mat2 rotmatrix = mat2(cos(rotation), -sin(rotation), sin(rotation), cos(rotation));
+        vec2 pos = rotmatrix * scale * position;
+        if (push_constant.w_over_h >= 1.0) {
+            pos.x /= push_constant.w_over_h;
+        } else {
+            pos.y *= push_constant.w_over_h;
+        }
+        gl_Position = vec4(pos + dxdy, 0.0, 1.0);
+        outcolor = color;
+    }";
+
+    pub const FRAGMENT_SOURCE: &str = "#version 450
+    #extension GL_ARG_separate_shader_objects : enable
+    layout(location = 0) in vec4 incolor;
+    layout(location = 0) out vec4 color;
+    void main() {
+        color = incolor;
+    }";
+
+    let vs_module = {
+        let glsl = VERTEX_SOURCE;
+        let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
+            .unwrap()
+            .bytes()
+            .map(Result::unwrap)
+            .collect();
+        unsafe { s.device.create_shader_module(&spirv) }.unwrap()
+    };
+
+    let fs_module = {
+        let glsl = FRAGMENT_SOURCE;
+        let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Fragment)
+            .unwrap()
+            .bytes()
+            .map(Result::unwrap)
+            .collect();
+        unsafe { s.device.create_shader_module(&spirv) }.unwrap()
+    };
+
+    const ENTRY_NAME: &str = "main";
+    let vs_module: <back::Backend as Backend>::ShaderModule = vs_module;
+    let (vs_entry, fs_entry) = (
+        pso::EntryPoint {
+            entry: ENTRY_NAME,
+            module: &vs_module,
+            specialization: pso::Specialization::default(),
+        },
+        pso::EntryPoint {
+            entry: ENTRY_NAME,
+            module: &fs_module,
+            specialization: pso::Specialization::default(),
+        },
+    );
+
+    let shader_entries = pso::GraphicsShaderSet {
+        vertex: vs_entry,
+        hull: None,
+        domain: None,
+        geometry: None,
+        fragment: Some(fs_entry),
+    };
+
+    let input_assembler = pso::InputAssemblerDesc::new(Primitive::TriangleList);
+
+    let vertex_buffers = vec![pso::VertexBufferDesc {
+        binding: 0,
+        stride: BYTES_PER_VTX as u32,
+        rate: 0, // 0 = Per Vertex, 1 = Per Instance, >=2 = Nth Rate
+    }];
+
+    let attributes: Vec<pso::AttributeDesc> = vec![
+        pso::AttributeDesc {
+            location: 0,
+            binding: 0,
+            element: pso::Element {
+                format: format::Format::Rg32Float,
+                offset: 0,
+            },
+        },
+        pso::AttributeDesc {
+            location: 1,
+            binding: 0,
+            element: pso::Element {
+                format: format::Format::Rgba8Unorm,
+                offset: 8,
+            },
+        },
+        pso::AttributeDesc {
+            location: 2,
+            binding: 0,
+            element: pso::Element {
+                format: format::Format::Rg32Float,
+                offset: 12,
+            },
+        },
+        pso::AttributeDesc {
+            location: 3,
+            binding: 0,
+            element: pso::Element {
+                format: format::Format::R32Float,
+                offset: 20,
+            },
+        },
+        pso::AttributeDesc {
+            location: 4,
+            binding: 0,
+            element: pso::Element {
+                format: format::Format::R32Float,
+                offset: 24,
+            },
+        },
+    ];
+
+    let rasterizer = pso::Rasterizer {
+        depth_clamping: false,
+        polygon_mode: pso::PolygonMode::Fill,
+        cull_face: pso::Face::NONE,
+        front_face: pso::FrontFace::CounterClockwise,
+        depth_bias: None,
+        conservative: false,
+    };
+
+    let depth_stencil = pso::DepthStencilDesc {
+        depth: pso::DepthTest::Off,
+        depth_bounds: false,
+        stencil: pso::StencilTest::Off,
+    };
+
+    let blender = {
+        let blend_state = pso::BlendState::On {
+            color: pso::BlendOp::Add {
+                src: pso::Factor::One,
+                dst: pso::Factor::Zero,
+            },
+            alpha: pso::BlendOp::Add {
+                src: pso::Factor::One,
+                dst: pso::Factor::Zero,
+            },
+        };
+        pso::BlendDesc {
+            logic_op: Some(pso::LogicOp::Copy),
+            targets: vec![pso::ColorBlendDesc(pso::ColorMask::ALL, blend_state)],
+        }
+    };
+
+    let extent = image::Extent {
+        width: s.swapconfig.extent.width,
+        height: s.swapconfig.extent.height,
+        depth: 1,
+    }
+    .rect();
+
+    let triangle_render_pass = {
+        let attachment = pass::Attachment {
+            format: Some(s.format),
+            samples: 1,
+            ops: pass::AttachmentOps::new(
+                pass::AttachmentLoadOp::Clear,
+                pass::AttachmentStoreOp::Store,
+            ),
+            stencil_ops: pass::AttachmentOps::DONT_CARE,
+            layouts: image::Layout::Undefined..image::Layout::Present,
+        };
+        let depth = pass::Attachment {
+            format: Some(format::Format::D32Float),
+            samples: 1,
+            ops: pass::AttachmentOps::new(
+                pass::AttachmentLoadOp::Clear,
+                pass::AttachmentStoreOp::Store,
+            ),
+            stencil_ops: pass::AttachmentOps::DONT_CARE,
+            layouts: image::Layout::Undefined..image::Layout::DepthStencilAttachmentOptimal,
+        };
+
+        let subpass = pass::SubpassDesc {
+            colors: &[(0, image::Layout::ColorAttachmentOptimal)],
+            depth_stencil: Some(&(1, image::Layout::DepthStencilAttachmentOptimal)),
+            inputs: &[],
+            resolves: &[],
+            preserves: &[],
+        };
+
+        unsafe {
+            s.device
+                .create_render_pass(&[attachment, depth], &[subpass], &[])
+        }
+        .expect("Can't create render pass")
+    };
+
+    // TODO Remove explicit extent setting here, do that while rendering instead (avoids the need
+    // to recompile pipelines if the swapchain changes)
+    let baked_states = pso::BakedStates {
+        viewport: Some(pso::Viewport {
+            rect: extent,
+            depth: (0.0..1.0),
+        }),
+        scissor: Some(extent),
+        blend_color: None,
+        depth_bounds: None,
+    };
+
+    let bindings = Vec::<pso::DescriptorSetLayoutBinding>::new();
+    let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
+    let triangle_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
+        vec![unsafe {
+            s.device
+                .create_descriptor_set_layout(bindings, immutable_samplers)
+                .expect("Couldn't make a DescriptorSetLayout")
+        }];
+    let mut push_constants = Vec::<(pso::ShaderStageFlags, core::ops::Range<u32>)>::new();
+    push_constants.push((pso::ShaderStageFlags::VERTEX, 0..1));
+
+    let triangle_pipeline_layout = unsafe {
+        s.device
+            .create_pipeline_layout(&triangle_descriptor_set_layouts, push_constants)
+            .expect("Couldn't create a pipeline layout")
+    };
+
+    // Describe the pipeline (rasterization, triangle interpretation)
+    let pipeline_desc = pso::GraphicsPipelineDesc {
+        shaders: shader_entries,
+        rasterizer,
+        vertex_buffers,
+        attributes,
+        input_assembler,
+        blender,
+        depth_stencil,
+        multisampling: None,
+        baked_states,
+        layout: &triangle_pipeline_layout,
+        subpass: pass::Subpass {
+            index: 0,
+            main_pass: &triangle_render_pass,
+        },
+        flags: pso::PipelineCreationFlags::empty(),
+        parent: pso::BasePipeline::None,
+    };
+
+    let triangle_pipeline = unsafe {
+        s.device
+            .create_graphics_pipeline(&pipeline_desc, None)
+            .expect("Couldn't create a graphics pipeline!")
+    };
+
+    unsafe {
+        s.device.destroy_shader_module(vs_module);
+    }
+    unsafe {
+        s.device.destroy_shader_module(fs_module);
+    }
+
+    let (dtbuffer, dtmemory, dtreqs) =
+        make_vertex_buffer_with_data(s, &[0.0f32; TRI_BYTE_SIZE / 4 * 1000]);
+
+    let debug_triangles = ColoredTriangleList {
+        capacity: dtreqs.size,
+        triangles_count: 0,
+        triangles_buffer: dtbuffer,
+        triangles_memory: dtmemory,
+        memory_requirements: dtreqs,
+
+        descriptor_set: triangle_descriptor_set_layouts,
+        pipeline: ManuallyDrop::new(triangle_pipeline),
+        pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
+        render_pass: ManuallyDrop::new(triangle_render_pass),
+    };
+    s.debug_triangles = Some(debug_triangles);
+}
+
+/// Add a new debug triangle to the renderer
+///
+/// The new triangle will be drawn upon the next invocation of `draw_frame`
+pub fn push(s: &mut Windowing, triangle: DebugTriangle) -> DebugTriangleHandle {
     let overrun = if let Some(ref mut debug_triangles) = s.debug_triangles {
         Some(
             (debug_triangles.triangles_count + 1) * TRI_BYTE_SIZE
@@ -111,7 +393,7 @@ pub fn debug_triangle_push(s: &mut Windowing, triangle: DebugTriangle) -> DebugT
         None
     };
     if let Some(overrun) = overrun {
-        // Do reallocation here
+        // TODO Do reallocation here
         assert_eq![false, overrun];
     }
     if let Some(ref mut debug_triangles) = s.debug_triangles {
@@ -150,7 +432,8 @@ pub fn debug_triangle_push(s: &mut Windowing, triangle: DebugTriangle) -> DebugT
     }
 }
 
-pub fn debug_triangle_pop(s: &mut Windowing) {
+/// Remove the last added debug triangle from rendering
+pub fn pop(s: &mut Windowing) {
     if let Some(ref mut debug_triangles) = s.debug_triangles {
         unsafe {
             s.device
@@ -161,11 +444,13 @@ pub fn debug_triangle_pop(s: &mut Windowing) {
                 )
                 .expect("Unable to wait for fences");
         }
-        debug_triangles.triangles_count -= 1;
+        debug_triangles.triangles_count =
+            debug_triangles.triangles_count.checked_sub(1).unwrap_or(0);
     }
 }
 
-pub fn pop_n_triangles(s: &mut Windowing, n: usize) {
+/// Remove the last N added debug triangle from rendering
+pub fn pop_many(s: &mut Windowing, n: usize) {
     if let Some(ref mut debug_triangles) = s.debug_triangles {
         unsafe {
             s.device
@@ -176,286 +461,13 @@ pub fn pop_n_triangles(s: &mut Windowing, n: usize) {
                 )
                 .expect("Unable to wait for fences");
         }
-        debug_triangles.triangles_count -= n;
+        debug_triangles.triangles_count =
+            debug_triangles.triangles_count.checked_sub(n).unwrap_or(0);
     }
 }
 
-pub fn create_debug_triangle(s: &mut Windowing, log: &mut Logger<Log>) {
-    pub const VERTEX_SOURCE: &str = "#version 450
-    #extension GL_ARG_separate_shader_objects : enable
-    layout (location = 0) in vec2 position;
-    layout (location = 1) in vec4 color;
-    layout (location = 2) in vec2 dxdy;
-    layout (location = 3) in float rotation;
-    layout (location = 4) in float scale;
-
-    layout(push_constant) uniform PushConstant {
-        float w_over_h;
-    } push_constant;
-
-    layout (location = 0) out vec4 outcolor;
-    out gl_PerVertex {
-        vec4 gl_Position;
-    };
-    void main() {
-        mat2 rotmatrix = mat2(cos(rotation), -sin(rotation), sin(rotation), cos(rotation));
-        vec2 pos = rotmatrix * scale * position;
-        if (push_constant.w_over_h >= 1.0) {
-            pos.x /= push_constant.w_over_h;
-        } else {
-            pos.y *= push_constant.w_over_h;
-        }
-        gl_Position = vec4(pos + dxdy, 0.0, 1.0);
-        outcolor = color;
-    }";
-
-    pub const FRAGMENT_SOURCE: &str = "#version 450
-    #extension GL_ARG_separate_shader_objects : enable
-    layout(location = 0) in vec4 incolor;
-    layout(location = 0) out vec4 color;
-    void main() {
-        color = incolor;
-    }";
-
-    let vs_module = {
-        let glsl = VERTEX_SOURCE;
-        let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
-            .unwrap()
-            .bytes()
-            .map(Result::unwrap)
-            .collect();
-        unsafe { s.device.create_shader_module(&spirv) }.unwrap()
-    };
-    let fs_module = {
-        let glsl = FRAGMENT_SOURCE;
-        let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Fragment)
-            .unwrap()
-            .bytes()
-            .map(Result::unwrap)
-            .collect();
-        unsafe { s.device.create_shader_module(&spirv) }.unwrap()
-    };
-
-    // Describe the shaders
-    const ENTRY_NAME: &str = "main";
-    let vs_module: <back::Backend as Backend>::ShaderModule = vs_module;
-    let (vs_entry, fs_entry) = (
-        pso::EntryPoint {
-            entry: ENTRY_NAME,
-            module: &vs_module,
-            specialization: pso::Specialization::default(),
-        },
-        pso::EntryPoint {
-            entry: ENTRY_NAME,
-            module: &fs_module,
-            specialization: pso::Specialization::default(),
-        },
-    );
-    let shader_entries = pso::GraphicsShaderSet {
-        vertex: vs_entry,
-        hull: None,
-        domain: None,
-        geometry: None,
-        fragment: Some(fs_entry),
-    };
-    let input_assembler = InputAssemblerDesc::new(Primitive::TriangleList);
-
-    let vertex_buffers: Vec<VertexBufferDesc> = vec![VertexBufferDesc {
-        binding: 0,
-        stride: (TRI_BYTE_SIZE / PTS_PER_TRI) as u32,
-        rate: 0,
-    }];
-    let attributes: Vec<AttributeDesc> = vec![
-        AttributeDesc {
-            location: 0,
-            binding: 0,
-            element: Element {
-                format: format::Format::Rg32Float,
-                offset: 0,
-            },
-        },
-        AttributeDesc {
-            location: 1,
-            binding: 0,
-            element: Element {
-                format: format::Format::Rgba8Unorm,
-                offset: 8,
-            },
-        },
-        AttributeDesc {
-            location: 2,
-            binding: 0,
-            element: Element {
-                format: format::Format::Rg32Float,
-                offset: 12,
-            },
-        },
-        AttributeDesc {
-            location: 3,
-            binding: 0,
-            element: Element {
-                format: format::Format::R32Float,
-                offset: 20,
-            },
-        },
-        AttributeDesc {
-            location: 4,
-            binding: 0,
-            element: Element {
-                format: format::Format::R32Float,
-                offset: 24,
-            },
-        },
-    ];
-
-    let rasterizer = Rasterizer {
-        depth_clamping: false,
-        polygon_mode: PolygonMode::Fill,
-        cull_face: Face::NONE,
-        front_face: FrontFace::Clockwise,
-        depth_bias: None,
-        conservative: false,
-    };
-
-    let depth_stencil = DepthStencilDesc {
-        depth: DepthTest::Off,
-        depth_bounds: false,
-        stencil: StencilTest::Off,
-    };
-    let blender = {
-        let blend_state = BlendState::On {
-            color: BlendOp::Add {
-                src: Factor::One,
-                dst: Factor::Zero,
-            },
-            alpha: BlendOp::Add {
-                src: Factor::One,
-                dst: Factor::Zero,
-            },
-        };
-        BlendDesc {
-            logic_op: Some(LogicOp::Copy),
-            targets: vec![ColorBlendDesc(ColorMask::ALL, blend_state)],
-        }
-    };
-    let extent = image::Extent {
-        width: s.swapconfig.extent.width,
-        height: s.swapconfig.extent.height,
-        depth: 1,
-    }
-    .rect();
-    let triangle_render_pass = {
-        let attachment = pass::Attachment {
-            format: Some(s.format),
-            samples: 1,
-            ops: pass::AttachmentOps::new(
-                pass::AttachmentLoadOp::Clear,
-                pass::AttachmentStoreOp::Store,
-            ),
-            stencil_ops: pass::AttachmentOps::DONT_CARE,
-            layouts: image::Layout::Undefined..image::Layout::Present,
-        };
-        let depth = pass::Attachment {
-            format: Some(format::Format::D32Float),
-            samples: 1,
-            ops: pass::AttachmentOps::new(
-                pass::AttachmentLoadOp::Clear,
-                pass::AttachmentStoreOp::Store,
-            ),
-            stencil_ops: pass::AttachmentOps::DONT_CARE,
-            layouts: image::Layout::Undefined..image::Layout::DepthStencilAttachmentOptimal,
-        };
-
-        let subpass = pass::SubpassDesc {
-            colors: &[(0, image::Layout::ColorAttachmentOptimal)],
-            depth_stencil: Some(&(1, image::Layout::DepthStencilAttachmentOptimal)),
-            inputs: &[],
-            resolves: &[],
-            preserves: &[],
-        };
-
-        unsafe {
-            s.device
-                .create_render_pass(&[attachment, depth], &[subpass], &[])
-        }
-        .expect("Can't create render pass")
-    };
-    let baked_states = BakedStates {
-        viewport: Some(Viewport {
-            rect: extent,
-            depth: (0.0..1.0),
-        }),
-        scissor: Some(extent),
-        blend_color: None,
-        depth_bounds: None,
-    };
-    let bindings = Vec::<DescriptorSetLayoutBinding>::new();
-    let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
-    let triangle_descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
-        vec![unsafe {
-            s.device
-                .create_descriptor_set_layout(bindings, immutable_samplers)
-                .expect("Couldn't make a DescriptorSetLayout")
-        }];
-    let mut push_constants = Vec::<(ShaderStageFlags, core::ops::Range<u32>)>::new();
-    push_constants.push((ShaderStageFlags::VERTEX, 0..1));
-
-    let triangle_pipeline_layout = unsafe {
-        s.device
-            .create_pipeline_layout(&triangle_descriptor_set_layouts, push_constants)
-            .expect("Couldn't create a pipeline layout")
-    };
-
-    // Describe the pipeline (rasterization, triangle interpretation)
-    let pipeline_desc = GraphicsPipelineDesc {
-        shaders: shader_entries,
-        rasterizer,
-        vertex_buffers,
-        attributes,
-        input_assembler,
-        blender,
-        depth_stencil,
-        multisampling: None,
-        baked_states,
-        layout: &triangle_pipeline_layout,
-        subpass: pass::Subpass {
-            index: 0,
-            main_pass: &triangle_render_pass,
-        },
-        flags: PipelineCreationFlags::empty(),
-        parent: BasePipeline::None,
-    };
-
-    let triangle_pipeline = unsafe {
-        s.device
-            .create_graphics_pipeline(&pipeline_desc, None)
-            .expect("Couldn't create a graphics pipeline!")
-    };
-
-    unsafe {
-        s.device.destroy_shader_module(vs_module);
-    }
-    unsafe {
-        s.device.destroy_shader_module(fs_module);
-    }
-    let (dtbuffer, dtmemory, dtreqs) =
-        make_vertex_buffer_with_data(s, &[0.0f32; TRI_BYTE_SIZE / 4 * 1000]);
-    let debug_triangles = ColoredTriangleList {
-        capacity: dtreqs.size,
-        triangles_count: 0,
-        triangles_buffer: dtbuffer,
-        triangles_memory: dtmemory,
-        memory_requirements: dtreqs,
-
-        descriptor_set: triangle_descriptor_set_layouts,
-        pipeline: ManuallyDrop::new(triangle_pipeline),
-        pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
-        render_pass: ManuallyDrop::new(triangle_render_pass),
-    };
-    s.debug_triangles = Some(debug_triangles);
-}
-
-pub fn debug_triangle_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
+/// Rotate all debug triangles
+pub fn rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
     let device = &s.device;
     if let Some(ref mut debug_triangles) = s.debug_triangles {
         unsafe {
@@ -504,7 +516,7 @@ pub fn debug_triangle_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, de
     }
 }
 
-pub fn set_triangle_color(s: &mut Windowing, inst: &DebugTriangleHandle, rgba: [u8; 4]) {
+pub fn set_color(s: &mut Windowing, inst: &DebugTriangleHandle, rgba: [u8; 4]) {
     let inst = inst.0;
     let device = &s.device;
     if let Some(ref mut debug_triangles) = s.debug_triangles {

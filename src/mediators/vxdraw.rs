@@ -41,7 +41,7 @@ pub mod quads;
 pub mod strtex;
 pub mod utils;
 
-use debtri::*;
+use debtri::{DebugTriangle, DebugTriangleHandle};
 use dyntex::*;
 use quads::*;
 use strtex::{add_streaming_texture, streaming_texture_add_sprite};
@@ -512,7 +512,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         #[cfg(not(feature = "gl"))]
         window,
     };
-    create_debug_triangle(&mut windowing, log);
+    debtri::create_debug_triangle(&mut windowing);
     create_quad(&mut windowing, log);
     windowing
 }
@@ -1120,29 +1120,29 @@ mod tests {
             }
             tri.scale = scale;
             tri.translation = (dx, dy);
-            debug_triangles.push(debug_triangle_push(windowing, tri));
+            debug_triangles.push(debtri::push(windowing, tri));
         }
         debug_triangles
     }
 
     fn remove_windmills(windowing: &mut Windowing) {
-        pop_n_triangles(windowing, 1000);
+        debtri::pop_many(windowing, 1000);
     }
 
     fn add_4_screencorners(windowing: &mut Windowing) {
-        debug_triangle_push(
+        debtri::push(
             windowing,
             DebugTriangle::from([-1.0f32, -1.0, 0.0, -1.0, -1.0, 0.0]),
         );
-        debug_triangle_push(
+        debtri::push(
             windowing,
             DebugTriangle::from([-1.0f32, 1.0, 0.0, 1.0, -1.0, 0.0]),
         );
-        debug_triangle_push(
+        debtri::push(
             windowing,
             DebugTriangle::from([1.0f32, -1.0, 0.0, -1.0, 1.0, 0.0]),
         );
-        debug_triangle_push(
+        debtri::push(
             windowing,
             DebugTriangle::from([1.0f32, 1.0, 0.0, 1.0, 1.0, 0.0]),
         );
@@ -1288,7 +1288,7 @@ mod tests {
         let prspect = gen_perspective(&mut windowing);
         let tri = DebugTriangle::default();
 
-        debug_triangle_push(&mut windowing, tri);
+        debtri::push(&mut windowing, tri);
         add_4_screencorners(&mut windowing);
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
@@ -1318,8 +1318,8 @@ mod tests {
         let prspect = gen_perspective(&mut windowing);
         let tri = DebugTriangle::default();
 
-        let idx = debug_triangle_push(&mut windowing, tri);
-        set_triangle_color(&mut windowing, &idx, [255, 0, 255, 255]);
+        let idx = debtri::push(&mut windowing, tri);
+        debtri::set_color(&mut windowing, &idx, [255, 0, 255, 255]);
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
@@ -1336,7 +1336,7 @@ mod tests {
             for j in [-1f32, 1f32].iter() {
                 let mut tri = DebugTriangle::default();
                 tri.translation = (*i, *j);
-                let _idx = debug_triangle_push(&mut windowing, tri);
+                let _idx = debtri::push(&mut windowing, tri);
             }
         }
 
@@ -1355,7 +1355,7 @@ mod tests {
             for j in [-1f32, 1f32].iter() {
                 let mut tri = DebugTriangle::default();
                 tri.translation = (*i, *j);
-                let _idx = debug_triangle_push(&mut windowing, tri);
+                let _idx = debtri::push(&mut windowing, tri);
             }
         }
 
@@ -1374,7 +1374,7 @@ mod tests {
             let mut tri = DebugTriangle::default();
             tri.translation = ((i as f32).cos(), (i as f32).sin());
             tri.scale = 0.1f32;
-            let _idx = debug_triangle_push(&mut windowing, tri);
+            let _idx = debtri::push(&mut windowing, tri);
         }
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
@@ -1396,7 +1396,7 @@ mod tests {
         for j in 0..31 {
             for i in 0..31 {
                 tri.translation = (trans + i as f32 * 2.0 * radi, trans + j as f32 * 2.0 * radi);
-                debug_triangle_push(&mut windowing, tri);
+                debtri::push(&mut windowing, tri);
             }
         }
 
@@ -1423,8 +1423,8 @@ mod tests {
                     (trans + i as f32 * 2.0 * radi, trans + j as f32 * 2.0 * radi);
                 bottomleft.translation =
                     (trans + i as f32 * 2.0 * radi, trans + j as f32 * 2.0 * radi);
-                debug_triangle_push(&mut windowing, topright);
-                debug_triangle_push(&mut windowing, bottomleft);
+                debtri::push(&mut windowing, topright);
+                debtri::push(&mut windowing, bottomleft);
             }
         }
 
@@ -1564,10 +1564,10 @@ mod tests {
         let prspect = gen_perspective(&mut windowing);
 
         let handles = add_windmills(&mut windowing, false);
-        set_triangle_color(&mut windowing, &handles[0], [255, 0, 0, 255]);
-        set_triangle_color(&mut windowing, &handles[249], [0, 255, 0, 255]);
-        set_triangle_color(&mut windowing, &handles[499], [0, 0, 255, 255]);
-        set_triangle_color(&mut windowing, &handles[999], [0, 0, 0, 255]);
+        debtri::set_color(&mut windowing, &handles[0], [255, 0, 0, 255]);
+        debtri::set_color(&mut windowing, &handles[249], [0, 255, 0, 255]);
+        debtri::set_color(&mut windowing, &handles[499], [0, 0, 255, 255]);
+        debtri::set_color(&mut windowing, &handles[999], [0, 0, 0, 255]);
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
@@ -1581,12 +1581,12 @@ mod tests {
         let prspect = gen_perspective(&mut windowing);
 
         let _tri = make_centered_equilateral_triangle();
-        debug_triangle_push(&mut windowing, DebugTriangle::default());
+        debtri::push(&mut windowing, DebugTriangle::default());
         for i in 0..=360 {
             if i % 2 == 0 {
                 add_4_screencorners(&mut windowing);
             } else {
-                pop_n_triangles(&mut windowing, 4);
+                debtri::pop_many(&mut windowing, 4);
             }
             let rot =
                 prspect * Matrix4::from_axis_angle(Vector3::new(0.0f32, 0.0, 1.0), Deg(i as f32));
@@ -1827,7 +1827,7 @@ mod tests {
 
         add_windmills(&mut windowing, false);
         for _ in 0..30 {
-            debug_triangle_rotate_all(&mut windowing, Deg(-1.0f32));
+            debtri::rotate_all(&mut windowing, Deg(-1.0f32));
         }
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
@@ -1836,7 +1836,7 @@ mod tests {
 
         add_windmills(&mut windowing, false);
         for _ in 0..30 {
-            debug_triangle_rotate_all(&mut windowing, Deg(-1.0f32));
+            debtri::rotate_all(&mut windowing, Deg(-1.0f32));
             draw_frame(&mut windowing, &mut logger, &prspect);
         }
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
@@ -2136,7 +2136,7 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&mut windowing);
 
-        debug_triangle_push(&mut windowing, DebugTriangle::default());
+        debtri::push(&mut windowing, DebugTriangle::default());
         add_4_screencorners(&mut windowing);
 
         b.iter(|| {
@@ -2165,7 +2165,7 @@ mod tests {
         let handles = add_windmills(&mut windowing, false);
 
         b.iter(|| {
-            set_triangle_color(&mut windowing, &handles[0], black_box([0, 0, 0, 255]));
+            debtri::set_color(&mut windowing, &handles[0], black_box([0, 0, 0, 255]));
         });
     }
 
@@ -2178,7 +2178,7 @@ mod tests {
         add_windmills(&mut windowing, false);
 
         b.iter(|| {
-            debug_triangle_rotate_all(&mut windowing, Deg(1.0f32));
+            debtri::rotate_all(&mut windowing, Deg(1.0f32));
             draw_frame(&mut windowing, &mut logger, &prspect);
         });
     }
@@ -2191,7 +2191,7 @@ mod tests {
         add_windmills(&mut windowing, false);
 
         b.iter(|| {
-            debug_triangle_rotate_all(&mut windowing, Deg(1.0f32));
+            debtri::rotate_all(&mut windowing, Deg(1.0f32));
         });
     }
 

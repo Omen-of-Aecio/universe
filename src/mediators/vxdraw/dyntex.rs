@@ -1,8 +1,5 @@
 use super::utils::*;
-use crate::glocals::{
-    vxdraw::{SingleTexture, Windowing},
-    Log,
-};
+use crate::glocals::vxdraw::{SingleTexture, Windowing};
 use ::image as load_image;
 use cgmath::Rad;
 #[cfg(feature = "dx12")]
@@ -23,7 +20,6 @@ use gfx_hal::{
     pso::{self, DescriptorPool},
     Backend, Primitive,
 };
-use logger::{debug, Logger};
 use std::io::Read;
 use std::mem::{size_of, ManuallyDrop};
 

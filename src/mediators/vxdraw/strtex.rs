@@ -1,11 +1,9 @@
 use super::utils::*;
-use super::utils::*;
 use crate::glocals::{
     vxdraw::{StreamingTexture, Windowing},
     Log,
 };
 use ::image as load_image;
-use cgmath::Rad;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
 #[cfg(feature = "gl")]
@@ -15,12 +13,8 @@ use gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 use gfx_backend_vulkan as back;
 use gfx_hal::{
-    adapter::PhysicalDevice,
-    command,
     device::Device,
-    format, image, memory,
-    memory::Properties,
-    pass,
+    format, image, memory, pass,
     pso::{self, DescriptorPool},
     Backend, Primitive,
 };

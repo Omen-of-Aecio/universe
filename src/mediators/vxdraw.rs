@@ -919,8 +919,6 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32) -> Vec<u8> {
 
     unsafe {
         s.device.destroy_shader_module(vs_module);
-    }
-    unsafe {
         s.device.destroy_shader_module(fs_module);
     }
 

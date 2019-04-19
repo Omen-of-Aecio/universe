@@ -448,8 +448,6 @@ pub fn add_streaming_texture(
 
     unsafe {
         s.device.destroy_shader_module(vs_module);
-    }
-    unsafe {
         s.device.destroy_shader_module(fs_module);
     }
 
@@ -623,12 +621,18 @@ pub fn streaming_texture_set_pixels(
                 let h = item.1;
                 let color = item.2;
 
-                if w > strtex.width || h > strtex.height {
+                if !(w < strtex.width && h < strtex.height) {
                     continue;
                 }
 
                 let access = foot.row_pitch * u64::from(h) + u64::from(w * 4);
-                let align = align_top(Alignment(strtex.image_requirements.alignment), access + 4);
+
+                let aligned = perfect_mapping_alignment(Align {
+                    access_offset: access,
+                    how_many_bytes_you_need: 4,
+                    non_coherent_atom_size: s.device_limits.non_coherent_atom_size as u64,
+                    memory_size: strtex.image_requirements.size,
+                });
 
                 s.device
                     .wait_for_fences(
@@ -640,9 +644,10 @@ pub fn streaming_texture_set_pixels(
 
                 let mut target = s
                     .device
-                    .acquire_mapping_writer(&*strtex.image_memory, access..align)
+                    .acquire_mapping_writer(&*strtex.image_memory, aligned.begin..aligned.end)
                     .expect("unable to acquire mapping writer");
-                target[0..4].copy_from_slice(&[color.0, color.1, color.2, color.3]);
+                target[aligned.index_offset as usize..(aligned.index_offset + 4) as usize]
+                    .copy_from_slice(&[color.0, color.1, color.2, color.3]);
                 s.device
                     .release_mapping_writer(target)
                     .expect("Unable to release mapping writer");
@@ -902,6 +907,11 @@ mod tests {
             let y = rng.gen_range(0, 30);
 
             strtex::streaming_texture_set_pixel(&mut windowing, id, x, y, (0, 255, 0, 255));
+            strtex::streaming_texture_set_pixels(
+                &mut windowing,
+                id,
+                once((x, y, (0, 255, 0, 255))),
+            );
         }
     }
 

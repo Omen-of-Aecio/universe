@@ -591,8 +591,6 @@ pub fn add_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions) 
 
     unsafe {
         s.device.destroy_shader_module(vs_module);
-    }
-    unsafe {
         s.device.destroy_shader_module(fs_module);
     }
 

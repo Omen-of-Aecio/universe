@@ -357,8 +357,6 @@ pub fn create_debug_triangle(s: &mut Windowing) {
 
     unsafe {
         s.device.destroy_shader_module(vs_module);
-    }
-    unsafe {
         s.device.destroy_shader_module(fs_module);
     }
 
@@ -429,6 +427,7 @@ pub fn push(s: &mut Windowing, triangle: DebugTriangle) -> DebugTriangleHandle {
 /// Remove the last added debug triangle from rendering
 pub fn pop(s: &mut Windowing) {
     if let Some(ref mut debtris) = s.debtris {
+        // TODO deallocate and move the buffer if it's small enough
         unsafe {
             s.device
                 .wait_for_fences(
@@ -460,11 +459,7 @@ pub fn pop_many(s: &mut Windowing, n: usize) {
 
 // ---
 
-pub fn set_position<T: Copy + Into<Rad<f32>>>(
-    s: &mut Windowing,
-    inst: &DebugTriangleHandle,
-    pos: (f32, f32),
-) {
+pub fn set_position(s: &mut Windowing, inst: &DebugTriangleHandle, pos: (f32, f32)) {
     let inst = inst.0;
     let device = &s.device;
     if let Some(ref mut debtris) = s.debtris {
@@ -525,6 +520,7 @@ pub fn set_scale(s: &mut Windowing, inst: &DebugTriangleHandle, scale: f32) {
         }
     }
 }
+
 pub fn set_rotation<T: Copy + Into<Rad<f32>>>(
     s: &mut Windowing,
     inst: &DebugTriangleHandle,
@@ -647,6 +643,8 @@ mod tests {
     use cgmath::Deg;
     use test::{black_box, Bencher};
 
+    // ---
+
     #[test]
     fn simple_triangle() {
         let mut logger = Logger::spawn_void();
@@ -661,6 +659,24 @@ mod tests {
 
         utils::assert_swapchain_eq(&mut windowing, "simple_triangle", img);
     }
+
+    #[test]
+    fn test_single_triangle_api() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+        let tri = DebugTriangle::default();
+
+        let handle = push(&mut windowing, tri);
+        set_scale(&mut windowing, &handle, 0.1);
+        set_rotation(&mut windowing, &handle, Deg(30.0));
+        set_position(&mut windowing, &handle, (0.25, 0.5));
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        utils::assert_swapchain_eq(&mut windowing, "test_single_triangle_api", img);
+    }
+
+    // ---
 
     #[test]
     fn simple_triangle_change_color() {

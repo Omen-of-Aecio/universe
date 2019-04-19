@@ -476,6 +476,7 @@ pub fn copy_image_to_rgb(
             .wait_for_fence(&fence, u64::max_value())
             .expect("unable to wait for fence");
         s.device.destroy_fence(fence);
+        s.command_pool.free(once(cmd_buffer));
     }
     unsafe {
         let reader = s

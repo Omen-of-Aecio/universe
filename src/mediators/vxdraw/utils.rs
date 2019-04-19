@@ -563,7 +563,7 @@ pub fn assert_swapchain_eq(windowing: &mut Windowing, name: &str, rgb: Vec<u8>) 
                 .args(&[genname])
                 .output()
                 .expect("Failed to execute process");
-            panic![err]
+            panic!["Unable to open reference file: {}", err]
         }
     };
 

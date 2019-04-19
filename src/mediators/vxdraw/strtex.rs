@@ -770,7 +770,7 @@ pub fn streaming_texture_set_pixel(
     }
 }
 
-pub fn generate_map2(s: &mut Windowing, blitid: usize) {
+pub fn generate_map2(s: &mut Windowing, blitid: usize, seed: [f32; 3]) {
     static VERTEX_SOURCE: &str = include_str!("../../../shaders/proc1.vert");
     static FRAGMENT_SOURCE: &str = include_str!("../../../shaders/proc1.frag");
     let w = s.strtexs[blitid].width;
@@ -1055,7 +1055,7 @@ pub fn generate_map2(s: &mut Windowing, blitid: usize) {
                 &mapgen_pipeline_layout,
                 pso::ShaderStageFlags::FRAGMENT,
                 0,
-                &(std::mem::transmute::<[f32; 4], [u32; 4]>([w as f32, 0.3, 93.0, 3.0])),
+                &(std::mem::transmute::<[f32; 4], [u32; 4]>([w as f32, seed[0], seed[1], seed[2]])),
             );
             let buffers: ArrayVec<[_; 1]> = [(&pt_buffer, 0)].into();
             enc.bind_vertex_buffers(0, buffers);
@@ -1145,7 +1145,7 @@ mod tests {
 
         let id = push_texture(&mut windowing, 1000, 1000, &mut logger);
         push_sprite(&mut windowing, Sprite::default(), id);
-        generate_map2(&mut windowing, id);
+        generate_map2(&mut windowing, id, [0.0, 0.0, 0.0]);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         utils::assert_swapchain_eq(&mut windowing, "generate_map_randomly", img);
     }

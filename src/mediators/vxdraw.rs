@@ -1167,7 +1167,17 @@ mod tests {
         )
         .expect("Unable to encode PNG file");
 
-        let correct = std::fs::File::open(&correctname).unwrap();
+        let correct = match std::fs::File::open(&correctname) {
+            Ok(x) => x,
+            Err(err) => {
+                std::process::Command::new("feh")
+                    .args(&[genname])
+                    .output()
+                    .expect("Failed to execute process");
+                panic![err]
+            }
+        };
+
         let dec = load_image::png::PNGDecoder::new(correct)
             .expect("Unable to read PNG file (does it exist?)");
 

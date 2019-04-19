@@ -1,5 +1,4 @@
 use crate::glocals::vxdraw::Windowing;
-use cgmath::prelude::*;
 use cgmath::Matrix4;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
@@ -17,6 +16,7 @@ use gfx_hal::{
     memory::Properties,
     pso, Adapter, Backbuffer, Backend,
 };
+use std::f32::consts::PI;
 use std::iter::once;
 
 // ---
@@ -275,7 +275,6 @@ pub fn make_vertex_buffer_with_data_on_gpu(
 }
 
 pub fn make_centered_equilateral_triangle() -> [f32; 6] {
-    use std::f32::consts::PI;
     let mut tri = [0.0f32; 6];
     tri[2] = 1.0f32 * (60.0f32 / 180.0f32 * PI).cos();
     tri[3] = -1.0f32 * (60.0f32 / 180.0f32 * PI).sin();
@@ -531,4 +530,156 @@ pub fn align_top(alignment: Alignment, value: u64) -> u64 {
     } else {
         value
     }
+}
+
+#[cfg(feature = "gfx_tests")]
+pub fn assert_swapchain_eq(windowing: &mut Windowing, name: &str, rgb: Vec<u8>) {
+    use ::image as load_image;
+    use load_image::ImageDecoder;
+    use std::io::Read;
+
+    std::fs::create_dir_all("_build/vxdraw_results").expect("Unable to create directories");
+
+    let genname = String::from("_build/vxdraw_results/") + name + ".png";
+    let correctname = String::from("tests/vxdraw/") + name + ".png";
+    let diffname = String::from("_build/vxdraw_results/") + name + "#diff.png";
+    let appendname = String::from("_build/vxdraw_results/") + name + "#sum.png";
+
+    let file = std::fs::File::create(&genname).expect("Unable to create file");
+    let enc = load_image::png::PNGEncoder::new(file);
+    enc.encode(
+        &rgb,
+        windowing.swapconfig.extent.width,
+        windowing.swapconfig.extent.height,
+        load_image::ColorType::RGB(8),
+    )
+    .expect("Unable to encode PNG file");
+
+    let correct = match std::fs::File::open(&correctname) {
+        Ok(x) => x,
+        Err(err) => {
+            std::process::Command::new("feh")
+                .args(&[genname])
+                .output()
+                .expect("Failed to execute process");
+            panic![err]
+        }
+    };
+
+    let dec = load_image::png::PNGDecoder::new(correct)
+        .expect("Unable to read PNG file (does it exist?)");
+
+    assert_eq![
+        (
+            u64::from(windowing.swapconfig.extent.width),
+            u64::from(windowing.swapconfig.extent.height),
+        ),
+        dec.dimensions(),
+        "The swapchain image and the preset correct image MUST be of the exact same size"
+    ];
+    assert_eq![
+        load_image::ColorType::RGB(8),
+        dec.colortype(),
+        "Both images MUST have the RGB(8) format"
+    ];
+
+    let correct_bytes = dec
+        .into_reader()
+        .expect("Unable to read file")
+        .bytes()
+        .map(|x| x.expect("Unable to read byte"))
+        .collect::<Vec<u8>>();
+
+    fn absdiff(lhs: u8, rhs: u8) -> u8 {
+        if let Some(newbyte) = lhs.checked_sub(rhs) {
+            newbyte
+        } else {
+            rhs - lhs
+        }
+    }
+
+    if correct_bytes != rgb {
+        let mut diff = Vec::with_capacity(correct_bytes.len());
+        for (idx, byte) in correct_bytes.iter().enumerate() {
+            diff.push(absdiff(*byte, rgb[idx]));
+        }
+        let file = std::fs::File::create(&diffname).expect("Unable to create file");
+        let enc = load_image::png::PNGEncoder::new(file);
+        enc.encode(
+            &diff,
+            windowing.swapconfig.extent.width,
+            windowing.swapconfig.extent.height,
+            load_image::ColorType::RGB(8),
+        )
+        .expect("Unable to encode PNG file");
+        std::process::Command::new("convert")
+            .args(&[
+                "-bordercolor".into(),
+                "black".into(),
+                "-border".into(),
+                "20".into(),
+                correctname,
+                genname,
+                diffname,
+                "+append".into(),
+                appendname.clone(),
+            ])
+            .output()
+            .expect("Failed to execute process");
+        std::process::Command::new("feh")
+            .args(&[appendname])
+            .output()
+            .expect("Failed to execute process");
+        panic!["Images were NOT the same!"];
+    }
+}
+
+#[cfg(feature = "gfx_tests")]
+#[cfg(test)]
+pub fn add_windmills(
+    windowing: &mut Windowing,
+    rand_rotat: bool,
+) -> Vec<super::debtri::DebugTriangleHandle> {
+    use rand::Rng;
+    use rand_pcg::Pcg64Mcg as random;
+    let mut rng = random::new(0);
+    let mut debtris = Vec::with_capacity(1000);
+    for _ in 0..1000 {
+        let mut tri = super::debtri::DebugTriangle::default();
+        let (dx, dy) = (
+            rng.gen_range(-1.0f32, 1.0f32),
+            rng.gen_range(-1.0f32, 1.0f32),
+        );
+        let scale = rng.gen_range(0.03f32, 0.1f32);
+        if rand_rotat {
+            tri.rotation = rng.gen_range(-PI, PI);
+        }
+        tri.scale = scale;
+        tri.translation = (dx, dy);
+        debtris.push(super::debtri::push(windowing, tri));
+    }
+    debtris
+}
+
+pub fn remove_windmills(windowing: &mut Windowing) {
+    super::debtri::pop_many(windowing, 1000);
+}
+
+pub fn add_4_screencorners(windowing: &mut Windowing) {
+    super::debtri::push(
+        windowing,
+        super::debtri::DebugTriangle::from([-1.0f32, -1.0, 0.0, -1.0, -1.0, 0.0]),
+    );
+    super::debtri::push(
+        windowing,
+        super::debtri::DebugTriangle::from([-1.0f32, 1.0, 0.0, 1.0, -1.0, 0.0]),
+    );
+    super::debtri::push(
+        windowing,
+        super::debtri::DebugTriangle::from([1.0f32, -1.0, 0.0, -1.0, 1.0, 0.0]),
+    );
+    super::debtri::push(
+        windowing,
+        super::debtri::DebugTriangle::from([1.0f32, 1.0, 0.0, 1.0, 1.0, 0.0]),
+    );
 }

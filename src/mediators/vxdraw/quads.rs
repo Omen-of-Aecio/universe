@@ -1,8 +1,5 @@
 use super::utils::*;
-use crate::glocals::{
-    vxdraw::{ColoredQuadList, Windowing},
-    Log,
-};
+use crate::glocals::vxdraw::{ColoredQuadList, Windowing};
 use cgmath::Rad;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
@@ -13,7 +10,6 @@ use gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 use gfx_backend_vulkan as back;
 use gfx_hal::{device::Device, format, image, pass, pso, Backend, Primitive};
-use logger::Logger;
 use std::io::Read;
 use std::mem::{size_of, transmute, ManuallyDrop};
 
@@ -167,7 +163,7 @@ pub fn pop_n_quads(s: &mut Windowing, n: usize) {
     }
 }
 
-pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
+pub fn create_quad(s: &mut Windowing) {
     pub const VERTEX_SOURCE: &str = "#version 450
     #extension GL_ARG_separate_shader_objects : enable
     layout (location = 0) in vec3 position;
@@ -438,8 +434,8 @@ pub fn create_quad(s: &mut Windowing, log: &mut Logger<Log>) {
         quads_memory: dtmemory,
         memory_requirements: dtreqs,
 
-        quads_buffer_indices: quads_buffer_indices,
-        quads_memory_indices: quads_memory_indices,
+        quads_buffer_indices,
+        quads_memory_indices,
         quads_requirements_indices,
 
         descriptor_set: quad_descriptor_set_layouts,
@@ -549,7 +545,7 @@ mod tests {
         quads::push(&mut windowing, quad);
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "simple_quad", img);
+        utils::assert_swapchain_eq(&mut windowing, "simple_quad", img);
     }
 
     #[test]
@@ -558,8 +554,8 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&windowing);
 
-        let mut topright = DebugTriangle::from([-1.0, -1.0, 1.0, 1.0, 1.0, -1.0]);
-        let mut bottomleft = DebugTriangle::from([-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]);
+        let mut topright = debtri::DebugTriangle::from([-1.0, -1.0, 1.0, 1.0, 1.0, -1.0]);
+        let mut bottomleft = debtri::DebugTriangle::from([-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]);
         topright.scale = 0.1;
         bottomleft.scale = 0.1;
         let radi = 0.1;
@@ -577,7 +573,7 @@ mod tests {
         }
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "a_bunch_of_quads", img);
+        utils::assert_swapchain_eq(&mut windowing, "a_bunch_of_quads", img);
     }
 
     #[test]
@@ -605,7 +601,7 @@ mod tests {
         quads::push(&mut windowing, quad);
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "overlapping_quads_respect_z_order", img);
+        utils::assert_swapchain_eq(&mut windowing, "overlapping_quads_respect_z_order", img);
 
         // ---
 
@@ -628,6 +624,6 @@ mod tests {
         quads::push(&mut windowing, quad);
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "overlapping_quads_respect_z_order", img);
+        utils::assert_swapchain_eq(&mut windowing, "overlapping_quads_respect_z_order", img);
     }
 }

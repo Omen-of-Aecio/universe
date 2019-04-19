@@ -3,7 +3,6 @@ use crate::glocals::{
     vxdraw::{StreamingTexture, Windowing},
     Log,
 };
-use ::image as load_image;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
 #[cfg(feature = "gl")]
@@ -628,7 +627,7 @@ pub fn streaming_texture_set_pixels(
                     continue;
                 }
 
-                let access = foot.row_pitch * h as u64 + (w * 4) as u64;
+                let access = foot.row_pitch * u64::from(h) + u64::from(w * 4);
                 let align = align_top(Alignment(strtex.image_requirements.alignment), access + 4);
 
                 s.device
@@ -675,10 +674,10 @@ pub fn streaming_texture_set_pixels_block(
 
             // Vulkan 01390, Size must be a multiple of DeviceLimits:nonCoherentAtomSize, or offset
             // plus size = size of memory, if it's not VK_WHOLE_SIZE
-            let access_begin = foot.row_pitch * start.1 as u64 + (start.0 * 4) as u64;
+            let access_begin = foot.row_pitch * u64::from(start.1) + u64::from(start.0 * 4);
             let access_end = foot.row_pitch
-                * (start.1 + if wh.1 == 0 { 0 } else { wh.1 - 1 }) as u64
-                + ((start.0 + wh.0) * 4) as u64;
+                * u64::from(start.1 + if wh.1 == 0 { 0 } else { wh.1 - 1 })
+                + u64::from((start.0 + wh.0) * 4);
 
             debug_assert![access_end <= strtex.image_requirements.size];
 
@@ -741,7 +740,7 @@ pub fn streaming_texture_set_pixel(
                     layer: 0,
                 },
             );
-            let access = foot.row_pitch * h as u64 + (w * 4) as u64;
+            let access = foot.row_pitch * u64::from(h) + u64::from(w * 4);
 
             let aligned = perfect_mapping_alignment(Align {
                 access_offset: access,
@@ -776,10 +775,11 @@ pub fn streaming_texture_set_pixel(
 #[cfg(feature = "gfx_tests")]
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::mediators::vxdraw::*;
-    use cgmath::{Deg, Vector3};
     use rand::Rng;
     use rand_pcg::Pcg64Mcg as random;
+    use test::{black_box, Bencher};
 
     #[test]
     fn streaming_texture_blocks() {
@@ -820,7 +820,7 @@ mod tests {
         );
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "streaming_texture_blocks", img);
+        utils::assert_swapchain_eq(&mut windowing, "streaming_texture_blocks", img);
     }
 
     #[test]
@@ -849,7 +849,7 @@ mod tests {
         );
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "streaming_texture_blocks_off_by_one", img);
+        utils::assert_swapchain_eq(&mut windowing, "streaming_texture_blocks_off_by_one", img);
 
         strtex::streaming_texture_set_pixels_block(
             &mut windowing,
@@ -884,7 +884,7 @@ mod tests {
         );
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "streaming_texture_blocks_off_by_one", img);
+        utils::assert_swapchain_eq(&mut windowing, "streaming_texture_blocks_off_by_one", img);
     }
 
     #[test]
@@ -963,6 +963,67 @@ mod tests {
         );
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "streaming_texture_z_ordering", img);
+        utils::assert_swapchain_eq(&mut windowing, "streaming_texture_z_ordering", img);
+    }
+
+    // ---
+
+    #[bench]
+    fn bench_streaming_texture_set_single_pixel_while_drawing(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let id = add_streaming_texture(&mut windowing, 50, 50, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
+
+        b.iter(|| {
+            strtex::streaming_texture_set_pixel(
+                &mut windowing,
+                id,
+                black_box(1),
+                black_box(2),
+                (255, 0, 0, 255),
+            );
+            draw_frame(&mut windowing, &mut logger, &prspect);
+        });
+    }
+
+    #[bench]
+    fn bench_streaming_texture_set_500x500_area(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+
+        let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
+
+        b.iter(|| {
+            strtex::streaming_texture_set_pixels_block(
+                &mut windowing,
+                id,
+                (0, 0),
+                (500, 500),
+                (255, 0, 0, 255),
+            );
+        });
+    }
+
+    #[bench]
+    fn bench_streaming_texture_set_single_pixel(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+
+        let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
+        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
+
+        b.iter(|| {
+            strtex::streaming_texture_set_pixel(
+                &mut windowing,
+                id,
+                black_box(1),
+                black_box(2),
+                (255, 0, 0, 255),
+            );
+        });
     }
 }

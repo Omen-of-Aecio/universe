@@ -642,8 +642,10 @@ pub fn rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
 #[cfg(feature = "gfx_tests")]
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::mediators::vxdraw::*;
-    use cgmath::{Deg, Vector3};
+    use cgmath::Deg;
+    use test::{black_box, Bencher};
 
     #[test]
     fn simple_triangle() {
@@ -652,12 +654,12 @@ mod tests {
         let prspect = gen_perspective(&windowing);
         let tri = DebugTriangle::default();
 
-        debtri::push(&mut windowing, tri);
-        tests::add_4_screencorners(&mut windowing);
+        push(&mut windowing, tri);
+        utils::add_4_screencorners(&mut windowing);
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
-        tests::assert_swapchain_eq(&mut windowing, "simple_triangle", img);
+        utils::assert_swapchain_eq(&mut windowing, "simple_triangle", img);
     }
 
     #[test]
@@ -667,12 +669,12 @@ mod tests {
         let prspect = gen_perspective(&windowing);
         let tri = DebugTriangle::default();
 
-        let idx = debtri::push(&mut windowing, tri);
-        debtri::set_color(&mut windowing, &idx, [255, 0, 255, 255]);
+        let idx = push(&mut windowing, tri);
+        set_color(&mut windowing, &idx, [255, 0, 255, 255]);
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
-        tests::assert_swapchain_eq(&mut windowing, "simple_triangle_change_color", img);
+        utils::assert_swapchain_eq(&mut windowing, "simple_triangle_change_color", img);
     }
 
     #[test]
@@ -685,13 +687,13 @@ mod tests {
             for j in [-1f32, 1f32].iter() {
                 let mut tri = DebugTriangle::default();
                 tri.translation = (*i, *j);
-                let _idx = debtri::push(&mut windowing, tri);
+                let _idx = push(&mut windowing, tri);
             }
         }
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
-        tests::assert_swapchain_eq(&mut windowing, "debug_triangle_corners_widescreen", img);
+        utils::assert_swapchain_eq(&mut windowing, "debug_triangle_corners_widescreen", img);
     }
 
     #[test]
@@ -704,13 +706,13 @@ mod tests {
             for j in [-1f32, 1f32].iter() {
                 let mut tri = DebugTriangle::default();
                 tri.translation = (*i, *j);
-                let _idx = debtri::push(&mut windowing, tri);
+                let _idx = push(&mut windowing, tri);
             }
         }
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
-        tests::assert_swapchain_eq(&mut windowing, "debug_triangle_corners_tallscreen", img);
+        utils::assert_swapchain_eq(&mut windowing, "debug_triangle_corners_tallscreen", img);
     }
 
     #[test]
@@ -723,12 +725,12 @@ mod tests {
             let mut tri = DebugTriangle::default();
             tri.translation = ((i as f32).cos(), (i as f32).sin());
             tri.scale = 0.1f32;
-            let _idx = debtri::push(&mut windowing, tri);
+            let _idx = push(&mut windowing, tri);
         }
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
-        tests::assert_swapchain_eq(&mut windowing, "circle_of_triangles", img);
+        utils::assert_swapchain_eq(&mut windowing, "circle_of_triangles", img);
     }
 
     #[test]
@@ -745,12 +747,12 @@ mod tests {
         for j in 0..31 {
             for i in 0..31 {
                 tri.translation = (trans + i as f32 * 2.0 * radi, trans + j as f32 * 2.0 * radi);
-                debtri::push(&mut windowing, tri);
+                push(&mut windowing, tri);
             }
         }
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "triangle_in_corner", img);
+        utils::assert_swapchain_eq(&mut windowing, "triangle_in_corner", img);
     }
 
     #[test]
@@ -759,10 +761,10 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&windowing);
 
-        tests::add_windmills(&mut windowing, false);
+        utils::add_windmills(&mut windowing, false);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
-        tests::assert_swapchain_eq(&mut windowing, "windmills", img);
+        utils::assert_swapchain_eq(&mut windowing, "windmills", img);
     }
 
     #[test]
@@ -771,10 +773,10 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
         let prspect = gen_perspective(&windowing);
 
-        tests::add_windmills(&mut windowing, false);
+        utils::add_windmills(&mut windowing, false);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
-        tests::assert_swapchain_eq(&mut windowing, "windmills_ignore_perspective", img);
+        utils::assert_swapchain_eq(&mut windowing, "windmills_ignore_perspective", img);
     }
 
     #[test]
@@ -783,15 +785,15 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&windowing);
 
-        let handles = tests::add_windmills(&mut windowing, false);
-        debtri::set_color(&mut windowing, &handles[0], [255, 0, 0, 255]);
-        debtri::set_color(&mut windowing, &handles[249], [0, 255, 0, 255]);
-        debtri::set_color(&mut windowing, &handles[499], [0, 0, 255, 255]);
-        debtri::set_color(&mut windowing, &handles[999], [0, 0, 0, 255]);
+        let handles = utils::add_windmills(&mut windowing, false);
+        set_color(&mut windowing, &handles[0], [255, 0, 0, 255]);
+        set_color(&mut windowing, &handles[249], [0, 255, 0, 255]);
+        set_color(&mut windowing, &handles[499], [0, 0, 255, 255]);
+        set_color(&mut windowing, &handles[999], [0, 0, 0, 255]);
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
-        tests::assert_swapchain_eq(&mut windowing, "windmills_change_color", img);
+        utils::assert_swapchain_eq(&mut windowing, "windmills_change_color", img);
     }
 
     #[test]
@@ -800,22 +802,22 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&windowing);
 
-        tests::add_windmills(&mut windowing, false);
+        utils::add_windmills(&mut windowing, false);
         for _ in 0..30 {
-            debtri::rotate_all(&mut windowing, Deg(-1.0f32));
+            rotate_all(&mut windowing, Deg(-1.0f32));
         }
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
-        tests::assert_swapchain_eq(&mut windowing, "rotating_windmills_drawing_invariant", img);
-        tests::remove_windmills(&mut windowing);
+        utils::assert_swapchain_eq(&mut windowing, "rotating_windmills_drawing_invariant", img);
+        utils::remove_windmills(&mut windowing);
 
-        tests::add_windmills(&mut windowing, false);
+        utils::add_windmills(&mut windowing, false);
         for _ in 0..30 {
-            debtri::rotate_all(&mut windowing, Deg(-1.0f32));
+            rotate_all(&mut windowing, Deg(-1.0f32));
             draw_frame(&mut windowing, &mut logger, &prspect);
         }
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "rotating_windmills_drawing_invariant", img);
+        utils::assert_swapchain_eq(&mut windowing, "rotating_windmills_drawing_invariant", img);
     }
 
     #[test]
@@ -824,8 +826,75 @@ mod tests {
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&windowing);
 
-        tests::add_windmills(&mut windowing, true);
+        utils::add_windmills(&mut windowing, true);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "windmills_given_initial_rotation", img);
+        utils::assert_swapchain_eq(&mut windowing, "windmills_given_initial_rotation", img);
+    }
+
+    // ---
+
+    #[bench]
+    fn bench_simple_triangle(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        push(&mut windowing, DebugTriangle::default());
+        utils::add_4_screencorners(&mut windowing);
+
+        b.iter(|| {
+            draw_frame(&mut windowing, &mut logger, &prspect);
+        });
+    }
+
+    #[bench]
+    fn bench_still_windmills(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        utils::add_windmills(&mut windowing, false);
+
+        b.iter(|| {
+            draw_frame(&mut windowing, &mut logger, &prspect);
+        });
+    }
+
+    #[bench]
+    fn bench_windmills_set_color(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+
+        let handles = utils::add_windmills(&mut windowing, false);
+
+        b.iter(|| {
+            set_color(&mut windowing, &handles[0], black_box([0, 0, 0, 255]));
+        });
+    }
+
+    #[bench]
+    fn bench_rotating_windmills(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        utils::add_windmills(&mut windowing, false);
+
+        b.iter(|| {
+            rotate_all(&mut windowing, Deg(1.0f32));
+            draw_frame(&mut windowing, &mut logger, &prspect);
+        });
+    }
+
+    #[bench]
+    fn bench_rotating_windmills_no_render(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+
+        utils::add_windmills(&mut windowing, false);
+
+        b.iter(|| {
+            rotate_all(&mut windowing, Deg(1.0f32));
+        });
     }
 }

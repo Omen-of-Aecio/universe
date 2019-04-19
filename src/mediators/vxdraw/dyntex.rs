@@ -820,11 +820,13 @@ pub fn sprite_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, tex: &Text
 #[cfg(feature = "gfx_tests")]
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::mediators::vxdraw::*;
-    use cgmath::{Deg, Vector3};
+    use cgmath::Deg;
     use rand::Rng;
     use rand_pcg::Pcg64Mcg as random;
     use std::f32::consts::PI;
+    use test::Bencher;
 
     static LOGO: &[u8] = include_bytes!["../../../assets/images/logo.png"];
     static FOREST: &[u8] = include_bytes!["../../../assets/images/forest-light.png"];
@@ -844,7 +846,7 @@ mod tests {
             ..Sprite::default()
         };
 
-        let sprite_tree = add_sprite(
+        add_sprite(
             &mut windowing,
             Sprite {
                 depth: 0.5,
@@ -852,7 +854,7 @@ mod tests {
             },
             &tree,
         );
-        let sprite_logo = add_sprite(
+        add_sprite(
             &mut windowing,
             Sprite {
                 depth: 0.6,
@@ -863,7 +865,7 @@ mod tests {
         );
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "overlapping_dyntex_respect_z_order", img);
+        utils::assert_swapchain_eq(&mut windowing, "overlapping_dyntex_respect_z_order", img);
     }
 
     #[test]
@@ -875,7 +877,7 @@ mod tests {
 
         let prspect = gen_perspective(&windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "simple_texture", img);
+        utils::assert_swapchain_eq(&mut windowing, "simple_texture", img);
     }
 
     #[test]
@@ -887,7 +889,7 @@ mod tests {
 
         let prspect = gen_perspective(&windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "simple_texture_adheres_to_view", img);
+        utils::assert_swapchain_eq(&mut windowing, "simple_texture_adheres_to_view", img);
     }
 
     #[test]
@@ -911,7 +913,7 @@ mod tests {
 
         let prspect = gen_perspective(&windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "colored_simple_texture", img);
+        utils::assert_swapchain_eq(&mut windowing, "colored_simple_texture", img);
     }
 
     #[test]
@@ -973,7 +975,7 @@ mod tests {
 
         let prspect = gen_perspective(&windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "translated_texture", img);
+        utils::assert_swapchain_eq(&mut windowing, "translated_texture", img);
     }
 
     #[test]
@@ -1035,7 +1037,7 @@ mod tests {
 
         let prspect = gen_perspective(&windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "rotated_texture", img);
+        utils::assert_swapchain_eq(&mut windowing, "rotated_texture", img);
     }
 
     #[test]
@@ -1064,7 +1066,7 @@ mod tests {
 
         let prspect = gen_perspective(&windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "many_sprites", img);
+        utils::assert_swapchain_eq(&mut windowing, "many_sprites", img);
     }
 
     #[test]
@@ -1101,7 +1103,58 @@ mod tests {
         );
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        tests::assert_swapchain_eq(&mut windowing, "three_layer_scene", img);
+        utils::assert_swapchain_eq(&mut windowing, "three_layer_scene", img);
     }
 
+    #[bench]
+    fn bench_many_sprites(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let tex = add_texture(&mut windowing, LOGO, TextureOptions::default());
+        for i in 0..1000 {
+            add_sprite(
+                &mut windowing,
+                Sprite {
+                    rotation: ((i * 10) as f32 / 180f32 * PI),
+                    scale: 0.5,
+                    ..Sprite::default()
+                },
+                &tex,
+            );
+        }
+
+        let prspect = gen_perspective(&windowing);
+        b.iter(|| {
+            draw_frame(&mut windowing, &mut logger, &prspect);
+        });
+    }
+
+    #[bench]
+    fn bench_many_particles(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let tex = add_texture(&mut windowing, LOGO, TextureOptions::default());
+        let mut rng = random::new(0);
+        for i in 0..1000 {
+            let (dx, dy) = (
+                rng.gen_range(-1.0f32, 1.0f32),
+                rng.gen_range(-1.0f32, 1.0f32),
+            );
+            add_sprite(
+                &mut windowing,
+                Sprite {
+                    translation: (dx, dy),
+                    rotation: ((i * 10) as f32 / 180f32 * PI),
+                    scale: 0.01,
+                    ..Sprite::default()
+                },
+                &tex,
+            );
+        }
+
+        let prspect = gen_perspective(&windowing);
+        b.iter(|| {
+            draw_frame(&mut windowing, &mut logger, &prspect);
+        });
+    }
 }

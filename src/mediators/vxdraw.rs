@@ -41,9 +41,6 @@ pub mod quads;
 pub mod strtex;
 pub mod utils;
 
-use debtri::{DebugTriangle, DebugTriangleHandle};
-use dyntex::*;
-use strtex::{add_streaming_texture, streaming_texture_add_sprite};
 use utils::*;
 
 // ---
@@ -512,7 +509,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         window,
     };
     debtri::create_debug_triangle(&mut windowing);
-    quads::create_quad(&mut windowing, log);
+    quads::create_quad(&mut windowing);
     windowing
 }
 
@@ -747,7 +744,7 @@ fn draw_frame_internal<T>(
     postproc_res
 }
 
-pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) -> Vec<u8> {
+pub fn generate_map(s: &mut Windowing, w: u32, h: u32) -> Vec<u8> {
     static VERTEX_SOURCE: &str = include_str!("../../shaders/proc1.vert");
     static FRAGMENT_SOURCE: &str = include_str!("../../shaders/proc1.frag");
     let vs_module = {
@@ -1091,161 +1088,8 @@ pub fn generate_map(s: &mut Windowing, w: u32, h: u32, log: &mut Logger<Log>) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test::{black_box, Bencher};
-
     use cgmath::{Deg, Vector3};
-    use rand::Rng;
-    use rand_pcg::Pcg64Mcg as random;
-    use std::f32::consts::PI;
-
-    static LOGO: &[u8] = include_bytes!["../../assets/images/logo.png"];
-    static FOREST: &[u8] = include_bytes!["../../assets/images/forest-light.png"];
-    static TREE: &[u8] = include_bytes!["../../assets/images/treetest.png"];
-
-    // ---
-
-    pub fn add_windmills(windowing: &mut Windowing, rand_rotat: bool) -> Vec<DebugTriangleHandle> {
-        let mut rng = random::new(0);
-        let mut debtris = Vec::with_capacity(1000);
-        for _ in 0..1000 {
-            let mut tri = DebugTriangle::default();
-            let (dx, dy) = (
-                rng.gen_range(-1.0f32, 1.0f32),
-                rng.gen_range(-1.0f32, 1.0f32),
-            );
-            let scale = rng.gen_range(0.03f32, 0.1f32);
-            if rand_rotat {
-                tri.rotation = rng.gen_range(-PI, PI);
-            }
-            tri.scale = scale;
-            tri.translation = (dx, dy);
-            debtris.push(debtri::push(windowing, tri));
-        }
-        debtris
-    }
-
-    pub fn remove_windmills(windowing: &mut Windowing) {
-        debtri::pop_many(windowing, 1000);
-    }
-
-    pub fn add_4_screencorners(windowing: &mut Windowing) {
-        debtri::push(
-            windowing,
-            DebugTriangle::from([-1.0f32, -1.0, 0.0, -1.0, -1.0, 0.0]),
-        );
-        debtri::push(
-            windowing,
-            DebugTriangle::from([-1.0f32, 1.0, 0.0, 1.0, -1.0, 0.0]),
-        );
-        debtri::push(
-            windowing,
-            DebugTriangle::from([1.0f32, -1.0, 0.0, -1.0, 1.0, 0.0]),
-        );
-        debtri::push(
-            windowing,
-            DebugTriangle::from([1.0f32, 1.0, 0.0, 1.0, 1.0, 0.0]),
-        );
-    }
-
-    pub fn assert_swapchain_eq(windowing: &mut Windowing, name: &str, rgb: Vec<u8>) {
-        use load_image::ImageDecoder;
-        std::fs::create_dir_all("_build/vxdraw_results").expect("Unable to create directories");
-
-        let genname = String::from("_build/vxdraw_results/") + name + ".png";
-        let correctname = String::from("tests/vxdraw/") + name + ".png";
-        let diffname = String::from("_build/vxdraw_results/") + name + "#diff.png";
-        let appendname = String::from("_build/vxdraw_results/") + name + "#sum.png";
-
-        let file = std::fs::File::create(&genname).expect("Unable to create file");
-        let enc = load_image::png::PNGEncoder::new(file);
-        enc.encode(
-            &rgb,
-            windowing.swapconfig.extent.width,
-            windowing.swapconfig.extent.height,
-            load_image::ColorType::RGB(8),
-        )
-        .expect("Unable to encode PNG file");
-
-        let correct = match std::fs::File::open(&correctname) {
-            Ok(x) => x,
-            Err(err) => {
-                std::process::Command::new("feh")
-                    .args(&[genname])
-                    .output()
-                    .expect("Failed to execute process");
-                panic![err]
-            }
-        };
-
-        let dec = load_image::png::PNGDecoder::new(correct)
-            .expect("Unable to read PNG file (does it exist?)");
-
-        assert_eq![
-            (
-                windowing.swapconfig.extent.width as u64,
-                windowing.swapconfig.extent.height as u64
-            ),
-            dec.dimensions(),
-            "The swapchain image and the preset correct image MUST be of the exact same size"
-        ];
-        assert_eq![
-            load_image::ColorType::RGB(8),
-            dec.colortype(),
-            "Both images MUST have the RGB(8) format"
-        ];
-
-        let correct_bytes = dec
-            .into_reader()
-            .expect("Unable to read file")
-            .bytes()
-            .map(|x| x.expect("Unable to read byte"))
-            .collect::<Vec<u8>>();
-
-        fn absdiff(lhs: u8, rhs: u8) -> u8 {
-            if let Some(newbyte) = lhs.checked_sub(rhs) {
-                newbyte
-            } else {
-                rhs - lhs
-            }
-        }
-
-        if correct_bytes != rgb {
-            let mut diff = Vec::with_capacity(correct_bytes.len());
-            for (idx, byte) in correct_bytes.iter().enumerate() {
-                diff.push(absdiff(*byte, rgb[idx]));
-            }
-            let file = std::fs::File::create(&diffname).expect("Unable to create file");
-            let enc = load_image::png::PNGEncoder::new(file);
-            enc.encode(
-                &diff,
-                windowing.swapconfig.extent.width,
-                windowing.swapconfig.extent.height,
-                load_image::ColorType::RGB(8),
-            )
-            .expect("Unable to encode PNG file");
-            std::process::Command::new("convert")
-                .args(&[
-                    "-bordercolor".into(),
-                    "black".into(),
-                    "-border".into(),
-                    "20".into(),
-                    correctname,
-                    genname,
-                    diffname,
-                    "+append".into(),
-                    appendname.clone(),
-                ])
-                .output()
-                .expect("Failed to execute process");
-            std::process::Command::new("feh")
-                .args(&[appendname])
-                .output()
-                .expect("Failed to execute process");
-            assert![false, "Images were NOT the same!"];
-        } else {
-            assert![true];
-        }
-    }
+    use test::Bencher;
 
     // ---
 
@@ -1294,7 +1138,7 @@ mod tests {
     fn generate_map() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let mut img = super::generate_map(&mut windowing, 1000, 1000, &mut logger);
+        let mut img = super::generate_map(&mut windowing, 1000, 1000);
         let img = img
             .drain(..)
             .enumerate()
@@ -1311,7 +1155,7 @@ mod tests {
         let prspect = gen_perspective(&windowing);
 
         let _tri = make_centered_equilateral_triangle();
-        debtri::push(&mut windowing, DebugTriangle::default());
+        debtri::push(&mut windowing, debtri::DebugTriangle::default());
         for i in 0..=360 {
             if i % 2 == 0 {
                 add_4_screencorners(&mut windowing);
@@ -1329,18 +1173,18 @@ mod tests {
     fn correct_perspective() {
         let mut logger = Logger::spawn_void();
         {
-            let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+            let windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
             assert_eq![Matrix4::identity(), gen_perspective(&windowing)];
         }
         {
-            let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1x2k);
+            let windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1x2k);
             assert_eq![
                 Matrix4::from_nonuniform_scale(1.0, 0.5, 1.0),
                 gen_perspective(&windowing)
             ];
         }
         {
-            let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
+            let windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
             assert_eq![
                 Matrix4::from_nonuniform_scale(0.5, 1.0, 1.0),
                 gen_perspective(&windowing)
@@ -1349,123 +1193,6 @@ mod tests {
     }
 
     // ---
-
-    #[bench]
-    fn bench_many_sprites(b: &mut Bencher) {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(&mut windowing, LOGO, TextureOptions::default());
-        for i in 0..1000 {
-            add_sprite(
-                &mut windowing,
-                Sprite {
-                    rotation: ((i * 10) as f32 / 180f32 * PI),
-                    scale: 0.5,
-                    ..Sprite::default()
-                },
-                &tex,
-            );
-        }
-
-        let prspect = gen_perspective(&windowing);
-        b.iter(|| {
-            draw_frame(&mut windowing, &mut logger, &prspect);
-        });
-    }
-
-    #[bench]
-    fn bench_many_particles(b: &mut Bencher) {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let tex = add_texture(&mut windowing, LOGO, TextureOptions::default());
-        let mut rng = random::new(0);
-        for i in 0..1000 {
-            let (dx, dy) = (
-                rng.gen_range(-1.0f32, 1.0f32),
-                rng.gen_range(-1.0f32, 1.0f32),
-            );
-            add_sprite(
-                &mut windowing,
-                Sprite {
-                    translation: (dx, dy),
-                    rotation: ((i * 10) as f32 / 180f32 * PI),
-                    scale: 0.01,
-                    ..Sprite::default()
-                },
-                &tex,
-            );
-        }
-
-        let prspect = gen_perspective(&windowing);
-        b.iter(|| {
-            draw_frame(&mut windowing, &mut logger, &prspect);
-        });
-    }
-
-    #[bench]
-    fn bench_simple_triangle(b: &mut Bencher) {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&windowing);
-
-        debtri::push(&mut windowing, DebugTriangle::default());
-        add_4_screencorners(&mut windowing);
-
-        b.iter(|| {
-            draw_frame(&mut windowing, &mut logger, &prspect);
-        });
-    }
-
-    #[bench]
-    fn bench_still_windmills(b: &mut Bencher) {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&windowing);
-
-        add_windmills(&mut windowing, false);
-
-        b.iter(|| {
-            draw_frame(&mut windowing, &mut logger, &prspect);
-        });
-    }
-
-    #[bench]
-    fn bench_windmills_set_color(b: &mut Bencher) {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-
-        let handles = add_windmills(&mut windowing, false);
-
-        b.iter(|| {
-            debtri::set_color(&mut windowing, &handles[0], black_box([0, 0, 0, 255]));
-        });
-    }
-
-    #[bench]
-    fn bench_rotating_windmills(b: &mut Bencher) {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&windowing);
-
-        add_windmills(&mut windowing, false);
-
-        b.iter(|| {
-            debtri::rotate_all(&mut windowing, Deg(1.0f32));
-            draw_frame(&mut windowing, &mut logger, &prspect);
-        });
-    }
-
-    #[bench]
-    fn bench_rotating_windmills_no_render(b: &mut Bencher) {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-
-        add_windmills(&mut windowing, false);
-
-        b.iter(|| {
-            debtri::rotate_all(&mut windowing, Deg(1.0f32));
-        });
-    }
 
     #[bench]
     fn clears_per_second(b: &mut Bencher) {
@@ -1483,66 +1210,7 @@ mod tests {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         b.iter(|| {
-            super::generate_map(&mut windowing, 1000, 1000, &mut logger);
-        });
-    }
-
-    #[bench]
-    fn bench_streaming_texture_set_500x500_area(b: &mut Bencher) {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-
-        let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
-        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
-
-        b.iter(|| {
-            strtex::streaming_texture_set_pixels_block(
-                &mut windowing,
-                id,
-                (0, 0),
-                (500, 500),
-                (255, 0, 0, 255),
-            );
-        });
-    }
-
-    #[bench]
-    fn bench_streaming_texture_set_single_pixel(b: &mut Bencher) {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-
-        let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
-        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
-
-        b.iter(|| {
-            strtex::streaming_texture_set_pixel(
-                &mut windowing,
-                id,
-                black_box(1),
-                black_box(2),
-                (255, 0, 0, 255),
-            );
-        });
-    }
-
-    #[bench]
-    fn bench_streaming_texture_set_single_pixel_while_drawing(b: &mut Bencher) {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&windowing);
-
-        let id = add_streaming_texture(&mut windowing, 50, 50, &mut logger);
-        streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
-
-        b.iter(|| {
-            strtex::streaming_texture_set_pixel(
-                &mut windowing,
-                id,
-                black_box(1),
-                black_box(2),
-                (255, 0, 0, 255),
-            );
-            draw_frame(&mut windowing, &mut logger, &prspect);
+            super::generate_map(&mut windowing, 1000, 1000);
         });
     }
 }

@@ -59,7 +59,6 @@ pub struct Main<'a> {
     pub threads: Threads,
     pub time: Instant,
     pub timers: Timers,
-    pub windowing: Option<vxdraw::Windowing>,
 }
 
 impl Default for Main<'_> {
@@ -74,7 +73,6 @@ impl Default for Main<'_> {
             threads: Threads::default(),
             time: Instant::now(),
             timers: Timers::default(),
-            windowing: None,
         }
     }
 }
@@ -123,6 +121,7 @@ pub struct Client {
     pub audio: rodio::Sink,
     pub logic_benchmarker: Benchmarker,
     pub drawing_benchmarker: Benchmarker,
+    pub windowing: Option<vxdraw::Windowing>,
     // Networking
     // pub server: SocketAddr,
 }

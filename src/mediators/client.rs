@@ -1,10 +1,9 @@
 use crate::glocals::*;
 use crate::mediators::{
-    vxdraw,
-    does_line_collide_with_grid::*, random_map_generator, render_grid, render_polygon,
+    does_line_collide_with_grid::*, random_map_generator, render_grid, render_polygon, vxdraw,
 };
-use cgmath::*;
 use benchmarker::Benchmarker;
+use cgmath::*;
 use geometry::{boxit::Boxit, cam::Camera, grid2d::Grid, vec::Vec2};
 use glium::{
     self,
@@ -14,9 +13,33 @@ use glium::{
 use input::Input;
 use logger::{debug, info, InDebug, Logger};
 use std::time::Instant;
+use winit::*;
 
 fn initialize_grid(s: &mut Grid<u8>) {
     s.resize(1000, 1000);
+}
+
+pub fn collect_input_vk(client: &mut Client) {
+    if let Some(ref mut windowing) = client.windowing {
+        for event in super::vxdraw::collect_input(windowing) {
+            match event {
+                Event::WindowEvent {
+                    window_id,
+                    event: WindowEvent::KeyboardInput { device_id, input },
+                } => {
+                    if let Some(keycode) = input.virtual_keycode {
+                        match keycode {
+                            VirtualKeyCode::Escape => {
+                                client.should_exit = true;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 pub fn collect_input(client: &mut Client) {
@@ -457,25 +480,37 @@ pub fn entry_point_client_vulkan(s: &mut Main) {
             .push(render_polygon::create_render_polygon(&client.display));
 
         client.logger.set_log_level(196);
-        let tex = vxdraw::strtex::push_texture(&mut s.windowing.as_mut().unwrap(), 1000, 1000, &mut client.logger);
-        vxdraw::strtex::generate_map2(&mut s.windowing.as_mut().unwrap(), &tex, [1.0, 2.0, 4.0]);
-        vxdraw::strtex::push_sprite(&mut s.windowing.as_mut().unwrap(), &tex, vxdraw::strtex::Sprite {
-            width: 100.0,
-            height: 100.0,
-            ..vxdraw::strtex::Sprite::default()
-        });
-        vxdraw::quads::push(&mut s.windowing.as_mut().unwrap(), vxdraw::quads::Quad { colors: [(255, 0, 0, 255); 4], width: 20.3, height: 20.3,..vxdraw::quads::Quad::default()});
+        let tex = vxdraw::strtex::push_texture(
+            &mut client.windowing.as_mut().unwrap(),
+            1000,
+            1000,
+            &mut client.logger,
+        );
+        vxdraw::strtex::generate_map2(
+            &mut client.windowing.as_mut().unwrap(),
+            &tex,
+            [1.0, 2.0, 4.0],
+        );
+        vxdraw::strtex::push_sprite(
+            &mut client.windowing.as_mut().unwrap(),
+            &tex,
+            vxdraw::strtex::Sprite {
+                width: 100.0,
+                height: 100.0,
+                ..vxdraw::strtex::Sprite::default()
+            },
+        );
+        vxdraw::quads::push(
+            &mut client.windowing.as_mut().unwrap(),
+            vxdraw::quads::Quad {
+                colors: [(255, 0, 0, 255); 4],
+                width: 20.3,
+                height: 20.3,
+                ..vxdraw::quads::Quad::default()
+            },
+        );
         // vxdraw::debtri::push(&mut s.windowing.as_mut().unwrap(), vxdraw::debtri::DebugTriangle::default());
         loop {
-            if let Some(ref mut windowing) = s.windowing {
-                let persp = super::vxdraw::utils::gen_perspective(windowing);
-                let scale = Matrix4::from_scale(client.game.cam.zoom);
-                let center = client.game.cam.center;
-                // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
-                let trans = Matrix4::from_translation(Vector3::new(-center.x / 1000.0, center.y / 1000.0, 0.0));
-                // info![client.logger, "main", "Okay wth"; "trans" => InDebug(&trans); clone trans];
-                super::vxdraw::draw_frame(windowing, &mut client.logger, &(persp * trans * scale));
-            }
             s.time = Instant::now();
             let xform = if let Some(ref mut rx) = s.config_change_recv {
                 match rx.try_recv() {
@@ -504,7 +539,7 @@ fn client_tick_vulkan(s: &mut Client) {
     s.logic_benchmarker.start();
     // ---
 
-    collect_input(s);
+    collect_input_vk(s);
     toggle_camera_mode(s);
     let movement = move_player_according_to_input(&s.input);
     check_for_collision_and_move_players_according_to_movement_vector(
@@ -532,6 +567,17 @@ fn client_tick_vulkan(s: &mut Client) {
     // ---
     s.drawing_benchmarker.start();
     // ---
+
+    if let Some(ref mut windowing) = s.windowing {
+        let persp = super::vxdraw::utils::gen_perspective(windowing);
+        let scale = Matrix4::from_scale(s.game.cam.zoom);
+        let center = s.game.cam.center;
+        // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
+        let trans =
+            Matrix4::from_translation(Vector3::new(-center.x / 1000.0, center.y / 1000.0, 0.0));
+        // info![client.logger, "main", "Okay wth"; "trans" => InDebug(&trans); clone trans];
+        super::vxdraw::draw_frame(windowing, &mut s.logger, &(persp * trans * scale));
+    }
 
     // ---
     stop_benchmark(

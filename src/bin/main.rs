@@ -58,6 +58,7 @@ fn run_client_or_server(s: &mut glocals::Main) {
             audio: rodio::Sink::new(&rodio::default_output_device().unwrap()),
             logic_benchmarker: Benchmarker::new(99),
             drawing_benchmarker: Benchmarker::new(99),
+            windowing: None,
         };
         s.client = Some(client);
         mediators::client::entry_point_client(s);
@@ -65,12 +66,12 @@ fn run_client_or_server(s: &mut glocals::Main) {
         let mut logger = logger::Logger::spawn();
         logger.set_colorize(true);
         logger.set_context_specific_log_level("benchmark", 0);
-        s.windowing = Some(init_window_with_vulkan(&mut logger, ShowWindow::Enable));
         if let Some(game_shell) = crate::mediators::game_shell::spawn(logger.clone()) {
             s.threads.game_shell = Some(game_shell.0);
             s.threads.game_shell_keep_running = Some(game_shell.1);
         }
         let client = Client {
+            windowing: Some(init_window_with_vulkan(&mut logger, ShowWindow::Enable)),
             logger,
             should_exit: false,
             game: Game::default(),

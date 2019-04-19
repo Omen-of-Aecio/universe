@@ -1253,7 +1253,7 @@ mod tests {
         logger.set_log_level(64);
 
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
 
@@ -1285,7 +1285,7 @@ mod tests {
     fn simple_triangle() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
         let tri = DebugTriangle::default();
 
         debtri::push(&mut windowing, tri);
@@ -1300,7 +1300,7 @@ mod tests {
     fn simple_quad() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         let mut quad = Quad::default();
         quad.colors[0].1 = 255;
@@ -1315,7 +1315,7 @@ mod tests {
     fn simple_triangle_change_color() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
         let tri = DebugTriangle::default();
 
         let idx = debtri::push(&mut windowing, tri);
@@ -1330,7 +1330,7 @@ mod tests {
     fn debug_triangle_corners_widescreen() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         for i in [-1f32, 1f32].iter() {
             for j in [-1f32, 1f32].iter() {
@@ -1349,7 +1349,7 @@ mod tests {
     fn debug_triangle_corners_tallscreen() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1x2k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         for i in [-1f32, 1f32].iter() {
             for j in [-1f32, 1f32].iter() {
@@ -1368,7 +1368,7 @@ mod tests {
     fn circle_of_triangles() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         for i in 0..360 {
             let mut tri = DebugTriangle::default();
@@ -1386,7 +1386,7 @@ mod tests {
     fn triangle_in_corner() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         let mut tri = DebugTriangle::default();
         tri.scale = 0.1f32;
@@ -1408,7 +1408,7 @@ mod tests {
     fn a_bunch_of_quads() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         let mut topright = DebugTriangle::from([-1.0, -1.0, 1.0, 1.0, 1.0, -1.0]);
         let mut bottomleft = DebugTriangle::from([-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]);
@@ -1436,7 +1436,7 @@ mod tests {
     fn overlapping_quads_respect_z_order() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
         let mut quad = Quad {
             scale: 0.5,
             ..Quad::default()
@@ -1487,7 +1487,7 @@ mod tests {
     fn overlapping_dyntex_respect_z_order() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         let tree = add_texture(&mut windowing, TREE, TextureOptions::default());
         let logo = add_texture(&mut windowing, LOGO, TextureOptions::default());
@@ -1537,7 +1537,7 @@ mod tests {
     fn windmills() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         add_windmills(&mut windowing, false);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
@@ -1549,7 +1549,7 @@ mod tests {
     fn windmills_ignore_perspective() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         add_windmills(&mut windowing, false);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
@@ -1561,7 +1561,7 @@ mod tests {
     fn windmills_change_color() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         let handles = add_windmills(&mut windowing, false);
         debtri::set_color(&mut windowing, &handles[0], [255, 0, 0, 255]);
@@ -1578,7 +1578,7 @@ mod tests {
     fn tearing_test() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         let _tri = make_centered_equilateral_triangle();
         debtri::push(&mut windowing, DebugTriangle::default());
@@ -1602,7 +1602,7 @@ mod tests {
         let tex = add_texture(&mut windowing, LOGO, TextureOptions::default());
         add_sprite(&mut windowing, Sprite::default(), &tex);
 
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         assert_swapchain_eq(&mut windowing, "simple_texture", img);
     }
@@ -1614,7 +1614,7 @@ mod tests {
         let tex = add_texture(&mut windowing, LOGO, TextureOptions::default());
         add_sprite(&mut windowing, Sprite::default(), &tex);
 
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         assert_swapchain_eq(&mut windowing, "simple_texture_adheres_to_view", img);
     }
@@ -1638,7 +1638,7 @@ mod tests {
             &tex,
         );
 
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         assert_swapchain_eq(&mut windowing, "colored_simple_texture", img);
     }
@@ -1700,7 +1700,7 @@ mod tests {
         );
         sprite_translate_all(&mut windowing, &tex, (0.25, 0.35));
 
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         assert_swapchain_eq(&mut windowing, "translated_texture", img);
     }
@@ -1762,7 +1762,7 @@ mod tests {
         );
         sprite_rotate_all(&mut windowing, &tex, Deg(90.0));
 
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         assert_swapchain_eq(&mut windowing, "rotated_texture", img);
     }
@@ -1772,20 +1772,20 @@ mod tests {
         let mut logger = Logger::spawn_void();
         {
             let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-            assert_eq![Matrix4::identity(), gen_perspective(&mut windowing)];
+            assert_eq![Matrix4::identity(), gen_perspective(&windowing)];
         }
         {
             let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1x2k);
             assert_eq![
                 Matrix4::from_nonuniform_scale(1.0, 0.5, 1.0),
-                gen_perspective(&mut windowing)
+                gen_perspective(&windowing)
             ];
         }
         {
             let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
             assert_eq![
                 Matrix4::from_nonuniform_scale(0.5, 1.0, 1.0),
-                gen_perspective(&mut windowing)
+                gen_perspective(&windowing)
             ];
         }
     }
@@ -1814,7 +1814,7 @@ mod tests {
             );
         }
 
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         assert_swapchain_eq(&mut windowing, "many_sprites", img);
     }
@@ -1823,7 +1823,7 @@ mod tests {
     fn rotating_windmills_drawing_invariant() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         add_windmills(&mut windowing, false);
         for _ in 0..30 {
@@ -1847,7 +1847,7 @@ mod tests {
     fn windmills_given_initial_rotation() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         add_windmills(&mut windowing, true);
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
@@ -1858,7 +1858,7 @@ mod tests {
     fn streaming_texture_blocks() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         let id = add_streaming_texture(&mut windowing, 1000, 1000, &mut logger);
         streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
@@ -1900,7 +1900,7 @@ mod tests {
     fn streaming_texture_blocks_off_by_one() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         let id = add_streaming_texture(&mut windowing, 10, 1, &mut logger);
         streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);
@@ -2006,7 +2006,7 @@ mod tests {
     fn three_layer_scene() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         let options = TextureOptions {
             depth_test: false,
@@ -2043,7 +2043,7 @@ mod tests {
     fn streaming_texture_respects_z_ordering() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         let strtex1 = add_streaming_texture(&mut windowing, 10, 10, &mut logger);
         strtex::streaming_texture_set_pixels_block(
@@ -2095,7 +2095,7 @@ mod tests {
             );
         }
 
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
         b.iter(|| {
             draw_frame(&mut windowing, &mut logger, &prspect);
         });
@@ -2124,7 +2124,7 @@ mod tests {
             );
         }
 
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
         b.iter(|| {
             draw_frame(&mut windowing, &mut logger, &prspect);
         });
@@ -2134,7 +2134,7 @@ mod tests {
     fn bench_simple_triangle(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         debtri::push(&mut windowing, DebugTriangle::default());
         add_4_screencorners(&mut windowing);
@@ -2148,7 +2148,7 @@ mod tests {
     fn bench_still_windmills(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         add_windmills(&mut windowing, false);
 
@@ -2173,7 +2173,7 @@ mod tests {
     fn bench_rotating_windmills(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         add_windmills(&mut windowing, false);
 
@@ -2199,7 +2199,7 @@ mod tests {
     fn clears_per_second(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         b.iter(|| {
             draw_frame(&mut windowing, &mut logger, &prspect);
@@ -2257,7 +2257,7 @@ mod tests {
     fn bench_streaming_texture_set_single_pixel_while_drawing(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&mut windowing);
+        let prspect = gen_perspective(&windowing);
 
         let id = add_streaming_texture(&mut windowing, 50, 50, &mut logger);
         streaming_texture_add_sprite(&mut windowing, strtex::Sprite::default(), id);

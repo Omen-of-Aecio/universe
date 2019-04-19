@@ -291,7 +291,7 @@ pub fn make_centered_equilateral_triangle() -> [f32; 6] {
     tri
 }
 
-pub fn gen_perspective(s: &mut Windowing) -> Matrix4<f32> {
+pub fn gen_perspective(s: &Windowing) -> Matrix4<f32> {
     let size = s.swapconfig.extent;
     let w_over_h = size.width as f32 / size.height as f32;
     let h_over_w = size.height as f32 / size.width as f32;

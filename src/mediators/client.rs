@@ -7,33 +7,65 @@ use cgmath::*;
 use geometry::{boxit::Boxit, cam::Camera, grid2d::Grid, vec::Vec2};
 use glium::{
     self,
-    glutin::{self, MouseScrollDelta, VirtualKeyCode as Key},
+    glutin::{self, MouseScrollDelta},
     Surface,
 };
 use input::Input;
 use logger::{debug, info, InDebug, Logger};
 use std::time::Instant;
-use winit::*;
+use winit::{VirtualKeyCode as Key, *};
 
 fn initialize_grid(s: &mut Grid<u8>) {
     s.resize(1000, 1000);
 }
 
+    // CursorMoved {
+    //     device_id: DeviceId,
+
+    //     /// (x,y) coords in pixels relative to the top-left corner of the window. Because the range of this data is
+    //     /// limited by the display area and it may have been transformed by the OS to implement effects such as cursor
+    //     /// acceleration, it should not be used to implement non-cursor-like interactions such as 3D camera control.
+    //     position: LogicalPosition,
+    //     modifiers: ModifiersState
+    // },
+
+    // /// The cursor has entered the window.
+    // CursorEntered { device_id: DeviceId },
+
+    // /// The cursor has left the window.
+    // CursorLeft { device_id: DeviceId },
+
+    // /// A mouse wheel movement or touchpad scroll occurred.
+    // MouseWheel { device_id: DeviceId, delta: MouseScrollDelta, phase: TouchPhase, modifiers: ModifiersState },
 pub fn collect_input_vk(client: &mut Client) {
     if let Some(ref mut windowing) = client.windowing {
         for event in super::vxdraw::collect_input(windowing) {
             match event {
-                Event::WindowEvent {
-                    window_id,
-                    event: WindowEvent::KeyboardInput { device_id, input },
-                } => {
-                    if let Some(keycode) = input.virtual_keycode {
-                        match keycode {
-                            VirtualKeyCode::Escape => {
-                                client.should_exit = true;
+                Event::WindowEvent { window_id, event } => {
+                    match event {
+                        WindowEvent::KeyboardInput { device_id, input } => {
+                            if let Some(keycode) = input.virtual_keycode {
+                                match keycode {
+                                    VirtualKeyCode::Escape => {
+                                        client.should_exit = true;
+                                    }
+                                    _ => {
+                                    }
+                                }
                             }
-                            _ => {}
                         }
+                        WindowEvent::MouseWheel { device_id, delta, phase, modifiers } => {
+                            match delta {
+                                winit::MouseScrollDelta::LineDelta(_, v) => {
+                                    client.input.register_mouse_wheel(v);
+                                }
+                                _ => {}
+                            }
+                        }
+                        // WindowEvent::CursorMoved { device_id, position, modifiers } => {
+                        //     client.input.register_mouse_input(state, button);
+                        // }
+                        _ => {}
                     }
                 }
                 _ => {}
@@ -49,14 +81,14 @@ pub fn collect_input(client: &mut Client) {
             glutin::Event::Closed => {
                 client.should_exit = true;
             }
-            glutin::Event::MouseMoved(x, y) => client.input.position_mouse(x, y),
+            // glutin::Event::MouseMoved(x, y) => client.input.position_mouse(x, y),
             glutin::Event::MouseWheel(MouseScrollDelta::LineDelta(_, y), _) => {
-                client.input.register_mouse_wheel(y)
+                // client.input.register_mouse_wheel(y)
             }
             glutin::Event::MouseInput(state, button) => {
-                client.input.register_mouse_input(state, button)
+                // client.input.register_mouse_input(state, button)
             }
-            glutin::Event::KeyboardInput(_, _, _) => client.input.register_key(&ev),
+            // glutin::Event::KeyboardInput(_, _, _) => client.input.register_key(&ev),
             glutin::Event::Resized(w, h) => {
                 client.game.cam.width = w;
                 client.game.cam.height = h;
@@ -455,29 +487,9 @@ fn client_tick(s: &mut Client) {
 }
 
 pub fn entry_point_client_vulkan(s: &mut Main) {
-    // play_song(s);
     if let Some(ref mut client) = s.client {
         client.logger.info("cli", "Creating grid");
-        initialize_grid(&mut client.game.grid);
         client.game.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
-        random_map_generator::proc1(&mut client.game.grid, &client.display);
-        create_black_square_around_player(&mut client.game.grid);
-        // let size = s.game.grid.get_size();
-        // for i in 0 .. size.0 {
-        //     *s.game.grid.get_mut(i, 800).unwrap() = 255;
-        //     *s.game.grid.get_mut(i, 0).unwrap() = 255;
-        //     *s.game.grid.get_mut(40, i).unwrap() = 255;
-        //     *s.game.grid.get_mut(600, i).unwrap() = 255;
-        // }
-        // *s.game.grid.get_mut(100, 1).unwrap() = 255;
-        client.game.grid_render = Some(render_grid::create_grid_u8_render_data(
-            &client.display,
-            &client.game.grid,
-        ));
-        client
-            .game
-            .players
-            .push(render_polygon::create_render_polygon(&client.display));
 
         client.logger.set_log_level(196);
         let tex = vxdraw::strtex::push_texture(
@@ -509,7 +521,6 @@ pub fn entry_point_client_vulkan(s: &mut Main) {
                 ..vxdraw::quads::Quad::default()
             },
         );
-        // vxdraw::debtri::push(&mut s.windowing.as_mut().unwrap(), vxdraw::debtri::DebugTriangle::default());
         loop {
             s.time = Instant::now();
             let xform = if let Some(ref mut rx) = s.config_change_recv {

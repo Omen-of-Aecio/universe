@@ -1,6 +1,4 @@
-use glium::glutin;
-use glium::glutin::Event::KeyboardInput;
-use glium::glutin::{ElementState, MouseButton, VirtualKeyCode as KeyCode};
+use winit::*;
 
 const NUM_KEYS: usize = 150;
 struct Keys([bool; NUM_KEYS]);
@@ -32,14 +30,14 @@ impl Input {
         self.mouse_in_previous_frame.1 = self.mouse.1;
     }
 
-    pub fn register_key(&mut self, input: &glutin::Event) {
+    pub fn register_key(&mut self, input: &Event) {
         match *input {
-            KeyboardInput(ElementState::Pressed, _, Some(keycode)) => {
-                self.register_key_down(keycode)
-            }
-            KeyboardInput(ElementState::Released, _, Some(keycode)) => {
-                self.register_key_up(keycode)
-            }
+            // KeyboardInput(ElementState::Pressed, _, Some(keycode)) => {
+            //     self.register_key_down(keycode)
+            // }
+            // KeyboardInput(ElementState::Released, _, Some(keycode)) => {
+            //     self.register_key_up(keycode)
+            // }
             _ => (), // Do nothing. Should probably log the error.
         }
     }
@@ -64,15 +62,15 @@ impl Input {
 
     // ---
 
-    pub fn is_key_down(&self, keycode: KeyCode) -> bool {
+    pub fn is_key_down(&self, keycode: VirtualKeyCode) -> bool {
         self.key_down.0[keycode as usize]
     }
 
-    pub fn is_key_toggled(&self, keycode: KeyCode) -> bool {
+    pub fn is_key_toggled(&self, keycode: VirtualKeyCode) -> bool {
         self.key_toggled.0[keycode as usize]
     }
 
-    pub fn is_key_toggled_down(&self, keycode: KeyCode) -> bool {
+    pub fn is_key_toggled_down(&self, keycode: VirtualKeyCode) -> bool {
         self.is_key_down(keycode) && self.is_key_toggled(keycode)
     }
 
@@ -97,7 +95,7 @@ impl Input {
 
     // ---
 
-    pub fn register_key_down(&mut self, keycode: KeyCode) {
+    pub fn register_key_down(&mut self, keycode: VirtualKeyCode) {
         let keycode = keycode as usize;
         if !self.key_down.0[keycode] {
             self.key_toggled.0[keycode] = true;
@@ -105,7 +103,7 @@ impl Input {
         self.key_down.0[keycode] = true;
     }
 
-    pub fn register_key_up(&mut self, keycode: KeyCode) {
+    pub fn register_key_up(&mut self, keycode: VirtualKeyCode) {
         let keycode = keycode as usize;
         if self.key_down.0[keycode] {
             self.key_toggled.0[keycode] = true;

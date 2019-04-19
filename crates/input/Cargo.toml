@@ -9,4 +9,4 @@ name = "input"
 path = "lib.rs"
 
 [dependencies]
-glium = "0.16.0"
+winit = "0.18.0"

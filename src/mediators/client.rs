@@ -11,7 +11,7 @@ use glium::{
     Surface,
 };
 use input::Input;
-use logger::{debug, Logger};
+use logger::{debug, info, InDebug, Logger};
 use std::time::Instant;
 use winit::{VirtualKeyCode as Key, *};
 
@@ -95,9 +95,9 @@ fn move_camera_according_to_input(s: &mut Client) {
 fn move_player_according_to_input(s: &Input) -> Vec2 {
     let (dx, dy);
     if s.is_key_down(Key::Up) {
-        dy = 1;
-    } else if s.is_key_down(Key::Down) {
         dy = -1;
+    } else if s.is_key_down(Key::Down) {
+        dy = 1;
     } else {
         dy = 0;
     }
@@ -163,6 +163,45 @@ fn check_player_collides_here(grid: &Grid<u8>, position: Vec2) -> bool {
             .map_or(false, |x| *x > 0)
 }
 
+fn check_for_collision_and_move_player_according_to_movement_vector_vk(
+    grid: &Grid<u8>,
+    player: &mut PlayerData,
+    movement: Vec2,
+) -> bool {
+    let tl = Vec2 {
+        x: player.position.x + 0.01,
+        y: player.position.y + 0.01,
+    };
+    let tr = Vec2 {
+        x: player.position.x + 9.99,
+        y: player.position.y + 0.01,
+    };
+    let bl = Vec2 {
+        x: player.position.x + 0.01,
+        y: player.position.y + 9.99,
+    };
+    let br = Vec2 {
+        x: player.position.x + 9.99,
+        y: player.position.y + 9.99,
+    };
+    let collision_point = do_lines_collide_with_grid(
+        grid,
+        &[
+            (tl, tl + movement),
+            (tr, tr + movement),
+            (bl, bl + movement),
+            (br, br + movement),
+        ],
+        |x| *x > 0,
+    );
+    if collision_point.is_none() {
+        player.position.x += movement.x as f32;
+        player.position.y += movement.y as f32;
+        return false;
+    }
+    true
+}
+
 fn check_for_collision_and_move_player_according_to_movement_vector(
     grid: &Grid<u8>,
     player: &mut PolygonRenderData,
@@ -210,6 +249,32 @@ fn check_for_collision_and_move_players_according_to_movement_vector(
     for player in players {
         let mut movement_current = movement;
         let collided = check_for_collision_and_move_player_according_to_movement_vector(
+            grid,
+            player,
+            movement_current,
+        );
+        if !collided {
+            break;
+        }
+        movement_current = Vec2 {
+            x: movement.x,
+            y: movement.y + 1.1f32,
+        };
+        let new_position = player.position + movement_current;
+        if !check_player_collides_here(grid, new_position) {
+            player.position += movement_current;
+        }
+    }
+}
+
+fn check_for_collision_and_move_players_according_to_movement_vector_vk(
+    grid: &Grid<u8>,
+    players: &mut [PlayerData],
+    movement: Vec2,
+) {
+    for player in players {
+        let mut movement_current = movement;
+        let collided = check_for_collision_and_move_player_according_to_movement_vector_vk(
             grid,
             player,
             movement_current,
@@ -462,6 +527,10 @@ pub fn entry_point_client_vulkan(s: &mut Main) {
         client.game.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
 
         client.logger.set_log_level(196);
+        client
+            .game
+            .players2
+            .push(PlayerData { position: Vec2 { x: 0.0, y: 0.0 } });
 
         let tex = vxdraw::strtex::push_texture(
             &mut client.windowing.as_mut().unwrap(),
@@ -487,17 +556,19 @@ pub fn entry_point_client_vulkan(s: &mut Main) {
             &mut client.windowing.as_mut().unwrap(),
             &tex,
             vxdraw::strtex::Sprite {
-                width: 100.0,
-                height: 100.0,
+                width: 1000.0,
+                height: 1000.0,
+                translation: (500.0, 500.0),
                 ..vxdraw::strtex::Sprite::default()
             },
         );
-        vxdraw::quads::push(
+        let handle = vxdraw::quads::push(
             &mut client.windowing.as_mut().unwrap(),
             vxdraw::quads::Quad {
                 colors: [(255, 0, 0, 255); 4],
-                width: 20.3,
-                height: 20.3,
+                width: 10.0,
+                height: 10.0,
+                origin: (-5.0, -5.0),
                 ..vxdraw::quads::Quad::default()
             },
         );
@@ -514,7 +585,7 @@ pub fn entry_point_client_vulkan(s: &mut Main) {
             if let Some(xform) = xform {
                 xform(&mut s.config);
             }
-            client_tick_vulkan(client);
+            client_tick_vulkan(client, &handle);
             if let Some(ref mut network) = s.network {
                 s.timers.network_timer.update(s.time, network);
             }
@@ -525,7 +596,14 @@ pub fn entry_point_client_vulkan(s: &mut Main) {
     }
 }
 
-fn client_tick_vulkan(s: &mut Client) {
+fn upload_player_position(s: &mut Client, handle: &vxdraw::quads::QuadHandle) {
+    let pos = s.game.players2[0].position;
+    if let Some(ref mut windowing) = s.windowing {
+        vxdraw::quads::set_position(windowing, handle, (pos.x, pos.y));
+    }
+}
+
+fn client_tick_vulkan(s: &mut Client, handle: &vxdraw::quads::QuadHandle) {
     // ---
     s.logic_benchmarker.start();
     // ---
@@ -533,9 +611,9 @@ fn client_tick_vulkan(s: &mut Client) {
     collect_input_vk(s);
     toggle_camera_mode(s);
     let movement = move_player_according_to_input(&s.input);
-    check_for_collision_and_move_players_according_to_movement_vector(
+    check_for_collision_and_move_players_according_to_movement_vector_vk(
         &s.game.grid,
-        &mut s.game.players,
+        &mut s.game.players2,
         movement,
     );
     move_camera_according_to_input(s);
@@ -546,6 +624,8 @@ fn client_tick_vulkan(s: &mut Client) {
     maybe_fire_bullets(s);
     update_bullets(&mut s.game.bullets);
     remove_bullets_outside_camera(&mut s.logger, &mut s.game.bullets, &s.game.cam);
+
+    upload_player_position(s, handle);
 
     // ---
     stop_benchmark(

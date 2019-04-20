@@ -210,11 +210,16 @@ pub struct Bullet {
     pub position: Vec2,
 }
 
+pub struct PlayerData {
+    pub position: Vec2,
+}
+
 #[derive(Default)]
 pub struct Game {
     pub grid: Grid<u8>,
     pub game_config: GameConfig,
     pub players: Vec<PolygonRenderData>,
+    pub players2: Vec<PlayerData>,
     pub bullets: Vec<Bullet>,
     pub cam: Camera,
     pub grid_render: Option<GridU8RenderData>,

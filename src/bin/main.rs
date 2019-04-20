@@ -1,7 +1,6 @@
 use benchmarker::Benchmarker;
 use clap::crate_authors;
 use clap::{App, Arg};
-use glium::{glutin, DisplayBuild};
 use input;
 use rodio;
 use std::net::TcpStream;
@@ -21,12 +20,6 @@ fn parse_command_line_arguments<'a>() -> clap::ArgMatches<'a> {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("vx")
-                .short("v")
-                .help("Use the new renderer")
-                .takes_value(false),
-        )
-        .arg(
             Arg::with_name("host")
                 .short("h")
                 .help("Host a server on a port")
@@ -37,32 +30,10 @@ fn parse_command_line_arguments<'a>() -> clap::ArgMatches<'a> {
 
 fn run_client_or_server(s: &mut glocals::Main) {
     let commandline = s.commandline.clone();
-    if let Some(_connect) = commandline.value_of("connect") {
-        let mut logger = logger::Logger::spawn();
-        logger.set_colorize(true);
-        logger.set_context_specific_log_level("benchmark", 0);
-        if let Some(game_shell) = crate::mediators::game_shell::spawn(logger.clone()) {
-            s.threads.game_shell = Some(game_shell.0);
-            s.threads.game_shell_keep_running = Some(game_shell.1);
-        }
-        let client = Client {
-            logger,
-            should_exit: false,
-            game: Game::default(),
-            display: glutin::WindowBuilder::new()
-                .with_dimensions(1024, 768)
-                .with_title("Universe")
-                .build_glium()
-                .unwrap(),
-            input: input::Input::default(),
-            audio: rodio::Sink::new(&rodio::default_output_device().unwrap()),
-            logic_benchmarker: Benchmarker::new(99),
-            drawing_benchmarker: Benchmarker::new(99),
-            windowing: None,
-        };
-        s.client = Some(client);
-        mediators::client::entry_point_client(s);
-    } else if commandline.is_present("vx") {
+    if let Some(_port) = commandline.value_of("host") {
+        s.server = Some(Server::default());
+        mediators::server::entry_point_server(s);
+    } else {
         let mut logger = logger::Logger::spawn();
         logger.set_colorize(true);
         logger.set_context_specific_log_level("benchmark", 0);
@@ -75,12 +46,6 @@ fn run_client_or_server(s: &mut glocals::Main) {
             logger,
             should_exit: false,
             game: Game::default(),
-            display: glutin::WindowBuilder::new()
-                .with_dimensions(1024, 768)
-                .with_title("Universe")
-                .with_visibility(false)
-                .build_glium()
-                .unwrap(),
             input: input::Input::default(),
             audio: rodio::Sink::new(&rodio::default_output_device().unwrap()),
             logic_benchmarker: Benchmarker::new(99),
@@ -88,9 +53,6 @@ fn run_client_or_server(s: &mut glocals::Main) {
         };
         s.client = Some(client);
         mediators::client::entry_point_client_vulkan(s);
-    } else if let Some(_port) = commandline.value_of("host") {
-        s.server = Some(Server::default());
-        mediators::server::entry_point_server(s);
     }
 }
 

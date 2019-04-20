@@ -1,8 +1,6 @@
 use benchmarker::Benchmarker;
 use clap;
 use geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
-pub use glium::uniforms::{MagnifySamplerFilter, MinifySamplerFilter};
-use glium::{implement_vertex, texture::Texture2d};
 use input;
 use ketimer::WeakTimer;
 use logger::Logger;
@@ -117,7 +115,6 @@ pub struct Client {
     pub should_exit: bool,
     pub game: Game,
     pub input: input::Input,
-    pub display: glium::Display,
     pub audio: rodio::Sink,
     pub logic_benchmarker: Benchmarker,
     pub drawing_benchmarker: Benchmarker,
@@ -205,7 +202,6 @@ pub struct ServerConfig {
 }
 
 pub struct Bullet {
-    pub render: PolygonRenderData,
     pub direction: Vec2,
     pub position: Vec2,
 }
@@ -218,11 +214,9 @@ pub struct PlayerData {
 pub struct Game {
     pub grid: Grid<u8>,
     pub game_config: GameConfig,
-    pub players: Vec<PolygonRenderData>,
     pub players2: Vec<PlayerData>,
     pub bullets: Vec<Bullet>,
     pub cam: Camera,
-    pub grid_render: Option<GridU8RenderData>,
     pub you: u32,
 
     pub white_base: Vec2,
@@ -241,27 +235,6 @@ pub enum CameraMode {
     FollowPlayer,
 }
 
-pub struct GridU8RenderData {
-    pub net_width: usize,
-    pub net_height: usize,
-
-    pub shader_prg: glium::Program,
-    pub quad_vbo: glium::VertexBuffer<Vertex>,
-    pub texture: Texture2d,
-
-    pub bg_col: [f32; 3],
-    pub minify_filter: MinifySamplerFilter,
-    pub magnify_filter: MagnifySamplerFilter,
-    pub smooth: bool,
-}
-
-pub struct PolygonRenderData {
-    pub prg: glium::Program,
-    pub vertex_buffer: glium::VertexBuffer<Vertex>,
-    pub position: Vec2,
-    pub velocity: Vec2,
-}
-
 // ---
 
 impl Default for CameraMode {
@@ -274,5 +247,3 @@ impl Default for CameraMode {
 pub struct Vertex {
     pub pos: [f32; 2],
 }
-
-implement_vertex!(Vertex, pos);

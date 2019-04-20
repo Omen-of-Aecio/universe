@@ -25,7 +25,6 @@ gfx-backend-metal = { version = "0.1", optional = true }
 gfx-backend-vulkan = { version = "0.1", optional = true }
 gfx-hal = "0.1"
 gfx_window_sdl = "0.8"
-glium = "0.16.0"
 glutin = { version = "0.19", optional = true }
 glsl-to-spirv = "0.1.4"
 honggfuzz = "0.5"

@@ -16,6 +16,12 @@ where
         Grid::default()
     }
 
+    pub fn set(&mut self, x: usize, y: usize, value: T) {
+        if x < self.width && y < self.height {
+            self.grid_data[x + y * self.width] = value;
+        }
+    }
+
     pub fn get(&self, x: usize, y: usize) -> Option<&T> {
         if x < self.width && y < self.height {
             Some(&self.grid_data[x + y * self.width])

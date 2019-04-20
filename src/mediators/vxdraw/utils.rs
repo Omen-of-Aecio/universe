@@ -510,6 +510,16 @@ pub struct AlignResult {
     pub index_offset: usize,
 }
 pub fn perfect_mapping_alignment(align: Align) -> AlignResult {
+    struct Alignment(pub u64);
+    fn align_top(alignment: Alignment, value: u64) -> u64 {
+        if value % alignment.0 != 0 {
+            let alig = value + (alignment.0 - value % alignment.0);
+            assert![alig % alignment.0 == 0];
+            alig
+        } else {
+            value
+        }
+    }
     let begin = align.access_offset - align.access_offset % align.non_coherent_atom_size;
     let end = align_top(
         Alignment(align.non_coherent_atom_size),
@@ -520,16 +530,6 @@ pub fn perfect_mapping_alignment(align: Align) -> AlignResult {
         begin,
         end,
         index_offset,
-    }
-}
-pub struct Alignment(pub u64);
-pub fn align_top(alignment: Alignment, value: u64) -> u64 {
-    if value % alignment.0 != 0 {
-        let alig = value + (alignment.0 - value % alignment.0);
-        assert![alig % alignment.0 == 0];
-        alig
-    } else {
-        value
     }
 }
 

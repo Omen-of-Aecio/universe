@@ -502,6 +502,51 @@ pub fn translate(s: &mut Windowing, handle: &QuadHandle, movement: (f32, f32)) {
     }
 }
 
+pub fn set_position(s: &mut Windowing, handle: &QuadHandle, position: (f32, f32)) {
+    let device = &s.device;
+    if let Some(ref mut quads) = s.quads {
+        unsafe {
+            let aligned = perfect_mapping_alignment(Align {
+                access_offset: handle.0 as u64 * QUAD_BYTE_SIZE as u64,
+                how_many_bytes_you_need: QUAD_BYTE_SIZE as u64,
+                non_coherent_atom_size: s.device_limits.non_coherent_atom_size as u64,
+                memory_size: quads.memory_requirements.size,
+            });
+
+            device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+
+            let mut data_target = device
+                .acquire_mapping_writer::<u8>(&quads.quads_memory, aligned.begin..aligned.end)
+                .expect("Failed to acquire a memory writer!");
+
+            let mut idx = aligned.index_offset;
+            let x = &transmute::<f32, [u8; 4]>(position.0);
+            let y = &transmute::<f32, [u8; 4]>(position.1);
+            data_target[idx + 16..idx + 20].copy_from_slice(x);
+            data_target[idx + 20..idx + 24].copy_from_slice(y);
+            idx += BYTES_PER_VTX;
+            data_target[idx + 16..idx + 20].copy_from_slice(x);
+            data_target[idx + 20..idx + 24].copy_from_slice(y);
+            idx += BYTES_PER_VTX;
+            data_target[idx + 16..idx + 20].copy_from_slice(x);
+            data_target[idx + 20..idx + 24].copy_from_slice(y);
+            idx += BYTES_PER_VTX;
+            data_target[idx + 16..idx + 20].copy_from_slice(x);
+            data_target[idx + 20..idx + 24].copy_from_slice(y);
+
+            device
+                .release_mapping_writer(data_target)
+                .expect("Couldn't release the mapping writer!");
+        }
+    }
+}
+
 pub fn quad_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
     let device = &s.device;
     if let Some(ref mut quads) = s.quads {
@@ -619,6 +664,33 @@ mod tests {
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         utils::assert_swapchain_eq(&mut windowing, "simple_quad_translated", img);
+    }
+
+    #[test]
+    fn simple_quad_set_position() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let mut quad = quads::Quad::default();
+        quad.colors[0].1 = 255;
+        quad.colors[3].1 = 255;
+
+        let handle = quads::push(&mut windowing, quad);
+
+        // when
+        quads::set_position(&mut windowing, &handle, (0.25, 0.4));
+
+        // then
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        utils::assert_swapchain_eq(&mut windowing, "simple_quad_set_position", img);
+
+        // when
+        quads::set_position(&mut windowing, &handle, (0.25, 0.4));
+
+        // then
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        utils::assert_swapchain_eq(&mut windowing, "simple_quad_set_position", img);
     }
 
     #[test]

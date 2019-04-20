@@ -11,7 +11,7 @@ use glium::{
     Surface,
 };
 use input::Input;
-use logger::{debug, info, InDebug, Logger};
+use logger::{debug, Logger};
 use std::time::Instant;
 use winit::{VirtualKeyCode as Key, *};
 
@@ -23,16 +23,11 @@ pub fn collect_input_vk(client: &mut Client) {
     if let Some(ref mut windowing) = client.windowing {
         for event in super::vxdraw::collect_input(windowing) {
             match event {
-                Event::WindowEvent { window_id, event } => match event {
-                    WindowEvent::KeyboardInput { device_id, input } => {
+                Event::WindowEvent { event, .. } => match event {
+                    WindowEvent::KeyboardInput { input, .. } => {
                         client.input.register_key(&input);
                     }
-                    WindowEvent::MouseWheel {
-                        device_id,
-                        delta,
-                        phase,
-                        modifiers,
-                    } => match delta {
+                    WindowEvent::MouseWheel { delta, .. } => match delta {
                         winit::MouseScrollDelta::LineDelta(_, v) => {
                             client.input.register_mouse_wheel(v);
                         }

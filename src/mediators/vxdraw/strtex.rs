@@ -776,6 +776,37 @@ pub fn streaming_texture_set_pixel(
     }
 }
 
+pub fn read(
+    s: &mut Windowing,
+    id: &TextureHandle,
+    mut map: impl FnMut(&[(u8, u8, u8, u8)], usize),
+) {
+    if let Some(ref strtex) = s.strtexs.get(id.0) {
+        unsafe {
+            let subres = s.device.get_image_subresource_footprint(
+                &*strtex.image_buffer,
+                gfx_hal::image::Subresource {
+                    aspects: gfx_hal::format::Aspects::COLOR,
+                    level: 0,
+                    layer: 0,
+                },
+            );
+
+            let mut target = s
+                .device
+                .acquire_mapping_reader::<(u8, u8, u8, u8)>(
+                    &*strtex.image_memory,
+                    0..strtex.image_requirements.size,
+                )
+                .expect("unable to acquire mapping writer");
+
+            map(&target, (subres.row_pitch / 4) as usize);
+
+            s.device.release_mapping_reader(target);
+        }
+    }
+}
+
 pub fn generate_map2(s: &mut Windowing, blitid: &TextureHandle, seed: [f32; 3]) {
     static VERTEX_SOURCE: &str = include_str!("../../../shaders/proc1.vert");
     static FRAGMENT_SOURCE: &str = include_str!("../../../shaders/proc1.frag");

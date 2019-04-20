@@ -23,25 +23,26 @@ pub fn collect_input_vk(client: &mut Client) {
     if let Some(ref mut windowing) = client.windowing {
         for event in super::vxdraw::collect_input(windowing) {
             match event {
-                Event::WindowEvent { window_id, event } => {
-                    match event {
-                        WindowEvent::KeyboardInput { device_id, input } => {
-                            client.input.register_key(&input);
-                        }
-                        WindowEvent::MouseWheel { device_id, delta, phase, modifiers } => {
-                            match delta {
-                                winit::MouseScrollDelta::LineDelta(_, v) => {
-                                    client.input.register_mouse_wheel(v);
-                                }
-                                _ => {}
-                            }
-                        }
-                        WindowEvent::MouseInput { state, button, .. } => {
-                            client.input.register_mouse_input(state, button);
+                Event::WindowEvent { window_id, event } => match event {
+                    WindowEvent::KeyboardInput { device_id, input } => {
+                        client.input.register_key(&input);
+                    }
+                    WindowEvent::MouseWheel {
+                        device_id,
+                        delta,
+                        phase,
+                        modifiers,
+                    } => match delta {
+                        winit::MouseScrollDelta::LineDelta(_, v) => {
+                            client.input.register_mouse_wheel(v);
                         }
                         _ => {}
+                    },
+                    WindowEvent::MouseInput { state, button, .. } => {
+                        client.input.register_mouse_input(state, button);
                     }
-                }
+                    _ => {}
+                },
                 _ => {}
             }
         }
@@ -466,17 +467,27 @@ pub fn entry_point_client_vulkan(s: &mut Main) {
         client.game.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
 
         client.logger.set_log_level(196);
+
         let tex = vxdraw::strtex::push_texture(
             &mut client.windowing.as_mut().unwrap(),
             1000,
             1000,
             &mut client.logger,
         );
+        client.game.grid.resize(1000, 1000);
         vxdraw::strtex::generate_map2(
             &mut client.windowing.as_mut().unwrap(),
             &tex,
             [1.0, 2.0, 4.0],
         );
+        let grid = &mut client.game.grid;
+        vxdraw::strtex::read(&mut client.windowing.as_mut().unwrap(), &tex, |x, pitch| {
+            for j in 0..1000 {
+                for i in 0..1000 {
+                    grid.set(i, j, x[i + j * pitch].0);
+                }
+            }
+        });
         vxdraw::strtex::push_sprite(
             &mut client.windowing.as_mut().unwrap(),
             &tex,
@@ -558,8 +569,7 @@ fn client_tick_vulkan(s: &mut Client) {
         let scale = Matrix4::from_scale(s.game.cam.zoom);
         let center = s.game.cam.center;
         // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
-        let trans =
-            Matrix4::from_translation(Vector3::new(-center.x / 10.0, center.y / 10.0, 0.0));
+        let trans = Matrix4::from_translation(Vector3::new(-center.x / 10.0, center.y / 10.0, 0.0));
         // info![client.logger, "main", "Okay wth"; "trans" => InDebug(&trans); clone trans];
         super::vxdraw::draw_frame(windowing, &mut s.logger, &(persp * scale * trans));
     }

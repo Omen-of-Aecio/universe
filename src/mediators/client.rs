@@ -83,10 +83,14 @@ fn move_camera_according_to_input(s: &mut Client) {
     }
     match s.input.get_mouse_wheel() {
         x if x > 0.0 => {
-            s.game.cam.zoom *= 1.1 / 1.0;
+            if s.game.cam.zoom < 5.0 {
+                s.game.cam.zoom *= 1.1;
+            }
         }
         x if x < 0.0 => {
-            s.game.cam.zoom *= 1.0 / 1.1;
+            if s.game.cam.zoom > 0.01 {
+                s.game.cam.zoom /= 1.1;
+            }
         }
         _ => {}
     }

@@ -156,6 +156,12 @@ impl From<(f32, f32)> for Vec2 {
     }
 }
 
+impl From<Vec2> for (f32, f32) {
+    fn from(point: Vec2) -> Self {
+        (point.x, point.y)
+    }
+}
+
 // ---
 
 #[cfg(test)]

@@ -26,6 +26,9 @@ pub struct Quad {
     pub translation: (f32, f32),
     pub rotation: f32,
     pub scale: f32,
+    /// Moves the origin of the quad to some point, for instance, you may want a corner of the quad
+    /// to be the origin. This affects rotation and translation of the quad.
+    pub origin: (f32, f32),
 }
 
 impl Default for Quad {
@@ -38,6 +41,7 @@ impl Default for Quad {
             translation: (0.0, 0.0),
             rotation: 0.0,
             scale: 1.0,
+            origin: (0.0, 0.0),
         }
     }
 }
@@ -75,10 +79,10 @@ pub fn push(s: &mut Windowing, quad: Quad) -> QuadHandle {
         let width = quad.width;
         let height = quad.height;
 
-        let topleft = (-width / 2f32, -height / 2f32, quad.depth);
-        let topright = (width / 2f32, -height / 2f32, quad.depth);
-        let bottomleft = (-width / 2f32, height / 2f32, quad.depth);
-        let bottomright = (width / 2f32, height / 2f32, quad.depth);
+        let topleft = (-width / 2f32 - quad.origin.0, -height / 2f32 - quad.origin.1, quad.depth);
+        let topright = (width / 2f32 - quad.origin.0, -height / 2f32 - quad.origin.1, quad.depth);
+        let bottomleft = (-width / 2f32 - quad.origin.0, height / 2f32 - quad.origin.1, quad.depth);
+        let bottomright = (width / 2f32 - quad.origin.0, height / 2f32 - quad.origin.1, quad.depth);
 
         unsafe {
             let mut data_target = device
@@ -566,7 +570,7 @@ pub fn quad_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
             let mut vertices = Vec::<f32>::with_capacity(quads.count);
             for i in 0..quads.count {
                 let idx = i * QUAD_BYTE_SIZE / size_of::<f32>();
-                let rotation = &data_reader[idx + 5..idx + 6];
+                let rotation = &data_reader[idx + 6..idx + 7];
                 vertices.push(rotation[0]);
             }
             device.release_mapping_reader(data_reader);
@@ -578,11 +582,11 @@ pub fn quad_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
             for (i, vert) in vertices.iter().enumerate() {
                 let mut idx = i * QUAD_BYTE_SIZE / size_of::<f32>();
                 data_target[idx + 6..idx + 7].copy_from_slice(&[*vert + deg.into().0]);
-                idx += 7;
+                idx += BYTES_PER_VTX / 4;
                 data_target[idx + 6..idx + 7].copy_from_slice(&[*vert + deg.into().0]);
-                idx += 7;
+                idx += BYTES_PER_VTX / 4;
                 data_target[idx + 6..idx + 7].copy_from_slice(&[*vert + deg.into().0]);
-                idx += 7;
+                idx += BYTES_PER_VTX / 4;
                 data_target[idx + 6..idx + 7].copy_from_slice(&[*vert + deg.into().0]);
             }
             device
@@ -632,6 +636,7 @@ pub fn set_quad_color(s: &mut Windowing, inst: &QuadHandle, rgba: [u8; 4]) {
 #[cfg(test)]
 mod tests {
     use crate::mediators::vxdraw::*;
+    use cgmath::Deg;
 
     #[test]
     fn simple_quad() {
@@ -667,30 +672,30 @@ mod tests {
     }
 
     #[test]
-    fn simple_quad_set_position() {
+    fn simple_quad_rotated_with_exotic_origin() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
         let prspect = gen_perspective(&windowing);
 
         let mut quad = quads::Quad::default();
+        quad.scale = 0.2;
+        quad.colors[0].0 = 255;
+        quad.colors[3].0 = 255;
+        let handle = quads::push(&mut windowing, quad);
+
+        let mut quad = quads::Quad::default();
+        quad.scale = 0.2;
+        quad.origin = (-1.0, -1.0);
         quad.colors[0].1 = 255;
         quad.colors[3].1 = 255;
-
         let handle = quads::push(&mut windowing, quad);
 
         // when
-        quads::set_position(&mut windowing, &handle, (0.25, 0.4));
+        quads::quad_rotate_all(&mut windowing, Deg(30.0));
 
         // then
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        utils::assert_swapchain_eq(&mut windowing, "simple_quad_set_position", img);
-
-        // when
-        quads::set_position(&mut windowing, &handle, (0.25, 0.4));
-
-        // then
-        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        utils::assert_swapchain_eq(&mut windowing, "simple_quad_set_position", img);
+        utils::assert_swapchain_eq(&mut windowing, "simple_quad_rotated_with_exotic_origin", img);
     }
 
     #[test]

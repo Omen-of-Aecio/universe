@@ -237,6 +237,8 @@ pub struct Game {
 
     pub cam_mode: CameraMode,
     pub bullets_handle: Option<crate::mediators::vxdraw::dyntex::TextureHandle>,
+
+    pub changed_tiles: Vec<(usize, usize)>,
 }
 
 /* Should go, together with some logic, to some camera module (?) */

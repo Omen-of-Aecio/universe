@@ -215,6 +215,10 @@ fn stop_benchmark(benchmarker: &mut Benchmarker, logger: &mut Logger<Log>, msg: 
     }
 }
 
+fn update_grid_texture(s: &mut Client) {
+
+}
+
 pub fn entry_point_client_vulkan(s: &mut Main) {
     if let Some(ref mut client) = s.client {
         client.logger.info("cli", "Creating grid");
@@ -274,6 +278,16 @@ pub fn entry_point_client_vulkan(s: &mut Main) {
         );
         client.game.bullets_handle = Some(fireballs);
         loop {
+            {
+                let grid = &client.game.grid;
+                let changeset = &client.game.changed_tiles;
+                vxdraw::strtex::write(&mut client.windowing.as_mut().unwrap(), &tex, |x, pitch| {
+                    for tile in changeset {
+                        x[tile.0 + tile.1 * pitch].1 = *grid.get(tile.0, tile.1).unwrap();
+                    }
+                });
+            }
+            client.game.changed_tiles.clear();
             s.time = Instant::now();
             let xform = if let Some(ref mut rx) = s.config_change_recv {
                 match rx.try_recv() {
@@ -375,6 +389,10 @@ fn update_bullets_uv(s: &mut Client) {
 
 fn update_bullets_position(s: &mut Client) {
     for b in s.game.bullets.iter_mut() {
+        if let Some(pos) = does_line_collide_with_grid(&s.game.grid, b.position, b.position + b.direction, |x| *x == 255) {
+            s.game.grid.set(pos.0, pos.1, 0);
+            s.game.changed_tiles.push(pos);
+        }
         b.position += b.direction;
         vxdraw::dyntex::set_position(
             s.windowing.as_mut().unwrap(),
@@ -401,6 +419,7 @@ fn client_tick_vulkan(s: &mut Client, handle: &vxdraw::quads::QuadHandle) {
 
     update_bullets_uv(s);
     update_bullets_position(s);
+
     fire_bullets(s);
 
     upload_player_position(s, handle);

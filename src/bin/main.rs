@@ -28,7 +28,7 @@ fn parse_command_line_arguments<'a>() -> clap::ArgMatches<'a> {
         .get_matches()
 }
 
-fn run_client_or_server(s: &mut glocals::Main) {
+fn run_game(s: &mut glocals::Main) {
     let commandline = s.commandline.clone();
     s.logger = logger::Logger::spawn();
     s.logger.set_colorize(true);
@@ -38,7 +38,7 @@ fn run_client_or_server(s: &mut glocals::Main) {
         s.threads.game_shell_keep_running = Some(game_shell.1);
     }
     s.windowing = Some(init_window_with_vulkan(&mut s.logger, ShowWindow::Enable));
-    mediators::client::entry_point_client_vulkan(s);
+    mediators::client::entry_point_client(s);
 }
 
 fn wait_for_threads_to_exit(s: glocals::Main) {
@@ -57,6 +57,6 @@ fn wait_for_threads_to_exit(s: glocals::Main) {
 fn main() {
     let mut s = glocals::Main::default();
     s.commandline = parse_command_line_arguments();
-    run_client_or_server(&mut s);
+    run_game(&mut s);
     wait_for_threads_to_exit(s);
 }

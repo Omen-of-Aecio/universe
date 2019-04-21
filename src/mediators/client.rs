@@ -213,9 +213,7 @@ fn stop_benchmark(benchmarker: &mut Benchmarker, logger: &mut Logger<Log>, msg: 
     }
 }
 
-fn update_grid_texture(s: &mut Logic) {}
-
-pub fn entry_point_client_vulkan(s: &mut Main) {
+pub fn entry_point_client(s: &mut Main) {
     s.logger.info("cli", "Creating grid");
     s.logic.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
     s.logic.cam.zoom = 0.01;
@@ -284,7 +282,7 @@ pub fn entry_point_client_vulkan(s: &mut Main) {
         }
         s.logic.changed_tiles.clear();
         s.time = Instant::now();
-        client_tick_vulkan(&mut s.logic, &handle, &mut s.logger);
+        tick_logic(&mut s.logic, &mut s.logger);
         s.timers.network_timer.update(s.time, &mut s.network);
         if s.logic.should_exit {
             break;
@@ -401,7 +399,7 @@ fn update_bullets_position(s: &mut Logic) {
     }
 }
 
-fn client_tick_vulkan(s: &mut Logic, handle: &vxdraw::quads::QuadHandle, logger: &mut Logger<Log>) {
+fn tick_logic(s: &mut Logic, logger: &mut Logger<Log>) {
     toggle_camera_mode(s);
     let movement = move_player_according_to_input(&s.input);
     check_for_collision_and_move_players_according_to_movement_vector(

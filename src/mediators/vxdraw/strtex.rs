@@ -807,6 +807,37 @@ pub fn read(
     }
 }
 
+pub fn write(
+    s: &mut Windowing,
+    id: &TextureHandle,
+    mut map: impl FnMut(&mut [(u8, u8, u8, u8)], usize),
+) {
+    if let Some(ref strtex) = s.strtexs.get(id.0) {
+        unsafe {
+            let subres = s.device.get_image_subresource_footprint(
+                &*strtex.image_buffer,
+                gfx_hal::image::Subresource {
+                    aspects: gfx_hal::format::Aspects::COLOR,
+                    level: 0,
+                    layer: 0,
+                },
+            );
+
+            let mut target = s
+                .device
+                .acquire_mapping_writer::<(u8, u8, u8, u8)>(
+                    &*strtex.image_memory,
+                    0..strtex.image_requirements.size,
+                )
+                .expect("unable to acquire mapping writer");
+
+            map(&mut target, (subres.row_pitch / 4) as usize);
+
+            s.device.release_mapping_writer(target);
+        }
+    }
+}
+
 pub fn generate_map2(s: &mut Windowing, blitid: &TextureHandle, seed: [f32; 3]) {
     static VERTEX_SOURCE: &str = include_str!("../../../shaders/proc1.vert");
     static FRAGMENT_SOURCE: &str = include_str!("../../../shaders/proc1.frag");
@@ -1305,6 +1336,25 @@ mod tests {
             green_value = arr[3 + 2 * pitch].1;
         });
         assert_eq![123, green_value];
+    }
+
+    #[test]
+    fn use_write() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+
+        let id = push_texture(&mut windowing, 10, 10, &mut logger);
+        strtex::streaming_texture_set_pixel(&mut windowing, &id, 3, 2, (0, 123, 0, 255));
+        let mut green_value = 0;
+        strtex::write(&mut windowing, &id, |arr, pitch| {
+            arr[3 + 2 * pitch].1 = 124;
+        });
+
+        let mut green_value = 0;
+        strtex::read(&mut windowing, &id, |arr, pitch| {
+            green_value = arr[3 + 2 * pitch].1;
+        });
+        assert_eq![124, green_value];
     }
 
     #[test]

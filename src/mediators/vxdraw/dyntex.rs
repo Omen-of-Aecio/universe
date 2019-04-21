@@ -905,6 +905,54 @@ pub fn set_uv(s: &mut Windowing, handle: &SpriteHandle, uv_begin: (f32, f32), uv
     }
 }
 
+pub fn set_uvs2<'a>(
+    s: &mut Windowing,
+    mut uvs: impl Iterator<Item = (&'a SpriteHandle, (f32, f32), (f32, f32))>,
+) {
+    if let Some(first) = uvs.next() {
+        if let Some(ref mut stex) = s.dyntexs.get((first.0).0) {
+            let device = &s.device;
+            let current_texture_handle = (first.0).0;
+            unsafe {
+                device
+                    .wait_for_fences(
+                        &s.frames_in_flight_fences,
+                        gfx_hal::device::WaitFor::All,
+                        u64::max_value(),
+                    )
+                    .expect("Unable to wait for fences");
+                let mut data_target = device
+                    .acquire_mapping_writer::<f32>(
+                        &stex.texture_vertex_memory,
+                        0..stex.texture_vertex_requirements.size,
+                    )
+                    .expect("Failed to acquire a memory writer!");
+                for handle in uvs {
+                    if (handle.0).0 != current_texture_handle {
+                        panic!["The texture handles of each sprite must be identical"];
+                    }
+                    if (handle.0).1 < stex.count as usize {
+                        let mut idx = ((handle.0).1 * 4 * 10) as usize;
+                        let uv_begin = handle.1;
+                        let uv_end = handle.2;
+
+                        data_target[idx + 3..idx + 5].copy_from_slice(&[uv_begin.0, uv_begin.1]);
+                        idx += 10;
+                        data_target[idx + 3..idx + 5].copy_from_slice(&[uv_begin.0, uv_end.1]);
+                        idx += 10;
+                        data_target[idx + 3..idx + 5].copy_from_slice(&[uv_end.0, uv_end.1]);
+                        idx += 10;
+                        data_target[idx + 3..idx + 5].copy_from_slice(&[uv_end.0, uv_begin.1]);
+                    }
+                }
+                device
+                    .release_mapping_writer(data_target)
+                    .expect("Couldn't release the mapping writer!");
+            }
+        }
+    }
+}
+
 pub fn set_uvs(
     s: &mut Windowing,
     handles: &[SpriteHandle],
@@ -1356,6 +1404,67 @@ mod tests {
                 &mut windowing,
                 &fireballs,
                 (0..fireballs.len()).map(|_| (uv_begin, uv_end)),
+            );
+            draw_frame(&mut windowing, &mut logger, &prspect);
+        });
+    }
+
+    #[bench]
+    fn animated_fireballs_20x20_uvs2(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let fireball_texture = push_texture(
+            &mut windowing,
+            FIREBALL,
+            TextureOptions {
+                depth_test: false,
+                ..TextureOptions::default()
+            },
+        );
+
+        let mut fireballs = vec![];
+        for idx in -10..10 {
+            for jdx in -10..10 {
+                fireballs.push(push_sprite(
+                    &mut windowing,
+                    &fireball_texture,
+                    Sprite {
+                        width: 0.68,
+                        height: 0.09,
+                        rotation: idx as f32 / 18.0 + jdx as f32 / 16.0,
+                        translation: (idx as f32 / 10.0, jdx as f32 / 10.0),
+                        ..Sprite::default()
+                    },
+                ));
+            }
+        }
+
+        let width_elems = 10;
+        let height_elems = 6;
+
+        let mut counter = 0;
+
+        b.iter(|| {
+            let width_elem = counter % width_elems;
+            let height_elem = counter / width_elems;
+            let uv_begin = (
+                width_elem as f32 / width_elems as f32,
+                height_elem as f32 / height_elems as f32,
+            );
+            let uv_end = (
+                (width_elem + 1) as f32 / width_elems as f32,
+                (height_elem + 1) as f32 / height_elems as f32,
+            );
+            counter += 1;
+            if counter > width_elems * height_elems {
+                counter = 0;
+            }
+
+            set_uvs2(
+                &mut windowing,
+                fireballs.iter().map(|id| (id, uv_begin, uv_end)),
             );
             draw_frame(&mut windowing, &mut logger, &prspect);
         });

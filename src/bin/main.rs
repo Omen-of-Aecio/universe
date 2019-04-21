@@ -42,7 +42,6 @@ fn run_client_or_server(s: &mut glocals::Main) {
         should_exit: false,
         game: Game::default(),
         input: input::Input::default(),
-        audio: rodio::Sink::new(&rodio::default_output_device().unwrap()),
         logic_benchmarker: Benchmarker::new(99),
         drawing_benchmarker: Benchmarker::new(99),
     };

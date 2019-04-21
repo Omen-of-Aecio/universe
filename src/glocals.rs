@@ -48,6 +48,7 @@ impl Hash for NamedFn {
 }
 
 pub struct Main<'a> {
+    pub audio: Option<rodio::Sink>,
     pub client: Option<Client>,
     pub commandline: clap::ArgMatches<'a>,
     pub config: Config,
@@ -62,6 +63,7 @@ pub struct Main<'a> {
 impl Default for Main<'_> {
     fn default() -> Self {
         Self {
+            audio: None,
             client: None,
             commandline: clap::ArgMatches::default(),
             config: Config::default(),
@@ -114,7 +116,6 @@ pub struct Client {
     pub should_exit: bool,
     pub game: Game,
     pub input: input::Input,
-    pub audio: rodio::Sink,
     pub logic_benchmarker: Benchmarker,
     pub drawing_benchmarker: Benchmarker,
     pub windowing: Option<vxdraw::Windowing>,

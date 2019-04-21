@@ -989,7 +989,7 @@ mod tests {
 
     #[test]
     fn change_log_level() -> io::Result<()> {
-        let logger = logger::Logger::spawn();
+        let logger = logger::Logger::spawn_void();
         assert_ne![123, logger.get_log_level()];
         let (listener, port) = bind_to_any_tcp_port();
         let (_gsh, keep_running) = spawn_with_listener(logger.clone(), listener);
@@ -1011,7 +1011,7 @@ mod tests {
     #[test]
     fn fuzzing_result_does_not_crash() -> io::Result<()> {
         // given
-        let mut logger = logger::Logger::spawn();
+        let mut logger = logger::Logger::spawn_void();
         logger.set_log_level(0);
         let keep_running = Arc::new(AtomicBool::new(true));
         let mut cmdmat = cmdmat::Mapping::default();
@@ -1038,7 +1038,7 @@ mod tests {
     #[test]
     fn check_variable_statements() -> io::Result<()> {
         // given
-        let mut logger = logger::Logger::spawn();
+        let mut logger = logger::Logger::spawn_void();
         logger.set_log_level(0);
         let keep_running = Arc::new(AtomicBool::new(true));
         let mut cmdmat = cmdmat::Mapping::default();
@@ -1083,7 +1083,7 @@ mod tests {
     #[test]
     fn check_idempotent_statements_work() -> io::Result<()> {
         // given
-        let mut logger = logger::Logger::spawn();
+        let mut logger = logger::Logger::spawn_void();
         logger.set_log_level(0);
         let keep_running = Arc::new(AtomicBool::new(true));
         let mut cmdmat = cmdmat::Mapping::default();
@@ -1230,7 +1230,7 @@ mod tests {
     #[test]
     fn check_integer_overflow() -> io::Result<()> {
         // given
-        let mut logger = logger::Logger::spawn();
+        let mut logger = logger::Logger::spawn_void();
         logger.set_log_level(0);
         let keep_running = Arc::new(AtomicBool::new(true));
         let mut cmdmat = cmdmat::Mapping::default();
@@ -1299,7 +1299,7 @@ mod tests {
     #[bench]
     fn speed_of_interpreting_a_raw_command(b: &mut Bencher) -> io::Result<()> {
         // given
-        let mut logger = logger::Logger::spawn();
+        let mut logger = logger::Logger::spawn_void();
         logger.set_log_level(0);
         let keep_running = Arc::new(AtomicBool::new(true));
         let mut cmdmat = cmdmat::Mapping::default();
@@ -1324,7 +1324,7 @@ mod tests {
     #[bench]
     fn speed_of_interpreting_a_nested_command_with_parameters(b: &mut Bencher) -> io::Result<()> {
         // given
-        let mut logger = logger::Logger::spawn();
+        let mut logger = logger::Logger::spawn_void();
         logger.set_log_level(0);
         let keep_running = Arc::new(AtomicBool::new(true));
         let mut cmdmat = cmdmat::Mapping::default();
@@ -1349,7 +1349,7 @@ mod tests {
     #[bench]
     fn speed_of_adding_a_bunch_of_numbers(b: &mut Bencher) -> io::Result<()> {
         // given
-        let mut logger = logger::Logger::spawn();
+        let mut logger = logger::Logger::spawn_void();
         logger.set_log_level(0);
         let keep_running = Arc::new(AtomicBool::new(true));
         let mut cmdmat = cmdmat::Mapping::default();
@@ -1373,7 +1373,7 @@ mod tests {
 
     #[bench]
     fn message_bandwidth_over_tcp(b: &mut Bencher) -> io::Result<()> {
-        let mut logger = logger::Logger::spawn();
+        let mut logger = logger::Logger::spawn_void();
         let (listener, port) = bind_to_any_tcp_port();
         let (mut _gsh, keep_running) = spawn_with_listener(logger.clone(), listener);
         logger.set_log_level(0);

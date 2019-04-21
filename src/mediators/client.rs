@@ -1,4 +1,4 @@
-use crate::glocals::*;
+use crate::glocals::{vxdraw::*, *};
 use crate::mediators::{does_line_collide_with_grid::*, vxdraw};
 use benchmarker::Benchmarker;
 use cgmath::*;
@@ -14,57 +14,55 @@ fn initialize_grid(s: &mut Grid<u8>) {
     s.resize(1000, 1000);
 }
 
-pub fn collect_input(client: &mut Client) {
-    if let Some(ref mut windowing) = client.windowing {
-        for event in super::vxdraw::collect_input(windowing) {
-            match event {
-                Event::WindowEvent { event, .. } => match event {
-                    WindowEvent::KeyboardInput { input, .. } => {
-                        client.input.register_key(&input);
-                    }
-                    WindowEvent::MouseWheel { delta, .. } => match delta {
-                        winit::MouseScrollDelta::LineDelta(_, v) => {
-                            client.input.register_mouse_wheel(v);
-                        }
-                        _ => {}
-                    },
-                    WindowEvent::MouseInput { state, button, .. } => {
-                        client.input.register_mouse_input(state, button);
-                    }
-                    WindowEvent::CursorMoved { position, .. } => {
-                        let pos: (i32, i32) = position.to_physical(1.6666).into();
-                        client.input.position_mouse(pos.0, pos.1);
+pub fn collect_input(client: &mut Logic, windowing: &mut Windowing) {
+    for event in super::vxdraw::collect_input(windowing) {
+        match event {
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::KeyboardInput { input, .. } => {
+                    client.input.register_key(&input);
+                }
+                WindowEvent::MouseWheel { delta, .. } => match delta {
+                    winit::MouseScrollDelta::LineDelta(_, v) => {
+                        client.input.register_mouse_wheel(v);
                     }
                     _ => {}
                 },
+                WindowEvent::MouseInput { state, button, .. } => {
+                    client.input.register_mouse_input(state, button);
+                }
+                WindowEvent::CursorMoved { position, .. } => {
+                    let pos: (i32, i32) = position.to_physical(1.6666).into();
+                    client.input.position_mouse(pos.0, pos.1);
+                }
                 _ => {}
-            }
+            },
+            _ => {}
         }
     }
 }
 
-fn move_camera_according_to_input(s: &mut Client) {
+fn move_camera_according_to_input(s: &mut Logic) {
     if s.input.is_key_down(Key::D) {
-        s.game.cam.center.x += 5.0;
+        s.cam.center.x += 5.0;
     }
     if s.input.is_key_down(Key::A) {
-        s.game.cam.center.x -= 5.0;
+        s.cam.center.x -= 5.0;
     }
     if s.input.is_key_down(Key::W) {
-        s.game.cam.center.y += 5.0;
+        s.cam.center.y += 5.0;
     }
     if s.input.is_key_down(Key::S) {
-        s.game.cam.center.y -= 5.0;
+        s.cam.center.y -= 5.0;
     }
     match s.input.get_mouse_wheel() {
         x if x > 0.0 => {
-            if s.game.cam.zoom < 5.0 {
-                s.game.cam.zoom *= 1.1;
+            if s.cam.zoom < 5.0 {
+                s.cam.zoom *= 1.1;
             }
         }
         x if x < 0.0 => {
-            if s.game.cam.zoom > 0.01 {
-                s.game.cam.zoom /= 1.1;
+            if s.cam.zoom > 0.01 {
+                s.cam.zoom /= 1.1;
             }
         }
         _ => {}
@@ -188,9 +186,9 @@ fn check_for_collision_and_move_players_according_to_movement_vector(
     }
 }
 
-fn set_gravity(s: &mut Client) {
+fn set_gravity(s: &mut Logic) {
     if s.input.is_key_toggled_down(Key::G) {
-        s.game.game_config.gravity_on = !s.game.game_config.gravity_on;
+        s.game_config.gravity_on = !s.game_config.gravity_on;
     }
 }
 
@@ -200,9 +198,9 @@ fn create_black_square_around_player(s: &mut Grid<u8>) {
     }
 }
 
-fn toggle_camera_mode(s: &mut Client) {
+fn toggle_camera_mode(s: &mut Logic) {
     if s.input.is_key_toggled_down(Key::F) {
-        s.game.cam_mode = match s.game.cam_mode {
+        s.cam_mode = match s.cam_mode {
             CameraMode::FollowPlayer => CameraMode::Interactive,
             CameraMode::Interactive => CameraMode::FollowPlayer,
         };
@@ -215,111 +213,131 @@ fn stop_benchmark(benchmarker: &mut Benchmarker, logger: &mut Logger<Log>, msg: 
     }
 }
 
-fn update_grid_texture(s: &mut Client) {}
+fn update_grid_texture(s: &mut Logic) {}
 
 pub fn entry_point_client_vulkan(s: &mut Main) {
-    if let Some(ref mut client) = s.client {
-        s.logger.info("cli", "Creating grid");
-        client.game.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
-        client.game.cam.zoom = 0.01;
+    s.logger.info("cli", "Creating grid");
+    s.logic.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
+    s.logic.cam.zoom = 0.01;
 
-        s.logger.set_log_level(196);
-        client.game.players2.push(PlayerData {
-            position: Vec2 { x: 0.0, y: 0.0 },
-        });
+    s.logger.set_log_level(196);
+    s.logic.players.push(PlayerData {
+        position: Vec2 { x: 0.0, y: 0.0 },
+    });
 
-        let tex = vxdraw::strtex::push_texture(
-            &mut client.windowing.as_mut().unwrap(),
-            1000,
-            1000,
-            &mut s.logger,
-        );
-        client.game.grid.resize(1000, 1000);
-        vxdraw::strtex::generate_map2(
-            &mut client.windowing.as_mut().unwrap(),
-            &tex,
-            [1.0, 2.0, 4.0],
-        );
-        let grid = &mut client.game.grid;
-        vxdraw::strtex::read(&mut client.windowing.as_mut().unwrap(), &tex, |x, pitch| {
-            for j in 0..1000 {
-                for i in 0..1000 {
-                    grid.set(i, j, x[i + j * pitch].0);
-                }
+    let tex = vxdraw::strtex::push_texture(
+        &mut s.windowing.as_mut().unwrap(),
+        1000,
+        1000,
+        &mut s.logger,
+    );
+    s.logic.grid.resize(1000, 1000);
+    vxdraw::strtex::generate_map2(&mut s.windowing.as_mut().unwrap(), &tex, [1.0, 2.0, 4.0]);
+    let grid = &mut s.logic.grid;
+    vxdraw::strtex::read(&mut s.windowing.as_mut().unwrap(), &tex, |x, pitch| {
+        for j in 0..1000 {
+            for i in 0..1000 {
+                grid.set(i, j, x[i + j * pitch].0);
             }
-        });
-        vxdraw::strtex::push_sprite(
-            &mut client.windowing.as_mut().unwrap(),
-            &tex,
-            vxdraw::strtex::Sprite {
-                width: 1000.0,
-                height: 1000.0,
-                translation: (500.0, 500.0),
-                ..vxdraw::strtex::Sprite::default()
-            },
-        );
-        let handle = vxdraw::quads::push(
-            &mut client.windowing.as_mut().unwrap(),
-            vxdraw::quads::Quad {
-                colors: [(255, 0, 0, 255); 4],
-                width: 10.0,
-                height: 10.0,
-                origin: (-5.0, -5.0),
-                ..vxdraw::quads::Quad::default()
-            },
-        );
+        }
+    });
+    vxdraw::strtex::push_sprite(
+        &mut s.windowing.as_mut().unwrap(),
+        &tex,
+        vxdraw::strtex::Sprite {
+            width: 1000.0,
+            height: 1000.0,
+            translation: (500.0, 500.0),
+            ..vxdraw::strtex::Sprite::default()
+        },
+    );
+    let handle = vxdraw::quads::push(
+        &mut s.windowing.as_mut().unwrap(),
+        vxdraw::quads::Quad {
+            colors: [(255, 0, 0, 255); 4],
+            width: 10.0,
+            height: 10.0,
+            origin: (-5.0, -5.0),
+            ..vxdraw::quads::Quad::default()
+        },
+    );
 
-        let fireballs = vxdraw::dyntex::push_texture(
-            &mut client.windowing.as_mut().unwrap(),
-            FIREBALLS,
-            vxdraw::dyntex::TextureOptions::default(),
-        );
-        client.game.bullets_handle = Some(fireballs);
-        loop {
-            {
-                let changeset = &client.game.changed_tiles;
-                vxdraw::strtex::streaming_texture_set_pixels(
-                    &mut client.windowing.as_mut().unwrap(),
-                    &tex,
-                    changeset
-                        .iter()
-                        .map(|pos| (pos.0 as u32, pos.1 as u32, (0, 0, 0, 255))),
+    let fireballs = vxdraw::dyntex::push_texture(
+        &mut s.windowing.as_mut().unwrap(),
+        FIREBALLS,
+        vxdraw::dyntex::TextureOptions::default(),
+    );
+    s.logic.bullets_handle = Some(fireballs);
+    loop {
+        if let Some(ref mut windowing) = s.windowing {
+            collect_input(&mut s.logic, windowing);
+        }
+        {
+            let changeset = &s.logic.changed_tiles;
+            vxdraw::strtex::streaming_texture_set_pixels(
+                &mut s.windowing.as_mut().unwrap(),
+                &tex,
+                changeset
+                    .iter()
+                    .map(|pos| (pos.0 as u32, pos.1 as u32, (0, 0, 0, 255))),
+            );
+        }
+        s.logic.changed_tiles.clear();
+        s.time = Instant::now();
+        client_tick_vulkan(&mut s.logic, &handle, &mut s.logger);
+        s.timers.network_timer.update(s.time, &mut s.network);
+        if s.logic.should_exit {
+            break;
+        }
+
+        if let Some(ref mut windowing) = s.windowing {
+            fire_bullets(&mut s.logic, windowing);
+
+            vxdraw::dyntex::set_uvs2(
+                windowing,
+                s.logic.bullets.iter().map(|b| {
+                    (
+                        b.handle.as_ref().unwrap(),
+                        b.current_uv_begin,
+                        b.current_uv_end,
+                    )
+                }),
+            );
+
+            for b in s.logic.bullets.iter() {
+                vxdraw::dyntex::set_position(
+                    windowing,
+                    b.handle.as_ref().unwrap(),
+                    b.position.into(),
                 );
             }
-            client.game.changed_tiles.clear();
-            s.time = Instant::now();
-            let xform = if let Some(ref mut rx) = s.config_change_recv {
-                match rx.try_recv() {
-                    Ok(msg) => Some(msg),
-                    Err(_) => None,
-                }
-            } else {
-                None
-            };
-            if let Some(xform) = xform {
-                xform(&mut s.config);
-            }
-            client_tick_vulkan(client, &handle, &mut s.logger);
-            s.timers.network_timer.update(s.time, &mut s.network);
-            if client.should_exit {
-                break;
-            }
+
+            upload_player_position(&mut s.logic, windowing, &handle);
+            let persp = super::vxdraw::utils::gen_perspective(windowing);
+            let scale = Matrix4::from_scale(s.logic.cam.zoom);
+            let center = s.logic.cam.center;
+            // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
+            let trans = Matrix4::from_translation(Vector3::new(-center.x, center.y, 0.0));
+            // info![client.logger, "main", "Okay wth"; "trans" => InDebug(&trans); clone trans];
+            super::vxdraw::draw_frame(windowing, &mut s.logger, &(persp * scale * trans));
         }
     }
 }
 
-fn upload_player_position(s: &mut Client, handle: &vxdraw::quads::QuadHandle) {
-    let pos = s.game.players2[0].position;
-    if let Some(ref mut windowing) = s.windowing {
-        vxdraw::quads::set_position(windowing, handle, (pos.x, pos.y));
-    }
+fn upload_player_position(
+    s: &mut Logic,
+    windowing: &mut Windowing,
+    handle: &vxdraw::quads::QuadHandle,
+) {
+    let pos = s.players[0].position;
+    vxdraw::quads::set_position(windowing, handle, (pos.x, pos.y));
 }
 
-fn fire_bullets(s: &mut Client) {
+fn fire_bullets(s: &mut Logic, windowing: &mut Windowing) {
     if s.input.is_left_mouse_button_down() {
-        if let Some(ref bullets) = s.game.bullets_handle {
+        if let Some(ref bullets) = s.bullets_handle {
             let handle = vxdraw::dyntex::push_sprite(
-                &mut s.windowing.as_mut().unwrap(),
+                windowing,
                 bullets,
                 vxdraw::dyntex::Sprite {
                     width: 6.8,
@@ -330,13 +348,8 @@ fn fire_bullets(s: &mut Client) {
             );
             // TODO get the window size
             let direction = Vec2::from(s.input.get_mouse_pos())
-                - Vec2::from(
-                    s.windowing
-                        .as_mut()
-                        .unwrap()
-                        .get_window_size_in_pixels_float(),
-                ) / 2.0;
-            s.game.bullets.push(Bullet {
+                - Vec2::from(windowing.get_window_size_in_pixels_float()) / 2.0;
+            s.bullets.push(Bullet {
                 direction: direction.normalize(),
                 position: Vec2 { x: 0.0, y: 0.0 },
 
@@ -353,8 +366,8 @@ fn fire_bullets(s: &mut Client) {
     }
 }
 
-fn update_bullets_uv(s: &mut Client) {
-    for b in s.game.bullets.iter_mut() {
+fn update_bullets_uv(s: &mut Logic) {
+    for b in s.bullets.iter_mut() {
         let width_elem = b.animation_sequence % b.width;
         let height_elem = b.animation_sequence / b.width;
         let uv_begin = (
@@ -372,92 +385,34 @@ fn update_bullets_uv(s: &mut Client) {
         b.current_uv_begin = uv_begin;
         b.current_uv_end = uv_end;
     }
-    vxdraw::dyntex::set_uvs2(
-        s.windowing.as_mut().unwrap(),
-        s.game.bullets.iter().map(|b| {
-            (
-                b.handle.as_ref().unwrap(),
-                b.current_uv_begin,
-                b.current_uv_end,
-            )
-        }),
-    );
 }
 
-fn update_bullets_position(s: &mut Client) {
-    for b in s.game.bullets.iter_mut() {
+fn update_bullets_position(s: &mut Logic) {
+    for b in s.bullets.iter_mut() {
         if let Some(pos) =
-            does_line_collide_with_grid(&s.game.grid, b.position, b.position + b.direction, |x| {
+            does_line_collide_with_grid(&s.grid, b.position, b.position + b.direction, |x| {
                 *x == 255
             })
         {
-            s.game.grid.set(pos.0, pos.1, 0);
-            s.game.changed_tiles.push(pos);
+            s.grid.set(pos.0, pos.1, 0);
+            s.changed_tiles.push(pos);
         }
         b.position += b.direction;
-        vxdraw::dyntex::set_position(
-            s.windowing.as_mut().unwrap(),
-            b.handle.as_ref().unwrap(),
-            b.position.into(),
-        );
     }
 }
 
-fn client_tick_vulkan(
-    s: &mut Client,
-    handle: &vxdraw::quads::QuadHandle,
-    logger: &mut Logger<Log>,
-) {
-    // ---
-    s.logic_benchmarker.start();
-    // ---
-
-    collect_input(s);
+fn client_tick_vulkan(s: &mut Logic, handle: &vxdraw::quads::QuadHandle, logger: &mut Logger<Log>) {
     toggle_camera_mode(s);
     let movement = move_player_according_to_input(&s.input);
     check_for_collision_and_move_players_according_to_movement_vector(
-        &s.game.grid,
-        &mut s.game.players2,
+        &s.grid,
+        &mut s.players,
         movement,
     );
     move_camera_according_to_input(s);
 
     update_bullets_uv(s);
     update_bullets_position(s);
-
-    fire_bullets(s);
-
-    upload_player_position(s, handle);
-
-    // ---
-    // stop_benchmark(
-    //     &mut s.logic_benchmarker,
-    //     &mut s.logger,
-    //     "Logic time spent (100-frame average)",
-    // );
-    // ---
-
-    // ---
-    s.drawing_benchmarker.start();
-    // ---
-
-    if let Some(ref mut windowing) = s.windowing {
-        let persp = super::vxdraw::utils::gen_perspective(windowing);
-        let scale = Matrix4::from_scale(s.game.cam.zoom);
-        let center = s.game.cam.center;
-        // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
-        let trans = Matrix4::from_translation(Vector3::new(-center.x, center.y, 0.0));
-        // info![client.logger, "main", "Okay wth"; "trans" => InDebug(&trans); clone trans];
-        super::vxdraw::draw_frame(windowing, logger, &(persp * scale * trans));
-    }
-
-    // ---
-    // stop_benchmark(
-    //     &mut s.drawing_benchmarker,
-    //     &mut s.logger,
-    //     "Drawing time spent (100-frame average)",
-    // );
-    // ---
 
     std::thread::sleep(std::time::Duration::new(0, 8_000_000));
 }

@@ -23,56 +23,32 @@ pub use log::Log;
 
 pub type Error = failure::Error;
 
-pub struct NamedFn {
-    pub name: &'static str,
-    pub func: fn(&mut Main),
-}
-impl Default for NamedFn {
-    fn default() -> Self {
-        Self {
-            name: "",
-            func: |&mut _| {},
-        }
-    }
-}
-impl PartialEq for NamedFn {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-    }
-}
-impl Eq for NamedFn {}
-impl Hash for NamedFn {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
-    }
-}
+// ---
 
 pub struct Main<'a> {
     pub audio: Option<rodio::Sink>,
-    pub client: Option<Client>,
     pub commandline: clap::ArgMatches<'a>,
-    pub config: Config,
-    pub config_change_recv: Option<mpsc::Receiver<fn(&mut Config)>>,
     pub logger: Logger<Log>,
+    pub logic: Logic,
     pub network: Socket<i32>,
     pub threads: Threads,
     pub time: Instant,
     pub timers: Timers,
+    pub windowing: Option<vxdraw::Windowing>,
 }
 
 impl Default for Main<'_> {
     fn default() -> Self {
         Self {
             audio: None,
-            client: None,
             commandline: clap::ArgMatches::default(),
-            config: Config::default(),
-            config_change_recv: None,
             logger: Logger::spawn_void(),
+            logic: Logic::default(),
             network: Socket::default(),
             threads: Threads::default(),
             time: Instant::now(),
             timers: Timers::default(),
+            windowing: None,
         }
     }
 }
@@ -112,14 +88,7 @@ pub struct GameShellContext {
     pub variables: HashMap<String, String>,
 }
 
-pub struct Client {
-    pub should_exit: bool,
-    pub game: Game,
-    pub input: input::Input,
-    pub logic_benchmarker: Benchmarker,
-    pub drawing_benchmarker: Benchmarker,
-    pub windowing: Option<vxdraw::Windowing>,
-}
+pub struct Client {}
 
 #[derive(Copy, Clone, Default)]
 pub struct GameConfig {
@@ -183,10 +152,13 @@ pub struct PlayerData {
 }
 
 #[derive(Default)]
-pub struct Game {
+pub struct Logic {
+    pub should_exit: bool,
+    pub input: input::Input,
+
     pub grid: Grid<u8>,
     pub game_config: GameConfig,
-    pub players2: Vec<PlayerData>,
+    pub players: Vec<PlayerData>,
     pub bullets: Vec<Bullet>,
     pub cam: Camera,
     pub you: u32,
@@ -201,6 +173,7 @@ pub struct Game {
     pub bullets_handle: Option<crate::mediators::vxdraw::dyntex::TextureHandle>,
 
     pub changed_tiles: Vec<(usize, usize)>,
+    pub bullets_added: Vec<Vec2>,
 }
 
 /* Should go, together with some logic, to some camera module (?) */

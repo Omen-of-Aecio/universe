@@ -37,15 +37,7 @@ fn run_client_or_server(s: &mut glocals::Main) {
         s.threads.game_shell = Some(game_shell.0);
         s.threads.game_shell_keep_running = Some(game_shell.1);
     }
-    let client = Client {
-        windowing: Some(init_window_with_vulkan(&mut s.logger, ShowWindow::Enable)),
-        should_exit: false,
-        game: Game::default(),
-        input: input::Input::default(),
-        logic_benchmarker: Benchmarker::new(99),
-        drawing_benchmarker: Benchmarker::new(99),
-    };
-    s.client = Some(client);
+    s.windowing = Some(init_window_with_vulkan(&mut s.logger, ShowWindow::Enable));
     mediators::client::entry_point_client_vulkan(s);
 }
 

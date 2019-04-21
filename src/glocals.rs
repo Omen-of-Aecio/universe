@@ -52,6 +52,7 @@ pub struct Main<'a> {
     pub commandline: clap::ArgMatches<'a>,
     pub config: Config,
     pub config_change_recv: Option<mpsc::Receiver<fn(&mut Config)>>,
+    pub logger: Logger<Log>,
     pub network: Option<Socket<i32>>,
     pub server: Option<Server>,
     pub threads: Threads,
@@ -66,6 +67,7 @@ impl Default for Main<'_> {
             commandline: clap::ArgMatches::default(),
             config: Config::default(),
             config_change_recv: None,
+            logger: Logger::spawn_void(),
             network: None,
             server: None,
             threads: Threads::default(),
@@ -111,7 +113,6 @@ pub struct GameShellContext {
 }
 
 pub struct Client {
-    pub logger: Logger<Log>,
     pub should_exit: bool,
     pub game: Game,
     pub input: input::Input,

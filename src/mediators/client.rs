@@ -215,17 +215,15 @@ fn stop_benchmark(benchmarker: &mut Benchmarker, logger: &mut Logger<Log>, msg: 
     }
 }
 
-fn update_grid_texture(s: &mut Client) {
-
-}
+fn update_grid_texture(s: &mut Client) {}
 
 pub fn entry_point_client_vulkan(s: &mut Main) {
     if let Some(ref mut client) = s.client {
-        client.logger.info("cli", "Creating grid");
+        s.logger.info("cli", "Creating grid");
         client.game.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
         client.game.cam.zoom = 0.01;
 
-        client.logger.set_log_level(196);
+        s.logger.set_log_level(196);
         client.game.players2.push(PlayerData {
             position: Vec2 { x: 0.0, y: 0.0 },
         });
@@ -234,7 +232,7 @@ pub fn entry_point_client_vulkan(s: &mut Main) {
             &mut client.windowing.as_mut().unwrap(),
             1000,
             1000,
-            &mut client.logger,
+            &mut s.logger,
         );
         client.game.grid.resize(1000, 1000);
         vxdraw::strtex::generate_map2(
@@ -279,7 +277,6 @@ pub fn entry_point_client_vulkan(s: &mut Main) {
         client.game.bullets_handle = Some(fireballs);
         loop {
             {
-                let grid = &client.game.grid;
                 let changeset = &client.game.changed_tiles;
                 vxdraw::strtex::streaming_texture_set_pixels(
                     &mut client.windowing.as_mut().unwrap(),
@@ -302,7 +299,7 @@ pub fn entry_point_client_vulkan(s: &mut Main) {
             if let Some(xform) = xform {
                 xform(&mut s.config);
             }
-            client_tick_vulkan(client, &handle);
+            client_tick_vulkan(client, &handle, &mut s.logger);
             if let Some(ref mut network) = s.network {
                 s.timers.network_timer.update(s.time, network);
             }
@@ -408,7 +405,11 @@ fn update_bullets_position(s: &mut Client) {
     }
 }
 
-fn client_tick_vulkan(s: &mut Client, handle: &vxdraw::quads::QuadHandle) {
+fn client_tick_vulkan(
+    s: &mut Client,
+    handle: &vxdraw::quads::QuadHandle,
+    logger: &mut Logger<Log>,
+) {
     // ---
     s.logic_benchmarker.start();
     // ---
@@ -431,11 +432,11 @@ fn client_tick_vulkan(s: &mut Client, handle: &vxdraw::quads::QuadHandle) {
     upload_player_position(s, handle);
 
     // ---
-    stop_benchmark(
-        &mut s.logic_benchmarker,
-        &mut s.logger,
-        "Logic time spent (100-frame average)",
-    );
+    // stop_benchmark(
+    //     &mut s.logic_benchmarker,
+    //     &mut s.logger,
+    //     "Logic time spent (100-frame average)",
+    // );
     // ---
 
     // ---
@@ -449,15 +450,15 @@ fn client_tick_vulkan(s: &mut Client, handle: &vxdraw::quads::QuadHandle) {
         // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
         let trans = Matrix4::from_translation(Vector3::new(-center.x, center.y, 0.0));
         // info![client.logger, "main", "Okay wth"; "trans" => InDebug(&trans); clone trans];
-        super::vxdraw::draw_frame(windowing, &mut s.logger, &(persp * scale * trans));
+        super::vxdraw::draw_frame(windowing, logger, &(persp * scale * trans));
     }
 
     // ---
-    stop_benchmark(
-        &mut s.drawing_benchmarker,
-        &mut s.logger,
-        "Drawing time spent (100-frame average)",
-    );
+    // stop_benchmark(
+    //     &mut s.drawing_benchmarker,
+    //     &mut s.logger,
+    //     "Drawing time spent (100-frame average)",
+    // );
     // ---
 
     std::thread::sleep(std::time::Duration::new(0, 8_000_000));

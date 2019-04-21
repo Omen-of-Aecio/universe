@@ -34,16 +34,15 @@ fn run_client_or_server(s: &mut glocals::Main) {
         s.server = Some(Server::default());
         mediators::server::entry_point_server(s);
     } else {
-        let mut logger = logger::Logger::spawn();
-        logger.set_colorize(true);
-        logger.set_context_specific_log_level("benchmark", 0);
-        if let Some(game_shell) = crate::mediators::game_shell::spawn(logger.clone()) {
+        s.logger = logger::Logger::spawn();
+        s.logger.set_colorize(true);
+        s.logger.set_context_specific_log_level("benchmark", 0);
+        if let Some(game_shell) = crate::mediators::game_shell::spawn(s.logger.clone()) {
             s.threads.game_shell = Some(game_shell.0);
             s.threads.game_shell_keep_running = Some(game_shell.1);
         }
         let client = Client {
-            windowing: Some(init_window_with_vulkan(&mut logger, ShowWindow::Enable)),
-            logger,
+            windowing: Some(init_window_with_vulkan(&mut s.logger, ShowWindow::Enable)),
             should_exit: false,
             game: Game::default(),
             input: input::Input::default(),

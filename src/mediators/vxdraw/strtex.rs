@@ -1294,6 +1294,20 @@ mod tests {
     }
 
     #[test]
+    fn use_read() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+
+        let id = push_texture(&mut windowing, 10, 10, &mut logger);
+        strtex::streaming_texture_set_pixel(&mut windowing, &id, 3, 2, (0, 123, 0, 255));
+        let mut green_value = 0;
+        strtex::read(&mut windowing, &id, |arr, pitch| {
+            green_value = arr[3 + 2 * pitch].1;
+        });
+        assert_eq![123, green_value];
+    }
+
+    #[test]
     fn streaming_texture_weird_pixel_accesses() {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);

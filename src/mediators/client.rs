@@ -281,11 +281,13 @@ pub fn entry_point_client_vulkan(s: &mut Main) {
             {
                 let grid = &client.game.grid;
                 let changeset = &client.game.changed_tiles;
-                vxdraw::strtex::write(&mut client.windowing.as_mut().unwrap(), &tex, |x, pitch| {
-                    for tile in changeset {
-                        x[tile.0 + tile.1 * pitch].1 = *grid.get(tile.0, tile.1).unwrap();
-                    }
-                });
+                vxdraw::strtex::streaming_texture_set_pixels(
+                    &mut client.windowing.as_mut().unwrap(),
+                    &tex,
+                    changeset
+                        .iter()
+                        .map(|pos| (pos.0 as u32, pos.1 as u32, (0, 0, 0, 255))),
+                );
             }
             client.game.changed_tiles.clear();
             s.time = Instant::now();
@@ -389,7 +391,11 @@ fn update_bullets_uv(s: &mut Client) {
 
 fn update_bullets_position(s: &mut Client) {
     for b in s.game.bullets.iter_mut() {
-        if let Some(pos) = does_line_collide_with_grid(&s.game.grid, b.position, b.position + b.direction, |x| *x == 255) {
+        if let Some(pos) =
+            does_line_collide_with_grid(&s.game.grid, b.position, b.position + b.direction, |x| {
+                *x == 255
+            })
+        {
             s.game.grid.set(pos.0, pos.1, 0);
             s.game.changed_tiles.push(pos);
         }

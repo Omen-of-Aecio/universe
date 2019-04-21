@@ -300,9 +300,7 @@ pub fn entry_point_client_vulkan(s: &mut Main) {
                 xform(&mut s.config);
             }
             client_tick_vulkan(client, &handle, &mut s.logger);
-            if let Some(ref mut network) = s.network {
-                s.timers.network_timer.update(s.time, network);
-            }
+            s.timers.network_timer.update(s.time, &mut s.network);
             if client.should_exit {
                 break;
             }

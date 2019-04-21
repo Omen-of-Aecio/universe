@@ -30,29 +30,24 @@ fn parse_command_line_arguments<'a>() -> clap::ArgMatches<'a> {
 
 fn run_client_or_server(s: &mut glocals::Main) {
     let commandline = s.commandline.clone();
-    if let Some(_port) = commandline.value_of("host") {
-        s.server = Some(Server::default());
-        mediators::server::entry_point_server(s);
-    } else {
-        s.logger = logger::Logger::spawn();
-        s.logger.set_colorize(true);
-        s.logger.set_context_specific_log_level("benchmark", 0);
-        if let Some(game_shell) = crate::mediators::game_shell::spawn(s.logger.clone()) {
-            s.threads.game_shell = Some(game_shell.0);
-            s.threads.game_shell_keep_running = Some(game_shell.1);
-        }
-        let client = Client {
-            windowing: Some(init_window_with_vulkan(&mut s.logger, ShowWindow::Enable)),
-            should_exit: false,
-            game: Game::default(),
-            input: input::Input::default(),
-            audio: rodio::Sink::new(&rodio::default_output_device().unwrap()),
-            logic_benchmarker: Benchmarker::new(99),
-            drawing_benchmarker: Benchmarker::new(99),
-        };
-        s.client = Some(client);
-        mediators::client::entry_point_client_vulkan(s);
+    s.logger = logger::Logger::spawn();
+    s.logger.set_colorize(true);
+    s.logger.set_context_specific_log_level("benchmark", 0);
+    if let Some(game_shell) = crate::mediators::game_shell::spawn(s.logger.clone()) {
+        s.threads.game_shell = Some(game_shell.0);
+        s.threads.game_shell_keep_running = Some(game_shell.1);
     }
+    let client = Client {
+        windowing: Some(init_window_with_vulkan(&mut s.logger, ShowWindow::Enable)),
+        should_exit: false,
+        game: Game::default(),
+        input: input::Input::default(),
+        audio: rodio::Sink::new(&rodio::default_output_device().unwrap()),
+        logic_benchmarker: Benchmarker::new(99),
+        drawing_benchmarker: Benchmarker::new(99),
+    };
+    s.client = Some(client);
+    mediators::client::entry_point_client_vulkan(s);
 }
 
 fn wait_for_threads_to_exit(s: glocals::Main) {

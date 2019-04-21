@@ -53,8 +53,7 @@ pub struct Main<'a> {
     pub config: Config,
     pub config_change_recv: Option<mpsc::Receiver<fn(&mut Config)>>,
     pub logger: Logger<Log>,
-    pub network: Option<Socket<i32>>,
-    pub server: Option<Server>,
+    pub network: Socket<i32>,
     pub threads: Threads,
     pub time: Instant,
     pub timers: Timers,
@@ -68,8 +67,7 @@ impl Default for Main<'_> {
             config: Config::default(),
             config_change_recv: None,
             logger: Logger::spawn_void(),
-            network: None,
-            server: None,
+            network: Socket::default(),
             threads: Threads::default(),
             time: Instant::now(),
             timers: Timers::default(),
@@ -120,44 +118,6 @@ pub struct Client {
     pub logic_benchmarker: Benchmarker,
     pub drawing_benchmarker: Benchmarker,
     pub windowing: Option<vxdraw::Windowing>,
-    // Networking
-    // pub server: SocketAddr,
-}
-
-#[derive(Default)]
-pub struct Server {
-    pub game: ServerGame,
-    pub connections: HashMap<std::net::SocketAddr, Connection>,
-
-    /// Frame duration in seconds (used only for how long to sleep. FPS is in GameConfig)
-    pub tick_duration: Duration,
-}
-
-#[derive(Clone, Default)]
-pub struct Connection {
-    pub last_snapshot: u32, // frame#
-    pub snapshot_rate: u64,
-}
-
-#[derive(Default)]
-pub struct ServerGame {
-    pub frame: u32,
-    pub game_conf: GameConfig,
-
-    /// Mapping from unique ID to specs Entity
-    // pub entities: HashMap<u32, specs::Entity>,
-    pub entity_id_seq: u32,
-
-    /// Width of the generated world
-    pub width: usize,
-    /// Height of the generated world
-    pub height: usize,
-
-    pub white_base: Vec2,
-    pub black_base: Vec2,
-
-    // Extra graphics data (for debugging/visualization)
-    pub vectors: Vec<(Vec2, Vec2)>,
 }
 
 #[derive(Copy, Clone, Default)]

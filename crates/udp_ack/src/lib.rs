@@ -28,6 +28,15 @@ pub struct Socket<T: Clone + Debug + PartialEq> {
     connections: HashMap<SocketAddr, Connection<T>>,
 }
 
+impl<T: Clone + Debug + PartialEq> Default for Socket<T> {
+    fn default() -> Self {
+        Self {
+            socket: UdpSocket::bind("127.0.0.1:34254").unwrap(),
+            connections: HashMap::default(),
+        }
+    }
+}
+
 impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
     pub fn new(port: u16) -> Result<Socket<T>, Error> {
         let socket =

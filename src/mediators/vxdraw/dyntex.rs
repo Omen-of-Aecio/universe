@@ -424,7 +424,7 @@ pub fn push_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions)
     let depth_stencil = pso::DepthStencilDesc {
         depth: if options.depth_test {
             pso::DepthTest::On {
-                fun: pso::Comparison::Less,
+                fun: pso::Comparison::LessEqual,
                 write: true,
             }
         } else {
@@ -721,6 +721,40 @@ pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -
 }
 
 // ---
+
+pub fn set_position(s: &mut Windowing, handle: &SpriteHandle, position: (f32, f32)) {
+    let device = &s.device;
+    if let Some(ref mut stex) = s.dyntexs.get(handle.0) {
+        unsafe {
+            device
+                .wait_for_fences(
+                    &s.frames_in_flight_fences,
+                    gfx_hal::device::WaitFor::All,
+                    u64::max_value(),
+                )
+                .expect("Unable to wait for fences");
+            let mut data_target = device
+                .acquire_mapping_writer::<f32>(
+                    &stex.texture_vertex_memory,
+                    0..stex.texture_vertex_requirements.size,
+                )
+                .expect("Failed to acquire a memory writer!");
+
+            let mut idx = (handle.1 * 10 * 4) as usize;
+            data_target[idx + 5..idx + 7].copy_from_slice(&[position.0, position.1]);
+            idx += 10;
+            data_target[idx + 5..idx + 7].copy_from_slice(&[position.0, position.1]);
+            idx += 10;
+            data_target[idx + 5..idx + 7].copy_from_slice(&[position.0, position.1]);
+            idx += 10;
+            data_target[idx + 5..idx + 7].copy_from_slice(&[position.0, position.1]);
+
+            device
+                .release_mapping_writer(data_target)
+                .expect("Couldn't release the mapping writer!");
+        }
+    }
+}
 
 /// Translate all sprites that depend on a given texture
 pub fn sprite_translate_all(s: &mut Windowing, tex: &TextureHandle, dxdy: (f32, f32)) {

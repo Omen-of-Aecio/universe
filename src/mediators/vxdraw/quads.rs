@@ -79,10 +79,26 @@ pub fn push(s: &mut Windowing, quad: Quad) -> QuadHandle {
         let width = quad.width;
         let height = quad.height;
 
-        let topleft = (-width / 2f32 - quad.origin.0, -height / 2f32 - quad.origin.1, quad.depth);
-        let topright = (width / 2f32 - quad.origin.0, -height / 2f32 - quad.origin.1, quad.depth);
-        let bottomleft = (-width / 2f32 - quad.origin.0, height / 2f32 - quad.origin.1, quad.depth);
-        let bottomright = (width / 2f32 - quad.origin.0, height / 2f32 - quad.origin.1, quad.depth);
+        let topleft = (
+            -width / 2f32 - quad.origin.0,
+            -height / 2f32 - quad.origin.1,
+            quad.depth,
+        );
+        let topright = (
+            width / 2f32 - quad.origin.0,
+            -height / 2f32 - quad.origin.1,
+            quad.depth,
+        );
+        let bottomleft = (
+            -width / 2f32 - quad.origin.0,
+            height / 2f32 - quad.origin.1,
+            quad.depth,
+        );
+        let bottomright = (
+            width / 2f32 - quad.origin.0,
+            height / 2f32 - quad.origin.1,
+            quad.depth,
+        );
 
         unsafe {
             let mut data_target = device
@@ -695,7 +711,11 @@ mod tests {
 
         // then
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
-        utils::assert_swapchain_eq(&mut windowing, "simple_quad_rotated_with_exotic_origin", img);
+        utils::assert_swapchain_eq(
+            &mut windowing,
+            "simple_quad_rotated_with_exotic_origin",
+            img,
+        );
     }
 
     #[test]

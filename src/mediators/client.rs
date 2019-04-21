@@ -1,7 +1,5 @@
 use crate::glocals::*;
-use crate::mediators::{
-    does_line_collide_with_grid::*, vxdraw,
-};
+use crate::mediators::{does_line_collide_with_grid::*, vxdraw};
 use benchmarker::Benchmarker;
 use cgmath::*;
 use geometry::{boxit::Boxit, cam::Camera, grid2d::Grid, vec::Vec2};
@@ -9,6 +7,8 @@ use input::Input;
 use logger::{debug, info, InDebug, Logger};
 use std::time::Instant;
 use winit::{VirtualKeyCode as Key, *};
+
+static FIREBALLS: &[u8] = include_bytes!["../../assets/images/Fireball_68x9.png"];
 
 fn initialize_grid(s: &mut Grid<u8>) {
     s.resize(1000, 1000);
@@ -30,6 +30,10 @@ pub fn collect_input(client: &mut Client) {
                     },
                     WindowEvent::MouseInput { state, button, .. } => {
                         client.input.register_mouse_input(state, button);
+                    }
+                    WindowEvent::CursorMoved { position, .. } => {
+                        let pos: (i32, i32) = position.to_physical(1.6666).into();
+                        client.input.position_mouse(pos.0, pos.1);
                     }
                     _ => {}
                 },
@@ -218,10 +222,9 @@ pub fn entry_point_client_vulkan(s: &mut Main) {
         client.game.cam.zoom = 0.01;
 
         client.logger.set_log_level(196);
-        client
-            .game
-            .players2
-            .push(PlayerData { position: Vec2 { x: 0.0, y: 0.0 } });
+        client.game.players2.push(PlayerData {
+            position: Vec2 { x: 0.0, y: 0.0 },
+        });
 
         let tex = vxdraw::strtex::push_texture(
             &mut client.windowing.as_mut().unwrap(),
@@ -263,6 +266,13 @@ pub fn entry_point_client_vulkan(s: &mut Main) {
                 ..vxdraw::quads::Quad::default()
             },
         );
+
+        let fireballs = vxdraw::dyntex::push_texture(
+            &mut client.windowing.as_mut().unwrap(),
+            FIREBALLS,
+            vxdraw::dyntex::TextureOptions::default(),
+        );
+        client.game.bullets_handle = Some(fireballs);
         loop {
             s.time = Instant::now();
             let xform = if let Some(ref mut rx) = s.config_change_recv {
@@ -294,6 +304,83 @@ fn upload_player_position(s: &mut Client, handle: &vxdraw::quads::QuadHandle) {
     }
 }
 
+fn fire_bullets(s: &mut Client) {
+    if s.input.is_left_mouse_button_down() {
+        if let Some(ref bullets) = s.game.bullets_handle {
+            let handle = vxdraw::dyntex::push_sprite(
+                &mut s.windowing.as_mut().unwrap(),
+                bullets,
+                vxdraw::dyntex::Sprite {
+                    width: 6.8,
+                    height: 0.9,
+                    scale: 3.0,
+                    ..vxdraw::dyntex::Sprite::default()
+                },
+            );
+            // TODO get the window size
+            let direction = Vec2::from(s.input.get_mouse_pos())
+                - Vec2::from(
+                    s.windowing
+                        .as_mut()
+                        .unwrap()
+                        .get_window_size_in_pixels_float(),
+                ) / 2.0;
+            s.game.bullets.push(Bullet {
+                direction: direction.normalize(),
+                position: Vec2 { x: 0.0, y: 0.0 },
+
+                animation_sequence: 0,
+                animation_block_begin: (0.0, 0.0),
+                animation_block_end: (0.0, 0.0),
+                height: 6,
+                width: 10,
+                current_uv_begin: (0.0, 0.0),
+                current_uv_end: (0.0, 0.0),
+                handle: Some(handle),
+            });
+        }
+    }
+}
+
+fn update_bullets_uv(s: &mut Client) {
+    for b in s.game.bullets.iter_mut() {
+        let width_elem = b.animation_sequence % b.width;
+        let height_elem = b.animation_sequence / b.width;
+        let uv_begin = (
+            width_elem as f32 / b.width as f32,
+            height_elem as f32 / b.height as f32,
+        );
+        let uv_end = (
+            (width_elem + 1) as f32 / b.width as f32,
+            (height_elem + 1) as f32 / b.height as f32,
+        );
+        b.animation_sequence += 1;
+        if b.animation_sequence > b.width * b.height {
+            b.animation_sequence = 0;
+        }
+        b.current_uv_begin = uv_begin;
+        b.current_uv_end = uv_end;
+
+        vxdraw::dyntex::set_uv(
+            s.windowing.as_mut().unwrap(),
+            b.handle.as_ref().unwrap(),
+            uv_begin,
+            uv_end,
+        );
+    }
+}
+
+fn update_bullets_position(s: &mut Client) {
+    for b in s.game.bullets.iter_mut() {
+        b.position += b.direction;
+        vxdraw::dyntex::set_position(
+            s.windowing.as_mut().unwrap(),
+            b.handle.as_ref().unwrap(),
+            b.position.into(),
+        );
+    }
+}
+
 fn client_tick_vulkan(s: &mut Client, handle: &vxdraw::quads::QuadHandle) {
     // ---
     s.logic_benchmarker.start();
@@ -308,6 +395,10 @@ fn client_tick_vulkan(s: &mut Client, handle: &vxdraw::quads::QuadHandle) {
         movement,
     );
     move_camera_according_to_input(s);
+
+    update_bullets_uv(s);
+    update_bullets_position(s);
+    fire_bullets(s);
 
     upload_player_position(s, handle);
 
@@ -328,7 +419,7 @@ fn client_tick_vulkan(s: &mut Client, handle: &vxdraw::quads::QuadHandle) {
         let scale = Matrix4::from_scale(s.game.cam.zoom);
         let center = s.game.cam.center;
         // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
-        let trans = Matrix4::from_translation(Vector3::new(-center.x / 10.0, center.y / 10.0, 0.0));
+        let trans = Matrix4::from_translation(Vector3::new(-center.x, center.y, 0.0));
         // info![client.logger, "main", "Okay wth"; "trans" => InDebug(&trans); clone trans];
         super::vxdraw::draw_frame(windowing, &mut s.logger, &(persp * scale * trans));
     }

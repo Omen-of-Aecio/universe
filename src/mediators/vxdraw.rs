@@ -128,6 +128,19 @@ fn set_window_size(window: &mut glutin::GlWindow, show: ShowWindow) -> Extent2D 
     }
 }
 
+impl Windowing {
+    pub fn get_window_size_in_pixels(&self) -> (u32, u32) {
+        (self.swapconfig.extent.width, self.swapconfig.extent.height)
+    }
+
+    pub fn get_window_size_in_pixels_float(&self) -> (f32, f32) {
+        (
+            self.swapconfig.extent.width as f32,
+            self.swapconfig.extent.height as f32,
+        )
+    }
+}
+
 pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windowing {
     #[cfg(feature = "gl")]
     static BACKEND: &str = "OpenGL";

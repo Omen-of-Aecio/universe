@@ -204,6 +204,16 @@ pub struct ServerConfig {
 pub struct Bullet {
     pub direction: Vec2,
     pub position: Vec2,
+
+    pub animation_sequence: usize,
+    pub animation_block_begin: (f32, f32),
+    pub animation_block_end: (f32, f32),
+    pub height: usize,
+    pub width: usize,
+    pub current_uv_begin: (f32, f32),
+    pub current_uv_end: (f32, f32),
+
+    pub handle: Option<crate::mediators::vxdraw::dyntex::SpriteHandle>,
 }
 
 pub struct PlayerData {
@@ -226,6 +236,7 @@ pub struct Game {
     pub vectors: Vec<(Vec2, Vec2)>,
 
     pub cam_mode: CameraMode,
+    pub bullets_handle: Option<crate::mediators::vxdraw::dyntex::TextureHandle>,
 }
 
 /* Should go, together with some logic, to some camera module (?) */

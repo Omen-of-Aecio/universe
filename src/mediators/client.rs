@@ -360,14 +360,17 @@ fn update_bullets_uv(s: &mut Client) {
         }
         b.current_uv_begin = uv_begin;
         b.current_uv_end = uv_end;
-
-        vxdraw::dyntex::set_uv(
-            s.windowing.as_mut().unwrap(),
-            b.handle.as_ref().unwrap(),
-            uv_begin,
-            uv_end,
-        );
     }
+    vxdraw::dyntex::set_uvs2(
+        s.windowing.as_mut().unwrap(),
+        s.game.bullets.iter().map(|b| {
+            (
+                b.handle.as_ref().unwrap(),
+                b.current_uv_begin,
+                b.current_uv_end,
+            )
+        }),
+    );
 }
 
 fn update_bullets_position(s: &mut Client) {

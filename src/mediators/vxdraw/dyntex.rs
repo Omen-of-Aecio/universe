@@ -735,6 +735,16 @@ pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -
     SpriteHandle(texture.0, (tex.count - 1) as usize)
 }
 
+pub fn remove_sprite(s: &mut Windowing, handle: SpriteHandle) {
+    if let Some(dyntex) = s.dyntexs.get_mut(handle.0) {
+        let mut idx = (handle.1 * 4 * 10 * 4) as usize + 39;
+        for i in 0..40 {
+            dyntex.mockbuffer.swap_remove(idx - i);
+        }
+        dyntex.count -= 1;
+    }
+}
+
 // ---
 
 pub fn set_position(s: &mut Windowing, handle: &SpriteHandle, position: (f32, f32)) {
@@ -1154,6 +1164,45 @@ mod tests {
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         utils::assert_swapchain_eq(&mut windowing, "three_layer_scene", img);
+    }
+
+    #[test]
+    fn three_layer_scene_remove_middle() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let options = TextureOptions {
+            depth_test: false,
+            ..TextureOptions::default()
+        };
+        let forest = push_texture(&mut windowing, FOREST, options);
+        let player = push_texture(&mut windowing, LOGO, options);
+        let tree = push_texture(&mut windowing, TREE, options);
+
+        push_sprite(&mut windowing, &forest, Sprite::default());
+        let middle = push_sprite(
+            &mut windowing,
+            &player,
+            Sprite {
+                scale: 0.4,
+                ..Sprite::default()
+            },
+        );
+        push_sprite(
+            &mut windowing,
+            &tree,
+            Sprite {
+                translation: (-0.3, 0.0),
+                scale: 0.4,
+                ..Sprite::default()
+            },
+        );
+
+        remove_sprite(&mut windowing, middle);
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        utils::assert_swapchain_eq(&mut windowing, "three_layer_scene_remove_middle", img);
     }
 
     #[bench]

@@ -262,30 +262,76 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
     });
 }
 
+fn update_graphics(s: &mut Main) {
+    if let Some(ref mut graphics) = s.graphics {
+        let changeset = &s.logic.changed_tiles;
+        vxdraw::strtex::streaming_texture_set_pixels(
+            &mut graphics.windowing,
+            &graphics.grid,
+            changeset
+                .iter()
+                .map(|pos| (pos.0 as u32, pos.1 as u32, (0, 0, 0, 255))),
+        );
+
+        vxdraw::dyntex::set_uvs2(
+            &mut graphics.windowing,
+            s.logic.bullets.iter().map(|b| {
+                (
+                    b.handle.as_ref().unwrap(),
+                    b.current_uv_begin,
+                    b.current_uv_end,
+                )
+            }),
+        );
+
+        for b in s.logic.bullets.iter() {
+            vxdraw::dyntex::set_position(
+                &mut graphics.windowing,
+                b.handle.as_ref().unwrap(),
+                b.position.into(),
+            );
+        }
+
+        upload_player_position(
+            &mut s.logic,
+            &mut graphics.windowing,
+            &graphics.player_quads[0],
+        );
+    }
+    s.logic.changed_tiles.clear();
+}
+
+fn draw_graphics(s: &mut Main) {
+    if let Some(ref mut graphics) = s.graphics {
+        let persp = super::vxdraw::utils::gen_perspective(&mut graphics.windowing);
+        let scale = Matrix4::from_scale(s.logic.cam.zoom);
+        let center = s.logic.cam.center;
+        // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
+        let trans = Matrix4::from_translation(Vector3::new(-center.x, center.y, 0.0));
+        // info![client.logger, "main", "Okay wth"; "trans" => InDebug(&trans); clone trans];
+        super::vxdraw::draw_frame(
+            &mut graphics.windowing,
+            &mut s.logger,
+            &(persp * scale * trans),
+        );
+        collect_input(&mut s.logic, &mut graphics.windowing);
+    }
+}
+
 pub fn entry_point_client(s: &mut Main) {
-    s.logger.info("cli", "Creating grid");
+    s.logger.set_log_level(196);
+
     s.logic.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
     s.logic.cam.zoom = 0.01;
 
-    s.logger.set_log_level(196);
     s.logic.players.push(PlayerData {
         position: Vec2 { x: 0.0, y: 0.0 },
     });
 
+    s.logger.info("cli", "Initializing graphics");
     maybe_initialize_graphics(s);
 
     loop {
-        if let Some(ref mut graphics) = s.graphics {
-            let changeset = &s.logic.changed_tiles;
-            vxdraw::strtex::streaming_texture_set_pixels(
-                &mut graphics.windowing,
-                &graphics.grid,
-                changeset
-                    .iter()
-                    .map(|pos| (pos.0 as u32, pos.1 as u32, (0, 0, 0, 255))),
-            );
-        }
-        s.logic.changed_tiles.clear();
         s.time = Instant::now();
         tick_logic(&mut s.logic, &mut s.logger);
         s.timers.network_timer.update(s.time, &mut s.network);
@@ -293,45 +339,8 @@ pub fn entry_point_client(s: &mut Main) {
             break;
         }
         fire_bullets(&mut s.logic, s.graphics.as_mut());
-
-        if let Some(ref mut graphics) = s.graphics {
-            vxdraw::dyntex::set_uvs2(
-                &mut graphics.windowing,
-                s.logic.bullets.iter().map(|b| {
-                    (
-                        b.handle.as_ref().unwrap(),
-                        b.current_uv_begin,
-                        b.current_uv_end,
-                    )
-                }),
-            );
-
-            for b in s.logic.bullets.iter() {
-                vxdraw::dyntex::set_position(
-                    &mut graphics.windowing,
-                    b.handle.as_ref().unwrap(),
-                    b.position.into(),
-                );
-            }
-
-            upload_player_position(
-                &mut s.logic,
-                &mut graphics.windowing,
-                &graphics.player_quads[0],
-            );
-            let persp = super::vxdraw::utils::gen_perspective(&mut graphics.windowing);
-            let scale = Matrix4::from_scale(s.logic.cam.zoom);
-            let center = s.logic.cam.center;
-            // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
-            let trans = Matrix4::from_translation(Vector3::new(-center.x, center.y, 0.0));
-            // info![client.logger, "main", "Okay wth"; "trans" => InDebug(&trans); clone trans];
-            super::vxdraw::draw_frame(
-                &mut graphics.windowing,
-                &mut s.logger,
-                &(persp * scale * trans),
-            );
-            collect_input(&mut s.logic, &mut graphics.windowing);
-        }
+        update_graphics(s);
+        draw_graphics(s);
     }
 }
 

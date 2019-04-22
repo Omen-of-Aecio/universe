@@ -1,4 +1,5 @@
 use crate::glocals::{vxdraw::*, *};
+use crate::mediators::vxdraw::*;
 use crate::mediators::{does_line_collide_with_grid::*, vxdraw};
 use benchmarker::Benchmarker;
 use cgmath::*;
@@ -213,26 +214,14 @@ fn stop_benchmark(benchmarker: &mut Benchmarker, logger: &mut Logger<Log>, msg: 
     }
 }
 
-pub fn entry_point_client(s: &mut Main) {
-    s.logger.info("cli", "Creating grid");
-    s.logic.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
-    s.logic.cam.zoom = 0.01;
+pub fn maybe_initialize_graphics(s: &mut Main) {
+    let mut windowing = init_window_with_vulkan(&mut s.logger, ShowWindow::Enable);
 
-    s.logger.set_log_level(196);
-    s.logic.players.push(PlayerData {
-        position: Vec2 { x: 0.0, y: 0.0 },
-    });
-
-    let tex = vxdraw::strtex::push_texture(
-        &mut s.windowing.as_mut().unwrap(),
-        1000,
-        1000,
-        &mut s.logger,
-    );
+    let tex = vxdraw::strtex::push_texture(&mut windowing, 1000, 1000, &mut s.logger);
     s.logic.grid.resize(1000, 1000);
-    vxdraw::strtex::generate_map2(&mut s.windowing.as_mut().unwrap(), &tex, [1.0, 2.0, 4.0]);
+    vxdraw::strtex::generate_map2(&mut windowing, &tex, [1.0, 2.0, 4.0]);
     let grid = &mut s.logic.grid;
-    vxdraw::strtex::read(&mut s.windowing.as_mut().unwrap(), &tex, |x, pitch| {
+    vxdraw::strtex::read(&mut windowing, &tex, |x, pitch| {
         for j in 0..1000 {
             for i in 0..1000 {
                 grid.set(i, j, x[i + j * pitch].0);
@@ -240,7 +229,7 @@ pub fn entry_point_client(s: &mut Main) {
         }
     });
     vxdraw::strtex::push_sprite(
-        &mut s.windowing.as_mut().unwrap(),
+        &mut windowing,
         &tex,
         vxdraw::strtex::Sprite {
             width: 1000.0,
@@ -250,7 +239,7 @@ pub fn entry_point_client(s: &mut Main) {
         },
     );
     let handle = vxdraw::quads::push(
-        &mut s.windowing.as_mut().unwrap(),
+        &mut windowing,
         vxdraw::quads::Quad {
             colors: [(255, 0, 0, 255); 4],
             width: 10.0,
@@ -261,20 +250,36 @@ pub fn entry_point_client(s: &mut Main) {
     );
 
     let fireballs = vxdraw::dyntex::push_texture(
-        &mut s.windowing.as_mut().unwrap(),
+        &mut windowing,
         FIREBALLS,
         vxdraw::dyntex::TextureOptions::default(),
     );
-    s.logic.bullets_handle = Some(fireballs);
+    s.graphics = Some(Graphics {
+        player_quads: vec![handle],
+        bullets_texture: fireballs,
+        grid: tex,
+        windowing,
+    });
+}
+
+pub fn entry_point_client(s: &mut Main) {
+    s.logger.info("cli", "Creating grid");
+    s.logic.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
+    s.logic.cam.zoom = 0.01;
+
+    s.logger.set_log_level(196);
+    s.logic.players.push(PlayerData {
+        position: Vec2 { x: 0.0, y: 0.0 },
+    });
+
+    maybe_initialize_graphics(s);
+
     loop {
-        if let Some(ref mut windowing) = s.windowing {
-            collect_input(&mut s.logic, windowing);
-        }
-        {
+        if let Some(ref mut graphics) = s.graphics {
             let changeset = &s.logic.changed_tiles;
             vxdraw::strtex::streaming_texture_set_pixels(
-                &mut s.windowing.as_mut().unwrap(),
-                &tex,
+                &mut graphics.windowing,
+                &graphics.grid,
                 changeset
                     .iter()
                     .map(|pos| (pos.0 as u32, pos.1 as u32, (0, 0, 0, 255))),
@@ -287,12 +292,11 @@ pub fn entry_point_client(s: &mut Main) {
         if s.logic.should_exit {
             break;
         }
+        fire_bullets(&mut s.logic, s.graphics.as_mut());
 
-        if let Some(ref mut windowing) = s.windowing {
-            fire_bullets(&mut s.logic, windowing);
-
+        if let Some(ref mut graphics) = s.graphics {
             vxdraw::dyntex::set_uvs2(
-                windowing,
+                &mut graphics.windowing,
                 s.logic.bullets.iter().map(|b| {
                     (
                         b.handle.as_ref().unwrap(),
@@ -304,20 +308,29 @@ pub fn entry_point_client(s: &mut Main) {
 
             for b in s.logic.bullets.iter() {
                 vxdraw::dyntex::set_position(
-                    windowing,
+                    &mut graphics.windowing,
                     b.handle.as_ref().unwrap(),
                     b.position.into(),
                 );
             }
 
-            upload_player_position(&mut s.logic, windowing, &handle);
-            let persp = super::vxdraw::utils::gen_perspective(windowing);
+            upload_player_position(
+                &mut s.logic,
+                &mut graphics.windowing,
+                &graphics.player_quads[0],
+            );
+            let persp = super::vxdraw::utils::gen_perspective(&mut graphics.windowing);
             let scale = Matrix4::from_scale(s.logic.cam.zoom);
             let center = s.logic.cam.center;
             // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
             let trans = Matrix4::from_translation(Vector3::new(-center.x, center.y, 0.0));
             // info![client.logger, "main", "Okay wth"; "trans" => InDebug(&trans); clone trans];
-            super::vxdraw::draw_frame(windowing, &mut s.logger, &(persp * scale * trans));
+            super::vxdraw::draw_frame(
+                &mut graphics.windowing,
+                &mut s.logger,
+                &(persp * scale * trans),
+            );
+            collect_input(&mut s.logic, &mut graphics.windowing);
         }
     }
 }
@@ -331,36 +344,39 @@ fn upload_player_position(
     vxdraw::quads::set_position(windowing, handle, (pos.x, pos.y));
 }
 
-fn fire_bullets(s: &mut Logic, windowing: &mut Windowing) {
+fn fire_bullets(s: &mut Logic, graphics: Option<&mut Graphics>) {
     if s.input.is_left_mouse_button_down() {
-        if let Some(ref bullets) = s.bullets_handle {
-            let handle = vxdraw::dyntex::push_sprite(
-                windowing,
-                bullets,
+        let handle = if let Some(graphics) = graphics {
+            Some(vxdraw::dyntex::push_sprite(
+                &mut graphics.windowing,
+                &graphics.bullets_texture,
                 vxdraw::dyntex::Sprite {
                     width: 6.8,
                     height: 0.9,
                     scale: 3.0,
                     ..vxdraw::dyntex::Sprite::default()
                 },
-            );
-            // TODO get the window size
-            let direction = Vec2::from(s.input.get_mouse_pos())
-                - Vec2::from(windowing.get_window_size_in_pixels_float()) / 2.0;
-            s.bullets.push(Bullet {
-                direction: direction.normalize(),
-                position: Vec2 { x: 0.0, y: 0.0 },
+            ))
+        } else {
+            None
+        };
+        // TODO get the window size
+        // let direction = Vec2::from(s.input.get_mouse_pos())
+        //     - Vec2::from(windowing.get_window_size_in_pixels_float()) / 2.0;
+        let direction = Vec2 { x: 1.0, y: 0.0 };
+        s.bullets.push(Bullet {
+            direction: direction.normalize(),
+            position: Vec2 { x: 0.0, y: 0.0 },
 
-                animation_sequence: 0,
-                animation_block_begin: (0.0, 0.0),
-                animation_block_end: (0.0, 0.0),
-                height: 6,
-                width: 10,
-                current_uv_begin: (0.0, 0.0),
-                current_uv_end: (0.0, 0.0),
-                handle: Some(handle),
-            });
-        }
+            animation_sequence: 0,
+            animation_block_begin: (0.0, 0.0),
+            animation_block_end: (0.0, 0.0),
+            height: 6,
+            width: 10,
+            current_uv_begin: (0.0, 0.0),
+            current_uv_end: (0.0, 0.0),
+            handle,
+        });
     }
 }
 

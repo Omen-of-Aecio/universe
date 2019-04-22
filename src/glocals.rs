@@ -28,13 +28,20 @@ pub type Error = failure::Error;
 pub struct Main<'a> {
     pub audio: Option<rodio::Sink>,
     pub commandline: clap::ArgMatches<'a>,
+    pub graphics: Option<Graphics>,
     pub logger: Logger<Log>,
     pub logic: Logic,
     pub network: Socket<i32>,
     pub threads: Threads,
     pub time: Instant,
     pub timers: Timers,
-    pub windowing: Option<vxdraw::Windowing>,
+}
+
+pub struct Graphics {
+    pub player_quads: Vec<crate::mediators::vxdraw::quads::QuadHandle>,
+    pub bullets_texture: crate::mediators::vxdraw::dyntex::TextureHandle,
+    pub grid: crate::mediators::vxdraw::strtex::TextureHandle,
+    pub windowing: vxdraw::Windowing,
 }
 
 impl Default for Main<'_> {
@@ -42,13 +49,13 @@ impl Default for Main<'_> {
         Self {
             audio: None,
             commandline: clap::ArgMatches::default(),
+            graphics: None,
             logger: Logger::spawn_void(),
             logic: Logic::default(),
             network: Socket::default(),
             threads: Threads::default(),
             time: Instant::now(),
             timers: Timers::default(),
-            windowing: None,
         }
     }
 }
@@ -170,7 +177,6 @@ pub struct Logic {
     pub vectors: Vec<(Vec2, Vec2)>,
 
     pub cam_mode: CameraMode,
-    pub bullets_handle: Option<crate::mediators::vxdraw::dyntex::TextureHandle>,
 
     pub changed_tiles: Vec<(usize, usize)>,
     pub bullets_added: Vec<Vec2>,

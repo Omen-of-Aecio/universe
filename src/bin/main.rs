@@ -37,7 +37,6 @@ fn run_game(s: &mut glocals::Main) {
         s.threads.game_shell = Some(game_shell.0);
         s.threads.game_shell_keep_running = Some(game_shell.1);
     }
-    s.windowing = Some(init_window_with_vulkan(&mut s.logger, ShowWindow::Enable));
     mediators::client::entry_point_client(s);
 }
 

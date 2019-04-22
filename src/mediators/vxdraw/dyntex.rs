@@ -91,9 +91,6 @@ impl Default for TextureOptions {
 /// To make sure transparency works correctly you can turn off the depth test for foreground
 /// objects and ensure that the foreground texture is allocated last.
 pub fn push_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions) -> TextureHandle {
-    let (texture_vertex_buffer, texture_vertex_memory, texture_vertex_requirements) =
-        make_vertex_buffer_with_data(s, &[0f32; 10 * 4 * 1000]);
-
     let device = &s.device;
 
     let img = load_image::load_from_memory_with_format(&img_data[..], load_image::PNG)
@@ -606,6 +603,9 @@ pub fn push_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions)
         s.device.destroy_shader_module(fs_module);
     }
 
+    let (texture_vertex_buffer, texture_vertex_memory, texture_vertex_requirements) =
+        make_vertex_buffer_with_data(s, &[0f32; 10 * 4 * 1000]);
+
     let (
         texture_vertex_buffer_indices,
         texture_vertex_memory_indices,
@@ -614,6 +614,8 @@ pub fn push_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions)
 
     s.dyntexs.push(SingleTexture {
         count: 0,
+
+        mockbuffer: vec![0u8; 4 * 10 * 1000 * 4],
 
         texture_vertex_buffer: ManuallyDrop::new(texture_vertex_buffer),
         texture_vertex_memory: ManuallyDrop::new(texture_vertex_memory),
@@ -685,13 +687,7 @@ pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -
             .expect("Couldn't release the mapping writer!");
     }
     unsafe {
-        let mut data_target = device
-            .acquire_mapping_writer(
-                &tex.texture_vertex_memory,
-                0..tex.texture_vertex_requirements.size,
-            )
-            .expect("Failed to acquire a memory writer!");
-        let idx = (tex.count * 4 * 10) as usize;
+        let idx = (tex.count * 4 * 10 * 4) as usize;
 
         for (i, (point, uv)) in [
             (topleft, topleft_uv),
@@ -702,20 +698,38 @@ pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -
         .iter()
         .enumerate()
         {
-            let idx = idx + i * 10;
-            data_target[idx..idx + 3].copy_from_slice(&[point.0, point.1, sprite.depth]);
-            data_target[idx + 3..idx + 5].copy_from_slice(&[uv.0, uv.1]);
-            data_target[idx + 5..idx + 7]
-                .copy_from_slice(&[sprite.translation.0, sprite.translation.1]);
-            data_target[idx + 7..idx + 8].copy_from_slice(&[sprite.rotation]);
-            data_target[idx + 8..idx + 9].copy_from_slice(&[sprite.scale]);
-            data_target[idx + 9..idx + 10]
-                .copy_from_slice(&[std::mem::transmute::<_, f32>(sprite.colors[i])]);
+            let idx = idx + i * 10 * 4;
+            use std::mem::transmute;
+            let x = &transmute::<f32, [u8; 4]>(point.0);
+            let y = &transmute::<f32, [u8; 4]>(point.1);
+
+            let uv0 = &transmute::<f32, [u8; 4]>(uv.0);
+            let uv1 = &transmute::<f32, [u8; 4]>(uv.1);
+
+            let tr0 = &transmute::<f32, [u8; 4]>(sprite.translation.0);
+            let tr1 = &transmute::<f32, [u8; 4]>(sprite.translation.1);
+
+            let rot = &transmute::<f32, [u8; 4]>(sprite.rotation);
+            let scale = &transmute::<f32, [u8; 4]>(sprite.scale);
+
+            let colors = &transmute::<(u8, u8, u8, u8), [u8; 4]>(sprite.colors[i]);
+
+            tex.mockbuffer[idx..idx + 4].copy_from_slice(x);
+            tex.mockbuffer[idx + 4..idx + 8].copy_from_slice(y);
+            tex.mockbuffer[idx + 8..idx + 12]
+                .copy_from_slice(&transmute::<f32, [u8; 4]>(sprite.depth));
+
+            tex.mockbuffer[idx + 12..idx + 16].copy_from_slice(uv0);
+            tex.mockbuffer[idx + 16..idx + 20].copy_from_slice(uv1);
+
+            tex.mockbuffer[idx + 20..idx + 24].copy_from_slice(tr0);
+            tex.mockbuffer[idx + 24..idx + 28].copy_from_slice(tr1);
+
+            tex.mockbuffer[idx + 28..idx + 32].copy_from_slice(rot);
+            tex.mockbuffer[idx + 32..idx + 36].copy_from_slice(scale);
+            tex.mockbuffer[idx + 36..idx + 40].copy_from_slice(colors);
         }
         tex.count += 1;
-        device
-            .release_mapping_writer(data_target)
-            .expect("Couldn't release the mapping writer!");
     }
     SpriteHandle(texture.0, (tex.count - 1) as usize)
 }
@@ -724,34 +738,25 @@ pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -
 
 pub fn set_position(s: &mut Windowing, handle: &SpriteHandle, position: (f32, f32)) {
     let device = &s.device;
-    if let Some(ref mut stex) = s.dyntexs.get(handle.0) {
+    if let Some(stex) = s.dyntexs.get_mut(handle.0) {
         unsafe {
-            device
-                .wait_for_fences(
-                    &s.frames_in_flight_fences,
-                    gfx_hal::device::WaitFor::All,
-                    u64::max_value(),
-                )
-                .expect("Unable to wait for fences");
-            let mut data_target = device
-                .acquire_mapping_writer::<f32>(
-                    &stex.texture_vertex_memory,
-                    0..stex.texture_vertex_requirements.size,
-                )
-                .expect("Failed to acquire a memory writer!");
+            use std::mem::transmute;
+            let position0 = &transmute::<f32, [u8; 4]>(position.0);
+            let position1 = &transmute::<f32, [u8; 4]>(position.1);
 
-            let mut idx = (handle.1 * 10 * 4) as usize;
-            data_target[idx + 5..idx + 7].copy_from_slice(&[position.0, position.1]);
-            idx += 10;
-            data_target[idx + 5..idx + 7].copy_from_slice(&[position.0, position.1]);
-            idx += 10;
-            data_target[idx + 5..idx + 7].copy_from_slice(&[position.0, position.1]);
-            idx += 10;
-            data_target[idx + 5..idx + 7].copy_from_slice(&[position.0, position.1]);
+            let mut idx = (handle.1 * 4 * 10 * 4) as usize;
 
-            device
-                .release_mapping_writer(data_target)
-                .expect("Couldn't release the mapping writer!");
+            stex.mockbuffer[idx + 5 * 4..idx + 6 * 4].copy_from_slice(position0);
+            stex.mockbuffer[idx + 6 * 4..idx + 7 * 4].copy_from_slice(position1);
+            idx += 40;
+            stex.mockbuffer[idx + 5 * 4..idx + 6 * 4].copy_from_slice(position0);
+            stex.mockbuffer[idx + 6 * 4..idx + 7 * 4].copy_from_slice(position1);
+            idx += 40;
+            stex.mockbuffer[idx + 5 * 4..idx + 6 * 4].copy_from_slice(position0);
+            stex.mockbuffer[idx + 6 * 4..idx + 7 * 4].copy_from_slice(position1);
+            idx += 40;
+            stex.mockbuffer[idx + 5 * 4..idx + 6 * 4].copy_from_slice(position0);
+            stex.mockbuffer[idx + 6 * 4..idx + 7 * 4].copy_from_slice(position1);
         }
     }
 }
@@ -759,52 +764,15 @@ pub fn set_position(s: &mut Windowing, handle: &SpriteHandle, position: (f32, f3
 /// Translate all sprites that depend on a given texture
 pub fn sprite_translate_all(s: &mut Windowing, tex: &TextureHandle, dxdy: (f32, f32)) {
     let device = &s.device;
-    if let Some(ref mut stex) = s.dyntexs.get(tex.0) {
+    if let Some(stex) = s.dyntexs.get_mut(tex.0) {
         unsafe {
-            device
-                .wait_for_fences(
-                    &s.frames_in_flight_fences,
-                    gfx_hal::device::WaitFor::All,
-                    u64::max_value(),
-                )
-                .expect("Unable to wait for fences");
-        }
-        unsafe {
-            let data_reader = device
-                .acquire_mapping_reader::<f32>(
-                    &stex.texture_vertex_memory,
-                    0..stex.texture_vertex_requirements.size,
-                )
-                .expect("Failed to acquire a memory writer!");
-            let mut vertices = Vec::with_capacity(stex.count as usize);
-            for i in 0..stex.count {
-                let idx = (i * 10 * 4) as usize;
-                let translation = &data_reader[idx + 5..idx + 7];
-                vertices.push((translation[0], translation[1]));
+            for mock in stex.mockbuffer.chunks_mut(40) {
+                use std::mem::transmute;
+                let x = transmute::<&[u8], &[f32]>(&mock[5 * 4..6 * 4]);
+                let y = transmute::<&[u8], &[f32]>(&mock[6 * 4..7 * 4]);
+                mock[5 * 4..6 * 4].copy_from_slice(&transmute::<f32, [u8; 4]>(x[0] + dxdy.0));
+                mock[6 * 4..7 * 4].copy_from_slice(&transmute::<f32, [u8; 4]>(y[0] + dxdy.1));
             }
-            device.release_mapping_reader(data_reader);
-
-            let mut data_target = device
-                .acquire_mapping_writer::<f32>(
-                    &stex.texture_vertex_memory,
-                    0..stex.texture_vertex_requirements.size,
-                )
-                .expect("Failed to acquire a memory writer!");
-
-            for (i, prev_dxdy) in vertices.iter().enumerate() {
-                let mut idx = (i * 10 * 4) as usize;
-                let new_dxdy = (prev_dxdy.0 + dxdy.0, prev_dxdy.1 + dxdy.1);
-                data_target[idx + 5..idx + 7].copy_from_slice(&[new_dxdy.0, new_dxdy.1]);
-                idx += 10;
-                data_target[idx + 5..idx + 7].copy_from_slice(&[new_dxdy.0, new_dxdy.1]);
-                idx += 10;
-                data_target[idx + 5..idx + 7].copy_from_slice(&[new_dxdy.0, new_dxdy.1]);
-                idx += 10;
-                data_target[idx + 5..idx + 7].copy_from_slice(&[new_dxdy.0, new_dxdy.1]);
-            }
-            device
-                .release_mapping_writer(data_target)
-                .expect("Couldn't release the mapping writer!");
         }
     }
 }
@@ -812,94 +780,40 @@ pub fn sprite_translate_all(s: &mut Windowing, tex: &TextureHandle, dxdy: (f32, 
 /// Rotate all sprites that depend on a given texture
 pub fn sprite_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, tex: &TextureHandle, deg: T) {
     let device = &s.device;
-    if let Some(ref mut stex) = s.dyntexs.get(tex.0) {
+    if let Some(stex) = s.dyntexs.get_mut(tex.0) {
         unsafe {
-            device
-                .wait_for_fences(
-                    &s.frames_in_flight_fences,
-                    gfx_hal::device::WaitFor::All,
-                    u64::max_value(),
-                )
-                .expect("Unable to wait for fences");
-        }
-        unsafe {
-            let data_reader = device
-                .acquire_mapping_reader::<f32>(
-                    &stex.texture_vertex_memory,
-                    0..stex.texture_vertex_requirements.size,
-                )
-                .expect("Failed to acquire a memory writer!");
-            let mut vertices = Vec::<f32>::with_capacity(stex.count as usize);
-            for i in 0..stex.count {
-                let idx = (i * 10 * 4) as usize;
-                let rotation = &data_reader[idx + 7..idx + 8];
-                vertices.push(rotation[0]);
+            for mock in stex.mockbuffer.chunks_mut(40) {
+                use std::mem::transmute;
+                let deggy = transmute::<&[u8], &[f32]>(&mock[28..32]);
+                mock[28..32].copy_from_slice(&transmute::<f32, [u8; 4]>(deggy[0] + deg.into().0));
             }
-            device.release_mapping_reader(data_reader);
-
-            let mut data_target = device
-                .acquire_mapping_writer::<f32>(
-                    &stex.texture_vertex_memory,
-                    0..stex.texture_vertex_requirements.size,
-                )
-                .expect("Failed to acquire a memory writer!");
-
-            for (i, vert) in vertices.iter().enumerate() {
-                let mut idx = (i * 10 * 4) as usize;
-                data_target[idx + 7..idx + 8].copy_from_slice(&[*vert + deg.into().0]);
-                idx += 10;
-                data_target[idx + 7..idx + 8].copy_from_slice(&[*vert + deg.into().0]);
-                idx += 10;
-                data_target[idx + 7..idx + 8].copy_from_slice(&[*vert + deg.into().0]);
-                idx += 10;
-                data_target[idx + 7..idx + 8].copy_from_slice(&[*vert + deg.into().0]);
-            }
-            device
-                .release_mapping_writer(data_target)
-                .expect("Couldn't release the mapping writer!");
         }
     }
 }
 
 pub fn set_uv(s: &mut Windowing, handle: &SpriteHandle, uv_begin: (f32, f32), uv_end: (f32, f32)) {
-    if let Some(ref mut stex) = s.dyntexs.get(handle.0) {
+    if let Some(stex) = s.dyntexs.get_mut(handle.0) {
         if handle.1 < stex.count as usize {
-            let device = &s.device;
-            let aligned = perfect_mapping_alignment(Align {
-                access_offset: (handle.1 * 4 * 10 * 4) as u64,
-                how_many_bytes_you_need: 40 * 4,
-                non_coherent_atom_size: s.device_limits.non_coherent_atom_size as u64,
-                memory_size: stex.texture_vertex_requirements.size,
-            });
-
             unsafe {
-                device
-                    .wait_for_fences(
-                        &s.frames_in_flight_fences,
-                        gfx_hal::device::WaitFor::All,
-                        u64::max_value(),
-                    )
-                    .expect("Unable to wait for fences");
-                let mut data_target = device
-                    .acquire_mapping_writer::<f32>(
-                        &stex.texture_vertex_memory,
-                        aligned.begin..aligned.end,
-                    )
-                    .expect("Failed to acquire a memory writer!");
+                let mut idx = (handle.1 * 4 * 10 * 4) as usize;
 
-                let mut idx = aligned.index_offset / 4;
+                use std::mem::transmute;
+                let begin0 = &transmute::<f32, [u8; 4]>(uv_begin.0);
+                let begin1 = &transmute::<f32, [u8; 4]>(uv_begin.1);
+                let end0 = &transmute::<f32, [u8; 4]>(uv_end.0);
+                let end1 = &transmute::<f32, [u8; 4]>(uv_end.1);
 
-                data_target[idx + 3..idx + 5].copy_from_slice(&[uv_begin.0, uv_begin.1]);
-                idx += 10;
-                data_target[idx + 3..idx + 5].copy_from_slice(&[uv_begin.0, uv_end.1]);
-                idx += 10;
-                data_target[idx + 3..idx + 5].copy_from_slice(&[uv_end.0, uv_end.1]);
-                idx += 10;
-                data_target[idx + 3..idx + 5].copy_from_slice(&[uv_end.0, uv_begin.1]);
-
-                device
-                    .release_mapping_writer(data_target)
-                    .expect("Couldn't release the mapping writer!");
+                stex.mockbuffer[idx + 3 * 4..idx + 4 * 4].copy_from_slice(begin0);
+                stex.mockbuffer[idx + 4 * 4..idx + 5 * 4].copy_from_slice(begin1);
+                idx += 40;
+                stex.mockbuffer[idx + 3 * 4..idx + 4 * 4].copy_from_slice(begin0);
+                stex.mockbuffer[idx + 4 * 4..idx + 5 * 4].copy_from_slice(end1);
+                idx += 40;
+                stex.mockbuffer[idx + 3 * 4..idx + 4 * 4].copy_from_slice(end0);
+                stex.mockbuffer[idx + 4 * 4..idx + 5 * 4].copy_from_slice(end1);
+                idx += 40;
+                stex.mockbuffer[idx + 3 * 4..idx + 4 * 4].copy_from_slice(end0);
+                stex.mockbuffer[idx + 4 * 4..idx + 5 * 4].copy_from_slice(begin1);
             }
         }
     }
@@ -910,93 +824,39 @@ pub fn set_uvs2<'a>(
     mut uvs: impl Iterator<Item = (&'a SpriteHandle, (f32, f32), (f32, f32))>,
 ) {
     if let Some(first) = uvs.next() {
-        if let Some(ref mut stex) = s.dyntexs.get((first.0).0) {
+        if let Some(ref mut stex) = s.dyntexs.get_mut((first.0).0) {
             let device = &s.device;
             let current_texture_handle = (first.0).0;
             unsafe {
-                device
-                    .wait_for_fences(
-                        &s.frames_in_flight_fences,
-                        gfx_hal::device::WaitFor::All,
-                        u64::max_value(),
-                    )
-                    .expect("Unable to wait for fences");
-                let mut data_target = device
-                    .acquire_mapping_writer::<f32>(
-                        &stex.texture_vertex_memory,
-                        0..stex.texture_vertex_requirements.size,
-                    )
-                    .expect("Failed to acquire a memory writer!");
                 for handle in uvs {
                     if (handle.0).0 != current_texture_handle {
                         panic!["The texture handles of each sprite must be identical"];
                     }
                     if (handle.0).1 < stex.count as usize {
-                        let mut idx = ((handle.0).1 * 4 * 10) as usize;
+                        let mut idx = ((handle.0).1 * 4 * 10 * 4) as usize;
                         let uv_begin = handle.1;
                         let uv_end = handle.2;
 
-                        data_target[idx + 3..idx + 5].copy_from_slice(&[uv_begin.0, uv_begin.1]);
-                        idx += 10;
-                        data_target[idx + 3..idx + 5].copy_from_slice(&[uv_begin.0, uv_end.1]);
-                        idx += 10;
-                        data_target[idx + 3..idx + 5].copy_from_slice(&[uv_end.0, uv_end.1]);
-                        idx += 10;
-                        data_target[idx + 3..idx + 5].copy_from_slice(&[uv_end.0, uv_begin.1]);
-                    }
-                }
-                device
-                    .release_mapping_writer(data_target)
-                    .expect("Couldn't release the mapping writer!");
-            }
-        }
-    }
-}
+                        use std::mem::transmute;
+                        let begin0 = &transmute::<f32, [u8; 4]>(uv_begin.0);
+                        let begin1 = &transmute::<f32, [u8; 4]>(uv_begin.1);
+                        let end0 = &transmute::<f32, [u8; 4]>(uv_end.0);
+                        let end1 = &transmute::<f32, [u8; 4]>(uv_end.1);
 
-pub fn set_uvs(
-    s: &mut Windowing,
-    handles: &[SpriteHandle],
-    mut uvs: impl Iterator<Item = ((f32, f32), (f32, f32))>,
-) {
-    if let Some(ref mut stex) = s.dyntexs.get(handles[0].0) {
-        let device = &s.device;
-        let current_texture_handle = handles[0].0;
-        unsafe {
-            device
-                .wait_for_fences(
-                    &s.frames_in_flight_fences,
-                    gfx_hal::device::WaitFor::All,
-                    u64::max_value(),
-                )
-                .expect("Unable to wait for fences");
-            let mut data_target = device
-                .acquire_mapping_writer::<f32>(
-                    &stex.texture_vertex_memory,
-                    0..stex.texture_vertex_requirements.size,
-                )
-                .expect("Failed to acquire a memory writer!");
-            for handle in handles {
-                if handle.0 != current_texture_handle {
-                    panic![];
-                }
-                if handle.1 < stex.count as usize {
-                    let mut idx = (handle.1 * 4 * 10) as usize;
-                    if let Some((uv_begin, uv_end)) = uvs.next() {
-                        data_target[idx + 3..idx + 5].copy_from_slice(&[uv_begin.0, uv_begin.1]);
-                        idx += 10;
-                        data_target[idx + 3..idx + 5].copy_from_slice(&[uv_begin.0, uv_end.1]);
-                        idx += 10;
-                        data_target[idx + 3..idx + 5].copy_from_slice(&[uv_end.0, uv_end.1]);
-                        idx += 10;
-                        data_target[idx + 3..idx + 5].copy_from_slice(&[uv_end.0, uv_begin.1]);
-                    } else {
-                        break;
+                        stex.mockbuffer[idx + 3 * 4..idx + 4 * 4].copy_from_slice(begin0);
+                        stex.mockbuffer[idx + 4 * 4..idx + 5 * 4].copy_from_slice(begin1);
+                        idx += 40;
+                        stex.mockbuffer[idx + 3 * 4..idx + 4 * 4].copy_from_slice(begin0);
+                        stex.mockbuffer[idx + 4 * 4..idx + 5 * 4].copy_from_slice(end1);
+                        idx += 40;
+                        stex.mockbuffer[idx + 3 * 4..idx + 4 * 4].copy_from_slice(end0);
+                        stex.mockbuffer[idx + 4 * 4..idx + 5 * 4].copy_from_slice(end1);
+                        idx += 40;
+                        stex.mockbuffer[idx + 3 * 4..idx + 4 * 4].copy_from_slice(end0);
+                        stex.mockbuffer[idx + 4 * 4..idx + 5 * 4].copy_from_slice(begin1);
                     }
                 }
             }
-            device
-                .release_mapping_writer(data_target)
-                .expect("Couldn't release the mapping writer!");
         }
     }
 }
@@ -1343,68 +1203,6 @@ mod tests {
 
         let prspect = gen_perspective(&windowing);
         b.iter(|| {
-            draw_frame(&mut windowing, &mut logger, &prspect);
-        });
-    }
-
-    #[bench]
-    fn animated_fireballs_20x20(b: &mut Bencher) {
-        let mut logger = Logger::spawn_void();
-        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&windowing);
-
-        let fireball_texture = push_texture(
-            &mut windowing,
-            FIREBALL,
-            TextureOptions {
-                depth_test: false,
-                ..TextureOptions::default()
-            },
-        );
-
-        let mut fireballs = vec![];
-        for idx in -10..10 {
-            for jdx in -10..10 {
-                fireballs.push(push_sprite(
-                    &mut windowing,
-                    &fireball_texture,
-                    Sprite {
-                        width: 0.68,
-                        height: 0.09,
-                        rotation: idx as f32 / 18.0 + jdx as f32 / 16.0,
-                        translation: (idx as f32 / 10.0, jdx as f32 / 10.0),
-                        ..Sprite::default()
-                    },
-                ));
-            }
-        }
-
-        let width_elems = 10;
-        let height_elems = 6;
-
-        let mut counter = 0;
-
-        b.iter(|| {
-            let width_elem = counter % width_elems;
-            let height_elem = counter / width_elems;
-            let uv_begin = (
-                width_elem as f32 / width_elems as f32,
-                height_elem as f32 / height_elems as f32,
-            );
-            let uv_end = (
-                (width_elem + 1) as f32 / width_elems as f32,
-                (height_elem + 1) as f32 / height_elems as f32,
-            );
-            counter += 1;
-            if counter > width_elems * height_elems {
-                counter = 0;
-            }
-
-            set_uvs(
-                &mut windowing,
-                &fireballs,
-                (0..fireballs.len()).map(|_| (uv_begin, uv_end)),
-            );
             draw_frame(&mut windowing, &mut logger, &prspect);
         });
     }

@@ -44,6 +44,8 @@ pub struct StreamingTexture {
 pub struct SingleTexture {
     pub count: u32,
 
+    pub mockbuffer: Vec<u8>,
+
     pub texture_vertex_buffer: ManuallyDrop<<back::Backend as Backend>::Buffer>,
     pub texture_vertex_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,
     pub texture_vertex_requirements: gfx_hal::memory::Requirements,

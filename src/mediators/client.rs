@@ -338,7 +338,7 @@ pub fn entry_point_client(s: &mut Main) {
         if s.logic.should_exit {
             break;
         }
-        fire_bullets(&mut s.logic, s.graphics.as_mut());
+        fire_bullets(&mut s.logic, &mut s.graphics);
         update_graphics(s);
         draw_graphics(s);
     }
@@ -353,9 +353,9 @@ fn upload_player_position(
     vxdraw::quads::set_position(windowing, handle, (pos.x, pos.y));
 }
 
-fn fire_bullets(s: &mut Logic, graphics: Option<&mut Graphics>) {
+fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>) {
     if s.input.is_left_mouse_button_down() {
-        let handle = if let Some(graphics) = graphics {
+        let handle = if let Some(ref mut graphics) = graphics {
             Some(vxdraw::dyntex::push_sprite(
                 &mut graphics.windowing,
                 &graphics.bullets_texture,
@@ -369,13 +369,20 @@ fn fire_bullets(s: &mut Logic, graphics: Option<&mut Graphics>) {
         } else {
             None
         };
-        // TODO get the window size
-        // let direction = Vec2::from(s.input.get_mouse_pos())
-        //     - Vec2::from(windowing.get_window_size_in_pixels_float()) / 2.0;
-        let direction = Vec2 { x: 1.0, y: 0.0 };
+
+        let direction = if let Some(ref mut graphics) = graphics {
+            Vec2::from(s.input.get_mouse_pos())
+                - Vec2::from(graphics.windowing.get_window_size_in_pixels_float()) / 2.0
+        } else {
+            Vec2 { x: 1.0, y: 0.0 }
+        };
+
+        let position = s.players.get(0).map_or(Vec2 { x: 0.0, y: 0.0 }, |x| {
+            x.position + Vec2 { x: 5.0, y: 5.0 }
+        });
         s.bullets.push(Bullet {
             direction: direction.normalize(),
-            position: Vec2 { x: 0.0, y: 0.0 },
+            position,
 
             animation_sequence: 0,
             animation_block_begin: (0.0, 0.0),

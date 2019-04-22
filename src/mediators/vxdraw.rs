@@ -678,7 +678,7 @@ fn draw_frame_internal<T>(
                             0..dyntex.texture_vertex_requirements.size,
                         )
                         .expect("Unable to get mapping writer");
-                    data_target[..4 * 10 * 1000 * 4].copy_from_slice(&dyntex.mockbuffer);
+                    data_target[..dyntex.mockbuffer.len()].copy_from_slice(&dyntex.mockbuffer);
                     s.device.release_mapping_writer(data_target);
                     let buffers: ArrayVec<[_; 1]> = [(&*dyntex.texture_vertex_buffer, 0)].into();
                     enc.bind_vertex_buffers(0, buffers);

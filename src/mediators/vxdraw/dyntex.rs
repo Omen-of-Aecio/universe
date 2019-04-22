@@ -615,7 +615,7 @@ pub fn push_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions)
     s.dyntexs.push(SingleTexture {
         count: 0,
 
-        mockbuffer: vec![0u8; 4 * 10 * 1000 * 4],
+        mockbuffer: vec![],
 
         texture_vertex_buffer: ManuallyDrop::new(texture_vertex_buffer),
         texture_vertex_memory: ManuallyDrop::new(texture_vertex_memory),
@@ -689,6 +689,7 @@ pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -
     unsafe {
         let idx = (tex.count * 4 * 10 * 4) as usize;
 
+        tex.mockbuffer.extend([0u8; 4*40].iter());
         for (i, (point, uv)) in [
             (topleft, topleft_uv),
             (bottomleft, bottomleft_uv),

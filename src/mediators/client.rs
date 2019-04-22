@@ -355,6 +355,13 @@ fn upload_player_position(
 
 fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>) {
     if s.input.is_left_mouse_button_down() {
+        let direction = if let Some(ref mut graphics) = graphics {
+            Vec2::from(s.input.get_mouse_pos())
+                - Vec2::from(graphics.windowing.get_window_size_in_pixels_float()) / 2.0
+        } else {
+            Vec2 { x: 1.0, y: 0.0 }
+        };
+
         let handle = if let Some(ref mut graphics) = graphics {
             Some(vxdraw::dyntex::push_sprite(
                 &mut graphics.windowing,
@@ -363,18 +370,12 @@ fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>) {
                     width: 6.8,
                     height: 0.9,
                     scale: 3.0,
+                    rotation: -direction.angle() + std::f32::consts::PI,
                     ..vxdraw::dyntex::Sprite::default()
                 },
             ))
         } else {
             None
-        };
-
-        let direction = if let Some(ref mut graphics) = graphics {
-            Vec2::from(s.input.get_mouse_pos())
-                - Vec2::from(graphics.windowing.get_window_size_in_pixels_float()) / 2.0
-        } else {
-            Vec2 { x: 1.0, y: 0.0 }
         };
 
         let position = s.players.get(0).map_or(Vec2 { x: 0.0, y: 0.0 }, |x| {

@@ -49,6 +49,10 @@ impl Vec2 {
     pub fn cross(a: Vec2, b: Vec2) -> f32 {
         a.x * b.y - a.y * b.x
     }
+
+    pub fn angle(self) -> f32 {
+        self.y.atan2(self.x)
+    }
 }
 
 // ---

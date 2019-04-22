@@ -43,7 +43,7 @@
 //!
 //! fn main() {
 //!     // Setup, with 99 buffered benchmarks
-//!     let mut bench = Benchmarker::new(99);
+//!     let mut bench = Benchmarker::new(100);
 //!
 //!     for _ in 0..99 {
 //!         // Start the benchmark
@@ -102,15 +102,21 @@ impl Benchmarker {
     pub fn stop(&mut self) -> Option<Duration> {
         let now = Instant::now();
         self.sum += now - self.last;
-        if self.count < self.window {
-            self.count += 1;
-            None
-        } else {
+        self.count += 1;
+        if self.count >= self.window {
+            let ret = Some(self.sum / self.count as u32);
             self.count = 0;
-            let ret = Some(self.sum);
             self.sum = Duration::new(0, 0);
             ret
+        } else {
+            None
         }
+    }
+
+    pub fn run<T>(&mut self, mut f: impl FnMut() -> T) -> (T, Option<Duration>) {
+        self.start();
+        let t = f();
+        (t, self.stop())
     }
 }
 
@@ -124,19 +130,28 @@ mod tests {
         let mut ben = Benchmarker::new(0);
         ben.start();
         assert![ben.stop().is_some()];
+        ben.start();
+        assert![ben.stop().is_some()];
     }
 
     #[test]
     fn basic_length() {
         let mut ben = Benchmarker::new(1);
         ben.start();
-        assert![ben.stop().is_none()];
+        assert![ben.stop().is_some()];
         ben.start();
         assert![ben.stop().is_some()];
     }
 
     #[test]
-    fn ten_length() {
+    fn basic_length_run() {
+        let mut ben = Benchmarker::new(1);
+        let ((), duration) = ben.run(|| {});
+        assert![duration.is_some()];
+    }
+
+    #[test]
+    fn five_length() {
         let mut ben = Benchmarker::new(5);
         ben.start();
         assert![ben.stop().is_none()];
@@ -147,10 +162,10 @@ mod tests {
         ben.start();
         assert![ben.stop().is_none()];
         ben.start();
-        assert![ben.stop().is_none()];
-        ben.start();
         assert![ben.stop().is_some()];
     }
+
+    // ---
 
     #[bench]
     fn zero_usage(b: &mut Bencher) {

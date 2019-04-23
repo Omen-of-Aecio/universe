@@ -62,7 +62,7 @@ fn move_camera_according_to_input(s: &mut Logic) {
             }
         }
         x if x < 0.0 => {
-            if s.cam.zoom > 0.01 {
+            if s.cam.zoom > 0.002 {
                 s.cam.zoom /= 1.1;
             }
         }
@@ -195,7 +195,7 @@ fn set_gravity(s: &mut Logic) {
 
 fn create_black_square_around_player(s: &mut Grid<u8>) {
     for (i, j) in Boxit::with_center((100, 100), (500, 300)) {
-        *s.get_mut(i, j).unwrap() = 0;
+        s.set(i, j, 0);
     }
 }
 
@@ -328,8 +328,13 @@ pub fn entry_point_client(s: &mut Main) {
         position: Vec2 { x: 0.0, y: 0.0 },
     });
 
+    create_black_square_around_player(&mut s.logic.grid);
+
     s.logger.info("cli", "Initializing graphics");
     maybe_initialize_graphics(s);
+
+    let mut draw_bench = benchmarker::Benchmarker::new(100);
+    let mut update_bench = benchmarker::Benchmarker::new(100);
 
     loop {
         s.time = Instant::now();
@@ -339,8 +344,19 @@ pub fn entry_point_client(s: &mut Main) {
             break;
         }
         fire_bullets(&mut s.logic, &mut s.graphics);
-        update_graphics(s);
-        draw_graphics(s);
+        let ((), duration) = update_bench.run(|| {
+            update_graphics(s);
+        });
+        if let Some(duration) = duration {
+            info![s.logger, "cli", "Time taken per update"; "duration" => InDebug(&duration)];
+        }
+
+        let ((), duration) = draw_bench.run(|| {
+            draw_graphics(s);
+        });
+        if let Some(duration) = duration {
+            info![s.logger, "cli", "Time taken per graphics"; "duration" => InDebug(&duration)];
+        }
     }
 }
 

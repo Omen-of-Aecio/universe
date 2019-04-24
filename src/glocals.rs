@@ -4,6 +4,8 @@ use geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
 use input;
 use ketimer::WeakTimer;
 use logger::Logger;
+use rand::Rng;
+use rand_pcg::Pcg64Mcg;
 use rodio;
 use serde_derive::Deserialize;
 use std::{
@@ -32,6 +34,7 @@ pub struct Main<'a> {
     pub logger: Logger<Log>,
     pub logic: Logic,
     pub network: Socket<i32>,
+    pub random: Pcg64Mcg,
     pub threads: Threads,
     pub time: Instant,
     pub timers: Timers,
@@ -53,6 +56,7 @@ impl Default for Main<'_> {
             logger: Logger::spawn_void(),
             logic: Logic::default(),
             network: Socket::default(),
+            random: Pcg64Mcg::new(0),
             threads: Threads::default(),
             time: Instant::now(),
             timers: Timers::default(),

@@ -6,6 +6,7 @@ use cgmath::*;
 use geometry::{boxit::Boxit, cam::Camera, grid2d::Grid, vec::Vec2};
 use input::Input;
 use logger::{debug, info, InDebug, Logger};
+use rand::Rng;
 use std::time::Instant;
 use winit::{VirtualKeyCode as Key, *};
 
@@ -360,7 +361,7 @@ pub fn entry_point_client(s: &mut Main) {
         if s.logic.should_exit {
             break;
         }
-        fire_bullets(&mut s.logic, &mut s.graphics);
+        fire_bullets(&mut s.logic, &mut s.graphics, &mut s.random);
         let ((), duration) = update_bench.run(|| {
             update_graphics(s);
         });
@@ -386,11 +387,12 @@ fn upload_player_position(
     vxdraw::quads::set_position(windowing, handle, (pos.x, pos.y));
 }
 
-fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>) {
+fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>, random: &mut rand_pcg::Pcg64Mcg) {
     if s.input.is_left_mouse_button_down() {
         let direction = if let Some(ref mut graphics) = graphics {
-            Vec2::from(s.input.get_mouse_pos())
-                - Vec2::from(graphics.windowing.get_window_size_in_pixels_float()) / 2.0
+            (Vec2::from(s.input.get_mouse_pos())
+                - Vec2::from(graphics.windowing.get_window_size_in_pixels_float()) / 2.0)
+                .rotate(random.gen_range(-0.1, 0.1))
         } else {
             Vec2 { x: 1.0, y: 0.0 }
         };

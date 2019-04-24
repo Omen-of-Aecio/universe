@@ -624,6 +624,7 @@ pub fn push_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions)
 
         fixed_perspective: options.fixed_perspective,
         mockbuffer: vec![],
+        removed: vec![],
 
         texture_vertex_buffer: ManuallyDrop::new(texture_vertex_buffer),
         texture_vertex_memory: ManuallyDrop::new(texture_vertex_memory),
@@ -673,6 +674,14 @@ pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -
     let bottomright = (width / 2f32, height / 2f32);
     let bottomright_uv = (uv_b.0, uv_b.1);
 
+    let index = if let Some(value) = tex.removed.pop() {
+        value as u32
+    } else {
+        let old = tex.count;
+        tex.count += 1;
+        old
+    };
+
     unsafe {
         let mut data_target = device
             .acquire_mapping_writer(
@@ -680,8 +689,8 @@ pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -
                 0..tex.texture_vertex_requirements_indices.size,
             )
             .expect("Failed to acquire a memory writer!");
-        let ver = (tex.count * 6) as u16;
-        let ind = (tex.count * 4) as u16;
+        let ver = (index * 6) as u16;
+        let ind = (index * 4) as u16;
         data_target[ver as usize..(ver + 6) as usize].copy_from_slice(&[
             ind,
             ind + 1,
@@ -695,7 +704,7 @@ pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -
             .expect("Couldn't release the mapping writer!");
     }
     unsafe {
-        let idx = (tex.count * 4 * 10 * 4) as usize;
+        let idx = (index * 4 * 10 * 4) as usize;
 
         tex.mockbuffer.extend([0u8; 4 * 40].iter());
         for (i, (point, uv)) in [
@@ -738,18 +747,18 @@ pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -
             tex.mockbuffer[idx + 32..idx + 36].copy_from_slice(scale);
             tex.mockbuffer[idx + 36..idx + 40].copy_from_slice(colors);
         }
-        tex.count += 1;
     }
-    SpriteHandle(texture.0, (tex.count - 1) as usize)
+    SpriteHandle(texture.0, index as usize)
 }
 
 pub fn remove_sprite(s: &mut Windowing, handle: SpriteHandle) {
     if let Some(dyntex) = s.dyntexs.get_mut(handle.0) {
-        let mut idx = (handle.1 * 4 * 10 * 4) as usize + 39;
-        for i in 0..40 {
-            dyntex.mockbuffer.swap_remove(idx - i);
+        let mut idx = (handle.1 * 4 * 10 * 4) as usize;
+        let zero = unsafe { std::mem::transmute::<f32, [u8; 4]>(0.0) };
+        for idx in (0..=3).map(|x| (x * 40) + idx) {
+            dyntex.mockbuffer[idx + 32..idx + 36].copy_from_slice(&zero);
         }
-        dyntex.count -= 1;
+        dyntex.removed.push(handle.1);
     }
 }
 

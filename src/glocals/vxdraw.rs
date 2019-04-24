@@ -47,6 +47,7 @@ pub struct SingleTexture {
 
     pub fixed_perspective: Option<Matrix4<f32>>,
     pub mockbuffer: Vec<u8>,
+    pub removed: Vec<usize>,
 
     pub texture_vertex_buffer: ManuallyDrop<<back::Backend as Backend>::Buffer>,
     pub texture_vertex_memory: ManuallyDrop<<back::Backend as Backend>::Memory>,

@@ -166,6 +166,7 @@ pub struct Logic {
     pub grid: Grid<u8>,
     pub game_config: GameConfig,
     pub players: Vec<PlayerData>,
+
     pub bullets: Vec<Bullet>,
     pub cam: Camera,
     pub you: u32,

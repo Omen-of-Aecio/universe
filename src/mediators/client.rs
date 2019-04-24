@@ -212,7 +212,6 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
     let mut windowing = init_window_with_vulkan(&mut s.logger, ShowWindow::Enable);
 
     {
-        use vxdraw::dyntex;
         static BACKGROUND: &[u8] = include_bytes!["../../assets/images/terrabackground.png"];
         let background = dyntex::push_texture(
             &mut windowing,
@@ -356,6 +355,7 @@ pub fn entry_point_client(s: &mut Main) {
     loop {
         s.time = Instant::now();
         tick_logic(&mut s.logic, &mut s.logger);
+        update_bullets_position(&mut s.logic, s.graphics.as_mut().map(|x| &mut x.windowing));
         s.timers.network_timer.update(s.time, &mut s.network);
         if s.logic.should_exit {
             break;
@@ -451,17 +451,45 @@ fn update_bullets_uv(s: &mut Logic) {
     }
 }
 
-fn update_bullets_position(s: &mut Logic) {
-    for b in s.bullets.iter_mut() {
+fn update_bullets_position(s: &mut Logic, mut windowing: Option<&mut Windowing>) {
+    let mut bullets_to_remove = vec![];
+    for (idx, b) in s.bullets.iter_mut().enumerate() {
         if let Some(pos) =
             does_line_collide_with_grid(&s.grid, b.position, b.position + b.direction, |x| {
                 *x == 255
             })
         {
-            s.grid.set(pos.0, pos.1, 0);
-            s.changed_tiles.push(pos);
+            bullets_to_remove.push(idx);
+            for i in -3..=3 {
+                for j in -3..=3 {
+                    let pos = (pos.0 as i32 + i, pos.1 as i32 + j);
+                    let pos = (pos.0 as usize, pos.1 as usize);
+                    s.grid.set(pos.0, pos.1, 0);
+                    s.changed_tiles.push((pos.0, pos.1));
+                }
+            }
         }
         b.position += b.direction;
+    }
+
+    use std::cmp::Ordering;
+    bullets_to_remove.sort_by(|x, y| {
+        if *x < *y {
+            Ordering::Greater
+        } else if *x == *y {
+            Ordering::Equal
+        } else {
+            Ordering::Less
+        }
+    });
+
+    for idx in bullets_to_remove.drain(..) {
+        let bullet = s.bullets.swap_remove(idx);
+        if let Some(ref mut windowing) = windowing {
+            if let Some(handle) = bullet.handle {
+                dyntex::remove_sprite(windowing, handle);
+            }
+        }
     }
 }
 
@@ -476,7 +504,6 @@ fn tick_logic(s: &mut Logic, logger: &mut Logger<Log>) {
     move_camera_according_to_input(s);
 
     update_bullets_uv(s);
-    update_bullets_position(s);
 
     std::thread::sleep(std::time::Duration::new(0, 8_000_000));
 }

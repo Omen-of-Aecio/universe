@@ -208,12 +208,6 @@ fn toggle_camera_mode(s: &mut Logic) {
     }
 }
 
-fn stop_benchmark(benchmarker: &mut Benchmarker, logger: &mut Logger<Log>, msg: &'static str) {
-    if let Some(duration) = benchmarker.stop() {
-        debug![logger, "benchmark", "{}", msg; "µs" => duration.as_micros() / 100];
-    }
-}
-
 pub fn maybe_initialize_graphics(s: &mut Main) {
     let mut windowing = init_window_with_vulkan(&mut s.logger, ShowWindow::Enable);
 
@@ -328,10 +322,11 @@ pub fn entry_point_client(s: &mut Main) {
         position: Vec2 { x: 0.0, y: 0.0 },
     });
 
-    create_black_square_around_player(&mut s.logic.grid);
-
     s.logger.info("cli", "Initializing graphics");
     maybe_initialize_graphics(s);
+
+    initialize_grid(&mut s.logic.grid);
+    create_black_square_around_player(&mut s.logic.grid);
 
     let mut draw_bench = benchmarker::Benchmarker::new(100);
     let mut update_bench = benchmarker::Benchmarker::new(100);

@@ -1,3 +1,4 @@
+use cgmath::Matrix4;
 use core::ptr::read;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
@@ -44,6 +45,7 @@ pub struct StreamingTexture {
 pub struct SingleTexture {
     pub count: u32,
 
+    pub fixed_perspective: Option<Matrix4<f32>>,
     pub mockbuffer: Vec<u8>,
 
     pub texture_vertex_buffer: ManuallyDrop<<back::Backend as Backend>::Buffer>,

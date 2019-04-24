@@ -1,6 +1,7 @@
 use super::utils::*;
 use crate::glocals::vxdraw::{SingleTexture, Windowing};
 use ::image as load_image;
+use cgmath::Matrix4;
 use cgmath::Rad;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
@@ -67,11 +68,17 @@ pub struct TextureHandle(usize);
 pub struct TextureOptions {
     /// Perform depth testing (and fragment culling) when drawing sprites from this texture
     pub depth_test: bool,
+    /// Fix the perspective, this ignores the perspective sent into draw for this texture and
+    /// all its associated sprites
+    pub fixed_perspective: Option<Matrix4<f32>>,
 }
 
 impl Default for TextureOptions {
     fn default() -> Self {
-        Self { depth_test: true }
+        Self {
+            depth_test: true,
+            fixed_perspective: None,
+        }
     }
 }
 
@@ -615,6 +622,7 @@ pub fn push_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions)
     s.dyntexs.push(SingleTexture {
         count: 0,
 
+        fixed_perspective: options.fixed_perspective,
         mockbuffer: vec![],
 
         texture_vertex_buffer: ManuallyDrop::new(texture_vertex_buffer),
@@ -689,7 +697,7 @@ pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -
     unsafe {
         let idx = (tex.count * 4 * 10 * 4) as usize;
 
-        tex.mockbuffer.extend([0u8; 4*40].iter());
+        tex.mockbuffer.extend([0u8; 4 * 40].iter());
         for (i, (point, uv)) in [
             (topleft, topleft_uv),
             (bottomleft, bottomleft_uv),
@@ -1203,6 +1211,25 @@ mod tests {
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         utils::assert_swapchain_eq(&mut windowing, "three_layer_scene_remove_middle", img);
+    }
+
+    #[test]
+    fn fixed_perspective() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless2x1k);
+        let prspect = Matrix4::from_scale(0.0) * gen_perspective(&windowing);
+
+        let options = TextureOptions {
+            depth_test: false,
+            fixed_perspective: Some(Matrix4::identity()),
+            ..TextureOptions::default()
+        };
+        let forest = push_texture(&mut windowing, FOREST, options);
+
+        push_sprite(&mut windowing, &forest, Sprite::default());
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        utils::assert_swapchain_eq(&mut windowing, "fixed_perspective", img);
     }
 
     #[bench]

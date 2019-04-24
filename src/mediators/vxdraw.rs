@@ -659,12 +659,21 @@ fn draw_frame_internal<T>(
 
                 for dyntex in s.dyntexs.iter() {
                     enc.bind_graphics_pipeline(&dyntex.pipeline);
-                    enc.push_graphics_constants(
-                        &dyntex.pipeline_layout,
-                        ShaderStageFlags::VERTEX,
-                        0,
-                        &*(view.as_ptr() as *const [u32; 16]),
-                    );
+                    if let Some(persp) = dyntex.fixed_perspective {
+                        enc.push_graphics_constants(
+                            &dyntex.pipeline_layout,
+                            ShaderStageFlags::VERTEX,
+                            0,
+                            &*(persp.as_ptr() as *const [u32; 16]),
+                        );
+                    } else {
+                        enc.push_graphics_constants(
+                            &dyntex.pipeline_layout,
+                            ShaderStageFlags::VERTEX,
+                            0,
+                            &*(view.as_ptr() as *const [u32; 16]),
+                        );
+                    }
                     enc.bind_graphics_descriptor_sets(
                         &dyntex.pipeline_layout,
                         0,

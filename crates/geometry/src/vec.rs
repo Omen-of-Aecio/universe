@@ -53,6 +53,14 @@ impl Vec2 {
     pub fn angle(self) -> f32 {
         self.y.atan2(self.x)
     }
+
+    /// Rotate the vector around the origin by a given angle
+    pub fn rotate(self, angle: f32) -> Vec2 {
+        let angle = self.angle() + angle;
+        let x = angle.cos() * self.length();
+        let y = angle.sin() * self.length();
+        Vec2 { x, y }
+    }
 }
 
 // ---
@@ -209,6 +217,24 @@ mod tests {
     #[test]
     fn eq() {
         assert![Vec2 { x: 1.2, y: 3.4 } == Vec2 { x: 1.2, y: 3.4 }]
+    }
+
+    #[quickcheck_macros::quickcheck]
+    fn rotate_preserves_length(x: f32, y: f32, angle: f32) {
+        let vec = Vec2 { x, y };
+        assert![(vec.length() - vec.rotate(angle).length()).abs() < 0.00001];
+    }
+
+    #[quickcheck_macros::quickcheck]
+    fn rotate(x: f32) {
+        let vec = Vec2 { x, y: 0.0 };
+        assert![(vec.rotate(std::f32::consts::PI).x + x).abs() < 0.00001];
+    }
+
+    #[quickcheck_macros::quickcheck]
+    fn rotate_correct_direction(x: f32) {
+        let vec = Vec2 { x, y: 0.0 };
+        assert![(vec.rotate(std::f32::consts::PI / 2.0).y - x).abs() < 0.00001];
     }
 
     #[test]

@@ -211,6 +211,28 @@ fn toggle_camera_mode(s: &mut Logic) {
 pub fn maybe_initialize_graphics(s: &mut Main) {
     let mut windowing = init_window_with_vulkan(&mut s.logger, ShowWindow::Enable);
 
+    {
+        use vxdraw::dyntex;
+        static BACKGROUND: &[u8] = include_bytes!["../../assets/images/terrabackground.png"];
+        let background = dyntex::push_texture(
+            &mut windowing,
+            BACKGROUND,
+            dyntex::TextureOptions {
+                depth_test: true,
+                fixed_perspective: Some(Matrix4::identity()),
+                ..dyntex::TextureOptions::default()
+            },
+        );
+        dyntex::push_sprite(
+            &mut windowing,
+            &background,
+            dyntex::Sprite {
+                depth: 1.0,
+                ..dyntex::Sprite::default()
+            },
+        );
+    }
+
     let tex = vxdraw::strtex::push_texture(&mut windowing, 1000, 1000, &mut s.logger);
     s.logic.grid.resize(1000, 1000);
     vxdraw::strtex::generate_map2(&mut windowing, &tex, [1.0, 2.0, 4.0]);

@@ -856,6 +856,29 @@ pub fn set_uvs2<'a>(
             let device = &s.device;
             let current_texture_handle = (first.0).0;
             unsafe {
+                if (first.0).1 < stex.count as usize {
+                    let mut idx = ((first.0).1 * 4 * 10 * 4) as usize;
+                    let uv_begin = first.1;
+                    let uv_end = first.2;
+
+                    use std::mem::transmute;
+                    let begin0 = &transmute::<f32, [u8; 4]>(uv_begin.0);
+                    let begin1 = &transmute::<f32, [u8; 4]>(uv_begin.1);
+                    let end0 = &transmute::<f32, [u8; 4]>(uv_end.0);
+                    let end1 = &transmute::<f32, [u8; 4]>(uv_end.1);
+
+                    stex.mockbuffer[idx + 3 * 4..idx + 4 * 4].copy_from_slice(begin0);
+                    stex.mockbuffer[idx + 4 * 4..idx + 5 * 4].copy_from_slice(begin1);
+                    idx += 40;
+                    stex.mockbuffer[idx + 3 * 4..idx + 4 * 4].copy_from_slice(begin0);
+                    stex.mockbuffer[idx + 4 * 4..idx + 5 * 4].copy_from_slice(end1);
+                    idx += 40;
+                    stex.mockbuffer[idx + 3 * 4..idx + 4 * 4].copy_from_slice(end0);
+                    stex.mockbuffer[idx + 4 * 4..idx + 5 * 4].copy_from_slice(end1);
+                    idx += 40;
+                    stex.mockbuffer[idx + 3 * 4..idx + 4 * 4].copy_from_slice(end0);
+                    stex.mockbuffer[idx + 4 * 4..idx + 5 * 4].copy_from_slice(begin1);
+                }
                 for handle in uvs {
                     if (handle.0).0 != current_texture_handle {
                         panic!["The texture handles of each sprite must be identical"];
@@ -904,6 +927,7 @@ mod tests {
 
     static LOGO: &[u8] = include_bytes!["../../../assets/images/logo.png"];
     static FOREST: &[u8] = include_bytes!["../../../assets/images/forest-light.png"];
+    static TESTURE: &[u8] = include_bytes!["../../../assets/images/testure.png"];
     static TREE: &[u8] = include_bytes!["../../../assets/images/treetest.png"];
     static FIREBALL: &[u8] = include_bytes!["../../../assets/images/Fireball_68x9.png"];
 
@@ -1239,6 +1263,23 @@ mod tests {
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         utils::assert_swapchain_eq(&mut windowing, "fixed_perspective", img);
+    }
+
+    #[test]
+    fn change_of_uv_works_for_first() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let options = TextureOptions::default();
+        let testure = push_texture(&mut windowing, TESTURE, options);
+
+        let sprite = push_sprite(&mut windowing, &testure, Sprite::default());
+
+        set_uvs2(&mut windowing, std::iter::once((&sprite, (1.0/3.0, 0.0), (2.0/3.0, 1.0))));
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        utils::assert_swapchain_eq(&mut windowing, "change_of_uv_works_for_first", img);
     }
 
     #[bench]

@@ -1276,7 +1276,10 @@ mod tests {
 
         let sprite = push_sprite(&mut windowing, &testure, Sprite::default());
 
-        set_uvs2(&mut windowing, std::iter::once((&sprite, (1.0/3.0, 0.0), (2.0/3.0, 1.0))));
+        set_uvs2(
+            &mut windowing,
+            std::iter::once((&sprite, (1.0 / 3.0, 0.0), (2.0 / 3.0, 1.0))),
+        );
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         utils::assert_swapchain_eq(&mut windowing, "change_of_uv_works_for_first", img);

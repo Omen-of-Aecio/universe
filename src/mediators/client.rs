@@ -357,11 +357,26 @@ pub fn entry_point_client(s: &mut Main) {
         s.time = Instant::now();
         tick_logic(&mut s.logic, &mut s.logger);
         update_bullets_position(&mut s.logic, s.graphics.as_mut().map(|x| &mut x.windowing));
+
+        {
+            let wheel = s.logic.input.get_mouse_wheel();
+            match wheel {
+                x if x == 0.0 => {}
+                x if x > 0.0 => {
+                    s.logic.current_weapon = Weapon::Ak47;
+                }
+                x if x < 0.0 => {
+                    s.logic.current_weapon = Weapon::Hellfire;
+                }
+                _ => {}
+            }
+        }
         s.timers.network_timer.update(s.time, &mut s.network);
         if s.logic.should_exit {
             break;
         }
         fire_bullets(&mut s.logic, &mut s.graphics, &mut s.random);
+
         let ((), duration) = update_bench.run(|| {
             update_graphics(s);
         });
@@ -389,10 +404,18 @@ fn upload_player_position(
 
 fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>, random: &mut rand_pcg::Pcg64Mcg) {
     if s.input.is_left_mouse_button_down() {
+        let weapon = &s.current_weapon;
+
+        let spread = if weapon == &Weapon::Hellfire {
+            0.1
+        } else {
+            0.3
+        };
+
         let direction = if let Some(ref mut graphics) = graphics {
             (Vec2::from(s.input.get_mouse_pos())
                 - Vec2::from(graphics.windowing.get_window_size_in_pixels_float()) / 2.0)
-                .rotate(random.gen_range(-0.1, 0.1))
+                .rotate(random.gen_range(-spread, spread))
         } else {
             Vec2 { x: 1.0, y: 0.0 }
         };
@@ -504,8 +527,6 @@ fn tick_logic(s: &mut Logic, logger: &mut Logger<Log>) {
         movement,
     );
     move_camera_according_to_input(s);
-
     update_bullets_uv(s);
-
     std::thread::sleep(std::time::Duration::new(0, 8_000_000));
 }

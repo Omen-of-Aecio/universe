@@ -162,6 +162,7 @@ pub struct PlayerData {
     pub position: Vec2,
 }
 
+#[derive(PartialEq)]
 pub enum Weapon {
     Hellfire,
     Ak47,

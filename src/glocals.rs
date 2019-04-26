@@ -162,6 +162,17 @@ pub struct PlayerData {
     pub position: Vec2,
 }
 
+pub enum Weapon {
+    Hellfire,
+    Ak47,
+}
+
+impl Default for Weapon {
+    fn default() -> Self {
+        Weapon::Hellfire
+    }
+}
+
 #[derive(Default)]
 pub struct Logic {
     pub should_exit: bool,
@@ -171,6 +182,7 @@ pub struct Logic {
     pub game_config: GameConfig,
     pub players: Vec<PlayerData>,
 
+    pub current_weapon: Weapon,
     pub bullets: Vec<Bullet>,
     pub cam: Camera,
     pub you: u32,

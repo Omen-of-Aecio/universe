@@ -422,7 +422,7 @@ fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>, random: &mut ran
 
             animation_sequence: 0,
             animation_block_begin: (0.0, 0.0),
-            animation_block_end: (0.0, 0.0),
+            animation_block_end: (1.0, 1.0),
             height: 6,
             width: 10,
             current_uv_begin: (0.0, 0.0),
@@ -448,8 +448,8 @@ fn update_bullets_uv(s: &mut Logic) {
         if b.animation_sequence > b.width * b.height {
             b.animation_sequence = 0;
         }
-        b.current_uv_begin = uv_begin;
-        b.current_uv_end = uv_end;
+        b.current_uv_begin = (Vec2::from(uv_begin) + Vec2::from(b.animation_block_begin)).into();
+        b.current_uv_end = (Vec2::from(uv_end) * Vec2::from(b.animation_block_end)).into();
     }
 }
 

@@ -615,11 +615,36 @@ pub fn push_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions)
     let (texture_vertex_buffer, texture_vertex_memory, texture_vertex_requirements) =
         make_vertex_buffer_with_data(s, &[0f32; 10 * 4 * 1000]);
 
+    const INDEX_COUNT: usize = 1000;
     let (
         texture_vertex_buffer_indices,
         texture_vertex_memory_indices,
         texture_vertex_requirements_indices,
-    ) = make_index_buffer_with_data(s, &[0f32; 4 * 1000]);
+    ) = make_index_buffer_with_data(s, &[0f32; 3 * INDEX_COUNT]);
+
+    unsafe {
+        let mut data_target = s.device
+            .acquire_mapping_writer(
+                &texture_vertex_memory_indices,
+                0..texture_vertex_requirements_indices.size,
+            )
+            .expect("Failed to acquire a memory writer!");
+        for index in 0..INDEX_COUNT {
+            let ver = (index * 6) as u16;
+            let ind = (index * 4) as u16;
+            data_target[ver as usize..(ver + 6) as usize].copy_from_slice(&[
+                ind,
+                ind + 1,
+                ind + 2,
+                ind + 2,
+                ind + 3,
+                ind,
+            ]);
+        }
+        s.device
+            .release_mapping_writer(data_target)
+            .expect("Couldn't release the mapping writer!");
+    }
 
     s.dyntexs.push(SingleTexture {
         count: 0,
@@ -696,27 +721,6 @@ pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -
         old
     };
 
-    unsafe {
-        let mut data_target = device
-            .acquire_mapping_writer(
-                &tex.texture_vertex_memory_indices,
-                0..tex.texture_vertex_requirements_indices.size,
-            )
-            .expect("Failed to acquire a memory writer!");
-        let ver = (index * 6) as u16;
-        let ind = (index * 4) as u16;
-        data_target[ver as usize..(ver + 6) as usize].copy_from_slice(&[
-            ind,
-            ind + 1,
-            ind + 2,
-            ind + 2,
-            ind + 3,
-            ind,
-        ]);
-        device
-            .release_mapping_writer(data_target)
-            .expect("Couldn't release the mapping writer!");
-    }
     unsafe {
         let idx = (index * 4 * 10 * 4) as usize;
 

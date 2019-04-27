@@ -186,6 +186,8 @@ pub struct Logic {
     pub players: Vec<PlayerData>,
 
     pub current_weapon: Weapon,
+    pub current_weapon_cooldown: usize,
+
     pub bullets: Vec<Bullet>,
     pub cam: Camera,
     pub you: u32,

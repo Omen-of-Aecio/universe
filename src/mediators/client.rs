@@ -415,12 +415,22 @@ fn upload_player_position(
 
 fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>, random: &mut rand_pcg::Pcg64Mcg) {
     if s.input.is_left_mouse_button_down() {
+        if s.current_weapon_cooldown == 0 {
+            s.current_weapon_cooldown = match s.current_weapon {
+                Weapon::Hellfire => 5,
+                Weapon::Ak47 => 2,
+            }
+        } else {
+            s.current_weapon_cooldown -= 1;
+            return;
+        }
+
         let weapon = &s.current_weapon;
 
         let spread = if weapon == &Weapon::Hellfire {
-            0.1
-        } else {
             0.3
+        } else {
+            0.1
         };
 
         let (
@@ -431,8 +441,10 @@ fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>, random: &mut ran
             sprite_width,
             sprite_height,
             destruction,
+            bullet_count,
+            speed,
         ) = match weapon {
-            &Weapon::Hellfire => (10, 6, (0.0, 0.0), (1.0, 53.0 / 60.0), 6.8, 0.9, 3),
+            &Weapon::Hellfire => (10, 6, (0.0, 0.0), (1.0, 53.0 / 60.0), 6.8, 0.9, 3, 1, 1.0),
             &Weapon::Ak47 => (
                 1,
                 1,
@@ -441,51 +453,55 @@ fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>, random: &mut ran
                 0.5,
                 0.5,
                 1,
+                1,
+                2.0,
             ),
         };
 
-        let direction = if let Some(ref mut graphics) = graphics {
-            (Vec2::from(s.input.get_mouse_pos())
-                - Vec2::from(graphics.windowing.get_window_size_in_pixels_float()) / 2.0)
-                .rotate(random.gen_range(-spread, spread))
-        } else {
-            Vec2 { x: 1.0, y: 0.0 }
-        };
+        for _ in 0..bullet_count {
+            let direction = if let Some(ref mut graphics) = graphics {
+                (Vec2::from(s.input.get_mouse_pos())
+                    - Vec2::from(graphics.windowing.get_window_size_in_pixels_float()) / 2.0)
+                    .rotate(random.gen_range(-spread, spread))
+            } else {
+                Vec2 { x: 1.0, y: 0.0 }
+            };
 
-        let handle = if let Some(ref mut graphics) = graphics {
-            Some(vxdraw::dyntex::push_sprite(
-                &mut graphics.windowing,
-                &graphics.bullets_texture,
-                vxdraw::dyntex::Sprite {
-                    width: sprite_width,
-                    height: sprite_height,
-                    scale: 3.0,
-                    origin: (-sprite_width / 2.0, sprite_height / 2.0),
-                    rotation: -direction.angle() + std::f32::consts::PI,
-                    ..vxdraw::dyntex::Sprite::default()
-                },
-            ))
-        } else {
-            None
-        };
+            let handle = if let Some(ref mut graphics) = graphics {
+                Some(vxdraw::dyntex::push_sprite(
+                    &mut graphics.windowing,
+                    &graphics.bullets_texture,
+                    vxdraw::dyntex::Sprite {
+                        width: sprite_width,
+                        height: sprite_height,
+                        scale: 3.0,
+                        origin: (-sprite_width / 2.0, sprite_height / 2.0),
+                        rotation: -direction.angle() + std::f32::consts::PI,
+                        ..vxdraw::dyntex::Sprite::default()
+                    },
+                ))
+            } else {
+                None
+            };
 
-        let position = s.players.get(0).map_or(Vec2 { x: 0.0, y: 0.0 }, |x| {
-            x.position + Vec2 { x: 5.0, y: 5.0 }
-        });
-        s.bullets.push(Bullet {
-            direction: direction.normalize(),
-            position,
-            destruction,
+            let position = s.players.get(0).map_or(Vec2 { x: 0.0, y: 0.0 }, |x| {
+                x.position + Vec2 { x: 5.0, y: 5.0 }
+            });
+            s.bullets.push(Bullet {
+                direction: direction.normalize() * speed,
+                position,
+                destruction,
 
-            animation_sequence: 0,
-            animation_block_begin,
-            animation_block_end,
-            height,
-            width,
-            current_uv_begin: (0.0, 0.0),
-            current_uv_end: (0.0, 0.0),
-            handle,
-        });
+                animation_sequence: 0,
+                animation_block_begin,
+                animation_block_end,
+                height,
+                width,
+                current_uv_begin: (0.0, 0.0),
+                current_uv_end: (0.0, 0.0),
+                handle,
+            });
+        }
     }
 }
 

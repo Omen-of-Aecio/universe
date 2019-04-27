@@ -337,7 +337,6 @@ fn draw_graphics(s: &mut Main) {
             &mut s.logger,
             &(persp * scale * trans),
         );
-        collect_input(&mut s.logic, &mut graphics.windowing);
     }
 }
 
@@ -389,6 +388,11 @@ pub fn entry_point_client(s: &mut Main) {
         });
         if let Some(duration) = duration {
             info![s.logger, "cli", "Time taken per update"; "duration" => InDebug(&duration)];
+        }
+
+        s.logic.input.prepare_for_next_frame();
+        if let Some(ref mut graphics) = s.graphics {
+            collect_input(&mut s.logic, &mut graphics.windowing);
         }
 
         let ((), duration) = draw_bench.run(|| {

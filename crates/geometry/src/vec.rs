@@ -221,7 +221,7 @@ mod tests {
 
     #[quickcheck_macros::quickcheck]
     fn rotate_preserves_length(angle: f32) {
-        if angle.is_nan() {
+        if angle.is_nan() || angle.is_infinite() {
             return;
         }
         let vec = Vec2 { x: 1.0, y: 1.0 };

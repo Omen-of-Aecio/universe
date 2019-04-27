@@ -122,3 +122,16 @@ impl Input {
         self.key_down.0[keycode] = false;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn setting_ctrl_key() {
+        let mut input = Input::default();
+        assert_eq![false, input.get_ctrl()];
+        input.set_ctrl();
+        assert_eq![true, input.get_ctrl()];
+    }
+}

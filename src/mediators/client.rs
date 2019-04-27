@@ -468,11 +468,13 @@ fn update_bullets_uv(s: &mut Logic) {
             (height_elem + 1) as f32 / b.height as f32,
         );
         b.animation_sequence += 1;
-        if b.animation_sequence > b.width * b.height {
+        if b.animation_sequence >= b.width * b.height {
             b.animation_sequence = 0;
         }
-        b.current_uv_begin = (Vec2::from(uv_begin) + Vec2::from(b.animation_block_begin)).into();
-        b.current_uv_end = (Vec2::from(uv_end) * Vec2::from(b.animation_block_end)).into();
+        let current_uv_begin = (Vec2::from(uv_begin) * Vec2::from(b.animation_block_end) + Vec2::from(b.animation_block_begin)).into();
+        let current_uv_end = (Vec2::from(uv_end) * Vec2::from(b.animation_block_end)).into();
+        b.current_uv_begin = current_uv_begin;
+        b.current_uv_end = current_uv_end;
     }
 }
 

@@ -10,7 +10,7 @@ use rand::Rng;
 use std::time::Instant;
 use winit::{VirtualKeyCode as Key, *};
 
-static FIREBALLS: &[u8] = include_bytes!["../../assets/images/Fireball_68x9.png"];
+static FIREBALLS: &[u8] = include_bytes!["../../assets/images/bullets.png"];
 
 fn initialize_grid(s: &mut Grid<u8>) {
     s.resize(1000, 1000);
@@ -23,9 +23,14 @@ pub fn collect_input(client: &mut Logic, windowing: &mut Windowing) {
                 WindowEvent::KeyboardInput { input, .. } => {
                     client.input.register_key(&input);
                 }
-                WindowEvent::MouseWheel { delta, .. } => match delta {
+                WindowEvent::MouseWheel {
+                    delta, modifiers, ..
+                } => match delta {
                     winit::MouseScrollDelta::LineDelta(_, v) => {
                         client.input.register_mouse_wheel(v);
+                        if modifiers.ctrl {
+                            client.input.set_ctrl();
+                        }
                     }
                     _ => {}
                 },
@@ -56,18 +61,20 @@ fn move_camera_according_to_input(s: &mut Logic) {
     if s.input.is_key_down(Key::S) {
         s.cam.center.y -= 5.0;
     }
-    match s.input.get_mouse_wheel() {
-        x if x > 0.0 => {
-            if s.cam.zoom < 5.0 {
-                s.cam.zoom *= 1.1;
+    if s.input.get_ctrl() {
+        match s.input.get_mouse_wheel() {
+            x if x > 0.0 => {
+                if s.cam.zoom < 5.0 {
+                    s.cam.zoom *= 1.1;
+                }
             }
-        }
-        x if x < 0.0 => {
-            if s.cam.zoom > 0.002 {
-                s.cam.zoom /= 1.1;
+            x if x < 0.0 => {
+                if s.cam.zoom > 0.002 {
+                    s.cam.zoom /= 1.1;
+                }
             }
+            _ => {}
         }
-        _ => {}
     }
 }
 
@@ -412,6 +419,27 @@ fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>, random: &mut ran
             0.3
         };
 
+        let (
+            width,
+            height,
+            animation_block_begin,
+            animation_block_end,
+            sprite_width,
+            sprite_height,
+            destruction,
+        ) = match weapon {
+            &Weapon::Hellfire => (10, 6, (0.0, 0.0), (1.0, 53.0 / 60.0), 6.8, 0.9, 3),
+            &Weapon::Ak47 => (
+                1,
+                1,
+                (0.0, 54.0 / 60.0),
+                (4.0 / 679.0, 58.0 / 60.0),
+                0.5,
+                0.5,
+                1,
+            ),
+        };
+
         let direction = if let Some(ref mut graphics) = graphics {
             (Vec2::from(s.input.get_mouse_pos())
                 - Vec2::from(graphics.windowing.get_window_size_in_pixels_float()) / 2.0)
@@ -425,9 +453,10 @@ fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>, random: &mut ran
                 &mut graphics.windowing,
                 &graphics.bullets_texture,
                 vxdraw::dyntex::Sprite {
-                    width: 6.8,
-                    height: 0.9,
+                    width: sprite_width,
+                    height: sprite_height,
                     scale: 3.0,
+                    origin: (-sprite_width / 2.0, sprite_height / 2.0),
                     rotation: -direction.angle() + std::f32::consts::PI,
                     ..vxdraw::dyntex::Sprite::default()
                 },
@@ -442,12 +471,13 @@ fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>, random: &mut ran
         s.bullets.push(Bullet {
             direction: direction.normalize(),
             position,
+            destruction,
 
             animation_sequence: 0,
-            animation_block_begin: (0.0, 0.0),
-            animation_block_end: (1.0, 1.0),
-            height: 6,
-            width: 10,
+            animation_block_begin,
+            animation_block_end,
+            height,
+            width,
             current_uv_begin: (0.0, 0.0),
             current_uv_end: (0.0, 0.0),
             handle,
@@ -471,7 +501,9 @@ fn update_bullets_uv(s: &mut Logic) {
         if b.animation_sequence >= b.width * b.height {
             b.animation_sequence = 0;
         }
-        let current_uv_begin = (Vec2::from(uv_begin) * Vec2::from(b.animation_block_end) + Vec2::from(b.animation_block_begin)).into();
+        let current_uv_begin = (Vec2::from(uv_begin) * Vec2::from(b.animation_block_end)
+            + Vec2::from(b.animation_block_begin))
+        .into();
         let current_uv_end = (Vec2::from(uv_end) * Vec2::from(b.animation_block_end)).into();
         b.current_uv_begin = current_uv_begin;
         b.current_uv_end = current_uv_end;
@@ -487,8 +519,9 @@ fn update_bullets_position(s: &mut Logic, mut windowing: Option<&mut Windowing>)
             })
         {
             bullets_to_remove.push(idx);
-            for i in -3..=3 {
-                for j in -3..=3 {
+            let area = b.destruction;
+            for i in -area..=area {
+                for j in -area..=area {
                     let pos = (pos.0 as i32 + i, pos.1 as i32 + j);
                     let pos = (pos.0 as usize, pos.1 as usize);
                     s.grid.set(pos.0, pos.1, 0);

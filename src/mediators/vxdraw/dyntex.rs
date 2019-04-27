@@ -40,6 +40,7 @@ pub struct Sprite {
     pub translation: (f32, f32),
     pub rotation: f32,
     pub scale: f32,
+    pub origin: (f32, f32),
 }
 
 impl Default for Sprite {
@@ -54,6 +55,7 @@ impl Default for Sprite {
             translation: (0.0, 0.0),
             rotation: 0.0,
             scale: 1.0,
+            origin: (0.0, 0.0),
         }
     }
 }
@@ -662,16 +664,28 @@ pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -
     let width = sprite.width;
     let height = sprite.height;
 
-    let topleft = (-width / 2f32, -height / 2f32);
+    let topleft = (
+        -width / 2f32 - sprite.origin.0,
+        -height / 2f32 - sprite.origin.1,
+    );
     let topleft_uv = uv_a;
 
-    let topright = (width / 2f32, -height / 2f32);
+    let topright = (
+        width / 2f32 - sprite.origin.0,
+        -height / 2f32 - sprite.origin.1,
+    );
     let topright_uv = (uv_b.0, uv_a.1);
 
-    let bottomleft = (-width / 2f32, height / 2f32);
+    let bottomleft = (
+        -width / 2f32 - sprite.origin.0,
+        height / 2f32 - sprite.origin.1,
+    );
     let bottomleft_uv = (uv_a.0, uv_b.1);
 
-    let bottomright = (width / 2f32, height / 2f32);
+    let bottomright = (
+        width / 2f32 - sprite.origin.0,
+        height / 2f32 - sprite.origin.1,
+    );
     let bottomright_uv = (uv_b.0, uv_b.1);
 
     let index = if let Some(value) = tex.removed.pop() {

@@ -147,6 +147,8 @@ pub struct Bullet {
     pub direction: Vec2,
     pub position: Vec2,
 
+    pub destruction: i32,
+
     pub animation_sequence: usize,
     pub animation_block_begin: (f32, f32),
     pub animation_block_end: (f32, f32),

@@ -220,21 +220,19 @@ mod tests {
     }
 
     #[quickcheck_macros::quickcheck]
-    fn rotate_preserves_length(x: f32, y: f32, angle: f32) {
-        let vec = Vec2 { x, y };
+    fn rotate_preserves_length(angle: f32) {
+        if angle.is_nan() {
+            return;
+        }
+        let vec = Vec2 { x: 1.0, y: 1.0 };
         assert![(vec.length() - vec.rotate(angle).length()).abs() < 0.00001];
     }
 
-    #[quickcheck_macros::quickcheck]
-    fn rotate(x: f32) {
-        let vec = Vec2 { x, y: 0.0 };
-        assert![(vec.rotate(std::f32::consts::PI).x + x).abs() < 0.00001];
-    }
-
-    #[quickcheck_macros::quickcheck]
-    fn rotate_correct_direction(x: f32) {
-        let vec = Vec2 { x, y: 0.0 };
-        assert![(vec.rotate(std::f32::consts::PI / 2.0).y - x).abs() < 0.00001];
+    #[test]
+    fn rotate_correct_direction() {
+        let vec = Vec2 { x: 1.0, y: 0.0 };
+        assert_eq![1.0, vec.rotate(std::f32::consts::PI / 2.0).y];
+        assert_eq![-1.0, vec.rotate(std::f32::consts::PI).x];
     }
 
     #[test]

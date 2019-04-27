@@ -720,7 +720,9 @@ pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -
     unsafe {
         let idx = (index * 4 * 10 * 4) as usize;
 
-        tex.mockbuffer.extend([0u8; 4 * 40].iter());
+        while tex.mockbuffer.len() <= idx {
+            tex.mockbuffer.extend([0u8; 4 * 40].iter());
+        }
         for (i, (point, uv)) in [
             (topleft, topleft_uv),
             (bottomleft, bottomleft_uv),
@@ -1299,6 +1301,23 @@ mod tests {
         utils::assert_swapchain_eq(&mut windowing, "change_of_uv_works_for_first", img);
     }
 
+    #[test]
+    fn push_and_pop_often_avoid_allocating_out_of_bounds() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let options = TextureOptions::default();
+        let testure = push_texture(&mut windowing, TESTURE, options);
+
+        for _ in 0..100_000 {
+            let sprite = push_sprite(&mut windowing, &testure, Sprite::default());
+            remove_sprite(&mut windowing, sprite);
+        }
+
+        draw_frame(&mut windowing, &mut logger, &prspect);
+    }
+
     #[bench]
     fn bench_many_sprites(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
@@ -1409,6 +1428,21 @@ mod tests {
                 fireballs.iter().map(|id| (id, uv_begin, uv_end)),
             );
             draw_frame(&mut windowing, &mut logger, &prspect);
+        });
+    }
+
+    #[bench]
+    fn bench_push_and_pop_sprite(b: &mut Bencher) {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let options = TextureOptions::default();
+        let testure = push_texture(&mut windowing, TESTURE, options);
+
+        b.iter(|| {
+            let sprite = push_sprite(&mut windowing, &testure, Sprite::default());
+            remove_sprite(&mut windowing, sprite);
         });
     }
 }

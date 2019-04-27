@@ -12,6 +12,8 @@ pub struct Input {
     mouse: (i32, i32),
     mouse_in_previous_frame: (i32, i32),
     mouse_wheel: f32,
+
+    ctrl: bool,
 }
 
 impl Default for Keys {
@@ -28,6 +30,15 @@ impl Input {
         self.mouse_wheel = 0.0;
         self.mouse_in_previous_frame.0 = self.mouse.0;
         self.mouse_in_previous_frame.1 = self.mouse.1;
+        self.ctrl = false;
+    }
+
+    pub fn set_ctrl(&mut self) {
+        self.ctrl = true;
+    }
+
+    pub fn get_ctrl(&self) -> bool {
+        self.ctrl
     }
 
     pub fn register_key(&mut self, input: &KeyboardInput) {

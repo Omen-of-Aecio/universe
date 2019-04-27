@@ -1,4 +1,4 @@
-use config::{config, get_paths_recurse};
+use config::{config, get_paths_recurse, Path, ConfigType};
 use serde_derive::{Deserialize, Serialize};
 
 // enum Key { A, B, C};
@@ -12,35 +12,34 @@ use serde_derive::{Deserialize, Serialize};
 
 config! {
 #[derive(Serialize, Deserialize, Default)]
+#[serde(default)]
 struct Config {
-    physics: Physics {
+    world: World {
         gravity: f32,
+        gravity_on: bool,
+        // air_fri: (f32, f32),
+        ground_fri: f32,
+        width: u32,
+        height: u32,
+    }
+    player: Player {
+        horizontal_acc: f32,
+        jump_duration: f32,
+        jump_acc: f32,
     }
     controls: Controls {
         down: String,
+        // up: String,
+        // left: String,
+        // right: String,
     }
-    fps: f32,
-}}
+    // server {
+        // srv_tick_duration: Duration,
+    // }
+    client: Client {
+        snapshot_rate: f32,
+        fps: f32,
+    }
+}
 
-// Turns into:
-/*
-struct Physics {
-    pub gravity: f32,
 }
-struct Controls {
-    pub down: Key,
-}
-struct Config {
-    pub physics: Physics,
-    pub controls: Controls,
-}
-impl Config {
-    pub fn update(&mut self, name: String, value: Value) {
-        if name == "physics gravity" {
-            self.physics.gravity = value.to_num(),
-        } else if name == "controls down" {
-            self.controls.down = key::from_value(value),
-        }
-    }
-}
-*/

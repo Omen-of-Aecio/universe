@@ -134,6 +134,7 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
     grid: &Grid<u8>,
     player: &mut PlayerData,
     movement: Vec2,
+    logger: &mut Logger<Log>,
 ) -> bool {
     let tl = Vec2 {
         x: player.position.x + 0.01,
@@ -151,53 +152,23 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
         x: player.position.x + 9.99,
         y: player.position.y + 9.99,
     };
-    let collision_point = do_lines_collide_with_grid(
+    let (new_movement, _, collision) = collision_test(
+        &[tl, tr, bl, br],
+        movement,
         grid,
-        &[
-            (tl, tl + movement),
-            (tr, tr + movement),
-            (bl, bl + movement),
-            (br, br + movement),
-        ],
         |x| *x > 0,
     );
-    if collision_point.is_none() {
-        player.position.x += movement.x as f32;
-        player.position.y += movement.y as f32;
-        return false;
+    logger::info!(logger, "cli", "Move"; "vector" => format!("{:?}", new_movement));
+    player.position += new_movement;
+    if collision {
+        player.velocity.y = 0.0;
     }
-    true
-}
-
-fn check_for_collision_and_move_players_according_to_movement_vector(
-    grid: &Grid<u8>,
-    players: &mut [PlayerData],
-    movement: Vec2,
-) {
-    for player in players {
-        let mut movement_current = movement;
-        let collided = check_for_collision_and_move_player_according_to_movement_vector(
-            grid,
-            player,
-            movement_current,
-        );
-        if !collided {
-            break;
-        }
-        movement_current = Vec2 {
-            x: movement.x,
-            y: movement.y + 1.1f32,
-        };
-        let new_position = player.position + movement_current;
-        if !check_player_collides_here(grid, new_position) {
-            player.position += movement_current;
-        }
-    }
+    collision
 }
 
 fn set_gravity(s: &mut Logic) {
     if s.input.is_key_toggled_down(Key::G) {
-        s.game_config.gravity_on = !s.game_config.gravity_on;
+        s.config.world.gravity_on = !s.config.world.gravity_on;
     }
 }
 
@@ -344,11 +315,12 @@ fn draw_graphics(s: &mut Main) {
 pub fn entry_point_client(s: &mut Main) {
     s.logger.set_log_level(196);
 
-    s.logic.game_config.gravity = Vec2 { x: 0.0, y: -0.3 };
+    s.logic.config.world.gravity = -0.3;
     s.logic.cam.zoom = 0.01;
 
     s.logic.players.push(PlayerData {
-        position: Vec2 { x: 0.0, y: 0.0 },
+        position: Vec2::null_vec(),
+        velocity: Vec2::null_vec(),
     });
 
     s.logger.info("cli", "Initializing graphics");
@@ -513,23 +485,21 @@ fn update_bullets_uv(s: &mut Logic) {
 fn update_bullets_position(s: &mut Logic, mut windowing: Option<&mut Windowing>) {
     let mut bullets_to_remove = vec![];
     for (idx, b) in s.bullets.iter_mut().enumerate() {
-        if let Some(pos) =
-            does_line_collide_with_grid(&s.grid, b.position, b.position + b.direction, |x| {
-                *x == 255
-            })
-        {
+        let (new_movement, (xi, yi), collision) = collision_test(&[b.position], b.direction, &s.grid, |x| {*x == 255});
+        if collision {
             bullets_to_remove.push(idx);
             let area = b.destruction;
             for i in -area..=area {
                 for j in -area..=area {
-                    let pos = (pos.0 as i32 + i, pos.1 as i32 + j);
-                    let pos = (pos.0 as usize, pos.1 as usize);
+                    let pos = (xi as i32 + i, yi as i32 + j);
+                    let pos = (xi as usize, yi as usize);
                     s.grid.set(pos.0, pos.1, 0);
                     s.changed_tiles.push((pos.0, pos.1));
                 }
             }
+        } else {
+            b.position += new_movement;
         }
-        b.position += b.direction;
     }
 
     use std::cmp::Ordering;
@@ -552,15 +522,21 @@ fn update_bullets_position(s: &mut Logic, mut windowing: Option<&mut Windowing>)
         }
     }
 }
+fn apply_physics_to_players(s: &mut Logic, logger: &mut Logger<Log>) {
+    for player in &mut s.players {
+        if s.config.world.gravity_on {
+            player.velocity += Vec2::new(0.0, -s.config.world.gravity);
+        }
+
+        check_for_collision_and_move_player_according_to_movement_vector(&s.grid, player, player.velocity, logger);
+    }
+}
 
 fn tick_logic(s: &mut Logic, logger: &mut Logger<Log>) {
     toggle_camera_mode(s);
     let movement = move_player_according_to_input(&s.input);
-    check_for_collision_and_move_players_according_to_movement_vector(
-        &s.grid,
-        &mut s.players,
-        movement,
-    );
+
+    apply_physics_to_players(s, logger);
     move_camera_according_to_input(s);
     update_bullets_uv(s);
     std::thread::sleep(std::time::Duration::new(0, 8_000_000));

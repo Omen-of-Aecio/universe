@@ -1,105 +1,132 @@
 use geometry::{grid2d::Grid, vec::Vec2};
 
+
 /// Check if multiple lines collide with some part of the grid given a predicate
 ///
 /// Returns the first found collision with the grid. This collision does not convey
 /// information about the distance travelled to cause the collision, so don't
 /// think "this is the closest collision".
-pub fn do_lines_collide_with_grid<T: Clone + Default>(
+/// Check if vertices will collide with the grid when moved with `velocity`.
+/// Returns the new movement vector.
+pub fn collision_test<T: Clone + Default>(
+    vertices: &[Vec2],
+    velocity: Vec2,
     grid: &Grid<T>,
-    lines: &[(Vec2, Vec2)],
     predicate: fn(&T) -> bool,
-) -> Option<(usize, usize)> {
-    for line in lines {
-        let result = does_line_collide_with_grid(grid, line.0, line.1, predicate);
-        if result.is_some() {
-            return result;
-        }
-    }
-    None
-}
+) -> (Vec2, (usize, usize), bool) {
+    let mut lines: Vec<Supercover> = vertices.iter()
+        .map(|vertex| Supercover::new(*vertex, *vertex+velocity)).collect();
+    let mut prev: Vec<(i32, i32)> = vertices.iter()
+        .map(|vertex| (vertex.x as i32, vertex.y as i32)).collect();
+    let len = lines[0].len();
+    for _ in 0..len {
+        for (i, line) in lines.iter_mut().enumerate() {
+            match line.next() {
+                Some((xi, yi)) => {
+                    if xi >= 0 && yi >= 0 {
+                        if let Some(entry) = grid.get(xi as usize, yi as usize) {
+                            if predicate(entry) {
+                                let start = vertices[i];
+                                let end = Vec2::new(prev[i].0 as f32, prev[i].1 as f32) ;
+                                return (end - start, (xi as usize, yi as usize), true);
+                            }
+                        }
+                    }
+                    prev[i] = (xi, yi);
 
-/// Check if a float-based line collides with a predicate on a grid
-///
-/// This algorithm uses a modified version of bresenham's line algorithm.
-/// It traces a line from start to finish and sees which indices it hits on
-/// the grid. This version is the "supercover" algorithm, which means that
-/// that going through diagonals will "touch" at least one of the grid points
-/// on the side.
-///
-/// It's quite an unsafe algorithm. Right now, if you give a floating
-/// point outside the range of i32, the code may overflow. To prevent an
-/// infinite loop, a length counter in usize is used, but it's not perfect.
-/// In the future, it may be an idea to bound the input to some maximum
-/// values.
-pub fn does_line_collide_with_grid<T: Clone + Default>(
-    grid: &Grid<T>,
-    start: Vec2,
-    stop: Vec2,
-    predicate: fn(&T) -> bool,
-) -> Option<(usize, usize)> {
-    let new = stop - start;
-    let (vx, vy) = (new.x, new.y);
-    let slope_x = 1.0 + vy * vy / vx / vx;
-    let slope_y = 1.0 + vx * vx / vy / vy;
-    let (dx, dy) = (slope_x.sqrt(), slope_y.sqrt());
-
-    let (mut ix, mut iy) = (
-        i32::from(start.x.floor() as i16),
-        i32::from(start.y.floor() as i16),
-    );
-
-    let (sx, sy);
-    let (mut ex, mut ey);
-
-    if vx < 0.0 {
-        sx = -1;
-        ex = start.x.fract() * dx;
-    } else {
-        sx = 1;
-        ex = (1.0 - start.x.fract()) * dx;
-    }
-
-    if vy < 0.0 {
-        sy = -1;
-        ey = start.y.fract() * dy;
-    } else {
-        sy = 1;
-        ey = (1.0 - start.y.fract()) * dy;
-    }
-
-    let len = ((i32::from(stop.x.floor() as i16) - i32::from(start.x.floor() as i16)).abs()
-        + (i32::from(stop.y.floor() as i16) - i32::from(start.y.floor() as i16)).abs())
-        as u16;
-
-    let mut it: u16 = 0;
-
-    let dest_x = stop.x.floor() as i32;
-    let dest_y = stop.y.floor() as i32;
-
-    while it < len {
-        it += 1;
-        if ix >= 0 && iy >= 0 {
-            if let Some(entry) = grid.get(ix as usize, iy as usize) {
-                if predicate(entry) {
-                    return Some((ix as usize, iy as usize));
                 }
+                None => unreachable!(),
             }
         }
-        if ex < ey {
-            ex += dx;
-            ix += sx;
+    }
+    (velocity, (0,0), false)
+}
+
+struct Supercover {
+    // Variables
+    ex: f32,
+    ey: f32,
+    ix: i32,
+    iy: i32,
+    progress: u16,
+    // Constant throughout algorithm
+    len: u16,
+    dx: f32,
+    dy: f32,
+    sx: i8, // Directions (-1, 1)
+    sy: i8,
+    dest_x: i32,
+    dest_y: i32,
+}
+impl Supercover {
+    pub fn new(start: Vec2, stop: Vec2) -> Self {
+        let new = stop - start;
+        let (vx, vy) = (new.x, new.y);
+        let slope_x = 1.0 + vy * vy / vx / vx;
+        let slope_y = 1.0 + vx * vx / vy / vy;
+        let (dx, dy) = (slope_x.sqrt(), slope_y.sqrt());
+
+        let (mut ix, mut iy) = (
+            i32::from(start.x.floor() as i16),
+            i32::from(start.y.floor() as i16),
+        );
+
+        let (sx, sy);
+        let (ex, ey);
+
+        if vx < 0.0 {
+            sx = -1;
+            ex = start.x.fract() * dx;
         } else {
-            ey += dy;
-            iy += sy;
+            sx = 1;
+            ex = (1.0 - start.x.fract()) * dx;
+        }
+
+        if vy < 0.0 {
+            sy = -1;
+            ey = start.y.fract() * dy;
+        } else {
+            sy = 1;
+            ey = (1.0 - start.y.fract()) * dy;
+        }
+        let len = ((i32::from(stop.x.floor() as i16) - i32::from(start.x.floor() as i16)).abs()
+            + (i32::from(stop.y.floor() as i16) - i32::from(start.y.floor() as i16)).abs())
+            as u16; // TODO: maybe +1 here?
+        Supercover {
+            progress: 0,
+            dest_x: stop.x.floor() as i32,
+            dest_y: stop.y.floor() as i32,
+            len, ix, iy, dx, dy, sx, sy, ex, ey,
         }
     }
-    if let Some(entry) = grid.get(dest_x as usize, dest_y as usize) {
-        if predicate(entry) {
-            return Some((dest_x as usize, dest_y as usize));
+    pub fn len(&self) -> u16 {
+        self.len + 1
+    }
+
+    pub fn progress(&self) -> u16 {
+        self.progress
+    }
+}
+impl Iterator for Supercover {
+    type Item = (i32, i32);
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.progress < self.len {
+            self.progress += 1;
+            let point = (self.ix as i32, self.iy as i32);
+            if self.ex < self.ey {
+                self.ex += self.dx;
+                self.ix += self.sx as i32;
+            } else {
+                self.ey += self.dy;
+                self.iy += self.sy as i32;
+            }
+            Some(point)
+        } else if self.progress == self.len {
+            Some((self.dest_x, self.dest_y))
+        } else {
+            None
         }
     }
-    None
 }
 
 #[cfg(test)]

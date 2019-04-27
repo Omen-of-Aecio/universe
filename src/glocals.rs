@@ -21,6 +21,7 @@ pub mod config;
 pub mod log;
 pub mod vxdraw;
 
+pub use self::config::Config;
 pub use log::Log;
 
 pub type Error = failure::Error;
@@ -101,47 +102,6 @@ pub struct GameShellContext {
 
 pub struct Client {}
 
-#[derive(Copy, Clone, Default)]
-pub struct GameConfig {
-    pub hori_acc: f32,
-    pub jump_duration: f32,
-    pub jump_delay: f32,
-    pub jump_acc: f32,
-    pub gravity: Vec2,
-    pub gravity_on: bool,
-    pub srv_tick_duration: Duration,
-    pub air_fri: Vec2,
-    pub ground_fri: f32,
-}
-
-#[derive(Default, Deserialize, Clone)]
-pub struct Config {
-    pub player: PlayerConfig,
-    pub world: WorldConfig,
-    pub srv: ServerConfig,
-}
-
-#[derive(Default, Deserialize, Clone)]
-pub struct PlayerConfig {
-    pub hori_acc: f32,
-    pub jump_duration: f32,
-    pub jump_delay: f32,
-    pub jump_acc: f32,
-    pub snapshot_rate: f32,
-}
-#[derive(Default, Deserialize, Clone)]
-pub struct WorldConfig {
-    pub width: u32,
-    pub height: u32,
-    pub gravity: f32,
-    pub air_fri: (f32, f32),
-    pub ground_fri: f32,
-}
-
-#[derive(Default, Deserialize, Clone)]
-pub struct ServerConfig {
-    pub ticks_per_second: u32,
-}
 
 pub struct Bullet {
     pub direction: Vec2,
@@ -162,6 +122,7 @@ pub struct Bullet {
 
 pub struct PlayerData {
     pub position: Vec2,
+    pub velocity: Vec2,
 }
 
 #[derive(PartialEq)]
@@ -182,7 +143,7 @@ pub struct Logic {
     pub input: input::Input,
 
     pub grid: Grid<u8>,
-    pub game_config: GameConfig,
+    pub config: Config,
     pub players: Vec<PlayerData>,
 
     pub current_weapon: Weapon,

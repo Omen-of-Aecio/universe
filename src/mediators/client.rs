@@ -57,10 +57,10 @@ fn move_camera_according_to_input(s: &mut Logic) {
         s.cam.center.x -= 5.0;
     }
     if s.input.is_key_down(Key::W) {
-        s.cam.center.y += 5.0;
+        s.cam.center.y -= 5.0;
     }
     if s.input.is_key_down(Key::S) {
-        s.cam.center.y -= 5.0;
+        s.cam.center.y += 5.0;
     }
     if s.input.get_ctrl() {
         match s.input.get_mouse_wheel() {
@@ -75,6 +75,12 @@ fn move_camera_according_to_input(s: &mut Logic) {
                 }
             }
             _ => {}
+        }
+    }
+
+    if s.cam_mode == CameraMode::FollowPlayer {
+        if let Some(player) = s.players.get_mut(0) {
+            s.cam.center -= (s.cam.center - player.position) / 10.0;
         }
     }
 }
@@ -339,7 +345,7 @@ fn draw_graphics(s: &mut Main) {
         let scale = Matrix4::from_scale(s.logic.cam.zoom);
         let center = s.logic.cam.center;
         // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
-        let trans = Matrix4::from_translation(Vector3::new(-center.x, center.y, 0.0));
+        let trans = Matrix4::from_translation(Vector3::new(-center.x, -center.y, 0.0));
         // info![client.logger, "main", "Okay wth"; "trans" => InDebug(&trans); clone trans];
         super::vxdraw::draw_frame(
             &mut graphics.windowing,

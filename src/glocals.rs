@@ -168,7 +168,7 @@ pub struct Logic {
 }
 
 /* Should go, together with some logic, to some camera module (?) */
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum CameraMode {
     Interactive,
     FollowPlayer,

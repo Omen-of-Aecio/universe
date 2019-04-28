@@ -305,6 +305,20 @@ fn update_graphics(s: &mut Main) {
             );
         }
 
+        {
+            let angle = -(Vec2::from(s.logic.input.get_mouse_pos())
+                - Vec2::from(graphics.windowing.get_window_size_in_pixels_float()) / 2.0)
+                .angle();
+            if let Some(Some(sprite)) = s.logic.players.get_mut(0).map(|x| &mut x.weapon_sprite) {
+                if angle > std::f32::consts::PI / 2.0 || angle < -std::f32::consts::PI / 2.0 {
+                    dyntex::set_uv(&mut graphics.windowing, sprite, (0.0, 1.0), (1.0, 0.0));
+                } else {
+                    dyntex::set_uv(&mut graphics.windowing, sprite, (0.0, 0.0), (1.0, 1.0));
+                }
+                dyntex::set_rotation(&mut graphics.windowing, sprite, angle);
+            }
+        }
+
         upload_player_position(
             &mut s.logic,
             &mut graphics.windowing,
@@ -364,12 +378,16 @@ pub fn entry_point_client(s: &mut Main) {
                     s.logic.current_weapon = Weapon::Ak47;
                     if let Some(this_player) = s.logic.players.get_mut(0) {
                         if let Some(ref mut gfx) = s.graphics {
-                            let new = dyntex::push_sprite(&mut gfx.windowing, &gfx.weapons_texture, dyntex::Sprite {
-                                width: 10.0,
-                                height: 5.0,
-                                origin: (-5.0, -5.0),
-                                ..dyntex::Sprite::default()
-                            });
+                            let new = dyntex::push_sprite(
+                                &mut gfx.windowing,
+                                &gfx.weapons_texture,
+                                dyntex::Sprite {
+                                    width: 10.0,
+                                    height: 5.0,
+                                    // origin: (-5.0, -5.0),
+                                    ..dyntex::Sprite::default()
+                                },
+                            );
                             let old = std::mem::replace(&mut this_player.weapon_sprite, Some(new));
                             if let Some(old_id) = old {
                                 dyntex::remove_sprite(&mut gfx.windowing, old_id);
@@ -417,7 +435,11 @@ fn upload_player_position(
 ) {
     if let Some(ref mut player) = s.players.get(0) {
         if let Some(ref gun_handle) = player.weapon_sprite {
-            dyntex::set_position(windowing, gun_handle, player.position.into());
+            dyntex::set_position(
+                windowing,
+                gun_handle,
+                (player.position + Vec2 { x: 5.0, y: 5.0 }).into(),
+            );
         }
         vxdraw::quads::set_position(windowing, handle, player.position.into());
     }

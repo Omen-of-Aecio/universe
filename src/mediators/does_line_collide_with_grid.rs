@@ -13,7 +13,22 @@ pub fn collision_test<T: Clone + Default>(
     velocity: Vec2,
     grid: &Grid<T>,
     predicate: fn(&T) -> bool,
-) -> (Vec2, (usize, usize), bool) {
+) -> Option<(usize, usize)> {
+    let mut lines: Vec<Supercover> = vertices.iter()
+        .map(|vertex| Supercover::new(*vertex, *vertex+velocity)).collect();
+    for line in lines.iter_mut() {
+        for (xi, yi) in line {
+            if xi >= 0 && yi >= 0 {
+                if let Some(entry) = grid.get(xi as usize, yi as usize) {
+                    if predicate(entry) {
+                        return Some((xi as usize, yi as usize));
+                    }
+                }
+            }
+        }
+    }
+    None
+    /*
     let mut lines: Vec<Supercover> = vertices.iter()
         .map(|vertex| Supercover::new(*vertex, *vertex+velocity)).collect();
     let mut prev: Vec<(i32, i32)> = vertices.iter()
@@ -40,6 +55,7 @@ pub fn collision_test<T: Clone + Default>(
         }
     }
     (velocity, (0,0), false)
+    */
 }
 
 struct Supercover {
@@ -122,6 +138,7 @@ impl Iterator for Supercover {
             }
             Some(point)
         } else if self.progress == self.len {
+            self.progress += 1;
             Some((self.dest_x, self.dest_y))
         } else {
             None

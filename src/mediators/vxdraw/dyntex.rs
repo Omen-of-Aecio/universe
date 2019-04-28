@@ -810,6 +810,25 @@ pub fn set_position(s: &mut Windowing, handle: &SpriteHandle, position: (f32, f3
     }
 }
 
+pub fn set_rotation(s: &mut Windowing, handle: &SpriteHandle, rotation: f32) {
+    if let Some(stex) = s.dyntexs.get_mut(handle.0) {
+        unsafe {
+            use std::mem::transmute;
+            let rot = &transmute::<f32, [u8; 4]>(rotation);
+
+            let mut idx = (handle.1 * 4 * 10 * 4) as usize;
+
+            stex.mockbuffer[idx + 7 * 4..idx + 8 * 4].copy_from_slice(rot);
+            idx += 40;
+            stex.mockbuffer[idx + 7 * 4..idx + 8 * 4].copy_from_slice(rot);
+            idx += 40;
+            stex.mockbuffer[idx + 7 * 4..idx + 8 * 4].copy_from_slice(rot);
+            idx += 40;
+            stex.mockbuffer[idx + 7 * 4..idx + 8 * 4].copy_from_slice(rot);
+        }
+    }
+}
+
 /// Translate all sprites that depend on a given texture
 pub fn sprite_translate_all(s: &mut Windowing, tex: &TextureHandle, dxdy: (f32, f32)) {
     let device = &s.device;
@@ -1304,6 +1323,21 @@ mod tests {
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         utils::assert_swapchain_eq(&mut windowing, "change_of_uv_works_for_first", img);
+    }
+
+    #[test]
+    fn set_single_sprite_rotation() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let options = TextureOptions::default();
+        let testure = push_texture(&mut windowing, TESTURE, options);
+        let sprite = push_sprite(&mut windowing, &testure, Sprite::default());
+        set_rotation(&mut windowing, &sprite, 0.3);
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        utils::assert_swapchain_eq(&mut windowing, "set_single_sprite_rotation", img);
     }
 
     #[test]

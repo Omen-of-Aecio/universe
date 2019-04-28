@@ -78,7 +78,7 @@ fn move_camera_according_to_input(s: &mut Logic) {
     }
 }
 
-fn move_player_according_to_input(s: &Input) -> Vec2 {
+fn accelerate_player_according_to_input(s: &Input) -> Vec2 {
     let (dx, dy);
     if s.is_key_down(Key::Up) {
         dy = -1;
@@ -528,6 +528,7 @@ fn apply_physics_to_players(s: &mut Logic, logger: &mut Logger<Log>) {
             player.velocity += Vec2::new(0.0, -s.config.world.gravity);
         }
 
++        player.velocity += accelerate_player_according_to_input(&mut s.input) / 30.0;
         check_for_collision_and_move_player_according_to_movement_vector(&s.grid, player, player.velocity, logger);
     }
 }

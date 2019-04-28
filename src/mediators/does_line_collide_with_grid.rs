@@ -1,5 +1,23 @@
 use geometry::{grid2d::Grid, vec::Vec2};
 
+fn does_line_collide_with_grid<T: Clone + Default>(
+    grid: &Grid<T>,
+    start: Vec2,
+    end: Vec2,
+    predicate: fn(&T) -> bool,
+) -> Option<(usize, usize)> {
+    let mut line = Supercover::new(start, end);
+    for (xi, yi) in line {
+        if xi >= 0 && yi >= 0 {
+            if let Some(entry) = grid.get(xi as usize, yi as usize) {
+                if predicate(entry) {
+                    return Some((xi as usize, yi as usize));
+                }
+            }
+        }
+    }
+    None
+}
 
 /// Check if multiple lines collide with some part of the grid given a predicate
 ///
@@ -14,17 +32,10 @@ pub fn collision_test<T: Clone + Default>(
     grid: &Grid<T>,
     predicate: fn(&T) -> bool,
 ) -> Option<(usize, usize)> {
-    let mut lines: Vec<Supercover> = vertices.iter()
-        .map(|vertex| Supercover::new(*vertex, *vertex+velocity)).collect();
-    for line in lines.iter_mut() {
-        for (xi, yi) in line {
-            if xi >= 0 && yi >= 0 {
-                if let Some(entry) = grid.get(xi as usize, yi as usize) {
-                    if predicate(entry) {
-                        return Some((xi as usize, yi as usize));
-                    }
-                }
-            }
+    for vertex in vertices {
+        let collision = does_line_collide_with_grid(grid, *vertex, *vertex+velocity, predicate);
+        if collision.is_some() {
+            return collision;
         }
     }
     None
@@ -340,13 +351,10 @@ mod tests {
         *grid.get_mut(2, 1).unwrap() = true;
         assert![
             Some((2, 1))
-                == do_lines_collide_with_grid(
+                == collision_test(
+                    &[Vec2 { x: 0.0, y: 0.5 }, Vec2 { x: 0.0, y: 1.5 }, Vec2 { x: 0.0, y: 2.5 }],
+                    Vec2::new(3.0, 0.0),
                     &grid,
-                    &[
-                        (Vec2 { x: 0.0, y: 0.5 }, Vec2 { x: 3.0, y: 0.5 }),
-                        (Vec2 { x: 0.0, y: 1.5 }, Vec2 { x: 3.0, y: 1.5 }),
-                        (Vec2 { x: 0.0, y: 2.5 }, Vec2 { x: 3.0, y: 2.5 }),
-                    ],
                     |x| *x,
                 )
         ];
@@ -357,13 +365,10 @@ mod tests {
         let mut grid: Grid<bool> = Grid::new();
         grid.resize(3, 3);
         assert![
-            None == do_lines_collide_with_grid(
+            None == collision_test(
+                &[Vec2 { x: 0.0, y: 0.5 }, Vec2 { x: 0.0, y: 1.5 }, Vec2 { x: 0.0, y: 2.5 }],
+                Vec2::new(3.0, 0.0),
                 &grid,
-                &[
-                    (Vec2 { x: 0.0, y: 0.5 }, Vec2 { x: 3.0, y: 0.5 }),
-                    (Vec2 { x: 0.0, y: 1.5 }, Vec2 { x: 3.0, y: 1.5 }),
-                    (Vec2 { x: 0.0, y: 2.5 }, Vec2 { x: 3.0, y: 2.5 }),
-                ],
                 |x| *x,
             )
         ];

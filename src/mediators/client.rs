@@ -171,8 +171,7 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
             true
         }
         None => {
-            player.position.x += movement.x as f32;
-            player.position.y += movement.y as f32;
+            player.position += movement;
             false
         }
     }

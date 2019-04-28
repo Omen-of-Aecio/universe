@@ -11,6 +11,7 @@ use std::time::Instant;
 use winit::{VirtualKeyCode as Key, *};
 
 static FIREBALLS: &[u8] = include_bytes!["../../assets/images/bullets.png"];
+static WEAPONS: &[u8] = include_bytes!["../../assets/images/weapons.png"];
 
 fn initialize_grid(s: &mut Grid<u8>) {
     s.resize(1000, 1000);
@@ -264,7 +265,7 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
     let handle = vxdraw::quads::push(
         &mut windowing,
         vxdraw::quads::Quad {
-            colors: [(255, 0, 0, 255); 4],
+            colors: [(255, 0, 0, 127); 4],
             width: 10.0,
             height: 10.0,
             origin: (-5.0, -5.0),
@@ -277,10 +278,18 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
         FIREBALLS,
         vxdraw::dyntex::TextureOptions::default(),
     );
+
+    let weapons_texture = vxdraw::dyntex::push_texture(
+        &mut windowing,
+        WEAPONS,
+        vxdraw::dyntex::TextureOptions::default(),
+    );
+
     s.graphics = Some(Graphics {
         player_quads: vec![handle],
         bullets_texture: fireballs,
         grid: tex,
+        weapons_texture,
         windowing,
     });
 }
@@ -348,6 +357,7 @@ pub fn entry_point_client(s: &mut Main) {
 
     s.logic.players.push(PlayerData {
         position: Vec2 { x: 0.0, y: 0.0 },
+        weapon_sprite: None,
     });
 
     s.logger.info("cli", "Initializing graphics");
@@ -370,6 +380,20 @@ pub fn entry_point_client(s: &mut Main) {
                 x if x == 0.0 => {}
                 x if x > 0.0 => {
                     s.logic.current_weapon = Weapon::Ak47;
+                    if let Some(this_player) = s.logic.players.get_mut(0) {
+                        if let Some(ref mut gfx) = s.graphics {
+                            let new = dyntex::push_sprite(&mut gfx.windowing, &gfx.weapons_texture, dyntex::Sprite {
+                                width: 10.0,
+                                height: 5.0,
+                                origin: (-5.0, -5.0),
+                                ..dyntex::Sprite::default()
+                            });
+                            let old = std::mem::replace(&mut this_player.weapon_sprite, Some(new));
+                            if let Some(old_id) = old {
+                                dyntex::remove_sprite(&mut gfx.windowing, old_id);
+                            }
+                        }
+                    }
                 }
                 x if x < 0.0 => {
                     s.logic.current_weapon = Weapon::Hellfire;
@@ -409,8 +433,12 @@ fn upload_player_position(
     windowing: &mut Windowing,
     handle: &vxdraw::quads::QuadHandle,
 ) {
-    let pos = s.players[0].position;
-    vxdraw::quads::set_position(windowing, handle, (pos.x, pos.y));
+    if let Some(ref mut player) = s.players.get(0) {
+        if let Some(ref gun_handle) = player.weapon_sprite {
+            dyntex::set_position(windowing, gun_handle, player.position.into());
+        }
+        vxdraw::quads::set_position(windowing, handle, player.position.into());
+    }
 }
 
 fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>, random: &mut rand_pcg::Pcg64Mcg) {

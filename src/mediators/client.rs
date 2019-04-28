@@ -167,7 +167,7 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
     );
     match collision {
         Some(_) => {
-            player.velocity.y = 0.0;
+            player.velocity = Vec2::null_vec();
             true
         }
         None => {

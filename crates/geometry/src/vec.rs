@@ -54,6 +54,25 @@ impl Vec2 {
         self.y.atan2(self.x)
     }
 
+    pub fn clamp(self, limit: Vec2) -> Vec2 {
+        Self {
+            x: if self.x > limit.x {
+                limit.x
+            } else if self.x < -limit.x {
+                -limit.x
+            } else {
+                self.x
+            },
+            y: if self.y > limit.y {
+                limit.y
+            } else if self.y < -limit.y {
+                -limit.y
+            } else {
+                self.y
+            },
+        }
+    }
+
     /// Rotate the vector around the origin by a given angle
     pub fn rotate(self, angle: f32) -> Vec2 {
         let angle = self.angle() + angle;
@@ -275,6 +294,19 @@ mod tests {
                 y: 0.20000005
             },
         ];
+    }
+
+    #[test]
+    fn clamping() {
+        assert_eq![Vec2::null_vec(), Vec2 { x: 1.0, y: 2.0 }.clamp(Vec2::null_vec())];
+        assert_eq![Vec2::null_vec(), Vec2 { x: -1.0, y: 2.0 }.clamp(Vec2::null_vec())];
+        assert_eq![Vec2::null_vec(), Vec2 { x: 1.0, y: -2.0 }.clamp(Vec2::null_vec())];
+        assert_eq![Vec2::null_vec(), Vec2 { x: -1.0, y: -2.0 }.clamp(Vec2::null_vec())];
+        assert_eq![Vec2::null_vec(), Vec2 { x: 0.0, y: 0.0 }.clamp(Vec2::null_vec())];
+
+        assert_eq![Vec2 { x: 1.0, y: 3.0 }, Vec2 { x: 1.0, y: 3.0 }.clamp(Vec2 { x: 1.0, y: 3.0 })];
+        assert_eq![Vec2 { x: 1.0, y: -3.0 }, Vec2 { x: 1.0, y: 4.0 }.clamp(Vec2 { x: 1.0, y: -3.0 })];
+        assert_eq![Vec2 { x: 1.0, y: 3.0 }, Vec2 { x: 1.0, y: 4.0 }.clamp(Vec2 { x: 2.0, y: 3.0 })];
     }
 
     #[bench]

@@ -587,6 +587,7 @@ fn apply_physics_to_players(s: &mut Logic, logger: &mut Logger<Log>) {
         }
 
         player.velocity += accelerate_player_according_to_input(&mut s.input) / 30.0;
+        player.velocity = player.velocity.clamp(Vec2 { x: 1.0, y: 1.0 });
         check_for_collision_and_move_player_according_to_movement_vector(&s.grid, player, player.velocity, logger);
     }
 }

@@ -623,7 +623,8 @@ pub fn push_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions)
     ) = make_index_buffer_with_data(s, &[0f32; 3 * INDEX_COUNT]);
 
     unsafe {
-        let mut data_target = s.device
+        let mut data_target = s
+            .device
             .acquire_mapping_writer(
                 &texture_vertex_memory_indices,
                 0..texture_vertex_requirements_indices.size,

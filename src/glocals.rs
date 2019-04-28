@@ -44,6 +44,7 @@ pub struct Main<'a> {
 pub struct Graphics {
     pub player_quads: Vec<crate::mediators::vxdraw::quads::QuadHandle>,
     pub bullets_texture: crate::mediators::vxdraw::dyntex::TextureHandle,
+    pub weapons_texture: crate::mediators::vxdraw::dyntex::TextureHandle,
     pub grid: crate::mediators::vxdraw::strtex::TextureHandle,
     pub windowing: vxdraw::Windowing,
 }
@@ -123,6 +124,7 @@ pub struct Bullet {
 pub struct PlayerData {
     pub position: Vec2,
     pub velocity: Vec2,
+    pub weapon_sprite: Option<crate::mediators::vxdraw::dyntex::SpriteHandle>,
 }
 
 #[derive(PartialEq)]
@@ -147,6 +149,8 @@ pub struct Logic {
     pub players: Vec<PlayerData>,
 
     pub current_weapon: Weapon,
+    pub current_weapon_cooldown: usize,
+
     pub bullets: Vec<Bullet>,
     pub cam: Camera,
     pub you: u32,

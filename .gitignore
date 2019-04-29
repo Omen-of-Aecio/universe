@@ -1,13 +1,14 @@
 /*
 !.gitignore
+!.pre-commit
 !.travis.yml
 !Cargo.toml
 !README.md
 !assets/
 !benches/
+!crates/
 !rustfmt.toml
 !scripts/
 !shaders/
 !src/
 !tests/
-!crates/

@@ -3,6 +3,7 @@ name = "universe"
 version = "0.3.0"
 authors = ["Erlend Hofstad Langseth <3rlendhl@gmail.com>", "Kevin Robert Stravers <macocio@gmail.com>"]
 edition = "2018"
+build = "build.rs"
 
 [lib]
 name = "universe"

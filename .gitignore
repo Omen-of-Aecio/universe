@@ -6,6 +6,7 @@
 !README.md
 !assets/
 !benches/
+!build.rs
 !crates/
 !rustfmt.toml
 !scripts/

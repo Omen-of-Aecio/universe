@@ -37,6 +37,7 @@ fn run_game(s: &mut glocals::Main) {
     if let Some(game_shell) = crate::mediators::game_shell::spawn(s.logger.clone()) {
         s.threads.game_shell = Some(game_shell.0);
         s.threads.game_shell_keep_running = Some(game_shell.1);
+        s.threads.game_shell_channel = Some(game_shell.2);
     }
     mediators::client::entry_point_client(s);
 }

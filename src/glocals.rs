@@ -83,6 +83,7 @@ impl<'a> Default for Timers {
 pub struct Threads {
     pub game_shell: Option<std::thread::JoinHandle<()>>,
     pub game_shell_keep_running: Option<Arc<AtomicBool>>,
+    pub game_shell_channel: Option<mpsc::Receiver<Box<Fn(&mut Main) + Send>>>,
 }
 
 // ---
@@ -95,7 +96,7 @@ pub struct GameShell<T: Send + Sync> {
 
 #[derive(Clone)]
 pub struct GameShellContext {
-    pub config_change: Option<mpsc::SyncSender<fn(&mut Config)>>,
+    pub config_change: Option<mpsc::SyncSender<Box<Fn(&mut Main) + Send>>>,
     pub logger: Logger<Log>,
     pub keep_running: Arc<AtomicBool>,
     pub variables: HashMap<String, String>,

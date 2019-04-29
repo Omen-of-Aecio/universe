@@ -1,6 +1,6 @@
 use self::command_handlers::*;
 use self::predicates::*;
-use crate::glocals::{GameShell, GameShellContext, Log};
+use crate::glocals::{GameShell, GameShellContext, Log, Main};
 use cmdmat::{self, LookError, SVec};
 use either::Either;
 use logger::{self, Logger};
@@ -11,7 +11,7 @@ use std::net::{TcpListener, TcpStream};
 use std::str::from_utf8;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc,
+    mpsc, Arc,
 };
 use std::thread::{self, JoinHandle};
 
@@ -35,6 +35,7 @@ const SPEC: &[cmdmat::Spec<Input, GshDecision, GameShellContext>] = &[
     (&[("str", ANY_STRING)], create_string),
     (&[("void", IGNORE_ALL)], void),
     (&[("|", MANY_I32)], bor),
+    (&[("config", None), ("gravity", None), ("set", None), ("y", ANY_F32)], set_gravity),
 ];
 
 // ---
@@ -349,6 +350,21 @@ mod command_handlers {
         Ok("Ok".into())
     }
 
+    pub fn set_gravity(s: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        if let Some(ref mut chan) = s.config_change {
+            if let Input::F32(value) = commands[0] {
+                chan.send(Box::new(move |main: &mut Main| {
+                    main.logic.config.world.gravity = value;
+                }));
+                Ok("Changed gravity".into())
+            } else {
+                Err("Did not get an f32".into())
+            }
+        } else {
+            Err("Unable to contact main".into())
+        }
+    }
+
     pub fn log_context(s: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
         let ctx;
         match commands[0] {
@@ -456,6 +472,19 @@ mod predicates {
         Decision::Accept(1)
     }
 
+    fn any_f32_function(input: &[&str], out: &mut SVec<Input>) -> Decision<GshDecision> {
+        ret_if_err![aslen(input, 1)];
+        match input[0].parse::<f32>().ok().map(Input::F32) {
+            Some(num) => {
+                out.push(num);
+            }
+            None => {
+                return Decision::Deny(GshDecision::Err(input[0].into()));
+            }
+        }
+        Decision::Accept(1)
+    }
+
     fn many_i32_function(input: &[&str], out: &mut SVec<Input>) -> Decision<GshDecision> {
         let mut cnt = 0;
         for i in input.iter() {
@@ -483,6 +512,11 @@ mod predicates {
     pub const ANY_STRING: SomeDec = Some(&Decider {
         description: "<string>",
         decider: any_string_function,
+    });
+
+    pub const ANY_F32: SomeDec = Some(&Decider {
+        description: "<f32>",
+        decider: any_f32_function,
     });
 
     pub const MANY_STRING: SomeDec = Some(&Decider {
@@ -533,9 +567,14 @@ pub fn make_new_gameshell(logger: Logger<Log>) -> Gsh<'static> {
 fn spawn_with_listener(
     logger: Logger<Log>,
     listener: TcpListener,
-) -> (JoinHandle<()>, Arc<AtomicBool>) {
+) -> (
+    JoinHandle<()>,
+    Arc<AtomicBool>,
+    mpsc::Receiver<Box<Fn(&mut Main) + Send>>,
+) {
     let keep_running = Arc::new(AtomicBool::new(true));
     let keep_running_clone = keep_running.clone();
+    let (tx, rx) = mpsc::sync_channel(2);
     (
         thread::Builder::new()
             .name("gsh/server".to_string())
@@ -545,7 +584,7 @@ fn spawn_with_listener(
                 game_shell_thread(
                     GameShell {
                         gshctx: GameShellContext {
-                            config_change: None,
+                            config_change: Some(tx),
                             logger,
                             keep_running,
                             variables: HashMap::new(),
@@ -557,10 +596,17 @@ fn spawn_with_listener(
             })
             .unwrap(),
         keep_running_clone,
+        rx,
     )
 }
 
-pub fn spawn(mut logger: Logger<Log>) -> Option<(JoinHandle<()>, Arc<AtomicBool>)> {
+pub fn spawn(
+    mut logger: Logger<Log>,
+) -> Option<(
+    JoinHandle<()>,
+    Arc<AtomicBool>,
+    mpsc::Receiver<Box<Fn(&mut Main) + Send>>,
+)> {
     if let Ok(listener) = TcpListener::bind("127.0.0.1:32931") {
         Some(spawn_with_listener(logger, listener))
     } else {
@@ -574,6 +620,7 @@ pub fn spawn(mut logger: Logger<Log>) -> Option<(JoinHandle<()>, Arc<AtomicBool>
 fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<()> {
     let logger = s.gshctx.logger.clone();
     let keep_running = s.gshctx.keep_running.clone();
+    let channel = s.gshctx.keep_running.clone();
     thread::Builder::new()
         .name("gsh/server/handler".to_string())
         .spawn(move || {
@@ -829,6 +876,7 @@ type Gsh<'a> = GameShell<Arc<cmdmat::Mapping<'a, Input, GshDecision, GameShellCo
 pub enum Input {
     U8(u8),
     I32(i32),
+    F32(f32),
     Atom(String),
     String(String),
     Command(String),
@@ -992,7 +1040,7 @@ mod tests {
         let logger = logger::Logger::spawn_void();
         assert_ne![123, logger.get_log_level()];
         let (listener, port) = bind_to_any_tcp_port();
-        let (_gsh, keep_running) = spawn_with_listener(logger.clone(), listener);
+        let (_gsh, keep_running, _) = spawn_with_listener(logger.clone(), listener);
         let mut listener =
             TcpStream::connect("127.0.0.1:".to_string() + port.to_string().as_ref()).unwrap();
         {
@@ -1375,7 +1423,7 @@ mod tests {
     fn message_bandwidth_over_tcp(b: &mut Bencher) -> io::Result<()> {
         let mut logger = logger::Logger::spawn_void();
         let (listener, port) = bind_to_any_tcp_port();
-        let (mut _gsh, keep_running) = spawn_with_listener(logger.clone(), listener);
+        let (mut _gsh, keep_running, _) = spawn_with_listener(logger.clone(), listener);
         logger.set_log_level(0);
         let mut listener =
             TcpStream::connect("127.0.0.1:".to_string() + port.to_string().as_ref())?;

@@ -368,6 +368,10 @@ pub fn entry_point_client(s: &mut Main) {
         tick_logic(&mut s.logic, &mut s.logger);
         update_bullets_position(&mut s.logic, s.graphics.as_mut().map(|x| &mut x.windowing));
 
+        if let Some(Ok(msg)) = s.threads.game_shell_channel.as_mut().map(|x| x.try_recv()) {
+            (msg)(s);
+        }
+
         {
             let wheel = s.logic.input.get_mouse_wheel();
             match wheel {

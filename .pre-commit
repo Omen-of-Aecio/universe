@@ -4,7 +4,7 @@ cargo fmt -- --check
 code="$?"
 
 if [ "$code" -ne 0 ]; then
-    echo $'Please run `cargo fmt\' before committing'
+    echo "Please run \`cargo fmt' before committing"
 fi
 
 exit "$code"

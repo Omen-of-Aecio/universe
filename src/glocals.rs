@@ -103,7 +103,6 @@ pub struct GameShellContext {
 
 pub struct Client {}
 
-
 pub struct Bullet {
     pub direction: Vec2,
     pub position: Vec2,

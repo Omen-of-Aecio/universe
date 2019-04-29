@@ -563,7 +563,7 @@ fn update_bullets_uv(s: &mut Logic) {
 fn update_bullets_position(s: &mut Logic, mut windowing: Option<&mut Windowing>) {
     let mut bullets_to_remove = vec![];
     for (idx, b) in s.bullets.iter_mut().enumerate() {
-        let collision = collision_test(&[b.position], b.direction, &s.grid, |x| {*x == 255});
+        let collision = collision_test(&[b.position], b.direction, &s.grid, |x| *x == 255);
         if let Some((xi, yi)) = collision {
             bullets_to_remove.push(idx);
             let area = b.destruction;
@@ -608,7 +608,12 @@ fn apply_physics_to_players(s: &mut Logic, logger: &mut Logger<Log>) {
 
         player.velocity += accelerate_player_according_to_input(&mut s.input) / 30.0;
         player.velocity = player.velocity.clamp(Vec2 { x: 1.0, y: 1.0 });
-        check_for_collision_and_move_player_according_to_movement_vector(&s.grid, player, player.velocity, logger);
+        check_for_collision_and_move_player_according_to_movement_vector(
+            &s.grid,
+            player,
+            player.velocity,
+            logger,
+        );
     }
 }
 

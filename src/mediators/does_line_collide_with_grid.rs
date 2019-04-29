@@ -33,7 +33,7 @@ pub fn collision_test<T: Clone + Default>(
     predicate: fn(&T) -> bool,
 ) -> Option<(usize, usize)> {
     for vertex in vertices {
-        let collision = does_line_collide_with_grid(grid, *vertex, *vertex+velocity, predicate);
+        let collision = does_line_collide_with_grid(grid, *vertex, *vertex + velocity, predicate);
         if collision.is_some() {
             return collision;
         }
@@ -123,7 +123,15 @@ impl Supercover {
             progress: 0,
             dest_x: stop.x.floor() as i32,
             dest_y: stop.y.floor() as i32,
-            len, ix, iy, dx, dy, sx, sy, ex, ey,
+            len,
+            ix,
+            iy,
+            dx,
+            dy,
+            sx,
+            sy,
+            ex,
+            ey,
         }
     }
     pub fn len(&self) -> u16 {
@@ -352,7 +360,11 @@ mod tests {
         assert![
             Some((2, 1))
                 == collision_test(
-                    &[Vec2 { x: 0.0, y: 0.5 }, Vec2 { x: 0.0, y: 1.5 }, Vec2 { x: 0.0, y: 2.5 }],
+                    &[
+                        Vec2 { x: 0.0, y: 0.5 },
+                        Vec2 { x: 0.0, y: 1.5 },
+                        Vec2 { x: 0.0, y: 2.5 }
+                    ],
                     Vec2::new(3.0, 0.0),
                     &grid,
                     |x| *x,
@@ -366,7 +378,11 @@ mod tests {
         grid.resize(3, 3);
         assert![
             None == collision_test(
-                &[Vec2 { x: 0.0, y: 0.5 }, Vec2 { x: 0.0, y: 1.5 }, Vec2 { x: 0.0, y: 2.5 }],
+                &[
+                    Vec2 { x: 0.0, y: 0.5 },
+                    Vec2 { x: 0.0, y: 1.5 },
+                    Vec2 { x: 0.0, y: 2.5 }
+                ],
                 Vec2::new(3.0, 0.0),
                 &grid,
                 |x| *x,

@@ -159,21 +159,19 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
         x: player.position.x + 9.99,
         y: player.position.y + 9.99,
     };
-    let collision = collision_test(
-        &[tl, tr, bl, br],
-        movement,
-        grid,
-        |x| *x > 0,
-    );
-    match collision {
-        Some(_) => {
-            player.velocity = Vec2::null_vec();
-            true
+    let mut collision = None;
+    for i in 1..=10 {
+        collision = collision_test(&[tl, tr, bl, br], movement / i as f32, grid, |x| *x > 0);
+        if collision.is_none() {
+            player.position += movement / i as f32;
+            break;
         }
-        None => {
-            player.position += movement;
-            false
-        }
+    }
+    if collision.is_some() {
+        player.velocity = Vec2::null_vec();
+        true
+    } else {
+        false
     }
 }
 

@@ -27,6 +27,8 @@ const SPEC: &[cmdmat::Spec<Input, GshDecision, GameShellContext>] = &[
     (&[("/", MANY_I32)], div),
     (&[("^", MANY_I32)], xor),
     (&[("cat", MANY_STRING)], cat),
+    (&[("config", None), ("gravity", None), ("enable", ANY_BOOL)], enable_gravity),
+    (&[("config", None), ("gravity", None), ("set", None), ("y", ANY_F32)], set_gravity),
     (&[("get", ANY_STRING)], do_get),
     (&[("log", None), ("context", ANY_ATOM), ("level", ANY_U8)], log_context),
     (&[("log", None), ("global", None), ("level", ANY_U8)], log),
@@ -35,7 +37,6 @@ const SPEC: &[cmdmat::Spec<Input, GshDecision, GameShellContext>] = &[
     (&[("str", ANY_STRING)], create_string),
     (&[("void", IGNORE_ALL)], void),
     (&[("|", MANY_I32)], bor),
-    (&[("config", None), ("gravity", None), ("set", None), ("y", ANY_F32)], set_gravity),
 ];
 
 // ---
@@ -365,6 +366,21 @@ mod command_handlers {
         }
     }
 
+    pub fn enable_gravity(s: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+        if let Some(ref mut chan) = s.config_change {
+            if let Input::Bool(value) = commands[0] {
+                chan.send(Box::new(move |main: &mut Main| {
+                    main.logic.config.world.gravity_on = value;
+                }));
+                Ok("Enabled/disabled gravity".into())
+            } else {
+                Err("Did not get a boolean".into())
+            }
+        } else {
+            Err("Unable to contact main".into())
+        }
+    }
+
     pub fn log_context(s: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
         let ctx;
         match commands[0] {
@@ -485,6 +501,18 @@ mod predicates {
         Decision::Accept(1)
     }
 
+    fn any_bool_function(input: &[&str], out: &mut SVec<Input>) -> Decision<GshDecision> {
+        ret_if_err![aslen(input, 1)];
+        match input[0].parse::<bool>().ok().map(Input::Bool) {
+            Some(num) => {
+                out.push(num);
+            }
+            None => {
+                return Decision::Deny(GshDecision::Err(input[0].into()));
+            }
+        }
+        Decision::Accept(1)
+    }
     fn many_i32_function(input: &[&str], out: &mut SVec<Input>) -> Decision<GshDecision> {
         let mut cnt = 0;
         for i in input.iter() {
@@ -517,6 +545,11 @@ mod predicates {
     pub const ANY_F32: SomeDec = Some(&Decider {
         description: "<f32>",
         decider: any_f32_function,
+    });
+
+    pub const ANY_BOOL: SomeDec = Some(&Decider {
+        description: "<true/false>",
+        decider: any_bool_function,
     });
 
     pub const MANY_STRING: SomeDec = Some(&Decider {
@@ -620,7 +653,7 @@ pub fn spawn(
 fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<()> {
     let logger = s.gshctx.logger.clone();
     let keep_running = s.gshctx.keep_running.clone();
-    let channel = s.gshctx.keep_running.clone();
+    let channel = s.gshctx.config_change.clone();
     thread::Builder::new()
         .name("gsh/server/handler".to_string())
         .spawn(move || {
@@ -628,7 +661,7 @@ fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<
             cmdmat.register_many(SPEC).unwrap();
             let mut shell_clone = GameShell {
                 gshctx: GameShellContext {
-                    config_change: None,
+                    config_change: channel,
                     logger,
                     keep_running,
                     variables: HashMap::new(),
@@ -874,12 +907,13 @@ fn game_shell_thread(mut s: Gsh, listener: TcpListener) {
 type Gsh<'a> = GameShell<Arc<cmdmat::Mapping<'a, Input, GshDecision, GameShellContext>>>;
 #[derive(Clone)]
 pub enum Input {
-    U8(u8),
-    I32(i32),
-    F32(f32),
     Atom(String),
-    String(String),
+    Bool(bool),
     Command(String),
+    F32(f32),
+    I32(i32),
+    String(String),
+    U8(u8),
 }
 
 #[derive(Clone, Debug, PartialEq)]

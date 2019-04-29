@@ -1,4 +1,4 @@
-use self::{command_handlers::*, predicates::*, types::*};
+use self::{command_handlers::*, incconsumer::*, predicates::*, types::*};
 use crate::glocals::{GameShell, GameShellContext, Log, Main};
 use cmdmat::{self, LookError, SVec};
 use either::Either;
@@ -15,6 +15,7 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 
 mod command_handlers;
+mod incconsumer;
 mod predicates;
 mod types;
 
@@ -156,72 +157,6 @@ fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<
 }
 
 // ---
-
-mod proc {
-    pub enum Consumption {
-        Consumed(usize),
-        Stop,
-    }
-    pub enum Validation {
-        Ready,
-        Unready,
-        Discard,
-    }
-    pub enum Process {
-        Continue,
-        Stop,
-    }
-    /// Incremental consumer of bytes
-    ///
-    /// Consume bytes until a complete set of bytes has been found, then, run a handler
-    /// function on just that set of bytes.
-    ///
-    /// This is used for accepting bytes from some external stream, note that we set a maximum
-    /// size on the buffer, so no external input can cause excessive memory usage.
-    /// Parsing must verify the legitimacy of the stream.
-    pub trait IncConsumer {
-        /// Consume bytes and place them on an output stack
-        fn consume(&mut self, output: &mut [u8]) -> Consumption;
-        /// Validate part of the bytestream, as soon as we return `Validation::Ready`, `process`
-        /// will be run on the current accumulated bytes, after which these bytes will be deleted.
-        fn validate(&mut self, output: u8) -> Validation;
-        /// Process do actual stuff with the bytes to affect the system.
-        ///
-        /// The sequence of bytes input here will have been verified by the `validate`
-        /// function.
-        fn process(&mut self, input: &[u8]) -> Process;
-
-        /// Runs the incremental consumer until it is signalled to quit
-        fn run(&mut self, bufsize: usize) {
-            let mut buf = vec![b'\0'; bufsize];
-            let mut begin = 0;
-            let mut shift = 0;
-            loop {
-                match self.consume(&mut buf[begin..]) {
-                    Consumption::Consumed(amount) => {
-                        for ch in buf[begin..(begin + amount)].iter() {
-                            begin += 1;
-                            match self.validate(*ch) {
-                                Validation::Ready => {
-                                    match self.process(&buf[shift..begin]) {
-                                        Process::Continue => {}
-                                        Process::Stop => return,
-                                    }
-                                    shift = begin;
-                                }
-                                Validation::Unready => {}
-                                Validation::Discard => shift = begin,
-                            }
-                        }
-                    }
-                    Consumption::Stop => return,
-                }
-            }
-        }
-    }
-}
-
-use self::proc::*;
 
 impl<'a, 'b> IncConsumer for GshTcp<'a, 'b> {
     fn consume(&mut self, output: &mut [u8]) -> Consumption {

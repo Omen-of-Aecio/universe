@@ -297,17 +297,6 @@ fn game_shell_thread(mut s: Gsh, listener: TcpListener) {
 
 // ---
 
-#[derive(Clone)]
-pub enum Input {
-    Atom(String),
-    Bool(bool),
-    Command(String),
-    F32(f32),
-    I32(i32),
-    String(String),
-    U8(u8),
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum EvalRes {
     Err(String),

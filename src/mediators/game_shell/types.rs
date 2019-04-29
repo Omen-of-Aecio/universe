@@ -15,3 +15,14 @@ pub enum GshDecision {
     Help(String),
     Err(String),
 }
+
+#[derive(Clone)]
+pub enum Input {
+    Atom(String),
+    Bool(bool),
+    Command(String),
+    F32(f32),
+    I32(i32),
+    String(String),
+    U8(u8),
+}

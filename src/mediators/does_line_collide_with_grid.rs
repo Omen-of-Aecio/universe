@@ -119,20 +119,20 @@ impl Supercover {
 
         let stopx = stop
             .x
-            .max(i16::max_value() as f32)
-            .min(i16::min_value() as f32) as i16;
+            .max(i16::min_value() as f32)
+            .min(i16::max_value() as f32) as i16;
         let stopy = stop
             .y
-            .max(i16::max_value() as f32)
-            .min(i16::min_value() as f32) as i16;
+            .max(i16::min_value() as f32)
+            .min(i16::max_value() as f32) as i16;
         let startx = start
             .x
-            .max(i16::max_value() as f32)
-            .min(i16::min_value() as f32) as i16;
+            .max(i16::min_value() as f32)
+            .min(i16::max_value() as f32) as i16;
         let starty = start
             .y
-            .max(i16::max_value() as f32)
-            .min(i16::min_value() as f32) as i16;
+            .max(i16::min_value() as f32)
+            .min(i16::max_value() as f32) as i16;
 
         let xdiff = (i32::from(stopx) - i32::from(startx)).abs();
         let ydiff = (i32::from(stopy) - i32::from(starty)).abs();

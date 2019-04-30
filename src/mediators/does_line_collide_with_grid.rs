@@ -84,6 +84,7 @@ struct Supercover {
     sy: i8,
     dest_x: i32,
     dest_y: i32,
+    done: bool,
 }
 impl Supercover {
     pub fn new(start: Vec2, stop: Vec2) -> Self {
@@ -116,9 +117,28 @@ impl Supercover {
             sy = 1;
             ey = (1.0 - start.y.fract()) * dy;
         }
-        let len = ((i32::from(stop.x.floor() as i16) - i32::from(start.x.floor() as i16)).abs()
-            + (i32::from(stop.y.floor() as i16) - i32::from(start.y.floor() as i16)).abs())
-            as u16; // TODO: maybe +1 here?
+
+        let stopx = stop
+            .x
+            .max(i16::max_value() as f32)
+            .min(i16::min_value() as f32) as i16;
+        let stopy = stop
+            .y
+            .max(i16::max_value() as f32)
+            .min(i16::min_value() as f32) as i16;
+        let startx = start
+            .x
+            .max(i16::max_value() as f32)
+            .min(i16::min_value() as f32) as i16;
+        let starty = start
+            .y
+            .max(i16::max_value() as f32)
+            .min(i16::min_value() as f32) as i16;
+
+        let xdiff = (i32::from(stopx) - i32::from(startx)).abs();
+        let ydiff = (i32::from(stopy) - i32::from(starty)).abs();
+        let len = ((xdiff + ydiff) as u16).min(u16::max_value() - 1);
+
         Supercover {
             progress: 0,
             dest_x: stop.x.floor() as i32,
@@ -132,6 +152,7 @@ impl Supercover {
             sy,
             ex,
             ey,
+            done: false,
         }
     }
     pub fn len(&self) -> u16 {
@@ -170,6 +191,13 @@ mod tests {
     use super::*;
     use rand::prelude::*;
     use test::{black_box, Bencher};
+
+    #[test]
+    fn i16_boundary_does_not_overflow() {
+        let values = Supercover::new(Vec2 { x: 32767.0, y: 0.0 }, Vec2 { x: 32768.0, y: 0.0 })
+            .collect::<Vec<_>>();
+        assert_eq![1, values.len()];
+    }
 
     #[test]
     fn test_no_collision() {

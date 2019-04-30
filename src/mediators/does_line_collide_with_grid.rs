@@ -231,7 +231,6 @@ mod tests {
         assert_eq![(32765, 0), values[65533]];
         assert_eq![(32766, 0), values[65534]];
         assert_eq![(32767, 0), values[65535]];
-        println!["{:?}", values];
     }
 
     #[test]

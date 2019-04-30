@@ -140,8 +140,14 @@ impl Supercover {
 
         Supercover {
             progress: 0,
-            dest_x: stop.x.floor() as i32,
-            dest_y: stop.y.floor() as i32,
+            dest_x: stop
+                .x
+                .min(i16::max_value() as f32)
+                .max(i16::min_value() as f32) as i32,
+            dest_y: stop
+                .y
+                .min(i16::max_value() as f32)
+                .max(i16::min_value() as f32) as i32,
             len,
             ix,
             iy,
@@ -195,6 +201,32 @@ mod tests {
         let values = Supercover::new(Vec2 { x: 32767.0, y: 0.0 }, Vec2 { x: 32768.0, y: 0.0 })
             .collect::<Vec<_>>();
         assert_eq![1, values.len()];
+        assert_eq![(32767, 0), values[0]];
+
+        let values = Supercover::new(
+            Vec2 {
+                x: 327670.0,
+                y: 0.0,
+            },
+            Vec2 {
+                x: 327680.0,
+                y: 0.0,
+            },
+        )
+        .collect::<Vec<_>>();
+        assert_eq![1, values.len()];
+        assert_eq![(32767, 0), values[0]];
+
+        let values = Supercover::new(
+            Vec2 {
+                x: 327670.0,
+                y: 0.0,
+            },
+            Vec2 { x: 1e12, y: 0.0 },
+        )
+        .collect::<Vec<_>>();
+        assert_eq![1, values.len()];
+        assert_eq![(32767, 0), values[0]];
     }
 
     #[test]

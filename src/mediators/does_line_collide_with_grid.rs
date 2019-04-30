@@ -69,6 +69,7 @@ pub fn collision_test<T: Clone + Default>(
     */
 }
 
+#[derive(Clone, Copy)]
 struct Supercover {
     // Variables
     ex: f32,
@@ -599,6 +600,27 @@ mod tests {
                 black_box(|x| *x),
             );
             black_box(result);
+        });
+    }
+
+    #[bench]
+    fn maximum_distance_to_collision(b: &mut Bencher) {
+        let iterator = Supercover::new(
+            Vec2 {
+                x: i16::min_value() as f32,
+                y: i16::min_value() as f32,
+            },
+            Vec2 {
+                x: i16::max_value() as f32,
+                y: i16::max_value() as f32,
+            },
+        );
+        b.iter(|| {
+            let mut count: u16 = 0;
+            for _ in iterator {
+                count += 1;
+            }
+            assert_eq![u16::max_value(), count];
         });
     }
 }

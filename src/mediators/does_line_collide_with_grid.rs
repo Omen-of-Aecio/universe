@@ -76,9 +76,9 @@ struct Supercover {
     ey: f32,
     ix: i32,
     iy: i32,
-    progress: u16,
+    progress: u32,
     // Constant throughout algorithm
-    len: u16,
+    len: u32,
     dx: f32,
     dy: f32,
     sx: i8, // Directions (-1, 1)
@@ -93,11 +93,6 @@ impl Supercover {
         let slope_x = 1.0 + vy * vy / vx / vx;
         let slope_y = 1.0 + vx * vx / vy / vy;
         let (dx, dy) = (slope_x.sqrt(), slope_y.sqrt());
-
-        let (mut ix, mut iy) = (
-            i32::from(start.x.floor() as i16),
-            i32::from(start.y.floor() as i16),
-        );
 
         let (sx, sy);
         let (ex, ey);
@@ -137,7 +132,9 @@ impl Supercover {
 
         let xdiff = (i32::from(stopx) - i32::from(startx)).abs();
         let ydiff = (i32::from(stopy) - i32::from(starty)).abs();
-        let len = ((xdiff + ydiff) as u16).min(u16::max_value() - 1);
+        let len = (xdiff + ydiff) as u32;
+
+        let (ix, iy) = (i32::from(startx), i32::from(starty));
 
         Supercover {
             progress: 0,
@@ -160,14 +157,8 @@ impl Supercover {
             ey,
         }
     }
-    pub fn len(&self) -> u16 {
-        self.len + 1
-    }
-
-    pub fn progress(&self) -> u16 {
-        self.progress
-    }
 }
+
 impl Iterator for Supercover {
     type Item = (i32, i32);
     fn next(&mut self) -> Option<Self::Item> {
@@ -228,6 +219,56 @@ mod tests {
         .collect::<Vec<_>>();
         assert_eq![1, values.len()];
         assert_eq![(32767, 0), values[0]];
+
+        let values = Supercover::new(Vec2 { x: -1e12, y: 0.0 }, Vec2 { x: 1e12, y: 0.0 })
+            .collect::<Vec<_>>();
+        assert_eq![65536, values.len()];
+        assert_eq![(-32768, 0), values[0]];
+        assert_eq![(-32767, 0), values[1]];
+        assert_eq![(-1, 0), values[32767]];
+        assert_eq![(0, 0), values[32768]];
+        assert_eq![(32764, 0), values[65532]];
+        assert_eq![(32765, 0), values[65533]];
+        assert_eq![(32766, 0), values[65534]];
+        assert_eq![(32767, 0), values[65535]];
+        println!["{:?}", values];
+    }
+
+    #[test]
+    fn corner_to_corner() {
+        let iterator = Supercover::new(
+            Vec2 {
+                x: i16::min_value() as f32,
+                y: i16::min_value() as f32,
+            },
+            Vec2 {
+                x: i16::max_value() as f32,
+                y: i16::max_value() as f32,
+            },
+        );
+        assert_eq![
+            (u16::max_value() as u32 * 2 + 1) as usize,
+            iterator.collect::<Vec<_>>().len()
+        ];
+        assert_eq![Some((-32768, -32768)), iterator.clone().next()];
+        assert_eq![Some((32767, 32767)), iterator.clone().last()];
+
+        let iterator = Supercover::new(
+            Vec2 {
+                x: i16::max_value() as f32,
+                y: i16::max_value() as f32,
+            },
+            Vec2 {
+                x: i16::min_value() as f32,
+                y: i16::min_value() as f32,
+            },
+        );
+        assert_eq![
+            (u16::max_value() as u32 * 2 + 1) as usize,
+            iterator.collect::<Vec<_>>().len()
+        ];
+        assert_eq![Some((32767, 32767)), iterator.clone().next()];
+        assert_eq![Some((-32768, -32768)), iterator.clone().last()];
     }
 
     #[test]
@@ -616,11 +657,11 @@ mod tests {
             },
         );
         b.iter(|| {
-            let mut count: u16 = 0;
-            for _ in iterator {
+            let mut count: u32 = 0;
+            for i in iterator {
                 count += 1;
             }
-            assert_eq![u16::max_value(), count];
+            assert_eq![u16::max_value() as u32 * 2 + 1, count];
         });
     }
 }

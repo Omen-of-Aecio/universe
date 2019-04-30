@@ -84,7 +84,6 @@ struct Supercover {
     sy: i8,
     dest_x: i32,
     dest_y: i32,
-    done: bool,
 }
 impl Supercover {
     pub fn new(start: Vec2, stop: Vec2) -> Self {
@@ -152,7 +151,6 @@ impl Supercover {
             sy,
             ex,
             ey,
-            done: false,
         }
     }
     pub fn len(&self) -> u16 {

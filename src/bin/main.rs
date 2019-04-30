@@ -30,7 +30,6 @@ fn parse_command_line_arguments<'a>() -> clap::ArgMatches<'a> {
 }
 
 fn run_game(s: &mut glocals::Main) {
-    let commandline = s.commandline.clone();
     s.logger = logger::Logger::spawn();
     s.logger.set_colorize(true);
     s.logger.set_context_specific_log_level("benchmark", 0);

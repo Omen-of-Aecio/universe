@@ -792,7 +792,7 @@ pub fn read(
                 },
             );
 
-            let mut target = s
+            let target = s
                 .device
                 .acquire_mapping_reader::<(u8, u8, u8, u8)>(
                     &*strtex.image_memory,
@@ -833,7 +833,9 @@ pub fn write(
 
             map(&mut target, (subres.row_pitch / 4) as usize);
 
-            s.device.release_mapping_writer(target);
+            s.device
+                .release_mapping_writer(target)
+                .expect("Unable to release mapping writer");
         }
     }
 }

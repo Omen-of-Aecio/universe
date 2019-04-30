@@ -310,10 +310,12 @@ pub fn log_trace(s: &mut GameShellContext, commands: &[Input]) -> Result<String,
 pub fn set_gravity(s: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
     if let Some(ref mut chan) = s.config_change {
         if let Input::F32(value) = commands[0] {
-            chan.send(Box::new(move |main: &mut Main| {
+            match chan.send(Box::new(move |main: &mut Main| {
                 main.logic.config.world.gravity = value;
-            }));
-            Ok("Changed gravity".into())
+            })) {
+                Ok(()) => Ok("Set gravity value".into()),
+                Err(_) => Err("Unable to send message to main".into()),
+            }
         } else {
             Err("Did not get an f32".into())
         }
@@ -325,10 +327,12 @@ pub fn set_gravity(s: &mut GameShellContext, commands: &[Input]) -> Result<Strin
 pub fn enable_gravity(s: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
     if let Some(ref mut chan) = s.config_change {
         if let Input::Bool(value) = commands[0] {
-            chan.send(Box::new(move |main: &mut Main| {
+            match chan.send(Box::new(move |main: &mut Main| {
                 main.logic.config.world.gravity_on = value;
-            }));
-            Ok("Enabled/disabled gravity".into())
+            })) {
+                Ok(()) => Ok("Enabled/disabled gravity".into()),
+                _ => Err("Unable to send message to main".into()),
+            }
         } else {
             Err("Did not get a boolean".into())
         }

@@ -62,14 +62,7 @@ pub fn make_new_gameshell(logger: Logger<Log>) -> Gsh<'static> {
 
 // ---
 
-fn spawn_with_listener(
-    logger: Logger<Log>,
-    listener: TcpListener,
-) -> (
-    JoinHandle<()>,
-    Arc<AtomicBool>,
-    mpsc::Receiver<Box<Fn(&mut Main) + Send>>,
-) {
+fn spawn_with_listener(logger: Logger<Log>, listener: TcpListener) -> GshSpawn {
     let keep_running = Arc::new(AtomicBool::new(true));
     let keep_running_clone = keep_running.clone();
     let (tx, rx) = mpsc::sync_channel(2);
@@ -98,13 +91,7 @@ fn spawn_with_listener(
     )
 }
 
-pub fn spawn(
-    mut logger: Logger<Log>,
-) -> Option<(
-    JoinHandle<()>,
-    Arc<AtomicBool>,
-    mpsc::Receiver<Box<Fn(&mut Main) + Send>>,
-)> {
+pub fn spawn(mut logger: Logger<Log>) -> Option<GshSpawn> {
     if let Ok(listener) = TcpListener::bind("127.0.0.1:32931") {
         Some(spawn_with_listener(logger, listener))
     } else {

@@ -681,7 +681,6 @@ pub fn push_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions)
 /// Add a sprite (a rectangular view of a texture) to the system
 pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -> SpriteHandle {
     let tex = &mut s.dyntexs[texture.0];
-    let device = &s.device;
 
     // Derive xy from the sprite's initial UV
     let uv_a = sprite.uv_begin;
@@ -774,7 +773,7 @@ pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -
 
 pub fn remove_sprite(s: &mut Windowing, handle: SpriteHandle) {
     if let Some(dyntex) = s.dyntexs.get_mut(handle.0) {
-        let mut idx = (handle.1 * 4 * 10 * 4) as usize;
+        let idx = (handle.1 * 4 * 10 * 4) as usize;
         let zero = unsafe { std::mem::transmute::<f32, [u8; 4]>(0.0) };
         for idx in (0..=3).map(|x| (x * 40) + idx) {
             dyntex.mockbuffer[idx + 32..idx + 36].copy_from_slice(&zero);
@@ -786,7 +785,6 @@ pub fn remove_sprite(s: &mut Windowing, handle: SpriteHandle) {
 // ---
 
 pub fn set_position(s: &mut Windowing, handle: &SpriteHandle, position: (f32, f32)) {
-    let device = &s.device;
     if let Some(stex) = s.dyntexs.get_mut(handle.0) {
         unsafe {
             use std::mem::transmute;
@@ -831,7 +829,6 @@ pub fn set_rotation(s: &mut Windowing, handle: &SpriteHandle, rotation: f32) {
 
 /// Translate all sprites that depend on a given texture
 pub fn sprite_translate_all(s: &mut Windowing, tex: &TextureHandle, dxdy: (f32, f32)) {
-    let device = &s.device;
     if let Some(stex) = s.dyntexs.get_mut(tex.0) {
         unsafe {
             for mock in stex.mockbuffer.chunks_mut(40) {
@@ -847,7 +844,6 @@ pub fn sprite_translate_all(s: &mut Windowing, tex: &TextureHandle, dxdy: (f32, 
 
 /// Rotate all sprites that depend on a given texture
 pub fn sprite_rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, tex: &TextureHandle, deg: T) {
-    let device = &s.device;
     if let Some(stex) = s.dyntexs.get_mut(tex.0) {
         unsafe {
             for mock in stex.mockbuffer.chunks_mut(40) {
@@ -893,7 +889,6 @@ pub fn set_uvs2<'a>(
 ) {
     if let Some(first) = uvs.next() {
         if let Some(ref mut stex) = s.dyntexs.get_mut((first.0).0) {
-            let device = &s.device;
             let current_texture_handle = (first.0).0;
             unsafe {
                 if (first.0).1 < stex.count as usize {

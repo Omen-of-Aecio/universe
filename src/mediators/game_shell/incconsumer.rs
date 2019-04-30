@@ -94,7 +94,6 @@ pub trait IncConsumer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test::{black_box, Bencher};
 
     #[test]
     fn simple() {
@@ -125,6 +124,38 @@ mod tests {
 
         assert_eq![1, consumed.consumption_count];
         assert_eq![0, consumed.validation_count];
+        assert_eq![0, consumed.process_count];
+    }
+
+    #[test]
+    fn stop_at_validation() {
+        #[derive(Default)]
+        struct Consumer {
+            pub consumption_count: usize,
+            pub validation_count: usize,
+            pub process_count: usize,
+        }
+
+        impl IncConsumer for Consumer {
+            fn consume(&mut self, _: &mut [u8]) -> Consumption {
+                self.consumption_count += 1;
+                Consumption::Consumed(1)
+            }
+            fn validate(&mut self, _: u8) -> Validation {
+                self.validation_count += 1;
+                Validation::Stop
+            }
+            fn process(&mut self, _: &[u8]) -> Process {
+                self.process_count += 1;
+                Process::Continue
+            }
+        }
+
+        let mut consumed = Consumer::default();
+        consumed.run(1);
+
+        assert_eq![1, consumed.consumption_count];
+        assert_eq![1, consumed.validation_count];
         assert_eq![0, consumed.process_count];
     }
 

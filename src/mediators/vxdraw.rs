@@ -688,7 +688,9 @@ fn draw_frame_internal<T>(
                         )
                         .expect("Unable to get mapping writer");
                     data_target[..dyntex.mockbuffer.len()].copy_from_slice(&dyntex.mockbuffer);
-                    s.device.release_mapping_writer(data_target);
+                    s.device
+                        .release_mapping_writer(data_target)
+                        .expect("Unable to release mapping writer");
                     let buffers: ArrayVec<[_; 1]> = [(&*dyntex.texture_vertex_buffer, 0)].into();
                     enc.bind_vertex_buffers(0, buffers);
                     enc.bind_index_buffer(gfx_hal::buffer::IndexBufferView {

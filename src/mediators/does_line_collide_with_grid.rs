@@ -6,7 +6,7 @@ fn does_line_collide_with_grid<T: Clone + Default>(
     end: Vec2,
     predicate: fn(&T) -> bool,
 ) -> Option<(usize, usize)> {
-    let mut line = Supercover::new(start, end);
+    let line = Supercover::new(start, end);
     for (xi, yi) in line {
         if xi >= 0 && yi >= 0 {
             if let Some(entry) = grid.get(xi as usize, yi as usize) {
@@ -115,20 +115,20 @@ impl Supercover {
 
         let stopx = stop
             .x
-            .max(i16::min_value() as f32)
-            .min(i16::max_value() as f32) as i16;
+            .max(f32::from(i16::min_value()))
+            .min(f32::from(i16::max_value())) as i16;
         let stopy = stop
             .y
-            .max(i16::min_value() as f32)
-            .min(i16::max_value() as f32) as i16;
+            .max(f32::from(i16::min_value()))
+            .min(f32::from(i16::max_value())) as i16;
         let startx = start
             .x
-            .max(i16::min_value() as f32)
-            .min(i16::max_value() as f32) as i16;
+            .max(f32::from(i16::min_value()))
+            .min(f32::from(i16::max_value())) as i16;
         let starty = start
             .y
-            .max(i16::min_value() as f32)
-            .min(i16::max_value() as f32) as i16;
+            .max(f32::from(i16::min_value()))
+            .min(f32::from(i16::max_value())) as i16;
 
         let xdiff = (i32::from(stopx) - i32::from(startx)).abs();
         let ydiff = (i32::from(stopy) - i32::from(starty)).abs();
@@ -140,12 +140,12 @@ impl Supercover {
             progress: 0,
             dest_x: stop
                 .x
-                .min(i16::max_value() as f32)
-                .max(i16::min_value() as f32) as i32,
+                .min(f32::from(i16::max_value()))
+                .max(f32::from(i16::min_value())) as i32,
             dest_y: stop
                 .y
-                .min(i16::max_value() as f32)
-                .max(i16::min_value() as f32) as i32,
+                .min(f32::from(i16::max_value()))
+                .max(f32::from(i16::min_value())) as i32,
             len,
             ix,
             iy,
@@ -167,10 +167,10 @@ impl Iterator for Supercover {
             let point = (self.ix as i32, self.iy as i32);
             if self.ex < self.ey {
                 self.ex += self.dx;
-                self.ix += self.sx as i32;
+                self.ix += i32::from(self.sx);
             } else {
                 self.ey += self.dy;
-                self.iy += self.sy as i32;
+                self.iy += i32::from(self.sy);
             }
             Some(point)
         } else if self.progress == self.len {
@@ -657,7 +657,7 @@ mod tests {
         );
         b.iter(|| {
             let mut count: u32 = 0;
-            for i in iterator {
+            for _ in iterator {
                 count += 1;
             }
             assert_eq![u16::max_value() as u32 * 2 + 1, count];

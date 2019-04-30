@@ -1,11 +1,10 @@
 use crate::glocals::{vxdraw::*, *};
 use crate::mediators::vxdraw::*;
 use crate::mediators::{does_line_collide_with_grid::*, vxdraw};
-use benchmarker::Benchmarker;
 use cgmath::*;
-use geometry::{boxit::Boxit, cam::Camera, grid2d::Grid, vec::Vec2};
+use geometry::{boxit::Boxit, grid2d::Grid, vec::Vec2};
 use input::Input;
-use logger::{debug, info, InDebug, Logger};
+use logger::{info, InDebug, Logger};
 use rand::Rng;
 use std::time::Instant;
 use winit::{VirtualKeyCode as Key, *};
@@ -19,22 +18,21 @@ fn initialize_grid(s: &mut Grid<u8>) {
 
 pub fn collect_input(client: &mut Logic, windowing: &mut Windowing) {
     for event in super::vxdraw::collect_input(windowing) {
-        match event {
-            Event::WindowEvent { event, .. } => match event {
+        if let Event::WindowEvent { event, .. } = event {
+            match event {
                 WindowEvent::KeyboardInput { input, .. } => {
                     client.input.register_key(&input);
                 }
                 WindowEvent::MouseWheel {
                     delta, modifiers, ..
-                } => match delta {
-                    winit::MouseScrollDelta::LineDelta(_, v) => {
+                } => {
+                    if let winit::MouseScrollDelta::LineDelta(_, v) = delta {
                         client.input.register_mouse_wheel(v);
                         if modifiers.ctrl {
                             client.input.set_ctrl();
                         }
                     }
-                    _ => {}
-                },
+                }
                 WindowEvent::MouseInput { state, button, .. } => {
                     client.input.register_mouse_input(state, button);
                 }
@@ -43,8 +41,7 @@ pub fn collect_input(client: &mut Logic, windowing: &mut Windowing) {
                     client.input.position_mouse(pos.0, pos.1);
                 }
                 _ => {}
-            },
-            _ => {}
+            }
         }
     }
 }
@@ -107,41 +104,11 @@ fn accelerate_player_according_to_input(s: &Input) -> Vec2 {
     } / if s.is_key_down(Key::LShift) { 3.0 } else { 1.0 }
 }
 
-fn check_player_collides_here(grid: &Grid<u8>, position: Vec2) -> bool {
-    let tl = Vec2 {
-        x: position.x + 0.01,
-        y: position.y + 0.01,
-    };
-    let tr = Vec2 {
-        x: position.x + 9.99,
-        y: position.y + 0.01,
-    };
-    let bl = Vec2 {
-        x: position.x + 0.01,
-        y: position.y + 9.99,
-    };
-    let br = Vec2 {
-        x: position.x + 9.99,
-        y: position.y + 9.99,
-    };
-    grid.get(tl.x as usize, tl.y as usize)
-        .map_or(false, |x| *x > 0)
-        || grid
-            .get(tr.x as usize, tr.y as usize)
-            .map_or(false, |x| *x > 0)
-        || grid
-            .get(br.x as usize, br.y as usize)
-            .map_or(false, |x| *x > 0)
-        || grid
-            .get(bl.x as usize, bl.y as usize)
-            .map_or(false, |x| *x > 0)
-}
-
 fn check_for_collision_and_move_player_according_to_movement_vector(
     grid: &Grid<u8>,
     player: &mut PlayerData,
     movement: Vec2,
-    logger: &mut Logger<Log>,
+    _logger: &mut Logger<Log>,
 ) -> bool {
     let tl = Vec2 {
         x: player.position.x + 0.01,
@@ -207,7 +174,6 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
             dyntex::TextureOptions {
                 depth_test: true,
                 fixed_perspective: Some(Matrix4::identity()),
-                ..dyntex::TextureOptions::default()
             },
         );
         dyntex::push_sprite(
@@ -328,7 +294,7 @@ fn update_graphics(s: &mut Main) {
 
 fn draw_graphics(s: &mut Main) {
     if let Some(ref mut graphics) = s.graphics {
-        let persp = super::vxdraw::utils::gen_perspective(&mut graphics.windowing);
+        let persp = super::vxdraw::utils::gen_perspective(&graphics.windowing);
         let scale = Matrix4::from_scale(s.logic.cam.zoom);
         let center = s.logic.cam.center;
         // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
@@ -366,6 +332,7 @@ pub fn entry_point_client(s: &mut Main) {
     loop {
         s.time = Instant::now();
         tick_logic(&mut s.logic, &mut s.logger);
+        set_gravity(&mut s.logic);
         update_bullets_position(&mut s.logic, s.graphics.as_mut().map(|x| &mut x.windowing));
 
         if let Some(Ok(msg)) = s.threads.game_shell_channel.as_mut().map(|x| x.try_recv()) {
@@ -478,8 +445,8 @@ fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>, random: &mut ran
             bullet_count,
             speed,
         ) = match weapon {
-            &Weapon::Hellfire => (10, 6, (0.0, 0.0), (1.0, 53.0 / 60.0), 6.8, 0.9, 3, 1, 1.0),
-            &Weapon::Ak47 => (
+            Weapon::Hellfire => (10, 6, (0.0, 0.0), (1.0, 53.0 / 60.0), 6.8, 0.9, 3, 1, 1.0),
+            Weapon::Ak47 => (
                 1,
                 1,
                 (0.0, 54.0 / 60.0),
@@ -610,7 +577,7 @@ fn apply_physics_to_players(s: &mut Logic, logger: &mut Logger<Log>) {
             player.velocity += Vec2::new(0.0, -s.config.world.gravity);
         }
 
-        player.velocity += accelerate_player_according_to_input(&mut s.input) / 30.0;
+        player.velocity += accelerate_player_according_to_input(&s.input) / 30.0;
         player.velocity = player.velocity.clamp(Vec2 { x: 1.0, y: 1.0 });
         check_for_collision_and_move_player_according_to_movement_vector(
             &s.grid,

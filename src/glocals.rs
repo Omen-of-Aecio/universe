@@ -1,16 +1,12 @@
-use benchmarker::Benchmarker;
 use clap;
 use geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
 use input;
 use ketimer::WeakTimer;
 use logger::Logger;
-use rand::Rng;
 use rand_pcg::Pcg64Mcg;
 use rodio;
-use serde_derive::Deserialize;
 use std::{
     collections::HashMap,
-    hash::{Hash, Hasher},
     sync::{atomic::AtomicBool, mpsc, Arc},
     time::{Duration, Instant},
     vec::Vec,
@@ -79,11 +75,14 @@ impl<'a> Default for Timers {
     }
 }
 
+pub type GshChannelRecv = mpsc::Receiver<Box<Fn(&mut Main) + Send>>;
+pub type GshChannelSend = mpsc::SyncSender<Box<Fn(&mut Main) + Send>>;
+
 #[derive(Default)]
 pub struct Threads {
     pub game_shell: Option<std::thread::JoinHandle<()>>,
     pub game_shell_keep_running: Option<Arc<AtomicBool>>,
-    pub game_shell_channel: Option<mpsc::Receiver<Box<Fn(&mut Main) + Send>>>,
+    pub game_shell_channel: Option<GshChannelRecv>,
 }
 
 // ---
@@ -96,7 +95,7 @@ pub struct GameShell<T: Send + Sync> {
 
 #[derive(Clone)]
 pub struct GameShellContext {
-    pub config_change: Option<mpsc::SyncSender<Box<Fn(&mut Main) + Send>>>,
+    pub config_change: Option<GshChannelSend>,
     pub logger: Logger<Log>,
     pub keep_running: Arc<AtomicBool>,
     pub variables: HashMap<String, String>,

@@ -1,5 +1,3 @@
-use clap::crate_authors;
-use clap::{App, Arg};
 use std::net::TcpStream;
 use std::sync::atomic::Ordering;
 use universe::{glocals::*, *};
@@ -8,25 +6,6 @@ use universe::{glocals::*, *};
 fn read_config(path: &str) -> Result<Config, Error> {
     let contents = std::fs::read_to_string(path)?;
     Ok(toml::from_str(&contents)?)
-}
-
-fn parse_command_line_arguments<'a>() -> clap::ArgMatches<'a> {
-    App::new("Universe")
-        .version("0.1.0")
-        .author(crate_authors!["\n"])
-        .arg(
-            Arg::with_name("connect")
-                .short("c")
-                .help("Run client and connect to specified server of form `ipaddress:port`")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("host")
-                .short("h")
-                .help("Host a server on a port")
-                .takes_value(true),
-        )
-        .get_matches()
 }
 
 fn run_game(s: &mut glocals::Main) {
@@ -56,7 +35,6 @@ fn wait_for_threads_to_exit(s: glocals::Main) {
 
 fn main() {
     let mut s = glocals::Main::default();
-    s.commandline = parse_command_line_arguments();
     s.logic.config = read_config("config.toml").unwrap();
     run_game(&mut s);
     wait_for_threads_to_exit(s);

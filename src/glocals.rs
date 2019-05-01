@@ -1,4 +1,3 @@
-use clap;
 use geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
 use input;
 use ketimer::WeakTimer;
@@ -24,9 +23,8 @@ pub type Error = failure::Error;
 
 // ---
 
-pub struct Main<'a> {
+pub struct Main {
     pub audio: Option<rodio::Sink>,
-    pub commandline: clap::ArgMatches<'a>,
     pub graphics: Option<Graphics>,
     pub logger: Logger<Log>,
     pub logic: Logic,
@@ -45,11 +43,10 @@ pub struct Graphics {
     pub windowing: vxdraw::Windowing,
 }
 
-impl Default for Main<'_> {
+impl Default for Main {
     fn default() -> Self {
         Self {
             audio: None,
-            commandline: clap::ArgMatches::default(),
             graphics: None,
             logger: Logger::spawn_void(),
             logic: Logic::default(),

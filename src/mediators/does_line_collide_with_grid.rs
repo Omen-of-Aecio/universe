@@ -321,7 +321,6 @@ mod tests {
         let first = cover.clone().next().unwrap();
         let second_last = cover.clone().skip(131069).next().unwrap();
         let last = cover.clone().last().unwrap();
-        dbg![last.0 - first.0];
         assert![second_last.1 - first.1 <= u16::max_value() as i32 * 2 - 1];
         assert_eq![131071, cover.count()];
         assert_eq![(-32768, -32768), first];

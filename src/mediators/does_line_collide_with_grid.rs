@@ -116,19 +116,23 @@ impl Supercover {
         let stopx = stop
             .x
             .max(f32::from(i16::min_value()))
-            .min(f32::from(i16::max_value())) as i16;
+            .min(f32::from(i16::max_value()))
+            .floor() as i16;
         let stopy = stop
             .y
             .max(f32::from(i16::min_value()))
-            .min(f32::from(i16::max_value())) as i16;
+            .min(f32::from(i16::max_value()))
+            .floor() as i16;
         let startx = start
             .x
             .max(f32::from(i16::min_value()))
-            .min(f32::from(i16::max_value())) as i16;
+            .min(f32::from(i16::max_value()))
+            .floor() as i16;
         let starty = start
             .y
             .max(f32::from(i16::min_value()))
-            .min(f32::from(i16::max_value())) as i16;
+            .min(f32::from(i16::max_value()))
+            .floor() as i16;
 
         let xdiff = (i32::from(stopx) - i32::from(startx)).abs();
         let ydiff = (i32::from(stopy) - i32::from(starty)).abs();
@@ -141,11 +145,13 @@ impl Supercover {
             dest_x: stop
                 .x
                 .min(f32::from(i16::max_value()))
-                .max(f32::from(i16::min_value())) as i32,
+                .max(f32::from(i16::min_value()))
+                .floor() as i32,
             dest_y: stop
                 .y
                 .min(f32::from(i16::max_value()))
-                .max(f32::from(i16::min_value())) as i32,
+                .max(f32::from(i16::min_value()))
+                .floor() as i32,
             len,
             ix,
             iy,
@@ -279,6 +285,28 @@ mod tests {
                 &grid,
                 Vec2 { x: 0.0, y: 0.0 },
                 Vec2 { x: 10.0, y: 10.0 },
+                |x| *x
+            )
+        ];
+    }
+
+    #[test]
+    fn test_top_collision() {
+        let mut grid: Grid<bool> = Grid::new();
+        grid.resize(10, 10);
+        use geometry::boxit::*;
+        for (x, y) in Boxit::with_center((9, 0), (0, 0)) {
+            grid.set(x, y, true);
+        }
+        assert_eq![
+            1,
+            Supercover::new(Vec2 { x: 5.0, y: -1.0 }, Vec2 { x: 5.0, y: -0.1 }).count()
+        ];
+        assert![
+            None == does_line_collide_with_grid(
+                &grid,
+                Vec2 { x: 5.0, y: -1.0 },
+                Vec2 { x: 5.0, y: -0.1 },
                 |x| *x
             )
         ];

@@ -324,6 +324,26 @@ pub fn set_gravity(s: &mut GameShellContext, commands: &[Input]) -> Result<Strin
     }
 }
 
+pub fn set_fps(s: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+    if let Some(ref mut chan) = s.config_change {
+        if let Input::F32(value) = commands[0] {
+            if value < 0.0 {
+                return Err("Fps value is negative".into());
+            }
+            match chan.send(Box::new(move |main: &mut Main| {
+                main.logic.config.client.fps = value;
+            })) {
+                Ok(()) => Ok("Changed fps".into()),
+                _ => Err("Unable to send message to main".into()),
+            }
+        } else {
+            Err("Did not get f32".into())
+        }
+    } else {
+        Err("Unable to contact main".into())
+    }
+}
+
 pub fn enable_gravity(s: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
     if let Some(ref mut chan) = s.config_change {
         if let Input::Bool(value) = commands[0] {

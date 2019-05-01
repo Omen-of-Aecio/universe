@@ -237,6 +237,96 @@ mod tests {
         assert_eq![(32765, 0), values[65533]];
         assert_eq![(32766, 0), values[65534]];
         assert_eq![(32767, 0), values[65535]];
+
+        let values = Supercover::new(Vec2 { x: -1e12, y: -1e12 }, Vec2 { x: 1e12, y: -1e12 })
+            .collect::<Vec<_>>();
+        assert_eq![65536, values.len()];
+    }
+
+    #[test]
+    fn almost_zero_slope_contains_stop() {
+        let cover = Supercover::new(
+            Vec2 {
+                x: -32768.0,
+                y: -32767.5,
+            },
+            Vec2 {
+                x: 32767.0,
+                y: -32766.5,
+            },
+        );
+        let first = cover.clone().next().unwrap();
+        let last = cover.clone().last().unwrap();
+        assert_eq![(-32768, -32768), first];
+        assert_eq![(32767, -32767), last];
+
+        let last = Supercover::new(
+            Vec2 {
+                x: -32768.0,
+                y: -32767.5,
+            },
+            Vec2 {
+                x: 32767.0,
+                y: -32768.5,
+            },
+        )
+        .last()
+        .unwrap();
+        assert_eq![(32767, -32768), last];
+
+        let cover = Supercover::new(
+            Vec2 { x: -1e13, y: 0.0 },
+            Vec2 {
+                x: -1.01e13,
+                y: 5.0,
+            },
+        );
+        let first = cover.clone().next().unwrap();
+        let last = cover.clone().last().unwrap();
+        assert_eq![(-32768, 0), first];
+        assert_eq![(-32768, 5), last];
+
+        let cover = Supercover::new(
+            Vec2 {
+                x: -50_000.0,
+                y: -40_000.0,
+            },
+            Vec2 {
+                x: 50_000.0,
+                y: 40_000.0,
+            },
+        );
+        let first = cover.clone().next().unwrap();
+        let last = cover.clone().last().unwrap();
+        for i in cover {
+            // TODO: Maybe ensure this holds, the current clamping method does not ensure that
+            // values are inside.
+            // assert![i.0 <= i16::max_value() as i32];
+            assert![i.0 <= u16::max_value() as i32 * 2];
+        }
+        assert_eq![131071, cover.count()];
+        assert_eq![(-32768, -32768), first];
+        assert_eq![(32767, 32767), last];
+
+        let cover = Supercover::new(
+            Vec2 {
+                x: std::f32::NEG_INFINITY,
+                y: -40_000.0,
+            },
+            Vec2 {
+                x: std::f32::INFINITY,
+                y: 40_000.0,
+            },
+        );
+        let first = cover.clone().next().unwrap();
+        let second_last = cover.clone().skip(131069).next().unwrap();
+        let last = cover.clone().last().unwrap();
+        dbg![last.0 - first.0];
+        assert![second_last.1 - first.1 <= u16::max_value() as i32 * 2 - 1];
+        assert_eq![131071, cover.count()];
+        assert_eq![(-32768, -32768), first];
+        assert_eq![(-32768, 98301), second_last];
+        assert_eq![(32767, 32767), last];
     }
 
     #[test]

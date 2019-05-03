@@ -596,3 +596,14 @@ fn tick_logic(s: &mut Logic, logger: &mut Logger<Log>) {
     update_bullets_uv(s);
     std::thread::sleep(std::time::Duration::new(0, 8_000_000));
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::glocals::*;
+
+    #[test]
+    fn basic_setup_and_teardown() {
+        Main::default();
+    }
+}

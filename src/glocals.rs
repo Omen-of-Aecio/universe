@@ -4,6 +4,7 @@ use ketimer::WeakTimer;
 use logger::Logger;
 use rand_pcg::Pcg64Mcg;
 use rodio;
+use std::net::TcpStream;
 use std::{
     collections::HashMap,
     sync::{atomic::AtomicBool, mpsc, Arc},
@@ -81,6 +82,7 @@ pub struct Threads {
     pub game_shell_keep_running: Option<Arc<AtomicBool>>,
     pub game_shell_port: Option<u16>,
     pub game_shell_channel: Option<GshChannelRecv>,
+    pub game_shell_connection: Option<TcpStream>,
 }
 
 // ---

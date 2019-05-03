@@ -28,10 +28,21 @@ pub struct Socket<T: Clone + Debug + PartialEq> {
     connections: HashMap<SocketAddr, Connection<T>>,
 }
 
+fn bind_to_any_udp_port() -> (UdpSocket, u16) {
+    let loopback = Ipv4Addr::new(127, 0, 0, 1);
+    let socket = SocketAddrV4::new(loopback, 0);
+    let listener = UdpSocket::bind(socket).expect("Unable to find an available port");
+    let port = listener
+        .local_addr()
+        .expect("Listener has no local address")
+        .port();
+    (listener, port)
+}
+
 impl<T: Clone + Debug + PartialEq> Default for Socket<T> {
     fn default() -> Self {
         Self {
-            socket: UdpSocket::bind("127.0.0.1:34254").unwrap(),
+            socket: bind_to_any_udp_port().0,
             connections: HashMap::default(),
         }
     }

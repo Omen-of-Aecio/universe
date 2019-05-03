@@ -6,6 +6,7 @@ use geometry::{boxit::Boxit, grid2d::Grid, vec::Vec2};
 use input::Input;
 use logger::{info, InDebug, Logger};
 use rand::Rng;
+use std::net::TcpStream;
 use std::time::Instant;
 use winit::{VirtualKeyCode as Key, *};
 
@@ -603,6 +604,9 @@ fn spawn_gameshell(s: &mut Main) {
     s.threads.game_shell_keep_running = Some(game_shell.keep_running);
     s.threads.game_shell_channel = Some(game_shell.channel);
     s.threads.game_shell_port = Some(game_shell.port);
+    // std::thread::sleep(std::time::Duration::new(1, 0));
+    s.threads.game_shell_connection =
+        Some(TcpStream::connect("127.0.0.1:".to_string() + &game_shell.port.to_string()).unwrap());
 }
 
 #[cfg(test)]

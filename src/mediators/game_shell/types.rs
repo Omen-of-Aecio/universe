@@ -2,11 +2,12 @@ use super::*;
 use cmdmat::Decider;
 use std::net::TcpStream;
 
-pub type GshSpawn = (
-    JoinHandle<()>,
-    Arc<AtomicBool>,
-    mpsc::Receiver<Box<Fn(&mut Main) + Send>>,
-);
+pub struct GshSpawn {
+    pub thread_handle: JoinHandle<()>,
+    pub keep_running: Arc<AtomicBool>,
+    pub channel: mpsc::Receiver<Box<Fn(&mut Main) + Send>>,
+    pub port: u16,
+}
 pub type SomeDec = Option<&'static Decider<Input, GshDecision>>;
 pub type Gsh<'a> = GameShell<Arc<cmdmat::Mapping<'a, Input, GshDecision, GameShellContext>>>;
 

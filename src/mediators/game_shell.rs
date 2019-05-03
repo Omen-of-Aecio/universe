@@ -6,6 +6,7 @@ use logger::{self, Logger};
 use metac::{Data, Evaluate, ParseError, PartialParse, PartialParseOp};
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
+use std::net::{Ipv4Addr, SocketAddrV4};
 use std::net::{TcpListener, TcpStream};
 use std::str::from_utf8;
 use std::sync::{
@@ -63,12 +64,12 @@ pub fn make_new_gameshell(logger: Logger<Log>) -> Gsh<'static> {
 
 // ---
 
-fn spawn_with_listener(logger: Logger<Log>, listener: TcpListener) -> GshSpawn {
+fn spawn_with_listener(logger: Logger<Log>, listener: TcpListener, port: u16) -> GshSpawn {
     let keep_running = Arc::new(AtomicBool::new(true));
     let keep_running_clone = keep_running.clone();
     let (tx, rx) = mpsc::sync_channel(2);
-    (
-        thread::Builder::new()
+    GshSpawn {
+        thread_handle: thread::Builder::new()
             .name("gsh/server".to_string())
             .spawn(move || {
                 let mut cmdmat = cmdmat::Mapping::default();
@@ -87,18 +88,40 @@ fn spawn_with_listener(logger: Logger<Log>, listener: TcpListener) -> GshSpawn {
                 )
             })
             .unwrap(),
-        keep_running_clone,
-        rx,
-    )
+        keep_running: keep_running_clone,
+        channel: rx,
+        port,
+    }
 }
 
 pub fn spawn(mut logger: Logger<Log>) -> Option<GshSpawn> {
     if let Ok(listener) = TcpListener::bind("127.0.0.1:32931") {
-        Some(spawn_with_listener(logger, listener))
+        Some(spawn_with_listener(logger, listener, 32931))
     } else {
         logger.info("gsh", "Unable to bind to tcp port");
         None
     }
+}
+
+pub fn spawn_with_any_port(mut logger: Logger<Log>) -> GshSpawn {
+    if let Ok(listener) = TcpListener::bind("127.0.0.1:32931") {
+        spawn_with_listener(logger, listener, 32931)
+    } else {
+        logger.info("gsh", "Unable to bind to tcp port");
+        let (listener, port) = bind_to_any_tcp_port();
+        spawn_with_listener(logger, listener, port)
+    }
+}
+
+fn bind_to_any_tcp_port() -> (TcpListener, u16) {
+    let loopback = Ipv4Addr::new(127, 0, 0, 1);
+    let socket = SocketAddrV4::new(loopback, 0);
+    let listener = TcpListener::bind(socket).expect("Unable to find an available port");
+    let port = listener
+        .local_addr()
+        .expect("Listener has no local address")
+        .port();
+    (listener, port)
 }
 
 // ---
@@ -422,19 +445,7 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
 mod tests {
     use super::*;
     use std::io;
-    use std::net::{Ipv4Addr, SocketAddrV4};
     use test::{black_box, Bencher};
-
-    fn bind_to_any_tcp_port() -> (TcpListener, u16) {
-        let loopback = Ipv4Addr::new(127, 0, 0, 1);
-        let socket = SocketAddrV4::new(loopback, 0);
-        let listener = TcpListener::bind(socket).expect("Unable to find an available port");
-        let port = listener
-            .local_addr()
-            .expect("Listener has no local address")
-            .port();
-        (listener, port)
-    }
 
     // ---
 
@@ -443,7 +454,7 @@ mod tests {
         let logger = logger::Logger::spawn_void();
         assert_ne![123, logger.get_log_level()];
         let (listener, port) = bind_to_any_tcp_port();
-        let (_gsh, keep_running, _) = spawn_with_listener(logger.clone(), listener);
+        let mut gshspawn = spawn_with_listener(logger.clone(), listener, port);
         let mut listener =
             TcpStream::connect("127.0.0.1:".to_string() + port.to_string().as_ref()).unwrap();
         {
@@ -452,7 +463,7 @@ mod tests {
             listener.read(&mut [0u8; 256])?;
         }
         assert_eq![123, logger.get_log_level()];
-        keep_running.store(false, Ordering::Release);
+        gshspawn.keep_running.store(false, Ordering::Release);
         std::mem::drop(listener);
         let _ = TcpStream::connect("127.0.0.1:".to_string() + port.to_string().as_ref())?;
 
@@ -826,7 +837,7 @@ mod tests {
     fn message_bandwidth_over_tcp(b: &mut Bencher) -> io::Result<()> {
         let mut logger = logger::Logger::spawn_void();
         let (listener, port) = bind_to_any_tcp_port();
-        let (mut _gsh, keep_running, _) = spawn_with_listener(logger.clone(), listener);
+        let mut gshspawn = spawn_with_listener(logger.clone(), listener, port);
         logger.set_log_level(0);
         let mut listener =
             TcpStream::connect("127.0.0.1:".to_string() + port.to_string().as_ref())?;
@@ -836,7 +847,7 @@ mod tests {
             listener.read(&mut [0u8; 1024])?;
             Ok(())
         });
-        keep_running.store(false, Ordering::Release);
+        gshspawn.keep_running.store(false, Ordering::Release);
         std::mem::drop(listener);
         std::mem::drop(logger);
         let _ = TcpStream::connect("127.0.0.1:".to_string() + port.to_string().as_ref())?;

@@ -597,13 +597,30 @@ fn tick_logic(s: &mut Logic, logger: &mut Logger<Log>) {
     std::thread::sleep(std::time::Duration::new(0, 8_000_000));
 }
 
+fn spawn_gameshell(s: &mut Main) {
+    let game_shell = crate::mediators::game_shell::spawn_with_any_port(s.logger.clone());
+    s.threads.game_shell = Some(game_shell.thread_handle);
+    s.threads.game_shell_keep_running = Some(game_shell.keep_running);
+    s.threads.game_shell_channel = Some(game_shell.channel);
+    s.threads.game_shell_port = Some(game_shell.port);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::glocals::*;
 
+    // ---
+
     #[test]
     fn basic_setup_and_teardown() {
         Main::default();
+    }
+
+    #[test]
+    fn basic_setup_gsh() {
+        let mut main = Main::default();
+        spawn_gameshell(&mut main);
+        assert![main.threads.game_shell_channel.is_some()];
     }
 }

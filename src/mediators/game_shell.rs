@@ -32,6 +32,7 @@ const SPEC: &[cmdmat::Spec<Input, GshDecision, GameShellContext>] = &[
     (&[("/", MANY_I32)], div),
     (&[("^", MANY_I32)], xor),
     (&[("cat", MANY_STRING)], cat),
+    (&[("config", None), ("fps", None), ("get", None)], get_fps),
     (&[("config", None), ("fps", None), ("set", ANY_F32)], set_fps),
     (&[("config", None), ("gravity", None), ("enable", ANY_BOOL)], enable_gravity),
     (&[("config", None), ("gravity", None), ("set", None), ("y", ANY_F32)], set_gravity),

@@ -627,6 +627,15 @@ mod tests {
         use std::io::{Read, Write};
         use std::str::from_utf8;
         {
+            assert![
+                s.threads
+                    .game_shell_channel
+                    .as_mut()
+                    .unwrap()
+                    .try_recv()
+                    .is_err(),
+                "Channel should be empty before sending a gsh command."
+            ];
             let conn = s.threads.game_shell_connection.as_mut().unwrap();
             conn.write_all(input.as_bytes()).unwrap();
             conn.write_all(b"\n").unwrap();
@@ -678,7 +687,6 @@ mod tests {
     fn gsh_change_gravity() {
         let mut main = Main::default();
         spawn_gameshell(&mut main);
-        assert![main.threads.game_shell_channel.is_some()];
         assert_eq![
             "Set gravity value",
             gsh(&mut main, "config gravity set y 1.23")
@@ -691,11 +699,28 @@ mod tests {
     fn gsh_change_gravity_synchronous() {
         let mut main = Main::default();
         spawn_gameshell(&mut main);
-        assert![main.threads.game_shell_channel.is_some()];
         assert_eq![
             "Set gravity value",
             gsh_synchronous(&mut main, "config gravity set y 1.23", tick_logic)
         ];
         assert_eq![1.23, main.logic.config.world.gravity];
+    }
+
+    #[test]
+    fn gsh_get_fps() {
+        let mut main = Main::default();
+        spawn_gameshell(&mut main);
+        assert_eq![
+            "0",
+            gsh_synchronous(&mut main, "config fps get", tick_logic)
+        ];
+
+        gsh(&mut main, "config fps set 1.23");
+        tick_logic(&mut main);
+
+        assert_eq![
+            "1.23",
+            gsh_synchronous(&mut main, "config fps get", tick_logic)
+        ];
     }
 }

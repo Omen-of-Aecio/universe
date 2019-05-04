@@ -109,7 +109,7 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
     player: &mut PlayerData,
     movement: Vec2,
     _logger: &mut Logger<Log>,
-) -> bool {
+) {
     let tl = Vec2 {
         x: player.position.x + 0.01,
         y: player.position.y + 0.01,
@@ -126,19 +126,52 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
         x: player.position.x + 9.99,
         y: player.position.y + 9.99,
     };
-    let mut collision = None;
+    let mut collision_x = None;
+    let xmove = Vec2 {
+        x: movement.x,
+        y: 0.0,
+    };
     for i in 1..=10 {
-        collision = collision_test(&[tl, tr, bl, br], movement / i as f32, grid, |x| *x > 0);
-        if collision.is_none() {
-            player.position += movement / i as f32;
+        collision_x = collision_test(&[tl, tr, bl, br], xmove / i as f32, grid, |x| *x > 0);
+        if collision_x.is_none() {
+            player.position += xmove / i as f32;
             break;
         }
     }
-    if collision.is_some() {
-        player.velocity = Vec2::null_vec();
-        true
-    } else {
-        false
+
+    let tl = Vec2 {
+        x: player.position.x + 0.01,
+        y: player.position.y + 0.01,
+    };
+    let tr = Vec2 {
+        x: player.position.x + 9.99,
+        y: player.position.y + 0.01,
+    };
+    let bl = Vec2 {
+        x: player.position.x + 0.01,
+        y: player.position.y + 9.99,
+    };
+    let br = Vec2 {
+        x: player.position.x + 9.99,
+        y: player.position.y + 9.99,
+    };
+    let mut collision_y = None;
+    let ymove = Vec2 {
+        x: 0.0,
+        y: movement.y,
+    };
+    for i in 1..=10 {
+        collision_y = collision_test(&[tl, tr, bl, br], ymove / i as f32, grid, |x| *x > 0);
+        if collision_y.is_none() {
+            player.position += ymove / i as f32;
+            break;
+        }
+    }
+    if collision_x.is_some() {
+        player.velocity.x = 0.0;
+    }
+    if collision_y.is_some() {
+        player.velocity.y = 0.0;
     }
 }
 
@@ -541,37 +574,36 @@ fn tick_logic(s: &mut Main) {
         (msg)(s);
     }
 
-    {
-        let wheel = s.logic.input.get_mouse_wheel();
-        match wheel {
-            x if x == 0.0 => {}
-            x if x > 0.0 => {
-                s.logic.current_weapon = Weapon::Ak47;
-                if let Some(this_player) = s.logic.players.get_mut(0) {
-                    if let Some(ref mut gfx) = s.graphics {
-                        let new = dyntex::push_sprite(
-                            &mut gfx.windowing,
-                            &gfx.weapons_texture,
-                            dyntex::Sprite {
-                                width: 10.0,
-                                height: 5.0,
-                                // origin: (-5.0, -5.0),
-                                ..dyntex::Sprite::default()
-                            },
-                        );
-                        let old = std::mem::replace(&mut this_player.weapon_sprite, Some(new));
-                        if let Some(old_id) = old {
-                            dyntex::remove_sprite(&mut gfx.windowing, old_id);
-                        }
+    let wheel = s.logic.input.get_mouse_wheel();
+    match wheel {
+        x if x == 0.0 => {}
+        x if x > 0.0 => {
+            s.logic.current_weapon = Weapon::Ak47;
+            if let Some(this_player) = s.logic.players.get_mut(0) {
+                if let Some(ref mut gfx) = s.graphics {
+                    let new = dyntex::push_sprite(
+                        &mut gfx.windowing,
+                        &gfx.weapons_texture,
+                        dyntex::Sprite {
+                            width: 10.0,
+                            height: 5.0,
+                            // origin: (-5.0, -5.0),
+                            ..dyntex::Sprite::default()
+                        },
+                    );
+                    let old = std::mem::replace(&mut this_player.weapon_sprite, Some(new));
+                    if let Some(old_id) = old {
+                        dyntex::remove_sprite(&mut gfx.windowing, old_id);
                     }
                 }
             }
-            x if x < 0.0 => {
-                s.logic.current_weapon = Weapon::Hellfire;
-            }
-            _ => {}
         }
+        x if x < 0.0 => {
+            s.logic.current_weapon = Weapon::Hellfire;
+        }
+        _ => {}
     }
+
     s.timers.network_timer.update(s.time, &mut s.network);
     fire_bullets(&mut s.logic, &mut s.graphics, &mut s.random);
 

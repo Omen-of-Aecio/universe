@@ -327,73 +327,11 @@ pub fn entry_point_client(s: &mut Main) {
     initialize_grid(&mut s.logic.grid);
     create_black_square_around_player(&mut s.logic.grid);
 
-    let mut draw_bench = benchmarker::Benchmarker::new(100);
-    let mut update_bench = benchmarker::Benchmarker::new(100);
-
     loop {
         s.time = Instant::now();
-        tick_logic(&mut s.logic, &mut s.logger);
-        set_gravity(&mut s.logic);
-        update_bullets_position(&mut s.logic, s.graphics.as_mut().map(|x| &mut x.windowing));
-
-        if let Some(Ok(msg)) = s.threads.game_shell_channel.as_mut().map(|x| x.try_recv()) {
-            (msg)(s);
-        }
-
-        {
-            let wheel = s.logic.input.get_mouse_wheel();
-            match wheel {
-                x if x == 0.0 => {}
-                x if x > 0.0 => {
-                    s.logic.current_weapon = Weapon::Ak47;
-                    if let Some(this_player) = s.logic.players.get_mut(0) {
-                        if let Some(ref mut gfx) = s.graphics {
-                            let new = dyntex::push_sprite(
-                                &mut gfx.windowing,
-                                &gfx.weapons_texture,
-                                dyntex::Sprite {
-                                    width: 10.0,
-                                    height: 5.0,
-                                    // origin: (-5.0, -5.0),
-                                    ..dyntex::Sprite::default()
-                                },
-                            );
-                            let old = std::mem::replace(&mut this_player.weapon_sprite, Some(new));
-                            if let Some(old_id) = old {
-                                dyntex::remove_sprite(&mut gfx.windowing, old_id);
-                            }
-                        }
-                    }
-                }
-                x if x < 0.0 => {
-                    s.logic.current_weapon = Weapon::Hellfire;
-                }
-                _ => {}
-            }
-        }
-        s.timers.network_timer.update(s.time, &mut s.network);
+        tick_logic(s);
         if s.logic.should_exit {
             break;
-        }
-        fire_bullets(&mut s.logic, &mut s.graphics, &mut s.random);
-
-        let ((), duration) = update_bench.run(|| {
-            update_graphics(s);
-        });
-        if let Some(duration) = duration {
-            info![s.logger, "cli", "Time taken per update"; "duration" => InDebug(&duration)];
-        }
-
-        s.logic.input.prepare_for_next_frame();
-        if let Some(ref mut graphics) = s.graphics {
-            collect_input(&mut s.logic, &mut graphics.windowing);
-        }
-
-        let ((), duration) = draw_bench.run(|| {
-            draw_graphics(s);
-        });
-        if let Some(duration) = duration {
-            info![s.logger, "cli", "Time taken per graphics"; "duration" => InDebug(&duration)];
         }
     }
 }
@@ -589,13 +527,63 @@ fn apply_physics_to_players(s: &mut Logic, logger: &mut Logger<Log>) {
     }
 }
 
-fn tick_logic(s: &mut Logic, logger: &mut Logger<Log>) {
-    toggle_camera_mode(s);
+fn tick_logic(s: &mut Main) {
+    toggle_camera_mode(&mut s.logic);
 
-    apply_physics_to_players(s, logger);
-    move_camera_according_to_input(s);
-    update_bullets_uv(s);
+    apply_physics_to_players(&mut s.logic, &mut s.logger);
+    move_camera_according_to_input(&mut s.logic);
+    update_bullets_uv(&mut s.logic);
     std::thread::sleep(std::time::Duration::new(0, 8_000_000));
+
+    set_gravity(&mut s.logic);
+    update_bullets_position(&mut s.logic, s.graphics.as_mut().map(|x| &mut x.windowing));
+
+    if let Some(Ok(msg)) = s.threads.game_shell_channel.as_mut().map(|x| x.try_recv()) {
+        (msg)(s);
+    }
+
+    {
+        let wheel = s.logic.input.get_mouse_wheel();
+        match wheel {
+            x if x == 0.0 => {}
+            x if x > 0.0 => {
+                s.logic.current_weapon = Weapon::Ak47;
+                if let Some(this_player) = s.logic.players.get_mut(0) {
+                    if let Some(ref mut gfx) = s.graphics {
+                        let new = dyntex::push_sprite(
+                            &mut gfx.windowing,
+                            &gfx.weapons_texture,
+                            dyntex::Sprite {
+                                width: 10.0,
+                                height: 5.0,
+                                // origin: (-5.0, -5.0),
+                                ..dyntex::Sprite::default()
+                            },
+                        );
+                        let old = std::mem::replace(&mut this_player.weapon_sprite, Some(new));
+                        if let Some(old_id) = old {
+                            dyntex::remove_sprite(&mut gfx.windowing, old_id);
+                        }
+                    }
+                }
+            }
+            x if x < 0.0 => {
+                s.logic.current_weapon = Weapon::Hellfire;
+            }
+            _ => {}
+        }
+    }
+    s.timers.network_timer.update(s.time, &mut s.network);
+    fire_bullets(&mut s.logic, &mut s.graphics, &mut s.random);
+
+    update_graphics(s);
+
+    s.logic.input.prepare_for_next_frame();
+    if let Some(ref mut graphics) = s.graphics {
+        collect_input(&mut s.logic, &mut graphics.windowing);
+    }
+
+    draw_graphics(s);
 }
 
 fn spawn_gameshell(s: &mut Main) {
@@ -643,5 +631,18 @@ mod tests {
         spawn_gameshell(&mut main);
         assert![main.threads.game_shell_channel.is_some()];
         assert_eq!["6", gsh(&mut main, "+ 1 2 3")];
+    }
+
+    #[test]
+    fn gsh_change_gravity() {
+        let mut main = Main::default();
+        spawn_gameshell(&mut main);
+        assert![main.threads.game_shell_channel.is_some()];
+        assert_eq![
+            "Set gravity value",
+            gsh(&mut main, "config gravity set y 1.23")
+        ];
+        tick_logic(&mut main);
+        assert_eq![1.23, main.logic.config.world.gravity];
     }
 }

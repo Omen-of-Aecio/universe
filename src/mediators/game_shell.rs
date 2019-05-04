@@ -457,7 +457,7 @@ mod tests {
         let logger = logger::Logger::spawn_void();
         assert_ne![123, logger.get_log_level()];
         let (listener, port) = bind_to_any_tcp_port();
-        let mut gshspawn = spawn_with_listener(logger.clone(), listener, port);
+        let gshspawn = spawn_with_listener(logger.clone(), listener, port);
         let mut listener =
             TcpStream::connect("127.0.0.1:".to_string() + port.to_string().as_ref()).unwrap();
         {
@@ -840,7 +840,7 @@ mod tests {
     fn message_bandwidth_over_tcp(b: &mut Bencher) -> io::Result<()> {
         let mut logger = logger::Logger::spawn_void();
         let (listener, port) = bind_to_any_tcp_port();
-        let mut gshspawn = spawn_with_listener(logger.clone(), listener, port);
+        let gshspawn = spawn_with_listener(logger.clone(), listener, port);
         logger.set_log_level(0);
         let mut listener =
             TcpStream::connect("127.0.0.1:".to_string() + port.to_string().as_ref())?;

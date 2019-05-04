@@ -4,9 +4,8 @@ use crate::mediators::{does_line_collide_with_grid::*, vxdraw};
 use cgmath::*;
 use geometry::{boxit::Boxit, grid2d::Grid, vec::Vec2};
 use input::Input;
-use logger::{info, InDebug, Logger};
+use logger::Logger;
 use rand::Rng;
-use std::net::TcpStream;
 use std::time::Instant;
 use winit::{VirtualKeyCode as Key, *};
 
@@ -586,24 +585,25 @@ fn tick_logic(s: &mut Main) {
     draw_graphics(s);
 }
 
-fn spawn_gameshell(s: &mut Main) {
-    let game_shell = crate::mediators::game_shell::spawn_with_any_port(s.logger.clone());
-    s.threads.game_shell = Some(game_shell.thread_handle);
-    s.threads.game_shell_keep_running = Some(game_shell.keep_running);
-    s.threads.game_shell_channel = Some(game_shell.channel);
-    s.threads.game_shell_channel_send = Some(game_shell.channel_send);
-    s.threads.game_shell_port = Some(game_shell.port);
-    // std::thread::sleep(std::time::Duration::new(1, 0));
-    s.threads.game_shell_connection =
-        Some(TcpStream::connect("127.0.0.1:".to_string() + &game_shell.port.to_string()).unwrap());
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::glocals::*;
+    use std::net::TcpStream;
 
     // ---
+
+    fn spawn_gameshell(s: &mut Main) {
+        let game_shell = crate::mediators::game_shell::spawn_with_any_port(s.logger.clone());
+        s.threads.game_shell = Some(game_shell.thread_handle);
+        s.threads.game_shell_keep_running = Some(game_shell.keep_running);
+        s.threads.game_shell_channel = Some(game_shell.channel);
+        s.threads.game_shell_channel_send = Some(game_shell.channel_send);
+        s.threads.game_shell_port = Some(game_shell.port);
+        // std::thread::sleep(std::time::Duration::new(1, 0));
+        s.threads.game_shell_connection = Some(
+            TcpStream::connect("127.0.0.1:".to_string() + &game_shell.port.to_string()).unwrap(),
+        );
+    }
 
     fn gsh(s: &mut Main, input: &str) -> String {
         use std::io::{Read, Write};
@@ -651,7 +651,8 @@ mod tests {
                 .game_shell_channel_send
                 .as_mut()
                 .unwrap()
-                .send(msg);
+                .send(msg)
+                .expect("Unable to requeue message");
         }
 
         tween(s);
@@ -709,6 +710,7 @@ mod tests {
     #[test]
     fn gsh_get_fps() {
         let mut main = Main::default();
+        main.logger = Logger::spawn_test();
         spawn_gameshell(&mut main);
         assert_eq![
             "0",

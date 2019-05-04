@@ -1,5 +1,7 @@
 use super::*;
 
+use logger::{debug, InDebug};
+
 pub fn void(_: &mut GameShellContext, _: &[Input]) -> Result<String, String> {
     Ok("".into())
 }
@@ -324,11 +326,12 @@ pub fn set_gravity(s: &mut GameShellContext, commands: &[Input]) -> Result<Strin
     }
 }
 
-pub fn get_fps(s: &mut GameShellContext, commands: &[Input]) -> Result<String, String> {
+pub fn get_fps(s: &mut GameShellContext, _: &[Input]) -> Result<String, String> {
     if let Some(ref mut chan) = s.config_change {
         let (tx, rx) = mpsc::sync_channel(0);
         let result = chan.send(Box::new(move |main: &mut Main| {
-            tx.send(main.logic.config.client.fps);
+            let send_status = tx.send(main.logic.config.client.fps);
+            debug![main.logger, "main", "Message reply"; "status" => InDebug(&send_status)];
         }));
         let fps = rx.recv().unwrap();
         match result {

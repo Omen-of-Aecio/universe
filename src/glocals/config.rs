@@ -1,4 +1,4 @@
-use config::{config, get_paths_recurse};
+use config::config;
 use serde_derive::{Deserialize, Serialize};
 
 // enum Key { A, B, C};

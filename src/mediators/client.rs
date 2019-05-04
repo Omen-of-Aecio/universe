@@ -591,6 +591,7 @@ fn spawn_gameshell(s: &mut Main) {
     s.threads.game_shell = Some(game_shell.thread_handle);
     s.threads.game_shell_keep_running = Some(game_shell.keep_running);
     s.threads.game_shell_channel = Some(game_shell.channel);
+    s.threads.game_shell_channel_send = Some(game_shell.channel_send);
     s.threads.game_shell_port = Some(game_shell.port);
     // std::thread::sleep(std::time::Duration::new(1, 0));
     s.threads.game_shell_connection =
@@ -614,6 +615,46 @@ mod tests {
 
         let mut buffer = [0u8; 1024];
         let count = conn.read(&mut buffer).unwrap();
+
+        from_utf8(&buffer[..count]).unwrap().to_string()
+    }
+
+    /// Runs a gsh command while also performing an operating between the write and read stages
+    ///
+    /// Gsh runs in its own thread, meaning that for main to see some results, it needs to run a
+    /// function on main to access gsh data from some channel.
+    fn gsh_synchronous(s: &mut Main, input: &str, tween: fn(&mut Main)) -> String {
+        use std::io::{Read, Write};
+        use std::str::from_utf8;
+        {
+            let conn = s.threads.game_shell_connection.as_mut().unwrap();
+            conn.write_all(input.as_bytes()).unwrap();
+            conn.write_all(b"\n").unwrap();
+            conn.flush().unwrap();
+            let msg = s
+                .threads
+                .game_shell_channel
+                .as_mut()
+                .unwrap()
+                .recv()
+                .unwrap();
+            s.threads
+                .game_shell_channel_send
+                .as_mut()
+                .unwrap()
+                .send(msg);
+        }
+
+        tween(s);
+
+        let mut buffer = [0u8; 1024];
+        let count = s
+            .threads
+            .game_shell_connection
+            .as_mut()
+            .unwrap()
+            .read(&mut buffer)
+            .unwrap();
 
         from_utf8(&buffer[..count]).unwrap().to_string()
     }
@@ -643,6 +684,18 @@ mod tests {
             gsh(&mut main, "config gravity set y 1.23")
         ];
         tick_logic(&mut main);
+        assert_eq![1.23, main.logic.config.world.gravity];
+    }
+
+    #[test]
+    fn gsh_change_gravity_synchronous() {
+        let mut main = Main::default();
+        spawn_gameshell(&mut main);
+        assert![main.threads.game_shell_channel.is_some()];
+        assert_eq![
+            "Set gravity value",
+            gsh_synchronous(&mut main, "config gravity set y 1.23", tick_logic)
+        ];
         assert_eq![1.23, main.logic.config.world.gravity];
     }
 }

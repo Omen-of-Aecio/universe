@@ -82,6 +82,7 @@ pub struct Threads {
     pub game_shell_keep_running: Option<Arc<AtomicBool>>,
     pub game_shell_port: Option<u16>,
     pub game_shell_channel: Option<GshChannelRecv>,
+    pub game_shell_channel_send: Option<mpsc::SyncSender<Box<Fn(&mut Main) + Send>>>,
     pub game_shell_connection: Option<TcpStream>,
 }
 

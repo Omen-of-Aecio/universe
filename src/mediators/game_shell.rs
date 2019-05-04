@@ -68,6 +68,7 @@ fn spawn_with_listener(logger: Logger<Log>, listener: TcpListener, port: u16) ->
     let keep_running = Arc::new(AtomicBool::new(true));
     let keep_running_clone = keep_running.clone();
     let (tx, rx) = mpsc::sync_channel(2);
+    let tx_clone = tx.clone();
     GshSpawn {
         thread_handle: thread::Builder::new()
             .name("gsh/server".to_string())
@@ -77,7 +78,7 @@ fn spawn_with_listener(logger: Logger<Log>, listener: TcpListener, port: u16) ->
                 game_shell_thread(
                     GameShell {
                         gshctx: GameShellContext {
-                            config_change: Some(tx),
+                            config_change: Some(tx_clone),
                             logger,
                             keep_running,
                             variables: HashMap::new(),
@@ -91,6 +92,7 @@ fn spawn_with_listener(logger: Logger<Log>, listener: TcpListener, port: u16) ->
         keep_running: keep_running_clone,
         channel: rx,
         port,
+        channel_send: tx,
     }
 }
 

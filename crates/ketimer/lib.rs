@@ -1,3 +1,4 @@
+#![feature(checked_duration_since)]
 #![feature(test)]
 extern crate test;
 
@@ -27,7 +28,7 @@ impl<T, R> WeakTimer<T, R> {
     ///
     /// The [WeakTimer] never runs the callback more than once per update.
     pub fn update(&mut self, now: Instant, arg: &mut T) -> Option<R> {
-        if now - self.prev >= self.interval {
+        if now.saturating_duration_since(self.prev) >= self.interval {
             let ret = (self.callback)(arg, now);
             self.prev = now;
             Some(ret)
@@ -43,6 +44,13 @@ mod tests {
     use test::{black_box, Bencher};
 
     // ---
+
+    #[test]
+    fn negative_timer_never_crashes() {
+        let now = Instant::now();
+        let mut timer = WeakTimer::new(|_, _| {}, Duration::new(1, 0), now);
+        timer.update(now - Duration::new(0, 1), &mut ());
+    }
 
     #[quickcheck_macros::quickcheck]
     fn timer_triggers_only_after_elapsing(interval: Duration, elapsed: Duration) -> bool {

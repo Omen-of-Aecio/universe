@@ -3,6 +3,7 @@ use std::sync::atomic::Ordering;
 use universe::{glocals::*, *};
 
 // ---
+
 fn read_config(path: &str) -> Result<Config, Error> {
     let contents = std::fs::read_to_string(path)?;
     Ok(toml::from_str(&contents)?)

@@ -616,6 +616,22 @@ mod tests {
 
     // ---
 
+    fn gsh(s: &mut Main, input: &str) -> String {
+        use std::io::{Read, Write};
+        use std::str::from_utf8;
+        let conn = s.threads.game_shell_connection.as_mut().unwrap();
+        conn.write_all(input.as_bytes()).unwrap();
+        conn.write_all(b"\n").unwrap();
+        conn.flush().unwrap();
+
+        let mut buffer = [0u8; 1024];
+        let count = conn.read(&mut buffer).unwrap();
+
+        from_utf8(&buffer[..count]).unwrap().to_string()
+    }
+
+    // ---
+
     #[test]
     fn basic_setup_and_teardown() {
         Main::default();
@@ -626,5 +642,6 @@ mod tests {
         let mut main = Main::default();
         spawn_gameshell(&mut main);
         assert![main.threads.game_shell_channel.is_some()];
+        assert_eq!["6", gsh(&mut main, "+ 1 2 3")];
     }
 }

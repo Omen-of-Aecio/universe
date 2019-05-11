@@ -102,12 +102,18 @@ pub struct ColoredQuadList {
     pub render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
 }
 
+pub enum DrawType {
+    StreamingTexture { id: usize },
+    DynamicTexture { id: usize },
+}
+
 pub struct Windowing {
     #[cfg(not(feature = "gl"))]
     pub window: winit::Window,
 
     pub events_loop: winit::EventsLoop,
 
+    pub draw_order: Vec<DrawType>,
     pub strtexs: Vec<StreamingTexture>,
     pub dyntexs: Vec<SingleTexture>,
     pub quads: Option<ColoredQuadList>,

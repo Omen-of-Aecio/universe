@@ -1,4 +1,7 @@
-use crate::glocals::{vxdraw::Windowing, Log};
+use crate::glocals::{
+    vxdraw::{DrawType, Windowing},
+    Log,
+};
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
 #[cfg(feature = "gl")]
@@ -483,6 +486,7 @@ pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windo
         command_buffers,
         command_pool: ManuallyDrop::new(command_pool),
         current_frame: 0,
+        draw_order: vec![],
         max_frames_in_flight,
         debtris: None,
         device: ManuallyDrop::new(device),
@@ -632,75 +636,80 @@ fn draw_frame_internal<T>(
                     s.render_area,
                     clear_values.iter(),
                 );
-
-                for strtex in s.strtexs.iter() {
-                    enc.bind_graphics_pipeline(&strtex.pipeline);
-                    enc.push_graphics_constants(
-                        &strtex.pipeline_layout,
-                        ShaderStageFlags::VERTEX,
-                        0,
-                        &*(view.as_ptr() as *const [u32; 16]),
-                    );
-                    enc.bind_graphics_descriptor_sets(
-                        &strtex.pipeline_layout,
-                        0,
-                        Some(&*strtex.descriptor_set),
-                        &[],
-                    );
-                    let buffers: ArrayVec<[_; 1]> = [(&*strtex.vertex_buffer, 0)].into();
-                    enc.bind_vertex_buffers(0, buffers);
-                    enc.bind_index_buffer(gfx_hal::buffer::IndexBufferView {
-                        buffer: &strtex.vertex_buffer_indices,
-                        offset: 0,
-                        index_type: gfx_hal::IndexType::U16,
-                    });
-                    enc.draw_indexed(0..strtex.count * 6, 0, 0..1);
-                }
-
-                for dyntex in s.dyntexs.iter() {
-                    enc.bind_graphics_pipeline(&dyntex.pipeline);
-                    if let Some(persp) = dyntex.fixed_perspective {
-                        enc.push_graphics_constants(
-                            &dyntex.pipeline_layout,
-                            ShaderStageFlags::VERTEX,
-                            0,
-                            &*(persp.as_ptr() as *const [u32; 16]),
-                        );
-                    } else {
-                        enc.push_graphics_constants(
-                            &dyntex.pipeline_layout,
-                            ShaderStageFlags::VERTEX,
-                            0,
-                            &*(view.as_ptr() as *const [u32; 16]),
-                        );
+                for draw_cmd in s.draw_order.iter() {
+                    match draw_cmd {
+                        DrawType::StreamingTexture { id } => {
+                            let strtex = &s.strtexs[*id];
+                            enc.bind_graphics_pipeline(&strtex.pipeline);
+                            enc.push_graphics_constants(
+                                &strtex.pipeline_layout,
+                                ShaderStageFlags::VERTEX,
+                                0,
+                                &*(view.as_ptr() as *const [u32; 16]),
+                            );
+                            enc.bind_graphics_descriptor_sets(
+                                &strtex.pipeline_layout,
+                                0,
+                                Some(&*strtex.descriptor_set),
+                                &[],
+                            );
+                            let buffers: ArrayVec<[_; 1]> = [(&*strtex.vertex_buffer, 0)].into();
+                            enc.bind_vertex_buffers(0, buffers);
+                            enc.bind_index_buffer(gfx_hal::buffer::IndexBufferView {
+                                buffer: &strtex.vertex_buffer_indices,
+                                offset: 0,
+                                index_type: gfx_hal::IndexType::U16,
+                            });
+                            enc.draw_indexed(0..strtex.count * 6, 0, 0..1);
+                        }
+                        DrawType::DynamicTexture { id } => {
+                            let dyntex = &s.dyntexs[*id];
+                            enc.bind_graphics_pipeline(&dyntex.pipeline);
+                            if let Some(persp) = dyntex.fixed_perspective {
+                                enc.push_graphics_constants(
+                                    &dyntex.pipeline_layout,
+                                    ShaderStageFlags::VERTEX,
+                                    0,
+                                    &*(persp.as_ptr() as *const [u32; 16]),
+                                );
+                            } else {
+                                enc.push_graphics_constants(
+                                    &dyntex.pipeline_layout,
+                                    ShaderStageFlags::VERTEX,
+                                    0,
+                                    &*(view.as_ptr() as *const [u32; 16]),
+                                );
+                            }
+                            enc.bind_graphics_descriptor_sets(
+                                &dyntex.pipeline_layout,
+                                0,
+                                Some(&*dyntex.descriptor_set),
+                                &[],
+                            );
+                            let mut data_target = s
+                                .device
+                                .acquire_mapping_writer::<u8>(
+                                    &dyntex.texture_vertex_memory,
+                                    0..dyntex.texture_vertex_requirements.size,
+                                )
+                                .expect("Unable to get mapping writer");
+                            data_target[..dyntex.mockbuffer.len()]
+                                .copy_from_slice(&dyntex.mockbuffer);
+                            s.device
+                                .release_mapping_writer(data_target)
+                                .expect("Unable to release mapping writer");
+                            let buffers: ArrayVec<[_; 1]> =
+                                [(&*dyntex.texture_vertex_buffer, 0)].into();
+                            enc.bind_vertex_buffers(0, buffers);
+                            enc.bind_index_buffer(gfx_hal::buffer::IndexBufferView {
+                                buffer: &dyntex.texture_vertex_buffer_indices,
+                                offset: 0,
+                                index_type: gfx_hal::IndexType::U16,
+                            });
+                            enc.draw_indexed(0..dyntex.count * 6, 0, 0..1);
+                        }
                     }
-                    enc.bind_graphics_descriptor_sets(
-                        &dyntex.pipeline_layout,
-                        0,
-                        Some(&*dyntex.descriptor_set),
-                        &[],
-                    );
-                    let mut data_target = s
-                        .device
-                        .acquire_mapping_writer::<u8>(
-                            &dyntex.texture_vertex_memory,
-                            0..dyntex.texture_vertex_requirements.size,
-                        )
-                        .expect("Unable to get mapping writer");
-                    data_target[..dyntex.mockbuffer.len()].copy_from_slice(&dyntex.mockbuffer);
-                    s.device
-                        .release_mapping_writer(data_target)
-                        .expect("Unable to release mapping writer");
-                    let buffers: ArrayVec<[_; 1]> = [(&*dyntex.texture_vertex_buffer, 0)].into();
-                    enc.bind_vertex_buffers(0, buffers);
-                    enc.bind_index_buffer(gfx_hal::buffer::IndexBufferView {
-                        buffer: &dyntex.texture_vertex_buffer_indices,
-                        offset: 0,
-                        index_type: gfx_hal::IndexType::U16,
-                    });
-                    enc.draw_indexed(0..dyntex.count * 6, 0, 0..1);
                 }
-
                 if let Some(ref quads) = s.quads {
                     enc.bind_graphics_pipeline(&quads.pipeline);
                     enc.push_graphics_constants(
@@ -1125,6 +1134,10 @@ mod tests {
 
     // ---
 
+    static TESTURE: &[u8] = include_bytes!["../../assets/images/testure.png"];
+
+    // ---
+
     #[test]
     fn setup_and_teardown() {
         let mut logger = Logger::spawn_void();
@@ -1222,6 +1235,80 @@ mod tests {
                 gen_perspective(&windowing)
             ];
         }
+    }
+
+    #[test]
+    fn strtex_and_dyntex_respect_draw_order() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let options = dyntex::TextureOptions {
+            depth_test: false,
+            ..dyntex::TextureOptions::default()
+        };
+        let tex1 = dyntex::push_texture(&mut windowing, TESTURE, options);
+        let tex2 = strtex::push_texture(
+            &mut windowing,
+            strtex::TextureOptions {
+                depth_test: false,
+                width: 1,
+                height: 1,
+                ..strtex::TextureOptions::default()
+            },
+            &mut logger,
+        );
+        let tex3 = dyntex::push_texture(&mut windowing, TESTURE, options);
+        let tex4 = strtex::push_texture(
+            &mut windowing,
+            strtex::TextureOptions {
+                depth_test: false,
+                width: 1,
+                height: 1,
+                ..strtex::TextureOptions::default()
+            },
+            &mut logger,
+        );
+
+        strtex::streaming_texture_set_pixel(&mut windowing, &tex2, 0, 0, (255, 0, 255, 255));
+        strtex::streaming_texture_set_pixel(&mut windowing, &tex4, 0, 0, (255, 255, 255, 255));
+
+        dyntex::push_sprite(
+            &mut windowing,
+            &tex1,
+            dyntex::Sprite {
+                rotation: 0.0,
+                ..dyntex::Sprite::default()
+            },
+        );
+        strtex::push_sprite(
+            &mut windowing,
+            &tex2,
+            strtex::Sprite {
+                rotation: 0.5,
+                ..strtex::Sprite::default()
+            },
+        );
+        dyntex::push_sprite(
+            &mut windowing,
+            &tex3,
+            dyntex::Sprite {
+                rotation: 1.0,
+                ..dyntex::Sprite::default()
+            },
+        );
+        strtex::push_sprite(
+            &mut windowing,
+            &tex4,
+            strtex::Sprite {
+                scale: 0.5,
+                rotation: 0.0,
+                ..strtex::Sprite::default()
+            },
+        );
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        utils::assert_swapchain_eq(&mut windowing, "strtex_and_dyntex_respect_draw_order", img);
     }
 
     // ---

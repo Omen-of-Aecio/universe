@@ -1,6 +1,6 @@
 use super::utils::*;
 use crate::glocals::{
-    vxdraw::{StreamingTexture, Windowing},
+    vxdraw::{DrawType, StreamingTexture, Windowing},
     Log,
 };
 use arrayvec::ArrayVec;
@@ -564,6 +564,9 @@ pub fn push_texture(
         pipeline: ManuallyDrop::new(triangle_pipeline),
         pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
         render_pass: ManuallyDrop::new(triangle_render_pass),
+    });
+    s.draw_order.push(DrawType::StreamingTexture {
+        id: s.strtexs.len() - 1,
     });
     TextureHandle(s.strtexs.len() - 1)
 }

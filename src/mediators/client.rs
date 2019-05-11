@@ -110,7 +110,6 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
     movement: Vec2,
     _logger: &mut Logger<Log>,
 ) {
-
     let tl = Vec2 {
         x: player.position.x + 0.01,
         y: player.position.y + 0.01,
@@ -168,6 +167,7 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
             break;
         }
     }
+    if collision_x.is_some() {}
 
     if collision_x.is_some() {
         player.velocity.x = 0.0;

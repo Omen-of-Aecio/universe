@@ -1,5 +1,5 @@
 use super::utils::*;
-use crate::glocals::vxdraw::{SingleTexture, Windowing};
+use crate::glocals::vxdraw::{DrawType, SingleTexture, Windowing};
 use ::image as load_image;
 use cgmath::Matrix4;
 use cgmath::Rad;
@@ -674,6 +674,9 @@ pub fn push_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions)
         pipeline: ManuallyDrop::new(triangle_pipeline),
         pipeline_layout: ManuallyDrop::new(triangle_pipeline_layout),
         render_pass: ManuallyDrop::new(triangle_render_pass),
+    });
+    s.draw_order.push(DrawType::DynamicTexture {
+        id: s.dyntexs.len() - 1,
     });
     TextureHandle(s.dyntexs.len() - 1)
 }

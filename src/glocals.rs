@@ -121,6 +121,7 @@ pub struct Bullet {
     pub handle: Option<crate::mediators::vxdraw::dyntex::SpriteHandle>,
 }
 
+#[derive(Default)]
 pub struct PlayerData {
     pub position: Vec2,
     pub velocity: Vec2,

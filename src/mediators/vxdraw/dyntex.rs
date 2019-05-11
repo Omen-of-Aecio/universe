@@ -1474,7 +1474,6 @@ mod tests {
     fn bench_push_and_pop_sprite(b: &mut Bencher) {
         let mut logger = Logger::spawn_void();
         let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
-        let prspect = gen_perspective(&windowing);
 
         let options = TextureOptions::default();
         let testure = push_texture(&mut windowing, TESTURE, options);

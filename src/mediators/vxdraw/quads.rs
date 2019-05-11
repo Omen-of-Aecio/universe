@@ -697,14 +697,14 @@ mod tests {
         quad.scale = 0.2;
         quad.colors[0].0 = 255;
         quad.colors[3].0 = 255;
-        let handle = quads::push(&mut windowing, quad);
+        quads::push(&mut windowing, quad);
 
         let mut quad = quads::Quad::default();
         quad.scale = 0.2;
         quad.origin = (-1.0, -1.0);
         quad.colors[0].1 = 255;
         quad.colors[3].1 = 255;
-        let handle = quads::push(&mut windowing, quad);
+        quads::push(&mut windowing, quad);
 
         // when
         quads::quad_rotate_all(&mut windowing, Deg(30.0));

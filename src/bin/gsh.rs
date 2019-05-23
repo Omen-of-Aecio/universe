@@ -3,7 +3,7 @@ use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
-use rustyline::{Editor, Helper};
+use rustyline::{Context, Editor, Helper};
 use std::cell::{Cell, RefCell};
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
@@ -15,13 +15,18 @@ struct AutoComplete(RefCell<TcpStream>, Cell<bool>);
 impl Completer for AutoComplete {
     type Candidate = Pair;
 
-    fn complete(&self, _: &str, pos: usize) -> Result<(usize, Vec<Pair>), ReadlineError> {
+    fn complete(
+        &self,
+        _: &str,
+        pos: usize,
+        _: &Context,
+    ) -> Result<(usize, Vec<Pair>), ReadlineError> {
         Ok((pos, vec![]))
     }
 }
 
 impl Hinter for AutoComplete {
-    fn hint(&self, line: &str, _: usize) -> Option<String> {
+    fn hint(&self, line: &str, _: usize, _: &Context) -> Option<String> {
         if !self.1.get() || line.find('(').is_some() {
             return None;
         }
@@ -96,7 +101,7 @@ fn main() -> io::Result<()> {
                         rl.helper_mut().unwrap().1.set(false);
                     }
                 }
-                rl.add_history_entry(line.as_ref());
+                rl.add_history_entry(&line);
                 {
                     let mut listener = rl.helper_mut().unwrap().0.borrow_mut();
                     // ---

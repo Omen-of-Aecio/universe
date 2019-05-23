@@ -3,6 +3,7 @@ use crate::glocals::vxdraw::{DrawType, SingleTexture, Windowing};
 use ::image as load_image;
 use cgmath::Matrix4;
 use cgmath::Rad;
+use core::ptr::read;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
 #[cfg(feature = "gl")]
@@ -681,6 +682,64 @@ pub fn push_texture(s: &mut Windowing, img_data: &[u8], options: TextureOptions)
     TextureHandle(s.dyntexs.len() - 1)
 }
 
+pub fn remove_texture(s: &mut Windowing, texture: TextureHandle) {
+    let mut index = None;
+    for (idx, x) in s.draw_order.iter().enumerate() {
+        match x {
+            DrawType::DynamicTexture { id } if *id == texture.0 => {
+                index = Some(idx);
+                break;
+            }
+            _ => {}
+        }
+    }
+    if let Some(idx) = index {
+        s.draw_order.remove(idx);
+        // Can't delete here always because other textures may still be referring to later dyntexs,
+        // only when this is the last texture.
+        if s.dyntexs.len() == texture.0 + 1 {
+            let dyntex = s.dyntexs.pop().unwrap();
+            destroy_texture(s, dyntex);
+        }
+    }
+}
+
+fn destroy_texture(s: &mut Windowing, mut dyntex: SingleTexture) {
+    unsafe {
+        s.device.destroy_buffer(ManuallyDrop::into_inner(read(
+            &dyntex.texture_vertex_buffer_indices,
+        )));
+        s.device.free_memory(ManuallyDrop::into_inner(read(
+            &dyntex.texture_vertex_memory_indices,
+        )));
+        s.device.destroy_buffer(ManuallyDrop::into_inner(read(
+            &dyntex.texture_vertex_buffer,
+        )));
+        s.device.free_memory(ManuallyDrop::into_inner(read(
+            &dyntex.texture_vertex_memory,
+        )));
+        s.device
+            .destroy_image(ManuallyDrop::into_inner(read(&dyntex.texture_image_buffer)));
+        s.device
+            .free_memory(ManuallyDrop::into_inner(read(&dyntex.texture_image_memory)));
+        s.device
+            .destroy_render_pass(ManuallyDrop::into_inner(read(&dyntex.render_pass)));
+        s.device
+            .destroy_pipeline_layout(ManuallyDrop::into_inner(read(&dyntex.pipeline_layout)));
+        s.device
+            .destroy_graphics_pipeline(ManuallyDrop::into_inner(read(&dyntex.pipeline)));
+        for dsl in dyntex.descriptor_set_layouts.drain(..) {
+            s.device.destroy_descriptor_set_layout(dsl);
+        }
+        s.device
+            .destroy_descriptor_pool(ManuallyDrop::into_inner(read(&dyntex.descriptor_pool)));
+        s.device
+            .destroy_sampler(ManuallyDrop::into_inner(read(&dyntex.sampler)));
+        s.device
+            .destroy_image_view(ManuallyDrop::into_inner(read(&dyntex.image_view)));
+    }
+}
+
 /// Add a sprite (a rectangular view of a texture) to the system
 pub fn push_sprite(s: &mut Windowing, texture: &TextureHandle, sprite: Sprite) -> SpriteHandle {
     let tex = &mut s.dyntexs[texture.0];
@@ -1282,6 +1341,96 @@ mod tests {
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         utils::assert_swapchain_eq(&mut windowing, "three_layer_scene_remove_middle", img);
+    }
+
+    #[test]
+    fn three_layer_scene_remove_middle_texture() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let options = TextureOptions {
+            depth_test: false,
+            ..TextureOptions::default()
+        };
+        let forest = push_texture(&mut windowing, FOREST, options);
+        let player = push_texture(&mut windowing, LOGO, options);
+        let tree = push_texture(&mut windowing, TREE, options);
+
+        push_sprite(&mut windowing, &forest, Sprite::default());
+        push_sprite(
+            &mut windowing,
+            &player,
+            Sprite {
+                scale: 0.4,
+                ..Sprite::default()
+            },
+        );
+        push_sprite(
+            &mut windowing,
+            &tree,
+            Sprite {
+                translation: (-0.3, 0.0),
+                scale: 0.4,
+                ..Sprite::default()
+            },
+        );
+
+        remove_texture(&mut windowing, player);
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        utils::assert_swapchain_eq(
+            &mut windowing,
+            "three_layer_scene_remove_middle_texture",
+            img,
+        );
+
+        remove_texture(&mut windowing, tree);
+
+        draw_frame(&mut windowing, &mut logger, &prspect);
+    }
+
+    #[test]
+    fn three_layer_scene_remove_last_texture() {
+        let mut logger = Logger::spawn_void();
+        let mut windowing = init_window_with_vulkan(&mut logger, ShowWindow::Headless1k);
+        let prspect = gen_perspective(&windowing);
+
+        let options = TextureOptions {
+            depth_test: false,
+            ..TextureOptions::default()
+        };
+        let forest = push_texture(&mut windowing, FOREST, options);
+        let player = push_texture(&mut windowing, LOGO, options);
+        let tree = push_texture(&mut windowing, TREE, options);
+
+        push_sprite(&mut windowing, &forest, Sprite::default());
+        push_sprite(
+            &mut windowing,
+            &player,
+            Sprite {
+                scale: 0.4,
+                ..Sprite::default()
+            },
+        );
+        push_sprite(
+            &mut windowing,
+            &tree,
+            Sprite {
+                translation: (-0.3, 0.0),
+                scale: 0.4,
+                ..Sprite::default()
+            },
+        );
+
+        remove_texture(&mut windowing, tree);
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        utils::assert_swapchain_eq(&mut windowing, "three_layer_scene_remove_last_texture", img);
+
+        remove_texture(&mut windowing, player);
+
+        draw_frame(&mut windowing, &mut logger, &prspect);
     }
 
     #[test]

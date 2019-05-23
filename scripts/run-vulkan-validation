@@ -30,7 +30,7 @@ if [ -z "${VULKAN_SDK:-}" ]; then
 fi
 
 set +e
-VK_INSTANCE_LAYERS=VK_LAYER_LUNARG_standard_validation cargo test --release --quiet vxdraw:: --features gfx_tests >& _build/vulkan.test_result.validation
+VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation cargo test --release --quiet vxdraw:: --features gfx_tests >& _build/vulkan.test_result.validation
 set -e
 
 if grep 'ERROR / SPEC' _build/vulkan.test_result.validation >& /dev/null; then

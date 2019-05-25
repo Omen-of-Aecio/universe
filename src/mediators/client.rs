@@ -260,17 +260,11 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
         },
     );
 
-    let fireballs = vxdraw::dyntex::push_texture(
-        &mut windowing,
-        FIREBALLS,
-        vxdraw::dyntex::TextureOptions::default(),
-    );
+    let mut dyntex = windowing.dyntex();
 
-    let weapons_texture = vxdraw::dyntex::push_texture(
-        &mut windowing,
-        WEAPONS,
-        vxdraw::dyntex::TextureOptions::default(),
-    );
+    let fireballs = dyntex.push_texture(FIREBALLS, vxdraw::dyntex::TextureOptions::default());
+
+    let weapons_texture = dyntex.push_texture(WEAPONS, vxdraw::dyntex::TextureOptions::default());
 
     s.graphics = Some(Graphics {
         player_quads: vec![handle],

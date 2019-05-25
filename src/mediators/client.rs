@@ -210,8 +210,7 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
                 fixed_perspective: Some(Matrix4::identity()),
             },
         );
-        dyntex::push_sprite(
-            &mut windowing,
+        windowing.dyntex().push_sprite(
             &background,
             dyntex::Sprite {
                 depth: 1.0,
@@ -438,8 +437,7 @@ fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>, random: &mut ran
             };
 
             let handle = if let Some(ref mut graphics) = graphics {
-                Some(vxdraw::dyntex::push_sprite(
-                    &mut graphics.windowing,
+                Some(graphics.windowing.dyntex().push_sprite(
                     &graphics.bullets_texture,
                     vxdraw::dyntex::Sprite {
                         width: sprite_width,
@@ -579,8 +577,7 @@ fn tick_logic(s: &mut Main) {
             s.logic.current_weapon = Weapon::Ak47;
             if let Some(this_player) = s.logic.players.get_mut(0) {
                 if let Some(ref mut gfx) = s.graphics {
-                    let new = dyntex::push_sprite(
-                        &mut gfx.windowing,
+                    let new = gfx.windowing.dyntex().push_sprite(
                         &gfx.weapons_texture,
                         dyntex::Sprite {
                             width: 10.0,

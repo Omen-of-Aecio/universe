@@ -1,5 +1,5 @@
 use super::utils::*;
-use crate::glocals::vxdraw::{ColoredTriangleList, Windowing};
+use crate::data::{ColoredTriangleList, Windowing};
 use cgmath::Rad;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
@@ -639,7 +639,7 @@ pub fn rotate_all<T: Copy + Into<Rad<f32>>>(s: &mut Windowing, deg: T) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mediators::vxdraw::*;
+    use crate::*;
     use cgmath::Deg;
     use test::{black_box, Bencher};
 

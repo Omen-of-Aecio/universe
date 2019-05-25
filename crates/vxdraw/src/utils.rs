@@ -1,4 +1,4 @@
-use crate::glocals::vxdraw::Windowing;
+use crate::data::Windowing;
 use cgmath::Matrix4;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;

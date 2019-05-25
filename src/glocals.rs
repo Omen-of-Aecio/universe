@@ -12,10 +12,10 @@ use std::{
     vec::Vec,
 };
 use udp_ack::Socket;
+use vxdraw;
 
 pub mod config;
 pub mod log;
-pub mod vxdraw;
 
 pub use self::config::Config;
 pub use log::Log;
@@ -37,11 +37,11 @@ pub struct Main {
 }
 
 pub struct Graphics {
-    pub player_quads: Vec<crate::mediators::vxdraw::quads::QuadHandle>,
-    pub bullets_texture: crate::mediators::vxdraw::dyntex::TextureHandle,
-    pub weapons_texture: crate::mediators::vxdraw::dyntex::TextureHandle,
-    pub grid: crate::mediators::vxdraw::strtex::TextureHandle,
-    pub windowing: vxdraw::Windowing,
+    pub player_quads: Vec<vxdraw::quads::QuadHandle>,
+    pub bullets_texture: vxdraw::dyntex::TextureHandle,
+    pub weapons_texture: vxdraw::dyntex::TextureHandle,
+    pub grid: vxdraw::strtex::TextureHandle,
+    pub windowing: vxdraw::data::Windowing,
 }
 
 impl Default for Main {
@@ -118,14 +118,14 @@ pub struct Bullet {
     pub current_uv_begin: (f32, f32),
     pub current_uv_end: (f32, f32),
 
-    pub handle: Option<crate::mediators::vxdraw::dyntex::SpriteHandle>,
+    pub handle: Option<vxdraw::dyntex::SpriteHandle>,
 }
 
 #[derive(Default)]
 pub struct PlayerData {
     pub position: Vec2,
     pub velocity: Vec2,
-    pub weapon_sprite: Option<crate::mediators::vxdraw::dyntex::SpriteHandle>,
+    pub weapon_sprite: Option<vxdraw::dyntex::SpriteHandle>,
 }
 
 #[derive(PartialEq)]

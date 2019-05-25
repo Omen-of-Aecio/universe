@@ -1,8 +1,5 @@
 use super::utils::*;
-use crate::glocals::{
-    vxdraw::{DrawType, StreamingTexture, Windowing},
-    Log,
-};
+use crate::data::{DrawType, StreamingTexture, Windowing};
 use arrayvec::ArrayVec;
 use cgmath::Matrix4;
 use core::ptr;
@@ -21,7 +18,7 @@ use gfx_hal::{
     pso::{self, DescriptorPool},
     Backend, Primitive,
 };
-use logger::{debug, Logger};
+use logger::{debug, Generic, Logger};
 use std::io::Read;
 use std::iter::once;
 use std::mem::{size_of, ManuallyDrop};
@@ -101,7 +98,7 @@ impl Default for Sprite {
 pub fn push_texture(
     s: &mut Windowing,
     options: TextureOptions,
-    log: &mut Logger<Log>,
+    log: &mut Logger<Generic>,
 ) -> TextureHandle {
     let (texture_vertex_buffer, texture_vertex_memory, vertex_requirements) =
         make_vertex_buffer_with_data(s, &[0f32; 9 * 4 * 1000]);
@@ -944,8 +941,8 @@ pub fn write(
 }
 
 pub fn generate_map2(s: &mut Windowing, blitid: &TextureHandle, seed: [f32; 3]) {
-    static VERTEX_SOURCE: &str = include_str!("../../../shaders/proc1.vert");
-    static FRAGMENT_SOURCE: &str = include_str!("../../../shaders/proc1.frag");
+    static VERTEX_SOURCE: &str = include_str!("../shaders/proc1.vert");
+    static FRAGMENT_SOURCE: &str = include_str!("../shaders/proc1.frag");
     let w = s.strtexs[blitid.0].width;
     let h = s.strtexs[blitid.0].height;
     let vs_module = {
@@ -1305,7 +1302,7 @@ pub fn generate_map2(s: &mut Windowing, blitid: &TextureHandle, seed: [f32; 3]) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mediators::vxdraw::*;
+    use crate::*;
     use rand::Rng;
     use rand_pcg::Pcg64Mcg as random;
     use test::{black_box, Bencher};

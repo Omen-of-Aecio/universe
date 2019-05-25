@@ -52,6 +52,7 @@ ketimer =     { path = "crates/ketimer"  }
 logger =      { path = "crates/logger" }
 metac =       { path = "crates/metac" }
 udp_ack =     { path = "crates/udp_ack" }
+vxdraw =      { path = "crates/vxdraw" }
 
 [dev-dependencies]
 itertools = "0.8"

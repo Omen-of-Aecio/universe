@@ -1,5 +1,5 @@
 use super::utils::*;
-use crate::glocals::vxdraw::{DrawType, SingleTexture, Windowing};
+use crate::data::{DrawType, SingleTexture, Windowing};
 use ::image as load_image;
 use cgmath::Matrix4;
 use cgmath::Rad;
@@ -1013,7 +1013,7 @@ pub fn set_uvs2<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mediators::vxdraw::*;
+    use crate::*;
     use cgmath::Deg;
     use rand::Rng;
     use rand_pcg::Pcg64Mcg as random;
@@ -1022,11 +1022,11 @@ mod tests {
 
     // ---
 
-    static LOGO: &[u8] = include_bytes!["../../../assets/images/logo.png"];
-    static FOREST: &[u8] = include_bytes!["../../../assets/images/forest-light.png"];
-    static TESTURE: &[u8] = include_bytes!["../../../assets/images/testure.png"];
-    static TREE: &[u8] = include_bytes!["../../../assets/images/treetest.png"];
-    static FIREBALL: &[u8] = include_bytes!["../../../assets/images/Fireball_68x9.png"];
+    static LOGO: &[u8] = include_bytes!["../images/logo.png"];
+    static FOREST: &[u8] = include_bytes!["../images/forest-light.png"];
+    static TESTURE: &[u8] = include_bytes!["../images/testure.png"];
+    static TREE: &[u8] = include_bytes!["../images/treetest.png"];
+    static FIREBALL: &[u8] = include_bytes!["../images/Fireball_68x9.png"];
 
     // ---
 

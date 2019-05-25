@@ -1,5 +1,5 @@
 use super::utils::*;
-use crate::glocals::vxdraw::{ColoredQuadList, Windowing};
+use crate::data::{ColoredQuadList, Windowing};
 use cgmath::Rad;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
@@ -651,7 +651,7 @@ pub fn set_quad_color(s: &mut Windowing, inst: &QuadHandle, rgba: [u8; 4]) {
 #[cfg(feature = "gfx_tests")]
 #[cfg(test)]
 mod tests {
-    use crate::mediators::vxdraw::*;
+    use crate::*;
     use cgmath::Deg;
 
     #[test]

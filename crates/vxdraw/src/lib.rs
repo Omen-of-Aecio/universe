@@ -1,7 +1,7 @@
-use crate::glocals::{
-    vxdraw::{DrawType, Windowing},
-    Log,
-};
+#![feature(test)]
+extern crate test;
+
+use crate::data::{DrawType, Windowing};
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
 #[cfg(feature = "gl")]
@@ -32,12 +32,13 @@ use gfx_hal::{
     window::{Extent2D, PresentMode::*, Surface, Swapchain},
     Backbuffer, Backend, FrameSync, Instance, Primitive, SwapchainConfig,
 };
-use logger::{debug, info, trace, warn, InDebug, InDebugPretty, Logger};
+use logger::{debug, info, trace, warn, Generic, InDebug, InDebugPretty, Logger};
 use std::io::Read;
 use std::iter::once;
 use std::mem::{size_of, ManuallyDrop};
 use winit::{dpi::LogicalSize, Event, EventsLoop, WindowBuilder};
 
+pub mod data;
 pub mod debtri;
 pub mod dyntex;
 pub mod quads;
@@ -144,7 +145,7 @@ impl Windowing {
     }
 }
 
-pub fn init_window_with_vulkan(log: &mut Logger<Log>, show: ShowWindow) -> Windowing {
+pub fn init_window_with_vulkan(log: &mut Logger<Generic>, show: ShowWindow) -> Windowing {
     #[cfg(feature = "gl")]
     static BACKEND: &str = "OpenGL";
     #[cfg(feature = "vulkan")]
@@ -536,19 +537,19 @@ pub fn collect_input(windowing: &mut Windowing) -> Vec<Event> {
 
 pub fn draw_frame_copy_framebuffer(
     s: &mut Windowing,
-    log: &mut Logger<Log>,
+    log: &mut Logger<Generic>,
     view: &Matrix4<f32>,
 ) -> Vec<u8> {
     draw_frame_internal(s, log, view, copy_image_to_rgb)
 }
 
-pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Log>, view: &Matrix4<f32>) {
+pub fn draw_frame(s: &mut Windowing, log: &mut Logger<Generic>, view: &Matrix4<f32>) {
     draw_frame_internal(s, log, view, |_, _| {});
 }
 
 fn draw_frame_internal<T>(
     s: &mut Windowing,
-    log: &mut Logger<Log>,
+    log: &mut Logger<Generic>,
     view: &Matrix4<f32>,
     postproc: fn(&mut Windowing, gfx_hal::window::SwapImageIndex) -> T,
 ) -> T {
@@ -783,8 +784,8 @@ fn draw_frame_internal<T>(
 }
 
 pub fn generate_map(s: &mut Windowing, w: u32, h: u32) -> Vec<u8> {
-    static VERTEX_SOURCE: &str = include_str!("../../shaders/proc1.vert");
-    static FRAGMENT_SOURCE: &str = include_str!("../../shaders/proc1.frag");
+    static VERTEX_SOURCE: &str = include_str!("../shaders/proc1.vert");
+    static FRAGMENT_SOURCE: &str = include_str!("../shaders/proc1.frag");
     let vs_module = {
         let glsl = VERTEX_SOURCE;
         let spirv: Vec<u8> = glsl_to_spirv::compile(&glsl, glsl_to_spirv::ShaderType::Vertex)
@@ -1134,7 +1135,7 @@ mod tests {
 
     // ---
 
-    static TESTURE: &[u8] = include_bytes!["../../assets/images/testure.png"];
+    static TESTURE: &[u8] = include_bytes!["../images/testure.png"];
 
     // ---
 

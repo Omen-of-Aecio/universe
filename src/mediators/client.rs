@@ -1,12 +1,12 @@
-use crate::glocals::{vxdraw::*, *};
-use crate::mediators::vxdraw::*;
-use crate::mediators::{does_line_collide_with_grid::*, vxdraw};
+use crate::glocals::*;
+use crate::mediators::does_line_collide_with_grid::*;
 use cgmath::*;
 use geometry::{boxit::Boxit, grid2d::Grid, vec::Vec2};
 use input::Input;
 use logger::Logger;
 use rand::Rng;
 use std::time::Instant;
+use vxdraw::{data::*, *};
 use winit::{VirtualKeyCode as Key, *};
 
 static FIREBALLS: &[u8] = include_bytes!["../../assets/images/bullets.png"];
@@ -17,7 +17,7 @@ fn initialize_grid(s: &mut Grid<u8>) {
 }
 
 pub fn collect_input(client: &mut Logic, windowing: &mut Windowing) {
-    for event in super::vxdraw::collect_input(windowing) {
+    for event in vxdraw::collect_input(windowing) {
         if let Event::WindowEvent { event, .. } = event {
             match event {
                 WindowEvent::KeyboardInput { input, .. } => {
@@ -199,7 +199,7 @@ fn toggle_camera_mode(s: &mut Logic) {
 }
 
 pub fn maybe_initialize_graphics(s: &mut Main) {
-    let mut windowing = init_window_with_vulkan(&mut s.logger, ShowWindow::Enable);
+    let mut windowing = init_window_with_vulkan(&mut Logger::spawn_void(), ShowWindow::Enable);
 
     {
         static BACKGROUND: &[u8] = include_bytes!["../../assets/images/terrabackground.png"];
@@ -228,7 +228,7 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
             height: 1000,
             ..strtex::TextureOptions::default()
         },
-        &mut s.logger,
+        &mut Logger::spawn_void(),
     );
     s.logic.grid.resize(1000, 1000);
     vxdraw::strtex::generate_map2(&mut windowing, &tex, [1.0, 2.0, 4.0]);
@@ -337,15 +337,15 @@ fn update_graphics(s: &mut Main) {
 
 fn draw_graphics(s: &mut Main) {
     if let Some(ref mut graphics) = s.graphics {
-        let persp = super::vxdraw::utils::gen_perspective(&graphics.windowing);
+        let persp = vxdraw::utils::gen_perspective(&graphics.windowing);
         let scale = Matrix4::from_scale(s.logic.cam.zoom);
         let center = s.logic.cam.center;
         // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
         let trans = Matrix4::from_translation(Vector3::new(-center.x, -center.y, 0.0));
         // info![client.logger, "main", "Okay wth"; "trans" => InDebug(&trans); clone trans];
-        super::vxdraw::draw_frame(
+        vxdraw::draw_frame(
             &mut graphics.windowing,
-            &mut s.logger,
+            &mut Logger::spawn_void(),
             &(persp * scale * trans),
         );
     }

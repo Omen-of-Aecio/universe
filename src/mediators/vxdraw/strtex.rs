@@ -5,6 +5,7 @@ use crate::glocals::{
 };
 use arrayvec::ArrayVec;
 use cgmath::Matrix4;
+use core::ptr;
 #[cfg(feature = "dx12")]
 use gfx_backend_dx12 as back;
 #[cfg(feature = "gl")]
@@ -569,6 +570,62 @@ pub fn push_texture(
         id: s.strtexs.len() - 1,
     });
     TextureHandle(s.strtexs.len() - 1)
+}
+
+pub fn remove_texture(s: &mut Windowing, texture: TextureHandle) {
+    let mut index = None;
+    for (idx, x) in s.draw_order.iter().enumerate() {
+        match x {
+            DrawType::StreamingTexture { id } if *id == texture.0 => {
+                index = Some(idx);
+                break;
+            }
+            _ => {}
+        }
+    }
+    if let Some(idx) = index {
+        s.draw_order.remove(idx);
+        // Can't delete here always because other textures may still be referring to later dyntexs,
+        // only when this is the last texture.
+        if s.strtexs.len() == texture.0 + 1 {
+            let strtex = s.strtexs.pop().unwrap();
+            destroy_texture(s, strtex);
+        }
+    }
+}
+
+fn destroy_texture(s: &mut Windowing, mut strtex: StreamingTexture) {
+    unsafe {
+        s.device.destroy_buffer(ManuallyDrop::into_inner(ptr::read(
+            &strtex.vertex_buffer_indices,
+        )));
+        s.device.free_memory(ManuallyDrop::into_inner(ptr::read(
+            &strtex.vertex_memory_indices,
+        )));
+        s.device
+            .destroy_buffer(ManuallyDrop::into_inner(ptr::read(&strtex.vertex_buffer)));
+        s.device
+            .free_memory(ManuallyDrop::into_inner(ptr::read(&strtex.vertex_memory)));
+        s.device
+            .destroy_image(ManuallyDrop::into_inner(ptr::read(&strtex.image_buffer)));
+        s.device
+            .free_memory(ManuallyDrop::into_inner(ptr::read(&strtex.image_memory)));
+        s.device
+            .destroy_render_pass(ManuallyDrop::into_inner(ptr::read(&strtex.render_pass)));
+        s.device
+            .destroy_pipeline_layout(ManuallyDrop::into_inner(ptr::read(&strtex.pipeline_layout)));
+        s.device
+            .destroy_graphics_pipeline(ManuallyDrop::into_inner(ptr::read(&strtex.pipeline)));
+        for dsl in strtex.descriptor_set_layouts.drain(..) {
+            s.device.destroy_descriptor_set_layout(dsl);
+        }
+        s.device
+            .destroy_descriptor_pool(ManuallyDrop::into_inner(ptr::read(&strtex.descriptor_pool)));
+        s.device
+            .destroy_sampler(ManuallyDrop::into_inner(ptr::read(&strtex.sampler)));
+        s.device
+            .destroy_image_view(ManuallyDrop::into_inner(ptr::read(&strtex.image_view)));
+    }
 }
 
 /// Add a sprite (a rectangular view of a texture) to the system
@@ -1522,6 +1579,11 @@ mod tests {
 
         let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
         utils::assert_swapchain_eq(&mut windowing, "streaming_texture_z_ordering", img);
+
+        strtex::remove_texture(&mut windowing, strtex1);
+
+        let img = draw_frame_copy_framebuffer(&mut windowing, &mut logger, &prspect);
+        utils::assert_swapchain_eq(&mut windowing, "streaming_texture_z_ordering_removed", img);
     }
 
     // ---

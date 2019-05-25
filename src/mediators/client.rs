@@ -3,7 +3,7 @@ use crate::mediators::does_line_collide_with_grid::*;
 use cgmath::*;
 use geometry::{boxit::Boxit, grid2d::Grid, vec::Vec2};
 use input::Input;
-use logger::Logger;
+use logger::{GenericLogger, Logger};
 use rand::Rng;
 use std::time::Instant;
 use vxdraw::{data::*, *};
@@ -199,7 +199,7 @@ fn toggle_camera_mode(s: &mut Logic) {
 }
 
 pub fn maybe_initialize_graphics(s: &mut Main) {
-    let mut windowing = init_window_with_vulkan(&mut Logger::spawn_void(), ShowWindow::Enable);
+    let mut windowing = init_window_with_vulkan(s.logger.clone().to_logpass(), ShowWindow::Enable);
 
     {
         static BACKGROUND: &[u8] = include_bytes!["../../assets/images/terrabackground.png"];
@@ -228,7 +228,6 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
             height: 1000,
             ..strtex::TextureOptions::default()
         },
-        &mut Logger::spawn_void(),
     );
     s.logic.grid.resize(1000, 1000);
     vxdraw::strtex::generate_map2(&mut windowing, &tex, [1.0, 2.0, 4.0]);
@@ -343,11 +342,7 @@ fn draw_graphics(s: &mut Main) {
         // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
         let trans = Matrix4::from_translation(Vector3::new(-center.x, -center.y, 0.0));
         // info![client.logger, "main", "Okay wth"; "trans" => InDebug(&trans); clone trans];
-        vxdraw::draw_frame(
-            &mut graphics.windowing,
-            &mut Logger::spawn_void(),
-            &(persp * scale * trans),
-        );
+        vxdraw::draw_frame(&mut graphics.windowing, &(persp * scale * trans));
     }
 }
 

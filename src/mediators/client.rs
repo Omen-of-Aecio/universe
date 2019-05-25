@@ -203,8 +203,7 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
 
     {
         static BACKGROUND: &[u8] = include_bytes!["../../assets/images/terrabackground.png"];
-        let background = dyntex::push_texture(
-            &mut windowing,
+        let background = windowing.dyntex().push_texture(
             BACKGROUND,
             dyntex::TextureOptions {
                 depth_test: true,

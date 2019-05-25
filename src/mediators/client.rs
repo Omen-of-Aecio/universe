@@ -230,7 +230,7 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
         },
     );
     s.logic.grid.resize(1000, 1000);
-    vxdraw::strtex::generate_map2(&mut windowing, &tex, [1.0, 2.0, 4.0]);
+    vxdraw::strtex::fill_with_perlin_noise(&mut windowing, &tex, [1.0, 2.0, 4.0]);
     let grid = &mut s.logic.grid;
     vxdraw::strtex::read(&mut windowing, &tex, |x, pitch| {
         for j in 0..1000 {

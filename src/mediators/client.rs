@@ -287,7 +287,7 @@ fn update_graphics(s: &mut Main) {
         graphics
             .windowing
             .dyntex()
-            .set_uvs2(s.logic.bullets.iter().map(|b| {
+            .set_uvs(s.logic.bullets.iter().map(|b| {
                 (
                     b.handle.as_ref().unwrap(),
                     b.current_uv_begin,

@@ -247,8 +247,10 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
             ..vxdraw::strtex::Sprite::default()
         },
     );
+    let layer = vxdraw::quads::create_quad(&mut windowing, vxdraw::quads::QuadOptions::default());
     let handle = vxdraw::quads::push(
         &mut windowing,
+        &layer,
         vxdraw::quads::Quad {
             colors: [(255, 0, 0, 127); 4],
             width: 10.0,

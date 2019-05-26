@@ -6,7 +6,7 @@ use input::Input;
 use logger::{GenericLogger, Logger};
 use rand::Rng;
 use std::time::Instant;
-use vxdraw::{data::*, *};
+use vxdraw::*;
 use winit::{VirtualKeyCode as Key, *};
 
 static FIREBALLS: &[u8] = include_bytes!["../../assets/images/bullets.png"];

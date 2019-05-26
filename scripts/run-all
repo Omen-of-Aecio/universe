@@ -104,7 +104,10 @@ for SCRIPT in "$DIR"/*; do
     set +e
     time ./"$SCRIPT" "--filter" "$filter" |& sed 's/^/\t/g'
     if [ "$?" -ne 0 ]; then
+        echo "FAIL: $SCRIPT"
         failures="$((failures + 1))"
+    else
+        echo "PASS: $SCRIPT"
     fi
     set -e
 done

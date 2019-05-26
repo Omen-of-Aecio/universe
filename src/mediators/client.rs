@@ -17,7 +17,7 @@ fn initialize_grid(s: &mut Grid<u8>) {
 }
 
 pub fn collect_input(client: &mut Logic, windowing: &mut VxDraw) {
-    for event in vxdraw::collect_input(windowing) {
+    for event in windowing.collect_input() {
         if let Event::WindowEvent { event, .. } = event {
             match event {
                 WindowEvent::KeyboardInput { input, .. } => {
@@ -339,7 +339,7 @@ fn draw_graphics(s: &mut Main) {
         // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
         let trans = Matrix4::from_translation(Vector3::new(-center.x, -center.y, 0.0));
         // info![client.logger, "main", "Okay wth"; "trans" => InDebug(&trans); clone trans];
-        vxdraw::draw_frame(&mut graphics.windowing, &(persp * scale * trans));
+        graphics.windowing.draw_frame(&(persp * scale * trans));
     }
 }
 

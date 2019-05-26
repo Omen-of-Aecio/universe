@@ -298,15 +298,39 @@ mod tests {
 
     #[test]
     fn clamping() {
-        assert_eq![Vec2::null_vec(), Vec2 { x: 1.0, y: 2.0 }.clamp(Vec2::null_vec())];
-        assert_eq![Vec2::null_vec(), Vec2 { x: -1.0, y: 2.0 }.clamp(Vec2::null_vec())];
-        assert_eq![Vec2::null_vec(), Vec2 { x: 1.0, y: -2.0 }.clamp(Vec2::null_vec())];
-        assert_eq![Vec2::null_vec(), Vec2 { x: -1.0, y: -2.0 }.clamp(Vec2::null_vec())];
-        assert_eq![Vec2::null_vec(), Vec2 { x: 0.0, y: 0.0 }.clamp(Vec2::null_vec())];
+        assert_eq![
+            Vec2::null_vec(),
+            Vec2 { x: 1.0, y: 2.0 }.clamp(Vec2::null_vec())
+        ];
+        assert_eq![
+            Vec2::null_vec(),
+            Vec2 { x: -1.0, y: 2.0 }.clamp(Vec2::null_vec())
+        ];
+        assert_eq![
+            Vec2::null_vec(),
+            Vec2 { x: 1.0, y: -2.0 }.clamp(Vec2::null_vec())
+        ];
+        assert_eq![
+            Vec2::null_vec(),
+            Vec2 { x: -1.0, y: -2.0 }.clamp(Vec2::null_vec())
+        ];
+        assert_eq![
+            Vec2::null_vec(),
+            Vec2 { x: 0.0, y: 0.0 }.clamp(Vec2::null_vec())
+        ];
 
-        assert_eq![Vec2 { x: 1.0, y: 3.0 }, Vec2 { x: 1.0, y: 3.0 }.clamp(Vec2 { x: 1.0, y: 3.0 })];
-        assert_eq![Vec2 { x: 1.0, y: -3.0 }, Vec2 { x: 1.0, y: 4.0 }.clamp(Vec2 { x: 1.0, y: -3.0 })];
-        assert_eq![Vec2 { x: 1.0, y: 3.0 }, Vec2 { x: 1.0, y: 4.0 }.clamp(Vec2 { x: 2.0, y: 3.0 })];
+        assert_eq![
+            Vec2 { x: 1.0, y: 3.0 },
+            Vec2 { x: 1.0, y: 3.0 }.clamp(Vec2 { x: 1.0, y: 3.0 })
+        ];
+        assert_eq![
+            Vec2 { x: 1.0, y: -3.0 },
+            Vec2 { x: 1.0, y: 4.0 }.clamp(Vec2 { x: 1.0, y: -3.0 })
+        ];
+        assert_eq![
+            Vec2 { x: 1.0, y: 3.0 },
+            Vec2 { x: 1.0, y: 4.0 }.clamp(Vec2 { x: 2.0, y: 3.0 })
+        ];
     }
 
     #[bench]

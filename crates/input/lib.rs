@@ -43,12 +43,16 @@ impl Input {
 
     pub fn register_key(&mut self, input: &KeyboardInput) {
         match *input {
-            KeyboardInput { state: ElementState::Pressed, virtual_keycode: Some(keycode),.. } => {
-                self.register_key_down(keycode)
-            }
-            KeyboardInput { state: ElementState::Released, virtual_keycode: Some(keycode), .. } => {
-                self.register_key_up(keycode)
-            }
+            KeyboardInput {
+                state: ElementState::Pressed,
+                virtual_keycode: Some(keycode),
+                ..
+            } => self.register_key_down(keycode),
+            KeyboardInput {
+                state: ElementState::Released,
+                virtual_keycode: Some(keycode),
+                ..
+            } => self.register_key_up(keycode),
             _ => (), // Do nothing. Should probably log the error.
         }
     }

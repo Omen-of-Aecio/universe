@@ -744,15 +744,9 @@ mod tests {
         let strings_ref = strings.iter().map(|s| &s[..]).collect::<Vec<_>>();
         let mapping: Mapping<Accept, Deny, Context> = Mapping::default();
         match mapping.lookup(&strings_ref[..]) {
-            Err(LookError::UnknownMapping(string)) => {
-                string == strings[0]
-            }
-            Err(LookError::FinalizerDoesNotExist) => {
-                strings.is_empty()
-            }
-            _ => {
-                false
-            }
+            Err(LookError::UnknownMapping(string)) => string == strings[0],
+            Err(LookError::FinalizerDoesNotExist) => strings.is_empty(),
+            _ => false,
         }
     }
 

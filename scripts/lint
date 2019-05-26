@@ -1,0 +1,12 @@
+#! /usr/bin/env bash
+
+set -Eeuo pipefail
+
+FILE="$(basename $0)"
+DIR="${0%$FILE}"
+
+cd "$DIR.."
+DIR="${DIR%/*}"
+DIR="${DIR##*/}"
+
+./.pre-commit

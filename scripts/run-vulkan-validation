@@ -18,7 +18,7 @@ mkdir -p _build/crates
     cd crates/vxdraw
 
     set +e
-    cargo test vxdraw:: --verbose --all --features gfx_tests  >& _build/vulkan.test_result
+    cargo test --verbose --all >& _build/vulkan.test_result
     if [ "$?" -ne 0 ]; then
         echo "FAIL: vulkan-validation"
         cat _build/vulkan.test_result
@@ -34,7 +34,7 @@ mkdir -p _build/crates
     fi
 
     set +e
-    VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation cargo test --release --quiet vxdraw:: --features gfx_tests >& _build/vulkan.test_result.validation
+    VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation cargo test --release --quiet >& _build/vulkan.test_result.validation
     set -e
 
     if grep 'ERROR / SPEC' _build/vulkan.test_result.validation >& /dev/null; then

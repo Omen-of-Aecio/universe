@@ -533,7 +533,7 @@ fn update_bullets_position(s: &mut Logic, mut windowing: Option<&mut Windowing>)
         let bullet = s.bullets.swap_remove(idx);
         if let Some(ref mut windowing) = windowing {
             if let Some(handle) = bullet.handle {
-                dyntex::remove_sprite(windowing, handle);
+                windowing.dyntex().remove_sprite(handle);
             }
         }
     }
@@ -588,7 +588,7 @@ fn tick_logic(s: &mut Main) {
                     );
                     let old = std::mem::replace(&mut this_player.weapon_sprite, Some(new));
                     if let Some(old_id) = old {
-                        dyntex::remove_sprite(&mut gfx.windowing, old_id);
+                        gfx.windowing.dyntex().remove_sprite(old_id);
                     }
                 }
             }

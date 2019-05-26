@@ -219,26 +219,25 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
         );
     }
 
-    let tex = vxdraw::strtex::push_texture(
-        &mut windowing,
-        strtex::TextureOptions {
-            width: 1000,
-            height: 1000,
-            ..strtex::TextureOptions::default()
-        },
-    );
+    let mut strtex = windowing.strtex();
+
+    let tex = strtex.push_texture(strtex::TextureOptions {
+        width: 1000,
+        height: 1000,
+        ..strtex::TextureOptions::default()
+    });
     s.logic.grid.resize(1000, 1000);
-    vxdraw::strtex::fill_with_perlin_noise(&mut windowing, &tex, [1.0, 2.0, 4.0]);
+
+    strtex.fill_with_perlin_noise(&tex, [1.0, 2.0, 4.0]);
     let grid = &mut s.logic.grid;
-    vxdraw::strtex::read(&mut windowing, &tex, |x, pitch| {
+    strtex.read(&tex, |x, pitch| {
         for j in 0..1000 {
             for i in 0..1000 {
                 grid.set(i, j, x[i + j * pitch].0);
             }
         }
     });
-    vxdraw::strtex::push_sprite(
-        &mut windowing,
+    strtex.push_sprite(
         &tex,
         vxdraw::strtex::Sprite {
             width: 1000.0,
@@ -279,8 +278,7 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
 fn update_graphics(s: &mut Main) {
     if let Some(ref mut graphics) = s.graphics {
         let changeset = &s.logic.changed_tiles;
-        vxdraw::strtex::streaming_texture_set_pixels(
-            &mut graphics.windowing,
+        graphics.windowing.strtex().streaming_texture_set_pixels(
             &graphics.grid,
             changeset
                 .iter()

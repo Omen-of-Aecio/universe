@@ -16,7 +16,7 @@ fn initialize_grid(s: &mut Grid<u8>) {
     s.resize(1000, 1000);
 }
 
-pub fn collect_input(client: &mut Logic, windowing: &mut Windowing) {
+pub fn collect_input(client: &mut Logic, windowing: &mut VxDraw) {
     for event in vxdraw::collect_input(windowing) {
         if let Event::WindowEvent { event, .. } = event {
             match event {
@@ -199,7 +199,7 @@ fn toggle_camera_mode(s: &mut Logic) {
 }
 
 pub fn maybe_initialize_graphics(s: &mut Main) {
-    let mut windowing = Windowing::new(s.logger.clone().to_logpass(), ShowWindow::Enable);
+    let mut windowing = VxDraw::new(s.logger.clone().to_logpass(), ShowWindow::Enable);
 
     {
         static BACKGROUND: &[u8] = include_bytes!["../../assets/images/terrabackground.png"];
@@ -372,7 +372,7 @@ pub fn entry_point_client(s: &mut Main) {
 
 fn upload_player_position(
     s: &mut Logic,
-    windowing: &mut Windowing,
+    windowing: &mut VxDraw,
     handle: &vxdraw::quads::QuadHandle,
 ) {
     if let Some(ref mut player) = s.players.get(0) {
@@ -502,7 +502,7 @@ fn update_bullets_uv(s: &mut Logic) {
     }
 }
 
-fn update_bullets_position(s: &mut Logic, mut windowing: Option<&mut Windowing>) {
+fn update_bullets_position(s: &mut Logic, mut windowing: Option<&mut VxDraw>) {
     let mut bullets_to_remove = vec![];
     for (idx, b) in s.bullets.iter_mut().enumerate() {
         let collision = collision_test(&[b.position], b.direction, &s.grid, |x| *x == 255);

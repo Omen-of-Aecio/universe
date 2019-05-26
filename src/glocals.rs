@@ -41,7 +41,7 @@ pub struct Graphics {
     pub bullets_texture: vxdraw::dyntex::TextureHandle,
     pub weapons_texture: vxdraw::dyntex::TextureHandle,
     pub grid: vxdraw::strtex::TextureHandle,
-    pub windowing: vxdraw::data::Windowing,
+    pub windowing: vxdraw::data::VxDraw,
 }
 
 impl Default for Main {

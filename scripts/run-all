@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-# ARG_OPTIONAL_SINGLE([filter],[f],[A regex filter that excludes scripts by this name])
+# ARG_OPTIONAL_SINGLE([filter],[f],[A regex filter that excludes matches by this name, passed through to all child scripts])
 # ARG_HELP([Run all scripts in this directory])
 # ARGBASH_GO()
 # needed because of Argbash --> m4_ignore([
@@ -102,7 +102,7 @@ for SCRIPT in "$DIR"/*; do
     fi
     echo "Running: $SCRIPT"
     set +e
-    time ./"$SCRIPT" |& sed 's/^/\t/g'
+    time ./"$SCRIPT" "--filter" "$filter" |& sed 's/^/\t/g'
     if [ "$?" -ne 0 ]; then
         failures="$((failures + 1))"
     fi

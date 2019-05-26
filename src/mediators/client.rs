@@ -318,7 +318,7 @@ fn update_graphics(s: &mut Main) {
                         .dyntex()
                         .set_uv(sprite, (0.0, 0.0), (1.0, 1.0));
                 }
-                graphics.windowing.dyntex().set_rotation(sprite, angle);
+                graphics.windowing.dyntex().set_rotation(sprite, Rad(angle));
             }
         }
 

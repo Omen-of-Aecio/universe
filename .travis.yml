@@ -2,10 +2,22 @@ addons:
     apt:
         sources:
             - devian-sid
+        packages:
+            - binutils-dev
+            - libasound2-dev
+            - libunwind8-dev
+            - libxxf86vm-dev
+            - libxinerama-dev
+            - libxinerama1
+            - libxcursor-dev
+            - libxcursor1
+            - libglfw-dev
+            - libosmesa6-dev
+            - libxi-dev
+            - libxrandr-dev
+            - g++
 sudo: false
 before_script:
-    - sudo apt update
-    - sudo apt install binutils-dev libasound2-dev libunwind8-dev g++
     - rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
 before_install:
     - "export DISPLAY=:99.0"

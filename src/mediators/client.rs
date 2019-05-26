@@ -296,11 +296,10 @@ fn update_graphics(s: &mut Main) {
         );
 
         for b in s.logic.bullets.iter() {
-            vxdraw::dyntex::set_position(
-                &mut graphics.windowing,
-                b.handle.as_ref().unwrap(),
-                b.position.into(),
-            );
+            graphics
+                .windowing
+                .dyntex()
+                .set_position(b.handle.as_ref().unwrap(), b.position.into());
         }
 
         {
@@ -372,8 +371,7 @@ fn upload_player_position(
 ) {
     if let Some(ref mut player) = s.players.get(0) {
         if let Some(ref gun_handle) = player.weapon_sprite {
-            dyntex::set_position(
-                windowing,
+            windowing.dyntex().set_position(
                 gun_handle,
                 (player.position + Vec2 { x: 5.0, y: 5.0 }).into(),
             );

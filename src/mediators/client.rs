@@ -247,9 +247,10 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
             ..vxdraw::strtex::Sprite::default()
         },
     );
-    let layer = vxdraw::quads::create_quad(&mut windowing, vxdraw::quads::QuadOptions::default());
-    let handle = vxdraw::quads::push(
-        &mut windowing,
+    let layer = windowing
+        .quads()
+        .create_quad(vxdraw::quads::QuadOptions::default());
+    let handle = windowing.quads().push(
         &layer,
         vxdraw::quads::Quad {
             colors: [(255, 0, 0, 127); 4],
@@ -384,7 +385,9 @@ fn upload_player_position(
                 (player.position + Vec2 { x: 5.0, y: 5.0 }).into(),
             );
         }
-        vxdraw::quads::set_position(windowing, handle, player.position.into());
+        windowing
+            .quads()
+            .set_position(handle, player.position.into());
     }
 }
 

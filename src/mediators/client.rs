@@ -284,16 +284,16 @@ fn update_graphics(s: &mut Main) {
                 .map(|pos| (pos.0 as u32, pos.1 as u32, (0, 0, 0, 255))),
         );
 
-        vxdraw::dyntex::set_uvs2(
-            &mut graphics.windowing,
-            s.logic.bullets.iter().map(|b| {
+        graphics
+            .windowing
+            .dyntex()
+            .set_uvs2(s.logic.bullets.iter().map(|b| {
                 (
                     b.handle.as_ref().unwrap(),
                     b.current_uv_begin,
                     b.current_uv_end,
                 )
-            }),
-        );
+            }));
 
         for b in s.logic.bullets.iter() {
             graphics
@@ -308,11 +308,17 @@ fn update_graphics(s: &mut Main) {
                 .angle();
             if let Some(Some(sprite)) = s.logic.players.get_mut(0).map(|x| &mut x.weapon_sprite) {
                 if angle > std::f32::consts::PI / 2.0 || angle < -std::f32::consts::PI / 2.0 {
-                    dyntex::set_uv(&mut graphics.windowing, sprite, (0.0, 1.0), (1.0, 0.0));
+                    graphics
+                        .windowing
+                        .dyntex()
+                        .set_uv(sprite, (0.0, 1.0), (1.0, 0.0));
                 } else {
-                    dyntex::set_uv(&mut graphics.windowing, sprite, (0.0, 0.0), (1.0, 1.0));
+                    graphics
+                        .windowing
+                        .dyntex()
+                        .set_uv(sprite, (0.0, 0.0), (1.0, 1.0));
                 }
-                dyntex::set_rotation(&mut graphics.windowing, sprite, angle);
+                graphics.windowing.dyntex().set_rotation(sprite, angle);
             }
         }
 

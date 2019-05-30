@@ -239,12 +239,10 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
     });
     strtex.add(
         &tex,
-        vxdraw::strtex::Sprite {
-            width: 1000.0,
-            height: 1000.0,
-            translation: (500.0, 500.0),
-            ..vxdraw::strtex::Sprite::default()
-        },
+        vxdraw::strtex::Sprite::new()
+            .width(1000.0)
+            .height(1000.0)
+            .translation((500.0, 500.0)),
     );
     let layer = windowing
         .quads()

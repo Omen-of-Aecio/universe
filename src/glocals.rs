@@ -37,7 +37,7 @@ pub struct Main {
 }
 
 pub struct Graphics {
-    pub player_quads: Vec<vxdraw::quads::QuadHandle>,
+    pub player_quads: Vec<vxdraw::quads::Handle>,
     pub bullets_texture: vxdraw::dyntex::TextureHandle,
     pub weapons_texture: vxdraw::dyntex::TextureHandle,
     pub grid: vxdraw::strtex::TextureHandle,

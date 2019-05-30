@@ -371,11 +371,7 @@ pub fn entry_point_client(s: &mut Main) {
     }
 }
 
-fn upload_player_position(
-    s: &mut Logic,
-    windowing: &mut VxDraw,
-    handle: &vxdraw::quads::QuadHandle,
-) {
+fn upload_player_position(s: &mut Logic, windowing: &mut VxDraw, handle: &vxdraw::quads::Handle) {
     if let Some(ref mut player) = s.players.get(0) {
         if let Some(ref gun_handle) = player.weapon_sprite {
             windowing.dyntex().set_position(
@@ -383,9 +379,11 @@ fn upload_player_position(
                 (player.position + Vec2 { x: 5.0, y: 5.0 }).into(),
             );
         }
+        dbg!(player.position);
+        windowing.quads().set_color(handle, [0, 255, 0, 255]);
         windowing
             .quads()
-            .set_position(handle, player.position.into());
+            .set_translation(handle, player.position.into());
     }
 }
 

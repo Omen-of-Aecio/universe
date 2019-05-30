@@ -270,7 +270,7 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
 fn update_graphics(s: &mut Main) {
     if let Some(ref mut graphics) = s.graphics {
         let changeset = &s.logic.changed_tiles;
-        graphics.windowing.strtex().streaming_texture_set_pixels(
+        graphics.windowing.strtex().set_pixels(
             &graphics.grid,
             changeset
                 .iter()

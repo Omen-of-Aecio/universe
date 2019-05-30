@@ -205,10 +205,9 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
         static BACKGROUND: &[u8] = include_bytes!["../../assets/images/terrabackground.png"];
         let background = windowing.dyntex().new_layer(
             BACKGROUND,
-            dyntex::LayerOptions {
-                depth_test: true,
-                fixed_perspective: Some(Matrix4::identity()),
-            },
+            dyntex::LayerOptions::new()
+                .depth(true)
+                .fixed_perspective(Matrix4::identity()),
         );
         windowing.dyntex().add(
             &background,
@@ -256,9 +255,9 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
 
     let mut dyntex = windowing.dyntex();
 
-    let fireballs = dyntex.new_layer(FIREBALLS, vxdraw::dyntex::LayerOptions::default());
+    let fireballs = dyntex.new_layer(FIREBALLS, vxdraw::dyntex::LayerOptions::new());
 
-    let weapons_texture = dyntex.new_layer(WEAPONS, vxdraw::dyntex::LayerOptions::default());
+    let weapons_texture = dyntex.new_layer(WEAPONS, vxdraw::dyntex::LayerOptions::new());
 
     s.graphics = Some(Graphics {
         player_quads: vec![handle],

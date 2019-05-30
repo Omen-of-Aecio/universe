@@ -203,14 +203,14 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
 
     {
         static BACKGROUND: &[u8] = include_bytes!["../../assets/images/terrabackground.png"];
-        let background = windowing.dyntex().push_texture(
+        let background = windowing.dyntex().new_layer(
             BACKGROUND,
             dyntex::TextureOptions {
                 depth_test: true,
                 fixed_perspective: Some(Matrix4::identity()),
             },
         );
-        windowing.dyntex().push_sprite(
+        windowing.dyntex().add(
             &background,
             dyntex::Sprite {
                 depth: 1.0,
@@ -221,7 +221,7 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
 
     let mut strtex = windowing.strtex();
 
-    let tex = strtex.push_texture(strtex::TextureOptions {
+    let tex = strtex.new_layer(strtex::TextureOptions {
         width: 1000,
         height: 1000,
         ..strtex::TextureOptions::default()
@@ -237,7 +237,7 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
             }
         }
     });
-    strtex.push_sprite(
+    strtex.add(
         &tex,
         vxdraw::strtex::Sprite {
             width: 1000.0,
@@ -262,9 +262,9 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
 
     let mut dyntex = windowing.dyntex();
 
-    let fireballs = dyntex.push_texture(FIREBALLS, vxdraw::dyntex::TextureOptions::default());
+    let fireballs = dyntex.new_layer(FIREBALLS, vxdraw::dyntex::TextureOptions::default());
 
-    let weapons_texture = dyntex.push_texture(WEAPONS, vxdraw::dyntex::TextureOptions::default());
+    let weapons_texture = dyntex.new_layer(WEAPONS, vxdraw::dyntex::TextureOptions::default());
 
     s.graphics = Some(Graphics {
         player_quads: vec![handle],
@@ -441,7 +441,7 @@ fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>, random: &mut ran
             };
 
             let handle = if let Some(ref mut graphics) = graphics {
-                Some(graphics.windowing.dyntex().push_sprite(
+                Some(graphics.windowing.dyntex().add(
                     &graphics.bullets_texture,
                     vxdraw::dyntex::Sprite {
                         width: sprite_width,
@@ -581,7 +581,7 @@ fn tick_logic(s: &mut Main) {
             s.logic.current_weapon = Weapon::Ak47;
             if let Some(this_player) = s.logic.players.get_mut(0) {
                 if let Some(ref mut gfx) = s.graphics {
-                    let new = gfx.windowing.dyntex().push_sprite(
+                    let new = gfx.windowing.dyntex().add(
                         &gfx.weapons_texture,
                         dyntex::Sprite {
                             width: 10.0,

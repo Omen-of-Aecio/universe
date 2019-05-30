@@ -290,7 +290,7 @@ fn update_graphics(s: &mut Main) {
             graphics
                 .windowing
                 .dyntex()
-                .set_position(b.handle.as_ref().unwrap(), b.position.into());
+                .set_translation(b.handle.as_ref().unwrap(), b.position.into());
         }
 
         {
@@ -364,7 +364,7 @@ pub fn entry_point_client(s: &mut Main) {
 fn upload_player_position(s: &mut Logic, windowing: &mut VxDraw, handle: &vxdraw::quads::Handle) {
     if let Some(ref mut player) = s.players.get(0) {
         if let Some(ref gun_handle) = player.weapon_sprite {
-            windowing.dyntex().set_position(
+            windowing.dyntex().set_translation(
                 gun_handle,
                 (player.position + Vec2 { x: 5.0, y: 5.0 }).into(),
             );

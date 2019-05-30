@@ -248,7 +248,7 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
     );
     let layer = windowing
         .quads()
-        .create_quad(vxdraw::quads::QuadOptions::default());
+        .new_layer(vxdraw::quads::QuadOptions::default());
     let handle = windowing.quads().push(
         &layer,
         vxdraw::quads::Quad {

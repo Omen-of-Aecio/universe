@@ -209,18 +209,17 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
                 .depth(true)
                 .fixed_perspective(Matrix4::identity()),
         );
-        windowing.dyntex().add(
-            &background,
-            dyntex::Sprite {
-                depth: 1.0,
-                ..dyntex::Sprite::default()
-            },
-        );
+        windowing.dyntex().add(&background, dyntex::Sprite::new());
     }
 
     let mut strtex = windowing.strtex();
 
-    let tex = strtex.new_layer(strtex::LayerOptions::new().width(1000).height(1000));
+    let tex = strtex.new_layer(
+        strtex::LayerOptions::new()
+            .width(1000)
+            .height(1000)
+            .depth(false),
+    );
     s.logic.grid.resize(1000, 1000);
 
     strtex.fill_with_perlin_noise(&tex, [1.0, 2.0, 4.0]);
@@ -434,17 +433,17 @@ fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>, random: &mut ran
             };
 
             let handle = if let Some(ref mut graphics) = graphics {
-                Some(graphics.windowing.dyntex().add(
-                    &graphics.bullets_texture,
-                    vxdraw::dyntex::Sprite {
-                        width: sprite_width,
-                        height: sprite_height,
-                        scale: 3.0,
-                        origin: (-sprite_width / 2.0, sprite_height / 2.0),
-                        rotation: -direction.angle() + std::f32::consts::PI,
-                        ..vxdraw::dyntex::Sprite::default()
-                    },
-                ))
+                Some(
+                    graphics.windowing.dyntex().add(
+                        &graphics.bullets_texture,
+                        vxdraw::dyntex::Sprite::new()
+                            .width(sprite_width)
+                            .height(sprite_height)
+                            .scale(3.0)
+                            .origin((-sprite_width / 2.0, sprite_height / 2.0))
+                            .rotation(-direction.angle() + std::f32::consts::PI),
+                    ),
+                )
             } else {
                 None
             };
@@ -576,12 +575,7 @@ fn tick_logic(s: &mut Main) {
                 if let Some(ref mut gfx) = s.graphics {
                     let new = gfx.windowing.dyntex().add(
                         &gfx.weapons_texture,
-                        dyntex::Sprite {
-                            width: 10.0,
-                            height: 5.0,
-                            // origin: (-5.0, -5.0),
-                            ..dyntex::Sprite::default()
-                        },
+                        dyntex::Sprite::new().width(10.0).height(5.0),
                     );
                     let old = std::mem::replace(&mut this_player.weapon_sprite, Some(new));
                     if let Some(old_id) = old {

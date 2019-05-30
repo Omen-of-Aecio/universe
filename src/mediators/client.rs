@@ -203,7 +203,7 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
 
     {
         static BACKGROUND: &[u8] = include_bytes!["../../assets/images/terrabackground.png"];
-        let background = windowing.dyntex().new_layer(
+        let background = windowing.dyntex().add_layer(
             BACKGROUND,
             dyntex::LayerOptions::new()
                 .depth(true)
@@ -214,7 +214,7 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
 
     let mut strtex = windowing.strtex();
 
-    let tex = strtex.new_layer(
+    let tex = strtex.add_layer(
         strtex::LayerOptions::new()
             .width(1000)
             .height(1000)
@@ -240,7 +240,7 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
     );
     let layer = windowing
         .quads()
-        .new_layer(vxdraw::quads::LayerOptions::default());
+        .add_layer(vxdraw::quads::LayerOptions::default());
     let handle = windowing.quads().add(
         &layer,
         vxdraw::quads::Quad {
@@ -254,9 +254,9 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
 
     let mut dyntex = windowing.dyntex();
 
-    let fireballs = dyntex.new_layer(FIREBALLS, vxdraw::dyntex::LayerOptions::new());
+    let fireballs = dyntex.add_layer(FIREBALLS, vxdraw::dyntex::LayerOptions::new());
 
-    let weapons_texture = dyntex.new_layer(WEAPONS, vxdraw::dyntex::LayerOptions::new());
+    let weapons_texture = dyntex.add_layer(WEAPONS, vxdraw::dyntex::LayerOptions::new());
 
     s.graphics = Some(Graphics {
         player_quads: vec![handle],

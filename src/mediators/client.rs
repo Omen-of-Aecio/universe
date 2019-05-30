@@ -243,13 +243,11 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
         .add_layer(vxdraw::quads::LayerOptions::default());
     let handle = windowing.quads().add(
         &layer,
-        vxdraw::quads::Quad {
-            colors: [(255, 0, 0, 127); 4],
-            width: 10.0,
-            height: 10.0,
-            origin: (-5.0, -5.0),
-            ..vxdraw::quads::Quad::default()
-        },
+        vxdraw::quads::Quad::new()
+            .colors([(255, 0, 0, 127); 4])
+            .width(10.0)
+            .height(10.0)
+            .origin((-5.0, -5.0)),
     );
 
     let mut dyntex = windowing.dyntex();

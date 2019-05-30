@@ -118,14 +118,14 @@ pub struct Bullet {
     pub current_uv_begin: (f32, f32),
     pub current_uv_end: (f32, f32),
 
-    pub handle: Option<vxdraw::dyntex::SpriteHandle>,
+    pub handle: Option<vxdraw::dyntex::Handle>,
 }
 
 #[derive(Default)]
 pub struct PlayerData {
     pub position: Vec2,
     pub velocity: Vec2,
-    pub weapon_sprite: Option<vxdraw::dyntex::SpriteHandle>,
+    pub weapon_sprite: Option<vxdraw::dyntex::Handle>,
 }
 
 #[derive(PartialEq)]

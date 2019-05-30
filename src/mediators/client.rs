@@ -221,11 +221,7 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
 
     let mut strtex = windowing.strtex();
 
-    let tex = strtex.new_layer(strtex::TextureOptions {
-        width: 1000,
-        height: 1000,
-        ..strtex::TextureOptions::default()
-    });
+    let tex = strtex.new_layer(strtex::TextureOptions::new().width(1000).height(1000));
     s.logic.grid.resize(1000, 1000);
 
     strtex.fill_with_perlin_noise(&tex, [1.0, 2.0, 4.0]);

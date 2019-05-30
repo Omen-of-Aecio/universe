@@ -379,7 +379,7 @@ fn upload_player_position(s: &mut Logic, windowing: &mut VxDraw, handle: &vxdraw
                 (player.position + Vec2 { x: 5.0, y: 5.0 }).into(),
             );
         }
-        windowing.quads().set_color(handle, [0, 255, 0, 255]);
+        windowing.quads().set_solid_color(handle, [0, 255, 0, 255]);
         windowing
             .quads()
             .set_translation(handle, player.position.into());

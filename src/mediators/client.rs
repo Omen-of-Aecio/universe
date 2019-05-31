@@ -439,7 +439,7 @@ fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>, random: &mut ran
                             .height(sprite_height)
                             .scale(3.0)
                             .origin((-sprite_width / 2.0, sprite_height / 2.0))
-                            .rotation(-direction.angle() + std::f32::consts::PI),
+                            .rotation(Rad(-direction.angle() + std::f32::consts::PI)),
                     ),
                 )
             } else {

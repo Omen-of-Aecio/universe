@@ -199,7 +199,7 @@ fn toggle_camera_mode(s: &mut Logic) {
 }
 
 pub fn maybe_initialize_graphics(s: &mut Main) {
-    let mut windowing = VxDraw::new(s.logger.clone().to_logpass(), ShowWindow::Enable);
+    let mut windowing = VxDraw::new(s.logger.clone().to_compatibility(), ShowWindow::Enable);
 
     {
         static BACKGROUND: &[u8] = include_bytes!["../../assets/images/terrabackground.png"];

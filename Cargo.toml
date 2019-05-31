@@ -19,6 +19,7 @@ clap = "2.32.0"
 derive_more = "0.11.0"
 either = "1.5.0"
 failure = "0.1.1"
+fast-logger = "0.1.1"
 gfx = "0.17"
 gfx-backend-dx12 = { version = "0.1", optional = true }
 gfx-backend-gl = { version = "0.1", optional = true }
@@ -49,7 +50,6 @@ config =      { path = "crates/config" }
 geometry =    { path = "crates/geometry" }
 input =       { path = "crates/input" }
 ketimer =     { path = "crates/ketimer"  }
-logger =      { path = "crates/logger" }
 metac =       { path = "crates/metac" }
 udp_ack =     { path = "crates/udp_ack" }
 vxdraw =      { path = "crates/vxdraw" }

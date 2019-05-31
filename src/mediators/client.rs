@@ -1,9 +1,9 @@
 use crate::glocals::*;
 use crate::mediators::does_line_collide_with_grid::*;
 use cgmath::*;
+use fast_logger::{GenericLogger, Logger};
 use geometry::{boxit::Boxit, grid2d::Grid, vec::Vec2};
 use input::Input;
-use logger::{GenericLogger, Logger};
 use rand::Rng;
 use std::time::Instant;
 use vxdraw::*;

@@ -1,6 +1,6 @@
 use super::*;
 
-use logger::{debug, InDebug};
+use fast_logger::{debug, InDebug};
 
 pub fn void(_: &mut GameShellContext, _: &[Input]) -> Result<String, String> {
     Ok("".into())

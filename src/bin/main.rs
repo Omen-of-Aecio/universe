@@ -10,7 +10,7 @@ fn read_config(path: &str) -> Result<Config, Error> {
 }
 
 fn run_game(s: &mut glocals::Main) {
-    s.logger = logger::Logger::spawn();
+    s.logger = fast_logger::Logger::spawn();
     s.logger.set_colorize(true);
     s.logger.set_context_specific_log_level("benchmark", 0);
     let game_shell = crate::mediators::game_shell::spawn_with_any_port(s.logger.clone());

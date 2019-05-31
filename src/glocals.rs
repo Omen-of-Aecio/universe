@@ -1,7 +1,7 @@
+use fast_logger::Logger;
 use geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
 use input;
 use ketimer::WeakTimer;
-use logger::Logger;
 use rand_pcg::Pcg64Mcg;
 use rodio;
 use std::net::TcpStream;

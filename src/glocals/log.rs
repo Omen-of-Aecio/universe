@@ -1,5 +1,5 @@
+use fast_logger::Generic;
 use geometry::vec::Vec2;
-use logger::Generic;
 
 ///
 #[derive(Clone)]

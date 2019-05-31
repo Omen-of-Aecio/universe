@@ -1,5 +1,5 @@
+use fast_logger::Logger;
 use honggfuzz::fuzz;
-use logger::Logger;
 use metac::Evaluate;
 use universe::mediators::game_shell::make_new_gameshell;
 

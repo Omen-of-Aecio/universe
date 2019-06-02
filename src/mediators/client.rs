@@ -272,7 +272,7 @@ fn update_graphics(s: &mut Main) {
             &graphics.grid,
             changeset
                 .iter()
-                .map(|pos| (pos.0 as u32, pos.1 as u32, (0, 0, 0, 255))),
+                .map(|pos| (pos.0 as u32, pos.1 as u32, Color::Rgba(0, 0, 0, 255))),
         );
 
         graphics

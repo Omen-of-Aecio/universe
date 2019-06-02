@@ -73,8 +73,8 @@ impl<'a> Default for Timers {
     }
 }
 
-pub type GshChannelRecv = mpsc::Receiver<Box<Fn(&mut Main) + Send>>;
-pub type GshChannelSend = mpsc::SyncSender<Box<Fn(&mut Main) + Send>>;
+pub type GshChannelRecv = mpsc::Receiver<Box<dyn Fn(&mut Main) + Send>>;
+pub type GshChannelSend = mpsc::SyncSender<Box<dyn Fn(&mut Main) + Send>>;
 
 #[derive(Default)]
 pub struct Threads {

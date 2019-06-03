@@ -17,7 +17,8 @@ struct Config {
     world: World {
         gravity: f32,
         gravity_on: bool,
-        // air_fri: (f32, f32),
+        air_fri_x: f32,
+        air_fri_y: f32,
         ground_fri: f32,
         width: u32,
         height: u32,
@@ -26,6 +27,8 @@ struct Config {
         horizontal_acc: f32,
         jump_duration: f32,
         jump_acc: f32,
+        acc: f32,
+        max_vel: f32,
     }
     controls: Controls {
         down: String,

@@ -82,34 +82,47 @@ fn move_camera_according_to_input(s: &mut Logic) {
     }
 }
 
-fn accelerate_player_according_to_input(s: &Input) -> Vec2 {
-    let (dx, dy);
-    if s.is_key_down(Key::Up) {
-        dy = -1;
+fn accelerate_player_according_to_input(
+    s: &Input,
+    conf: &Config,
+    on_ground: bool,
+    logger: &mut Logger<Log>,
+) -> Vec2 {
+    let dy = if s.is_key_down(Key::Up) {
+        if conf.world.gravity_on {
+            if on_ground {
+                -conf.player.jump_acc
+            } else {
+                0.0
+            }
+        } else {
+            -conf.player.acc
+        }
     } else if s.is_key_down(Key::Down) {
-        dy = 1;
+        conf.player.acc
     } else {
-        dy = 0;
-    }
-    if s.is_key_down(Key::Left) {
-        dx = -1;
+        0.0
+    };
+    let dx = if s.is_key_down(Key::Left) {
+        -conf.player.acc
     } else if s.is_key_down(Key::Right) {
-        dx = 1;
+        conf.player.acc
     } else {
-        dx = 0;
-    }
+        0.0
+    };
     Vec2 {
         x: dx as f32,
         y: dy as f32,
     } / if s.is_key_down(Key::LShift) { 3.0 } else { 1.0 }
 }
 
+/// Returns true if collision happened on y axis
 fn check_for_collision_and_move_player_according_to_movement_vector(
     grid: &Grid<u8>,
     player: &mut PlayerData,
     movement: Vec2,
     _logger: &mut Logger<Log>,
-) {
+) -> bool {
     let tl = Vec2 {
         x: player.position.x + 0.01,
         y: player.position.y + 0.01,
@@ -167,14 +180,13 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
             break;
         }
     }
-    if collision_x.is_some() {}
-
     if collision_x.is_some() {
         player.velocity.x = 0.0;
     }
     if collision_y.is_some() {
         player.velocity.y = 0.0;
     }
+    collision_y.is_some()
 }
 
 fn set_gravity(s: &mut Logic) {
@@ -337,7 +349,6 @@ fn draw_graphics(s: &mut Main) {
 pub fn entry_point_client(s: &mut Main) {
     s.logger.set_log_level(196);
 
-    s.logic.config.world.gravity = -0.3;
     s.logic.cam.zoom = 0.01;
 
     s.logic.players.push(PlayerData {
@@ -537,17 +548,27 @@ fn update_bullets_position(s: &mut Logic, mut windowing: Option<&mut VxDraw>) {
 fn apply_physics_to_players(s: &mut Logic, logger: &mut Logger<Log>) {
     for player in &mut s.players {
         if s.config.world.gravity_on {
-            player.velocity += Vec2::new(0.0, -s.config.world.gravity);
+            player.velocity += Vec2::new(0.0, s.config.world.gravity);
         }
 
-        player.velocity += accelerate_player_according_to_input(&s.input) / 30.0;
-        player.velocity = player.velocity.clamp(Vec2 { x: 1.0, y: 1.0 });
-        check_for_collision_and_move_player_according_to_movement_vector(
+        let on_ground = check_for_collision_and_move_player_according_to_movement_vector(
             &s.grid,
             player,
             player.velocity,
             logger,
         );
+        player.velocity +=
+            accelerate_player_according_to_input(&s.input, &s.config, on_ground, logger);
+        player.velocity = player.velocity.clamp(Vec2 {
+            x: s.config.player.max_vel,
+            y: s.config.player.max_vel,
+        });
+        if on_ground {
+            player.velocity.x *= s.config.world.ground_fri;
+        } else {
+            player.velocity.x *= s.config.world.air_fri_x;
+        }
+        player.velocity.y *= s.config.world.air_fri_y;
     }
 }
 

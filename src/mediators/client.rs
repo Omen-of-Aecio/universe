@@ -9,8 +9,10 @@ use std::time::Instant;
 use vxdraw::*;
 use winit::{VirtualKeyCode as Key, *};
 
-static FIREBALLS: &[u8] = include_bytes!["../../assets/images/bullets.png"];
-static WEAPONS: &[u8] = include_bytes!["../../assets/images/weapons.png"];
+static FIREBALLS: &dyntex::ImgData =
+    &dyntex::ImgData::PNGBytes(include_bytes!["../../assets/images/bullets.png"]);
+static WEAPONS: &dyntex::ImgData =
+    &dyntex::ImgData::PNGBytes(include_bytes!["../../assets/images/weapons.png"]);
 
 fn initialize_grid(s: &mut Grid<u8>) {
     s.resize(1000, 1000);
@@ -214,7 +216,8 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
     let mut windowing = VxDraw::new(s.logger.clone().to_compatibility(), ShowWindow::Enable);
 
     {
-        static BACKGROUND: &[u8] = include_bytes!["../../assets/images/terrabackground.png"];
+        static BACKGROUND: &dyntex::ImgData =
+            &dyntex::ImgData::PNGBytes(include_bytes!["../../assets/images/terrabackground.png"]);
         let background = windowing.dyntex().add_layer(
             BACKGROUND,
             dyntex::LayerOptions::new()

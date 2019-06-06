@@ -54,7 +54,7 @@ fn main() {
                 bytes_to_f32(&data[38..42]),
             ));
 
-            collision_test(&vertices, velocity, &grid, |x| *x);
+            collision_test(&vertices, None, velocity, &grid, |x| *x);
         });
     }
 }

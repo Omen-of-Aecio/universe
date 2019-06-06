@@ -147,7 +147,9 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
         y: movement.y,
     };
     for i in 1..=10 {
-        collision_y = collision_test(&[tl, tr, bl, br], ymove / i as f32, grid, |x| *x > 0);
+        collision_y = collision_test(&[tl, tr, br, bl], Some(0.5), ymove / i as f32, grid, |x| {
+            *x > 0
+        });
         if collision_y.is_none() {
             player.position += ymove / i as f32;
             break;
@@ -176,7 +178,9 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
         y: 0.0,
     };
     for i in 1..=10 {
-        collision_x = collision_test(&[tl, tr, bl, br], xmove / i as f32, grid, |x| *x > 0);
+        collision_x = collision_test(&[tl, tr, br, bl], Some(0.5), xmove / i as f32, grid, |x| {
+            *x > 0
+        });
         if collision_x.is_none() {
             player.position += xmove / i as f32;
             break;
@@ -511,7 +515,7 @@ fn update_bullets_uv(s: &mut Logic) {
 fn update_bullets_position(s: &mut Logic, mut windowing: Option<&mut VxDraw>) {
     let mut bullets_to_remove = vec![];
     for (idx, b) in s.bullets.iter_mut().enumerate() {
-        let collision = collision_test(&[b.position], b.direction, &s.grid, |x| *x == 255);
+        let collision = collision_test(&[b.position], None, b.direction, &s.grid, |x| *x == 255);
         if let Some((xi, yi)) = collision {
             bullets_to_remove.push(idx);
             let area = b.destruction;

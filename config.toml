@@ -1,12 +1,12 @@
 [world]
 gravity = 0.1
 gravity_on = false
-air_fri_x = 0.98
-air_fri_y = 0.98
+air_fri_x = 0.97
+air_fri_y = 0.97
 ground_fri = 0.9
 
 [player]
-acc = 0.07
+acc = 0.06
 jump_acc = 2.5
 max_vel = 2.5
 

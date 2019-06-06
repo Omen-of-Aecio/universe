@@ -19,7 +19,76 @@ fn does_line_collide_with_grid<T: Clone + Default>(
     None
 }
 
+/// returns alpha along line segment if collision happened
+pub fn intersect_line_line_segment(
+    line_start: Vec2,
+    line_direction: Vec2,
+    segment_start: Vec2,
+    segment_end: Vec2,
+) -> Option<f32> {
+    let start_diff = line_start - segment_start;
+    let segment1_vec = segment_end - segment_start;
+    let segment2_vec = line_direction;
+    let cross_vec = Vec2::cross(segment1_vec, segment2_vec);
+    if cross_vec == 0.0 {
+        return None; // This means colinear (if also cross(a_diff, line2_vec) == 0) OR parallel (else)
+    }
+    let alpha1 = Vec2::cross(start_diff, segment2_vec) / cross_vec; // alpha of line segment
+    let alpha2 = Vec2::cross(start_diff, segment1_vec) / cross_vec; // alpha of line
+    if alpha1 >= 0.0 && alpha1 <= 1.0 {
+        Some(alpha1)
+    } else {
+        None
+    }
+}
+
+/// Get extent of polygon projected onto the line of `dir`. Returns min and max
+fn get_projected_extent(vertices: &[Vec2], dir: Vec2) -> (f32, f32) {
+    let dir = dir.normalize();
+    let mut min = std::f32::MAX;
+    let mut max = std::f32::MIN;
+    for vertex in vertices {
+        let projected = Vec2::dot(*vertex, dir);
+        if projected < min {
+            min = projected;
+        }
+        if projected > max {
+            max = projected;
+        }
+    }
+    assert!(min != std::f32::MAX);
+    assert!(max != std::f32::MIN);
+    (min, max)
+}
+
+/// A line is defined by `point` and `dir`. Returns the intersection of this line and the polygon,
+/// that is furthest in the direction of `dir`
+fn furthest_line_shape_intersection(vertices: &[Vec2], point: Vec2, dir: Vec2) -> Option<Vec2> {
+    let mut best_point = None;
+    let mut best_extent = std::f32::MIN;
+    let normal_dir = dir.normalize();
+    let prev_vertices = vertices
+        .iter()
+        .cycle()
+        .skip(vertices.len() - 1)
+        .take(vertices.len());
+    for (vertex, prev_vertex) in vertices.iter().zip(prev_vertices) {
+        if let Some(alpha) = intersect_line_line_segment(point, dir, *prev_vertex, *vertex) {
+            let point = *prev_vertex + (*vertex - *prev_vertex).scale_uni(alpha);
+            let extent = Vec2::dot(dir, point);
+            if extent > best_extent {
+                best_extent = extent;
+                best_point = Some(point)
+            }
+        }
+    }
+    best_point
+}
+
 /// Check if multiple lines collide with some part of the grid given a predicate
+///
+/// If `coarseness` is present, it determines how many points will be created, by signifying the
+/// distance between each point generated in the direction of velocity.
 ///
 /// Returns the first found collision with the grid. This collision does not convey
 /// information about the distance travelled to cause the collision, so don't
@@ -28,10 +97,39 @@ fn does_line_collide_with_grid<T: Clone + Default>(
 /// Returns the new movement vector.
 pub fn collision_test<T: Clone + Default>(
     vertices: &[Vec2],
+    coarseness: Option<f32>,
     velocity: Vec2,
     grid: &Grid<T>,
     predicate: fn(&T) -> bool,
 ) -> Option<(usize, usize)> {
+    if velocity.length_squared() == 0.0 {
+        return None;
+    }
+
+    let vertices = &match coarseness {
+        Some(coarseness) => {
+            // Create new points.
+            // - project vertices in velocity direction to get extent
+            let dir = velocity.normalize();
+            let project_dir = Vec2::new(-dir.y, dir.x);
+            let (min, max) = get_projected_extent(vertices, project_dir);
+            // - calculate number of points
+            let n_points = ((max - min) / coarseness).max(2.0).round();
+            let dist_between_points = (max - min) / n_points;
+            // - sample lines and find intersection with polygon
+            let points: Vec<Vec2> = (0..n_points as i32)
+                .filter_map(|i| {
+                    let i = i as f32;
+                    let point = project_dir.scale_uni(min + i * dist_between_points);
+                    let a = furthest_line_shape_intersection(vertices, point, dir);
+                    a
+                })
+                .collect();
+            points
+        }
+        None => vertices.to_owned(), // TODO unnecessary clone
+    };
+
     for vertex in vertices {
         let collision = does_line_collide_with_grid(grid, *vertex, *vertex + velocity, predicate);
         if collision.is_some() {

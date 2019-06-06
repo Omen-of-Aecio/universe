@@ -224,7 +224,7 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
             &dyntex::ImgData::PNGBytes(include_bytes!["../../assets/images/terrabackground.png"]);
         let background = windowing.dyntex().add_layer(
             BACKGROUND,
-            dyntex::LayerOptions::new()
+            &dyntex::LayerOptions::new()
                 .depth(true)
                 .fixed_perspective(Matrix4::identity()),
         );
@@ -234,7 +234,7 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
     let mut strtex = windowing.strtex();
 
     let tex = strtex.add_layer(
-        strtex::LayerOptions::new()
+        &strtex::LayerOptions::new()
             .width(1000)
             .height(1000)
             .depth(false),
@@ -259,7 +259,7 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
     );
     let layer = windowing
         .quads()
-        .add_layer(vxdraw::quads::LayerOptions::default());
+        .add_layer(&vxdraw::quads::LayerOptions::default());
     let handle = windowing.quads().add(
         &layer,
         vxdraw::quads::Quad::new()
@@ -271,9 +271,9 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
 
     let mut dyntex = windowing.dyntex();
 
-    let fireballs = dyntex.add_layer(FIREBALLS, vxdraw::dyntex::LayerOptions::new());
+    let fireballs = dyntex.add_layer(FIREBALLS, &vxdraw::dyntex::LayerOptions::new());
 
-    let weapons_texture = dyntex.add_layer(WEAPONS, vxdraw::dyntex::LayerOptions::new());
+    let weapons_texture = dyntex.add_layer(WEAPONS, &vxdraw::dyntex::LayerOptions::new());
 
     s.graphics = Some(Graphics {
         player_quads: vec![handle],

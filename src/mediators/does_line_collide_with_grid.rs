@@ -56,8 +56,6 @@ fn get_projected_extent(vertices: &[Vec2], dir: Vec2) -> (f32, f32) {
             max = projected;
         }
     }
-    assert!(min != std::f32::MAX);
-    assert!(max != std::f32::MIN);
     (min, max)
 }
 
@@ -679,6 +677,7 @@ mod tests {
                         Vec2 { x: 0.0, y: 1.5 },
                         Vec2 { x: 0.0, y: 2.5 }
                     ],
+                    None,
                     Vec2::new(3.0, 0.0),
                     &grid,
                     |x| *x,
@@ -697,6 +696,7 @@ mod tests {
                     Vec2 { x: 0.0, y: 1.5 },
                     Vec2 { x: 0.0, y: 2.5 }
                 ],
+                None,
                 Vec2::new(3.0, 0.0),
                 &grid,
                 |x| *x,

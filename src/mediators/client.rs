@@ -274,8 +274,21 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
     let fireballs = dyntex.add_layer(FIREBALLS, &vxdraw::dyntex::LayerOptions::new());
 
     let weapons_texture = dyntex.add_layer(WEAPONS, &vxdraw::dyntex::LayerOptions::new());
+    let text_layer = windowing.text().add_layer(
+        include_bytes!["../../crates/vxdraw/fonts/DejaVuSans.ttf"],
+        vxdraw::text::LayerOptions::new(),
+    );
+    let basic_text = windowing.text().add(
+        &text_layer,
+        "( ͡° ͜ʖ ͡°)",
+        vxdraw::text::TextOptions::new()
+            .font_size(40.0)
+            .scale(100.0)
+            .translation((110.0, 3.2)),
+    );
 
     s.graphics = Some(Graphics {
+        basic_text,
         player_quads: vec![handle],
         bullets_texture: fireballs,
         grid: tex,

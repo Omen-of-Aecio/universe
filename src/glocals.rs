@@ -37,6 +37,7 @@ pub struct Main {
 }
 
 pub struct Graphics {
+    pub basic_text: vxdraw::text::Handle,
     pub player_quads: Vec<vxdraw::quads::Handle>,
     pub bullets_texture: vxdraw::dyntex::Layer,
     pub weapons_texture: vxdraw::dyntex::Layer,

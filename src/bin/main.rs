@@ -11,7 +11,7 @@ fn parse_arguments(s: &mut Main) {
         .version("0.1.0")
         .about("Does awesome things")
         .arg(
-            Arg::with_name("config")
+            Arg::with_name("connect")
                 .short("c")
                 .long("connect")
                 .value_name("ip:port")

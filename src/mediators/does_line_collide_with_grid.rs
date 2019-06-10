@@ -34,7 +34,6 @@ pub fn intersect_line_line_segment(
         return None; // This means colinear (if also cross(a_diff, line2_vec) == 0) OR parallel (else)
     }
     let alpha1 = Vec2::cross(start_diff, segment2_vec) / cross_vec; // alpha of line segment
-    let alpha2 = Vec2::cross(start_diff, segment1_vec) / cross_vec; // alpha of line
     if alpha1 >= 0.0 && alpha1 <= 1.0 {
         Some(alpha1)
     } else {
@@ -71,9 +70,9 @@ fn furthest_line_shape_intersection(vertices: &[Vec2], point: Vec2, dir: Vec2) -
         .skip(vertices.len() - 1)
         .take(vertices.len());
     for (vertex, prev_vertex) in vertices.iter().zip(prev_vertices) {
-        if let Some(alpha) = intersect_line_line_segment(point, dir, *prev_vertex, *vertex) {
+        if let Some(alpha) = intersect_line_line_segment(point, normal_dir, *prev_vertex, *vertex) {
             let point = *prev_vertex + (*vertex - *prev_vertex).scale_uni(alpha);
-            let extent = Vec2::dot(dir, point);
+            let extent = Vec2::dot(normal_dir, point);
             if extent > best_extent {
                 best_extent = extent;
                 best_point = Some(point)

@@ -5,11 +5,13 @@ use universe::{glocals::*, *};
 // ---
 
 fn parse_arguments(s: &mut Main) {
-    let matches = clap::App::new("Universe")
+    use clap::{App, Arg};
+    use std::net::SocketAddr;
+    let matches = App::new("Universe")
         .version("0.1.0")
         .about("Does awesome things")
         .arg(
-            clap::Arg::with_name("config")
+            Arg::with_name("config")
                 .short("c")
                 .long("connect")
                 .value_name("ip:port")
@@ -18,9 +20,9 @@ fn parse_arguments(s: &mut Main) {
         )
         .get_matches();
 
-    use std::net::SocketAddr;
     if let Some(address) = matches.value_of("connect") {
         let address: SocketAddr = address.parse().expect("Not a valid ip:port argument");
+        eprintln!("\nSent message to {:?}\n", address);
         s.network
             .send_reliably_to(0x0EADBEEF, address, std::time::Instant::now())
             .expect("Unable to send message");

@@ -1,5 +1,5 @@
 use super::pkt::Packet;
-use failure::Error;
+use failure::{bail, Error};
 use serde::{Deserialize, Serialize};
 use std::{
     self,
@@ -70,7 +70,7 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
         // Get the seq number of the first element
         let first_seq = match self.send_window.front() {
             None => {
-                panic!("Send window empty, but ack received.");
+                bail!["not good"];
             }
             Some(first) => match *first {
                 Some(ref sent_packet) => sent_packet.seq,

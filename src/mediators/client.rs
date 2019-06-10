@@ -628,11 +628,11 @@ pub fn tick_logic(s: &mut Main) {
         _ => {}
     }
 
-    s.timers.network_timer.update(s.time, &mut s.network);
     let mut buffer = [0u8; 100];
     if let Ok((_sender, msg)) = s.network.recv(&mut buffer) {
         info![s.logger, "main", "Got a message from the network"; "content" => msg];
     }
+    s.timers.network_timer.update(s.time, &mut s.network);
 
     fire_bullets(&mut s.logic, &mut s.graphics, &mut s.random);
 

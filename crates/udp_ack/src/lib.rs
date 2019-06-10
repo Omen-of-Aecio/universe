@@ -147,7 +147,6 @@ impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
     where
         T: Deserialize<'a> + Serialize,
     {
-        // Since we may just receive an Ack, we loop until we receive an actual message
         let socket = &self.socket;
         let (_, src) = socket.recv_from(buffer)?;
         if self.connections.get(&src).is_none() {

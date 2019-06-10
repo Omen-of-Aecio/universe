@@ -9,7 +9,6 @@ if [ "$code" -ne 0 ]; then
 fi
 
 for crate in crates/*; do
-(
     cd "$crate"
     cargo fmt -- --check
     code="$?"
@@ -18,5 +17,5 @@ for crate in crates/*; do
         echo "Please run \`cargo fmt' in $crate before committing"
         exit "$code"
     fi
-)
+    cd "../.."
 done

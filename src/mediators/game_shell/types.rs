@@ -5,9 +5,9 @@ use std::net::TcpStream;
 pub struct GshSpawn {
     pub thread_handle: JoinHandle<()>,
     pub keep_running: Arc<AtomicBool>,
-    pub channel: mpsc::Receiver<Box<Fn(&mut Main) + Send>>,
+    pub channel: mpsc::Receiver<Box<dyn Fn(&mut Main) + Send>>,
     pub port: u16,
-    pub channel_send: mpsc::SyncSender<Box<Fn(&mut Main) + Send>>,
+    pub channel_send: mpsc::SyncSender<Box<dyn Fn(&mut Main) + Send>>,
 }
 pub type SomeDec = Option<&'static Decider<Input, GshDecision>>;
 pub type Gsh<'a> = GameShell<Arc<cmdmat::Mapping<'a, Input, GshDecision, GameShellContext>>>;

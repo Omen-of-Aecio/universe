@@ -4,6 +4,29 @@ use universe::{glocals::*, *};
 
 // ---
 
+fn parse_arguments(s: &mut Main) {
+    let matches = clap::App::new("Universe")
+        .version("0.1.0")
+        .about("Does awesome things")
+        .arg(
+            clap::Arg::with_name("config")
+                .short("c")
+                .long("connect")
+                .value_name("ip:port")
+                .help("Connect to another player")
+                .takes_value(true),
+        )
+        .get_matches();
+
+    use std::net::SocketAddr;
+    if let Some(address) = matches.value_of("connect") {
+        let address: SocketAddr = address.parse().expect("Not a valid ip:port argument");
+        s.network
+            .send_reliably_to(0x0EADBEEF, address, std::time::Instant::now())
+            .expect("Unable to send message");
+    }
+}
+
 fn read_config(path: &str) -> Result<Config, Error> {
     let contents = std::fs::read_to_string(path)?;
     Ok(toml::from_str(&contents)?)
@@ -38,6 +61,7 @@ fn wait_for_threads_to_exit(s: glocals::Main) {
 fn main() {
     let mut s = glocals::Main::default();
     s.logic.config = read_config("config.toml").unwrap();
+    parse_arguments(&mut s);
     run_game(&mut s);
     wait_for_threads_to_exit(s);
 }

@@ -26,6 +26,7 @@ use std::time::Instant;
 pub struct Socket<T: Clone + Debug + PartialEq> {
     socket: UdpSocket,
     connections: HashMap<SocketAddr, Connection<T>>,
+    port: u16,
 }
 
 fn bind_to_any_udp_port() -> (UdpSocket, u16) {
@@ -41,9 +42,14 @@ fn bind_to_any_udp_port() -> (UdpSocket, u16) {
 
 impl<T: Clone + Debug + PartialEq> Default for Socket<T> {
     fn default() -> Self {
+        let (listener, port) = bind_to_any_udp_port();
+        listener
+            .set_nonblocking(true)
+            .expect("Unable to set the UDP socket to non-blocking mode");
         Self {
-            socket: bind_to_any_udp_port().0,
+            socket: listener,
             connections: HashMap::default(),
+            port,
         }
     }
 }
@@ -56,6 +62,7 @@ impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
         Ok(Socket {
             socket,
             connections: HashMap::new(),
+            port,
         })
     }
 
@@ -66,6 +73,10 @@ impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
             }
         }
         bail!["Unable to find a port"]
+    }
+
+    pub fn get_port(&self) -> u16 {
+        self.port
     }
 
     /// A temporary (TODO) simple (but brute force) solution to the need of occasionally resending

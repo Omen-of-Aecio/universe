@@ -1,7 +1,7 @@
 use crate::glocals::*;
 use crate::mediators::does_line_collide_with_grid::*;
 use cgmath::*;
-use fast_logger::{GenericLogger, Logger};
+use fast_logger::{info, GenericLogger, Logger};
 use geometry::{boxit::Boxit, grid2d::Grid, vec::Vec2};
 use input::Input;
 use rand::Rng;
@@ -84,12 +84,7 @@ fn move_camera_according_to_input(s: &mut Logic) {
     }
 }
 
-fn accelerate_player_according_to_input(
-    s: &Input,
-    conf: &Config,
-    on_ground: bool,
-    logger: &mut Logger<Log>,
-) -> Vec2 {
+fn accelerate_player_according_to_input(s: &Input, conf: &Config, on_ground: bool) -> Vec2 {
     let dy = if s.is_key_down(Key::Up) {
         if conf.world.gravity_on {
             if on_ground {
@@ -383,6 +378,9 @@ pub fn entry_point_client(s: &mut Main) {
     initialize_grid(&mut s.logic.grid);
     create_black_square_around_player(&mut s.logic.grid);
 
+    let port = s.network.get_port();
+    info![s.logger, "main", "Listening on port"; "port" => port];
+
     loop {
         s.time = Instant::now();
         tick_logic(s);
@@ -577,8 +575,7 @@ fn apply_physics_to_players(s: &mut Logic, logger: &mut Logger<Log>) {
             player.velocity,
             logger,
         );
-        player.velocity +=
-            accelerate_player_according_to_input(&s.input, &s.config, on_ground, logger);
+        player.velocity += accelerate_player_according_to_input(&s.input, &s.config, on_ground);
         player.velocity = player.velocity.clamp(Vec2 {
             x: s.config.player.max_vel,
             y: s.config.player.max_vel,
@@ -592,7 +589,7 @@ fn apply_physics_to_players(s: &mut Logic, logger: &mut Logger<Log>) {
     }
 }
 
-fn tick_logic(s: &mut Main) {
+pub fn tick_logic(s: &mut Main) {
     toggle_camera_mode(&mut s.logic);
 
     apply_physics_to_players(&mut s.logic, &mut s.logger);
@@ -632,6 +629,11 @@ fn tick_logic(s: &mut Main) {
     }
 
     s.timers.network_timer.update(s.time, &mut s.network);
+    let mut buffer = [0u8; 100];
+    if let Ok((_sender, msg)) = s.network.recv(&mut buffer) {
+        info![s.logger, "main", "Got a message from the network"; "content" => msg];
+    }
+
     fire_bullets(&mut s.logic, &mut s.graphics, &mut s.random);
 
     update_graphics(s);

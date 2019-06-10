@@ -15,12 +15,13 @@ pub struct SentPacket<T: Clone + Debug + PartialEq> {
     pub packet: Packet<T>,
 }
 
-impl<'a, T: Clone + Debug + Deserialize<'a> + Serialize + PartialEq> Debug for SentPacket<T> {
+impl<'a, T: Clone + Debug + PartialEq> Debug for SentPacket<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "SentPacket; time = {:?}, seq = {}", self.time, self.seq)
     }
 }
 
+#[derive(Debug)]
 pub struct Connection<T: Clone + Debug + PartialEq> {
     /// The sequence number of the next sent packet
     pub seq: u32,

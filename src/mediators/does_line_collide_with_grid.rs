@@ -1,6 +1,6 @@
 use geometry::{grid2d::Grid, vec::Vec2};
 
-fn does_line_collide_with_grid<T: Clone + Default>(
+pub fn does_line_collide_with_grid<T: Clone + Default>(
     grid: &Grid<T>,
     start: Vec2,
     end: Vec2,

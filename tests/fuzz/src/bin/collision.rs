@@ -12,17 +12,7 @@ fn bytes_to_f32(x: &[u8]) -> f32 {
 }
 
 fn main() {
-    // Here you can parse `std::env::args and
-    // setup / initialize your project
-
-    // You have full control over the loop but
-    // you're supposed to call `fuzz` ad vitam aeternam
     loop {
-        // The fuzz macro gives an arbitrary object (see `arbitrary crate`)
-        // to a closure-like block of code.
-        // For performance reasons, it is recommended that you use the native type
-        // `&[u8]` when possible.
-        // Here, this slice will contain a "random" quantity of "random" data.
         fuzz!(|data: &[u8]| {
             if data.len() < (2 + 2 * 4 + 2 * 4) {
                 return;
@@ -30,9 +20,6 @@ fn main() {
             let x_size = data[0];
             let y_size = data[1];
             let mut grid: Grid<bool> = Grid::new();
-            // if x_size > 0 {
-            //     panic!["BOOM2"];
-            // }
             grid.resize(x_size as usize, y_size as usize);
 
             let velocity = Vec2::new(bytes_to_f32(&data[2..6]), bytes_to_f32(&data[6..10]));

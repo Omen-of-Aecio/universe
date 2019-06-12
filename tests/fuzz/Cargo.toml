@@ -1,0 +1,12 @@
+[package]
+name = "fuzz"
+version = "0.3.0"
+authors = ["Erlend Hofstad Langseth <3rlendhl@gmail.com>", "Kevin Robert Stravers <macocio@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+fast-logger = "0.1"
+geometry = { path = "../../crates/geometry" }
+honggfuzz = "0.5"
+metac = { path = "../../crates/metac" }
+universe = { path = "../../" }

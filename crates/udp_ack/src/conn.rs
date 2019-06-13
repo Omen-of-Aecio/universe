@@ -1,43 +1,40 @@
 use super::pkt::Packet;
-use failure::{bail, Error};
-use serde::{Deserialize, Serialize};
+use failure::Error;
+use serde::Serialize;
 use std::{
     self,
-    collections::VecDeque,
+    collections::HashMap,
     fmt::Debug,
     net::{SocketAddr, UdpSocket},
     time::{Duration, Instant},
 };
 
+// ---
+
 pub struct SentPacket<T: Clone + Debug + PartialEq> {
+    /// The time the packet was sent, used for re-sending after a given time
     pub time: Instant,
-    pub seq: u32,
+    /// The contents of the packet
     pub packet: Packet<T>,
 }
 
 impl<'a, T: Clone + Debug + PartialEq> Debug for SentPacket<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "SentPacket; time = {:?}, seq = {}", self.time, self.seq)
+        write!(f, "SentPacket; time = {:?}", self.time)
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Connection<T: Clone + Debug + PartialEq> {
-    /// The sequence number of the next sent packet
+    /// The sequence number of the next sent packet, incremented after sending a packet
     pub seq: u32,
-    /// The first entry should always be Some.
-    /// Some means that it's not yet acknowledged
-    pub send_window: VecDeque<Option<SentPacket<T>>>,
+    /// Send window for packets
+    ///
+    /// When receiving an acknowledgement we remove the packet from the map.
+    pub send_window: HashMap<u32, SentPacket<T>>,
 }
 
 impl<T: Clone + Debug + PartialEq> Connection<T> {
-    pub fn new() -> Connection<T> {
-        Connection {
-            seq: 0,
-            send_window: VecDeque::new(),
-        }
-    }
-
     /// Returns Vec of encoded packets ready to be sent again
     pub fn resend_fast(
         &mut self,
@@ -49,52 +46,17 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
         T: Serialize,
     {
         let now = time;
-        self.update_send_window();
         let mut seen = false;
-        for sent_packet in self.send_window.iter_mut() {
-            if let Some(ref mut sent_packet) = *sent_packet {
-                if now - sent_packet.time >= Duration::new(1, 0) {
-                    sent_packet.time = now;
-                    socket.send_to(&sent_packet.packet.encode().unwrap()[..], dest)?;
-                    seen = true;
-                } else {
-                    break;
-                }
+        for (_, sent_packet) in self.send_window.iter_mut() {
+            if now - sent_packet.time >= Duration::new(1, 0) {
+                sent_packet.time = now;
+                socket.send_to(&sent_packet.packet.encode().unwrap()[..], dest)?;
+                seen = true;
+            } else {
+                break;
             }
         }
         Ok(seen)
-    }
-
-    pub fn acknowledge(&mut self, acked: u32) -> Result<(), Error> {
-        self.update_send_window();
-        // Get the seq number of the first element
-        let first_seq = match self.send_window.front() {
-            None => {
-                bail!["not good"];
-            }
-            Some(first) => match *first {
-                Some(ref sent_packet) => sent_packet.seq,
-                None => panic!("The first SentPacket is None."),
-            },
-        };
-
-        let index = (acked - first_seq) as usize;
-
-        match self.send_window.get_mut(index) {
-            Some(sent_packet) => {
-                *sent_packet = None;
-            }
-            None => panic!("Index out of bounds: {}", index),
-        };
-
-        Ok(())
-    }
-
-    /// Removes all None's that appear at the front of the send window queue
-    fn update_send_window(&mut self) {
-        while let Some(&None) = self.send_window.front() {
-            self.send_window.pop_front();
-        }
     }
 
     /// Wraps in a packet, encodes, and adds the packet to the send window queue. Returns the data
@@ -112,11 +74,13 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
         let packet = Packet::Reliable { seq: self.seq, msg };
         let pkt_bytes = packet.encode()?;
         // debug!("Send"; "seq" => self.seq, "ack" => self.received+1);
-        self.send_window.push_back(Some(SentPacket {
-            time,
-            seq: self.seq,
-            packet: packet.clone(),
-        }));
+        self.send_window.insert(
+            self.seq,
+            SentPacket {
+                time,
+                packet: packet.clone(),
+            },
+        );
 
         self.seq += 1;
         socket.send_to(&pkt_bytes, dest)?;
@@ -145,9 +109,13 @@ impl<T: Clone + Debug + PartialEq> Connection<T> {
                 Ok(Some(msg))
             }
             Packet::Ack { ack } => {
-                self.acknowledge(ack)?;
+                self.acknowledge(ack);
                 Ok(None)
             }
         }
+    }
+
+    fn acknowledge(&mut self, acked: u32) {
+        self.send_window.remove(&acked);
     }
 }

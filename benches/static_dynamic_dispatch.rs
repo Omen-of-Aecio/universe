@@ -19,7 +19,7 @@ fn static_call(obj: &C) -> Option<()> {
     obj.call()
 }
 
-fn dynamic_call(obj: &T) -> Option<()> {
+fn dynamic_call(obj: &dyn T) -> Option<()> {
     obj.call()
 }
 

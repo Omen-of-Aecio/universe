@@ -111,7 +111,7 @@ impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
 
     fn get_connection_or_create(&mut self, dest: SocketAddr) -> &mut Connection<T> {
         if self.connections.get(&dest).is_none() {
-            let conn = Connection::new();
+            let conn = Connection::default();
             self.connections.insert(dest, conn);
         }
         self.connections.get_mut(&dest).unwrap()
@@ -123,7 +123,7 @@ impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
         T: Serialize,
     {
         if self.connections.get(&dest).is_none() {
-            let conn = Connection::new();
+            let conn = Connection::default();
             self.connections.insert(dest, conn);
         }
         let conn = self.connections.get_mut(&dest).unwrap();
@@ -150,7 +150,7 @@ impl<T: Clone + Debug + Default + PartialEq> Socket<T> {
         let socket = &self.socket;
         let (_, src) = socket.recv_from(buffer)?;
         if self.connections.get(&src).is_none() {
-            let conn = Connection::new();
+            let conn = Connection::default();
             self.connections.insert(src, conn);
         }
         let conn = self.connections.get_mut(&src).unwrap();
@@ -217,9 +217,17 @@ mod tests {
         client.send_reliably_to(true, destination, now).unwrap();
         let mut buffer = [0u8; 9];
         assert_eq![true, server.recv(&mut buffer).unwrap().1];
-        assert![client.get_connection_or_create(destination).send_window[0].is_some()];
+        assert![client
+            .get_connection_or_create(destination)
+            .send_window
+            .get(&0)
+            .is_some()];
         assert![client.recv(&mut buffer).is_err()];
-        assert![client.get_connection_or_create(destination).send_window[0].is_none()];
+        assert![client
+            .get_connection_or_create(destination)
+            .send_window
+            .get(&0)
+            .is_none()];
     }
 
     #[test]
@@ -235,9 +243,17 @@ mod tests {
             .unwrap();
         let mut buffer = [0u8; 27];
         assert_eq!["Hello World", server.recv(&mut buffer).unwrap().1];
-        assert![client.get_connection_or_create(destination).send_window[0].is_some()];
+        assert![client
+            .get_connection_or_create(destination)
+            .send_window
+            .get(&0)
+            .is_some()];
         assert![client.recv(&mut buffer).is_err()];
-        assert![client.get_connection_or_create(destination).send_window[0].is_none()];
+        assert![client
+            .get_connection_or_create(destination)
+            .send_window
+            .get(&0)
+            .is_none()];
     }
 
     #[test]
@@ -263,9 +279,17 @@ mod tests {
         assert_eq!["Hello World", server.recv(&mut buffer).unwrap().1];
         assert_eq!["Hello World", server.recv(&mut buffer).unwrap().1];
         assert_eq![true, server.recv(&mut buffer).is_err()];
-        assert![client.get_connection_or_create(destination).send_window[0].is_some()];
+        assert![client
+            .get_connection_or_create(destination)
+            .send_window
+            .get(&0)
+            .is_some()];
         assert![client.recv(&mut buffer).is_err()];
-        assert![client.get_connection_or_create(destination).send_window[0].is_none()];
+        assert![client
+            .get_connection_or_create(destination)
+            .send_window
+            .get(&0)
+            .is_none()];
     }
 
     #[test]

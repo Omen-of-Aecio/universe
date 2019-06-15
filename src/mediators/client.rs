@@ -637,7 +637,6 @@ pub fn tick_logic(s: &mut Main) {
         }
         _ => {}
     }
-    s.timers.network_timer.update(s.time, &mut s.network);
 
     fire_bullets(&mut s.logic, &mut s.graphics, &mut s.random);
 

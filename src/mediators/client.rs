@@ -357,7 +357,8 @@ fn draw_graphics(s: &mut Main) {
         // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));
         let trans = Matrix4::from_translation(Vector3::new(-center.x, -center.y, 0.0));
         // info![client.logger, "main", "Okay wth"; "trans" => InDebug(&trans); clone trans];
-        graphics.windowing.draw_frame(&(persp * scale * trans));
+        graphics.windowing.set_perspective(persp * scale * trans);
+        graphics.windowing.draw_frame();
     }
 }
 

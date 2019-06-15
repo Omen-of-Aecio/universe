@@ -23,8 +23,10 @@ fn parse_arguments(s: &mut Main) {
     if let Some(address) = matches.value_of("connect") {
         let address: SocketAddr = address.parse().expect("Not a valid ip:port argument");
         eprintln!("\nSent message to {:?}\n", address);
+        use laminar::Packet;
         s.network
-            .send_reliably_to(0x0EADBEEF, address, std::time::Instant::now())
+            .send
+            .send(Packet::reliable_unordered(address, vec![65, 66, 67, 68]))
             .expect("Unable to send message");
     }
 }

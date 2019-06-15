@@ -1,17 +1,17 @@
 use fast_logger::Logger;
 use geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
 use input;
-use ketimer::WeakTimer;
+use laminar::{Packet, Socket, SocketEvent};
 use rand_pcg::Pcg64Mcg;
 use rodio;
 use std::net::TcpStream;
+use std::net::{Ipv4Addr, SocketAddrV4};
 use std::{
     collections::HashMap,
     sync::{atomic::AtomicBool, mpsc, Arc},
-    time::{Duration, Instant},
+    time::Instant,
     vec::Vec,
 };
-use udp_ack::Socket;
 use vxdraw;
 
 pub mod config;
@@ -29,11 +29,10 @@ pub struct Main {
     pub graphics: Option<Graphics>,
     pub logger: Logger<Log>,
     pub logic: Logic,
-    pub network: Socket<i32>,
+    pub network: Socket2,
     pub random: Pcg64Mcg,
     pub threads: Threads,
     pub time: Instant,
-    pub timers: Timers,
 }
 
 pub struct Graphics {
@@ -52,24 +51,10 @@ impl Default for Main {
             graphics: None,
             logger: Logger::spawn_void(),
             logic: Logic::default(),
-            network: Socket::default(),
+            network: random_port_socket(),
             random: Pcg64Mcg::new(0),
             threads: Threads::default(),
             time: Instant::now(),
-            timers: Timers::default(),
-        }
-    }
-}
-
-pub struct Timers {
-    pub network_timer: WeakTimer<Socket<i32>, Result<bool, Error>>,
-}
-
-impl<'a> Default for Timers {
-    fn default() -> Self {
-        let now = Instant::now();
-        Self {
-            network_timer: WeakTimer::new(Socket::update, Duration::new(1, 0), now),
         }
     }
 }
@@ -187,4 +172,29 @@ impl Default for CameraMode {
 #[derive(Copy, Clone)]
 pub struct Vertex {
     pub pos: [f32; 2],
+}
+
+use crossbeam_channel::{Receiver, Sender};
+// Not sure where to put this. Helper for laminar::Socket
+fn random_port_socket() -> Socket2 {
+    let loopback = Ipv4Addr::new(127, 0, 0, 1);
+    let socket = SocketAddrV4::new(loopback, 0);
+    Socket::bind(socket)
+        .map(|s| {
+            let port = s.0.get_port();
+            Socket2 {
+                socket: s.0,
+                send: s.1,
+                recv: s.2,
+                port,
+            }
+        })
+        .unwrap() // TODO laminar error not compatible with failure?
+}
+/// Temporary wrapper around Socket, until we can get all these from laminar::Socket hopefully
+pub struct Socket2 {
+    pub socket: Socket,
+    pub send: Sender<Packet>,
+    pub recv: Receiver<SocketEvent>,
+    pub port: u16,
 }

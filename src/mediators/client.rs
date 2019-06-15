@@ -379,7 +379,7 @@ pub fn entry_point_client(s: &mut Main) {
     initialize_grid(&mut s.logic.grid);
     create_black_square_around_player(&mut s.logic.grid);
 
-    let port = s.network.get_port();
+    let port = s.network.port;
     info![s.logger, "main", "Listening on port"; "port" => port];
 
     loop {
@@ -629,9 +629,13 @@ pub fn tick_logic(s: &mut Main) {
         _ => {}
     }
 
-    let mut buffer = [0u8; 100];
-    if let Ok((_sender, msg)) = s.network.recv(&mut buffer) {
-        info![s.logger, "main", "Got a message from the network"; "content" => msg];
+    s.network.socket.manual_poll(Instant::now());
+
+    match s.network.recv.try_recv() {
+        Ok(event) => {
+            info![s.logger, "main", "Got a message from the network"; "content" => format!("{:?}", event)];
+        }
+        _ => {}
     }
     s.timers.network_timer.update(s.time, &mut s.network);
 

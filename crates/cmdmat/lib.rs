@@ -121,7 +121,7 @@
 //! This library also allows partial lookups and iterating over the direct descendants in order
 //! to make autocomplete easy to implement for terminal interfaces.
 //! ```
-//! use cmdmat::{Decider, Decision, Mapping, Spec, SVec};
+//! use cmdmat::{Decider, Decision, Mapping, MappingEntry, Spec, SVec};
 //!
 //! #[derive(Debug)]
 //! enum Accept {
@@ -168,10 +168,10 @@
 //!     // In this case the decider succeeded during the partial lookup, so the next step in the
 //!     // tree is the "something" node.
 //!     let mapping = mapping.partial_lookup(&["my-command-name", "123"]).unwrap().left().unwrap();
-//!     let (name, decider, has_handler) = mapping.get_direct_keys().next().unwrap();
-//!     assert_eq!["something", name];
+//!     let MappingEntry { literal, decider, finalizer } = mapping.get_direct_keys().next().unwrap();
+//!     assert_eq!["something", literal];
 //!     assert![decider.is_none()];
-//!     assert![has_handler.is_some()];
+//!     assert![finalizer.is_some()];
 //! }
 //! ```
 #![feature(test)]
@@ -236,6 +236,13 @@ pub enum LookError<D> {
     DeciderDenied(String, D),
     FinalizerDoesNotExist,
     UnknownMapping(String),
+}
+
+/// An entry in the mapping table
+pub struct MappingEntry<'a, A, D, C> {
+    pub literal: &'a str,
+    pub decider: Option<&'a Decider<A, D>>,
+    pub finalizer: Option<Finalizer<A, C>>,
 }
 
 // ---
@@ -352,10 +359,12 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
     }
 
     /// Iterator over the current `Mapping` keys: containing subcommands
-    pub fn get_direct_keys(
-        &self,
-    ) -> impl Iterator<Item = (&str, Option<&'a Decider<A, D>>, Option<Finalizer<A, C>>)> {
-        self.map.iter().map(|(k, v)| (*k, v.decider, v.finalizer))
+    pub fn get_direct_keys(&self) -> impl Iterator<Item = MappingEntry<'_, A, D, C>> {
+        self.map.iter().map(|(k, v)| MappingEntry {
+            literal: *k,
+            decider: v.decider,
+            finalizer: v.finalizer,
+        })
     }
 
     pub fn partial_lookup<'b>(
@@ -708,22 +717,22 @@ mod tests {
             .left()
             .unwrap();
         let key = part.get_direct_keys().next().unwrap();
-        assert_eq!["dolor", key.0];
-        assert![key.1.is_none()];
-        assert![key.2.is_some()];
+        assert_eq!["dolor", key.literal];
+        assert![key.decider.is_none()];
+        assert![key.finalizer.is_some()];
 
         let part = mapping.partial_lookup(&["lorem"]).unwrap().left().unwrap();
         let key = part.get_direct_keys().next().unwrap();
-        assert_eq!["ipsum", key.0];
-        assert![key.1.is_none()];
-        assert![key.2.is_some()];
+        assert_eq!["ipsum", key.literal];
+        assert![key.decider.is_none()];
+        assert![key.finalizer.is_some()];
 
         let part = mapping.partial_lookup(&["mirana"]).unwrap().left().unwrap();
         let key = part.get_direct_keys().next().unwrap();
-        assert_eq!["ipsum", key.0];
-        assert![key.1.is_some()];
-        assert_eq!["Do nothing", key.1.unwrap().description];
-        assert![key.2.is_some()];
+        assert_eq!["ipsum", key.literal];
+        assert![key.decider.is_some()];
+        assert_eq!["Do nothing", key.decider.unwrap().description];
+        assert![key.finalizer.is_some()];
 
         let part = mapping
             .partial_lookup(&["consume", "123"])
@@ -731,9 +740,9 @@ mod tests {
             .left()
             .unwrap();
         let key = part.get_direct_keys().next().unwrap();
-        assert_eq!["dummy", key.0];
-        assert![key.1.is_none()];
-        assert![key.2.is_some()];
+        assert_eq!["dummy", key.literal];
+        assert![key.decider.is_none()];
+        assert![key.finalizer.is_some()];
 
         let part = mapping
             .partial_lookup(&["consume"])

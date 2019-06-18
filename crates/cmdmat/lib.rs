@@ -262,7 +262,7 @@ impl<'a, A, D, C> Default for Mapping<'a, A, D, C> {
 }
 
 impl<'a, A, D, C> Mapping<'a, A, D, C> {
-    /// Register many command specs at once, see `register` for more detail
+    /// Register many command specs at once, see [Mapping::register] for more detail
     pub fn register_many<'b>(&mut self, spec: &[Spec<'b, 'a, A, D, C>]) -> Result<(), RegError> {
         for subspec in spec {
             self.register(subspec.clone())?;
@@ -328,8 +328,8 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
             let mut advance_output = 0;
             if let Some(ref decider) = handler.decider {
                 match (decider.decider)(&input[1..], output) {
-                    Decision::Accept(res) => {
-                        advance_output = res;
+                    Decision::Accept(byte_count) => {
+                        advance_output = byte_count;
                     }
                     Decision::Deny(res) => {
                         return Err(LookError::DeciderDenied(decider.description.into(), res));

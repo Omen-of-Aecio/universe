@@ -779,4 +779,16 @@ mod tests {
             parse(black_box(line), &mut data).unwrap();
         });
     }
+
+    #[bench]
+    fn iterate_very_long(b: &mut Bencher) {
+        let line = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris tristique massa magna, eget consectetur dui posuere congue. Etiam rhoncus porttitor enim, eget malesuada ante dapibus eget. Duis neque dui, tincidunt ut varius";
+        b.iter(|| {
+            let mut count = 0;
+            for _ in black_box(line).chars() {
+                count += 1;
+            }
+            assert_eq![223, count];
+        });
+    }
 }

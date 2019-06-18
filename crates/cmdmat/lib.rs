@@ -169,9 +169,9 @@
 //!     // tree is the "something" node.
 //!     let mapping = mapping.partial_lookup(&["my-command-name", "123"]).unwrap().left().unwrap();
 //!     let (name, decider, has_handler) = mapping.get_direct_keys().next().unwrap();
-//!     assert_eq!["something", *name];
-//!     assert_eq![None, decider];
-//!     assert_eq![true, has_handler];
+//!     assert_eq!["something", name];
+//!     assert![decider.is_none()];
+//!     assert![has_handler.is_some()];
 //! }
 //! ```
 #![feature(test)]
@@ -352,10 +352,10 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
     }
 
     /// Iterator over the current `Mapping` keys: containing subcommands
-    pub fn get_direct_keys(&self) -> impl Iterator<Item = (&&str, Option<&'static str>, bool)> {
-        self.map
-            .iter()
-            .map(|(k, v)| (k, v.decider.map(|d| d.description), v.finalizer.is_some()))
+    pub fn get_direct_keys(
+        &self,
+    ) -> impl Iterator<Item = (&str, Option<&'a Decider<A, D>>, Option<Finalizer<A, C>>)> {
+        self.map.iter().map(|(k, v)| (*k, v.decider, v.finalizer))
     }
 
     pub fn partial_lookup<'b>(
@@ -708,15 +708,22 @@ mod tests {
             .left()
             .unwrap();
         let key = part.get_direct_keys().next().unwrap();
-        assert_eq![(&"dolor", None, true), key];
+        assert_eq!["dolor", key.0];
+        assert![key.1.is_none()];
+        assert![key.2.is_some()];
 
         let part = mapping.partial_lookup(&["lorem"]).unwrap().left().unwrap();
         let key = part.get_direct_keys().next().unwrap();
-        assert_eq![(&"ipsum", None, true), key];
+        assert_eq!["ipsum", key.0];
+        assert![key.1.is_none()];
+        assert![key.2.is_some()];
 
         let part = mapping.partial_lookup(&["mirana"]).unwrap().left().unwrap();
         let key = part.get_direct_keys().next().unwrap();
-        assert_eq![(&"ipsum", Some("Do nothing"), true), key];
+        assert_eq!["ipsum", key.0];
+        assert![key.1.is_some()];
+        assert_eq!["Do nothing", key.1.unwrap().description];
+        assert![key.2.is_some()];
 
         let part = mapping
             .partial_lookup(&["consume", "123"])
@@ -724,7 +731,9 @@ mod tests {
             .left()
             .unwrap();
         let key = part.get_direct_keys().next().unwrap();
-        assert_eq![(&"dummy", None, true), key];
+        assert_eq!["dummy", key.0];
+        assert![key.1.is_none()];
+        assert![key.2.is_some()];
 
         let part = mapping
             .partial_lookup(&["consume"])

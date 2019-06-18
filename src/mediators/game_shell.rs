@@ -399,15 +399,19 @@ impl<'a> Evaluate<EvalRes> for Gsh<'a> {
                         let mut col = mapping
                             .get_direct_keys()
                             .map(|k| {
-                                let mut s = String::new() + *k.0;
+                                let mut s = String::new() + k.0;
                                 if k.1.is_some() {
                                     s += " ";
                                 }
-                                s += if k.1.is_some() { k.1.unwrap() } else { "" };
-                                if k.2 {
+                                s += if k.1.is_some() {
+                                    k.1.unwrap().description
+                                } else {
+                                    ""
+                                };
+                                if k.2.is_some() {
                                     s += " ";
                                 }
-                                s += if k.2 { "(final)" } else { "" };
+                                s += if k.2.is_some() { "(final)" } else { "" };
                                 s
                             })
                             .collect::<Vec<_>>();

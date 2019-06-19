@@ -1,17 +1,15 @@
-use self::{command_handlers::*, types::*};
+use self::command_handlers::*;
+use crate::glocals::GshChannelSend;
 use crate::glocals::{GshSpawn, Log, Main};
-use cmdmat::{self, LookError, SVec};
-use either::Either;
+use cmdmat::Spec;
 use fast_logger::{self, Logger};
 use gameshell::{
-    decision::Decision, predicates::*, types::Type, Evaluator, Feedback, GameShell, IncConsumer,
+    decision::Decision, predicates::*, types::Type, Evaluator, GameShell, IncConsumer,
 };
-use metac::{Data, Evaluate, ParseError, PartialParse, PartialParseOp};
 use std::collections::HashMap;
-use std::io::{self, Read, Write};
+use std::io;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::net::{TcpListener, TcpStream};
-use std::str::from_utf8;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     mpsc, Arc,
@@ -19,12 +17,11 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 
 mod command_handlers;
-mod types;
 
 // ---
 
 #[rustfmt::skip]
-const SPEC: &[cmdmat::Spec<Type, Decision, GameShellContext>] = &[
+const SPEC: &[Spec<Type, Decision, GameShellContext>] = &[
     (&[("%", MANY_I32)], modulo),
     (&[("&", MANY_I32)], band),
     (&[("*", MANY_I32)], mul),
@@ -48,6 +45,14 @@ const SPEC: &[cmdmat::Spec<Type, Decision, GameShellContext>] = &[
 ];
 
 // ---
+
+#[derive(Clone)]
+pub struct GameShellContext {
+    pub config_change: Option<GshChannelSend>,
+    pub logger: Logger<Log>,
+    pub keep_running: Arc<AtomicBool>,
+    pub variables: HashMap<String, String>,
+}
 
 pub fn make_new_gameshell() -> Evaluator<'static, GameShellContext> {
     let gsh_spawn = spawn_with_any_port(Logger::spawn_void());
@@ -188,8 +193,9 @@ fn game_shell_thread(mut s: GameShellContext, listener: TcpListener) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gameshell::Evaluator;
-    use std::io;
+    use gameshell::Feedback;
+    use metac::Evaluate;
+    use std::io::{self, Read, Write};
     use test::{black_box, Bencher};
 
     // ---

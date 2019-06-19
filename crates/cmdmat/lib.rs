@@ -168,7 +168,7 @@
 //!     // In this case the decider succeeded during the partial lookup, so the next step in the
 //!     // tree is the "something" node.
 //!     let mapping = mapping.partial_lookup(&["my-command-name", "123"]).unwrap().left().unwrap();
-//!     let MappingEntry { literal, decider, finalizer } = mapping.get_direct_keys().next().unwrap();
+//!     let MappingEntry { literal, decider, finalizer, submap } = mapping.get_direct_keys().next().unwrap();
 //!     assert_eq!["something", literal];
 //!     assert![decider.is_none()];
 //!     assert![finalizer.is_some()];

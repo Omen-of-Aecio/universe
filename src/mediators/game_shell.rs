@@ -1,8 +1,11 @@
-use self::{command_handlers::*, incconsumer::*, predicates::*, types::*};
-use crate::glocals::{GameShell, GameShellContext, Log, Main};
+use self::{command_handlers::*, types::*};
+use crate::glocals::{GshSpawn, Log, Main};
 use cmdmat::{self, LookError, SVec};
 use either::Either;
 use fast_logger::{self, Logger};
+use gameshell::{
+    decision::Decision, predicates::*, types::Type, Evaluator, Feedback, GameShell, IncConsumer,
+};
 use metac::{Data, Evaluate, ParseError, PartialParse, PartialParseOp};
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
@@ -16,14 +19,12 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 
 mod command_handlers;
-mod incconsumer;
-mod predicates;
 mod types;
 
 // ---
 
 #[rustfmt::skip]
-const SPEC: &[cmdmat::Spec<Input, GshDecision, GameShellContext>] = &[
+const SPEC: &[cmdmat::Spec<Type, Decision, GameShellContext>] = &[
     (&[("%", MANY_I32)], modulo),
     (&[("&", MANY_I32)], band),
     (&[("*", MANY_I32)], mul),
@@ -48,22 +49,17 @@ const SPEC: &[cmdmat::Spec<Input, GshDecision, GameShellContext>] = &[
 
 // ---
 
-pub fn make_new_gameshell(logger: Logger<Log>) -> Gsh<'static> {
-    let keep_running = Arc::new(AtomicBool::new(true));
-    let mut cmdmat = cmdmat::Mapping::default();
-    cmdmat.register_many(SPEC).unwrap();
-    GameShell {
-        gshctx: GameShellContext {
-            config_change: None,
-            logger,
-            keep_running,
-            variables: HashMap::new(),
-        },
-        commands: Arc::new(cmdmat),
-    }
+pub fn make_new_gameshell() -> Evaluator<'static, GameShellContext> {
+    let gsh_spawn = spawn_with_any_port(Logger::spawn_void());
+    let mut gsh = Evaluator::new(GameShellContext {
+        config_change: Some(gsh_spawn.channel_send),
+        logger: Logger::spawn_void(),
+        keep_running: gsh_spawn.keep_running.clone(),
+        variables: HashMap::new(),
+    });
+    gsh.register_many(SPEC).unwrap();
+    gsh
 }
-
-// ---
 
 fn spawn_with_listener(logger: Logger<Log>, listener: TcpListener, port: u16) -> GshSpawn {
     let keep_running = Arc::new(AtomicBool::new(true));
@@ -74,17 +70,12 @@ fn spawn_with_listener(logger: Logger<Log>, listener: TcpListener, port: u16) ->
         thread_handle: thread::Builder::new()
             .name("gsh/server".to_string())
             .spawn(move || {
-                let mut cmdmat = cmdmat::Mapping::default();
-                cmdmat.register_many(SPEC).unwrap();
                 game_shell_thread(
-                    GameShell {
-                        gshctx: GameShellContext {
-                            config_change: Some(tx_clone),
-                            logger,
-                            keep_running,
-                            variables: HashMap::new(),
-                        },
-                        commands: Arc::new(cmdmat),
+                    GameShellContext {
+                        config_change: Some(tx_clone),
+                        logger,
+                        keep_running,
+                        variables: HashMap::new(),
                     },
                     listener,
                 )
@@ -129,34 +120,19 @@ fn bind_to_any_tcp_port() -> (TcpListener, u16) {
 
 // ---
 
-fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<()> {
-    let logger = s.gshctx.logger.clone();
-    let keep_running = s.gshctx.keep_running.clone();
-    let channel = s.gshctx.config_change.clone();
+fn clone_and_spawn_connection_handler(s: &GameShellContext, stream: TcpStream) -> JoinHandle<()> {
+    let ctx = s.clone();
     thread::Builder::new()
         .name("gsh/server/handler".to_string())
         .spawn(move || {
-            let mut cmdmat = cmdmat::Mapping::default();
-            cmdmat.register_many(SPEC).unwrap();
-            let mut shell_clone = GameShell {
-                gshctx: GameShellContext {
-                    config_change: channel,
-                    logger,
-                    keep_running,
-                    variables: HashMap::new(),
-                },
-                commands: Arc::new(cmdmat),
-            };
-            let result = connection_loop(&mut shell_clone, stream);
+            let mut logger = ctx.logger.clone();
+            let result = connection_loop(ctx, stream);
             match result {
                 Ok(()) => {
-                    shell_clone
-                        .gshctx
-                        .logger
-                        .debug("gsh", "Connection ended ok");
+                    logger.debug("gsh", "Connection ended ok");
                 }
                 Err(error) => {
-                    shell_clone.gshctx.logger.debug(
+                    logger.debug(
                         "gsh",
                         Log::StaticDynamic(
                             "Connection errored out",
@@ -172,122 +148,20 @@ fn clone_and_spawn_connection_handler(s: &Gsh, stream: TcpStream) -> JoinHandle<
 
 // ---
 
-impl<'a, 'b> IncConsumer for GshTcp<'a, 'b> {
-    fn consume(&mut self, output: &mut [u8]) -> Consumption {
-        match self.stream.read(output) {
-            Ok(0) => Consumption::Stop,
-            Ok(count) => Consumption::Consumed(count),
-            Err(_) => Consumption::Stop,
-        }
-    }
-    fn validate(&mut self, input: u8) -> Validation {
-        match self.parser.parse_increment(input) {
-            PartialParseOp::Ready => Validation::Ready,
-            PartialParseOp::Unready => Validation::Unready,
-            PartialParseOp::Discard => Validation::Discard,
-        }
-    }
-    fn process(&mut self, input: &[u8]) -> Process {
-        let string = from_utf8(input);
-        if let Ok(string) = string {
-            self.gsh.gshctx.logger.debug(
-                "gsh",
-                Log::StaticDynamic(
-                    "Converted farend message to UTF-8, calling interpret",
-                    "content",
-                    string.into(),
-                ),
-            );
-            let result = self.gsh.interpret_single(string);
-            if let Ok(result) = result {
-                self.gsh.gshctx.logger.debug(
-                    "gsh",
-                    "Message parsing succeeded and evaluated, sending response to client",
-                );
-                match result {
-                    EvalRes::Ok(res) => {
-                        if !res.is_empty() {
-                            if self.stream.write_all(res.as_bytes()).is_err() {
-                                return Process::Stop;
-                            }
-                        } else if self.stream.write_all(b"Ok").is_err() {
-                            return Process::Stop;
-                        }
-                    }
-                    EvalRes::Err(res) => {
-                        if self
-                            .stream
-                            .write_all(format!["Err: {}", res].as_bytes())
-                            .is_err()
-                        {
-                            return Process::Stop;
-                        }
-                    }
-                    EvalRes::Help(res) => {
-                        if !res.is_empty() {
-                            if self.stream.write_all(res.as_bytes()).is_err() {
-                                return Process::Stop;
-                            }
-                        } else {
-                            self.gsh
-                                .gshctx
-                                .logger
-                                .warn("gsh", "Sending empty help message");
-                            if self.stream.write_all(b"Empty help message").is_err() {
-                                return Process::Stop;
-                            }
-                        }
-                    }
-                }
-                if self.stream.flush().is_err() {
-                    return Process::Stop;
-                }
-            } else {
-                self.gsh
-                    .gshctx
-                    .logger
-                    .error("gsh", "Message parsing failed");
-                if self
-                    .stream
-                    .write_all(b"Unable to complete query (parse error)")
-                    .is_err()
-                {
-                    return Process::Stop;
-                }
-                if self.stream.flush().is_err() {
-                    return Process::Stop;
-                }
-            }
-            Process::Continue
-        } else {
-            self.gsh.gshctx.logger.warn(
-                "gsh",
-                "Malformed UTF-8 received, this should never happen. Ending connection",
-            );
-            Process::Stop
-        }
-    }
-}
-
-// ---
-
-fn connection_loop(s: &mut Gsh, stream: TcpStream) -> io::Result<()> {
-    s.gshctx.logger.debug("gsh", "Acquired new stream");
-    let mut gshtcp = GshTcp {
-        gsh: s,
-        stream,
-        parser: PartialParse::default(),
-    };
-    gshtcp.run(2048);
+fn connection_loop(mut s: GameShellContext, stream: TcpStream) -> io::Result<()> {
+    s.logger.debug("gsh", "Acquired new stream");
+    let mut gsh = GameShell::new(s, stream.try_clone().unwrap(), stream);
+    gsh.register_many(SPEC).unwrap();
+    gsh.run(2048);
     Ok(())
 }
 
-fn game_shell_thread(mut s: Gsh, listener: TcpListener) {
-    s.gshctx.logger.info("gsh", "Started GameShell server");
+fn game_shell_thread(mut s: GameShellContext, listener: TcpListener) {
+    s.logger.info("gsh", "Started GameShell server");
     'outer_loop: loop {
         for stream in listener.incoming() {
-            if !s.gshctx.keep_running.load(Ordering::Acquire) {
-                s.gshctx.logger.info("gsh", "Stopped GameShell server");
+            if !s.keep_running.load(Ordering::Acquire) {
+                s.logger.info("gsh", "Stopped GameShell server");
                 break 'outer_loop;
             }
             match stream {
@@ -295,7 +169,7 @@ fn game_shell_thread(mut s: Gsh, listener: TcpListener) {
                     clone_and_spawn_connection_handler(&s, stream);
                 }
                 Err(error) => {
-                    s.gshctx.logger.error(
+                    s.logger.error(
                         "gsh",
                         Log::StaticDynamic(
                             "Got a stream but there was an error",
@@ -311,146 +185,10 @@ fn game_shell_thread(mut s: Gsh, listener: TcpListener) {
 
 // ---
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum EvalRes {
-    Err(String),
-    Help(String),
-    Ok(String),
-}
-
-impl Default for EvalRes {
-    fn default() -> Self {
-        EvalRes::Ok(String::default())
-    }
-}
-
-fn lookerr_to_evalres(err: LookError<GshDecision>, allow_help: bool) -> EvalRes {
-    match err {
-        LookError::DeciderAdvancedTooFar => EvalRes::Err("Decider advanced too far".into()),
-        LookError::DeciderDenied(desc, GshDecision::Err(decider)) => {
-            EvalRes::Err(format!["Expected {} but got: {}", desc, decider])
-        }
-        LookError::DeciderDenied(desc, GshDecision::Help(help)) => {
-            if allow_help {
-                EvalRes::Help(help)
-            } else {
-                EvalRes::Err(format!["Expected {} but got denied: {}", desc, help])
-            }
-        }
-        LookError::FinalizerDoesNotExist => EvalRes::Err("Finalizer does not exist".into()),
-        LookError::UnknownMapping(token) => {
-            EvalRes::Err(format!["Unrecognized mapping: {}", token])
-        }
-    }
-}
-
-// ---
-
-impl<'a> Gsh<'a> {
-    fn parse_subcommands(&mut self, cmds: &[Data]) -> Result<Vec<String>, EvalRes> {
-        let mut content: Vec<String> = Vec::new();
-        for cmd in cmds {
-            match cmd {
-                Data::Atom(string) => {
-                    content.push((*string).into());
-                }
-                Data::Command(string) => {
-                    if let Some('#') = string.chars().next() {
-                        content.push((string[1..]).into());
-                    } else {
-                        let res = self.interpret_single(string);
-                        match res {
-                            Ok(EvalRes::Ok(string)) => {
-                                content.push(string);
-                            }
-                            Ok(ref res @ EvalRes::Help(_)) => {
-                                return Err(res.clone());
-                            }
-                            Ok(ref res @ EvalRes::Err(_)) => {
-                                return Err(res.clone());
-                            }
-                            Err(ParseError::DanglingLeftParenthesis) => {
-                                return Err(EvalRes::Err("Dangling left parenthesis".into()));
-                            }
-                            Err(ParseError::PrematureRightParenthesis) => {
-                                return Err(EvalRes::Err("Right parenthesis encountered with no matching left parenthesis".into()));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Ok(content)
-    }
-}
-
-impl<'a> Evaluate<EvalRes> for Gsh<'a> {
-    fn evaluate(&mut self, commands: &[Data]) -> EvalRes {
-        let content = match self.parse_subcommands(commands) {
-            Ok(content) => content,
-            Err(err) => return err,
-        };
-        let content_ref = content.iter().map(|s| &s[..]).collect::<Vec<_>>();
-
-        if let Some(front) = content_ref.first() {
-            if *front == "autocomplete" {
-                match self.commands.partial_lookup(&content_ref[1..]) {
-                    Ok(Either::Left(mapping)) => {
-                        let mut col = mapping
-                            .get_direct_keys()
-                            .map(|k| {
-                                let mut s = String::new() + k.literal;
-                                if k.decider.is_some() {
-                                    s += " ";
-                                }
-                                s += if k.decider.is_some() {
-                                    k.decider.unwrap().description
-                                } else {
-                                    ""
-                                };
-                                if k.finalizer.is_some() {
-                                    s += " ";
-                                }
-                                s += if k.finalizer.is_some() { "(final)" } else { "" };
-                                s
-                            })
-                            .collect::<Vec<_>>();
-                        if col.is_empty() {
-                            return EvalRes::Ok("No more handlers".into());
-                        } else {
-                            col.sort();
-                            return EvalRes::Ok(col.join(", "));
-                        }
-                    }
-                    Ok(Either::Right(name)) => {
-                        return EvalRes::Ok(name.into());
-                    }
-                    Err(err) => {
-                        return lookerr_to_evalres(err, true);
-                    }
-                }
-            }
-        }
-
-        let res = self.commands.lookup(&content_ref[..]);
-        match res {
-            Ok(fin) => {
-                let res = fin.0(&mut self.gshctx, &fin.1);
-                match res {
-                    Ok(res) => EvalRes::Ok(res),
-                    Err(res) => EvalRes::Err(res),
-                }
-            }
-            Err(err) => lookerr_to_evalres(err, false),
-        }
-    }
-}
-
-// ---
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gameshell::Evaluator;
     use std::io;
     use test::{black_box, Bencher};
 
@@ -478,366 +216,241 @@ mod tests {
     }
 
     #[test]
-    fn fuzzing_result_does_not_crash() -> io::Result<()> {
-        // given
-        let mut logger = fast_logger::Logger::spawn_void();
-        logger.set_log_level(0);
-        let keep_running = Arc::new(AtomicBool::new(true));
-        let mut cmdmat = cmdmat::Mapping::default();
-        cmdmat.register_many(SPEC).unwrap();
-        let mut gsh = GameShell {
-            gshctx: GameShellContext {
-                config_change: None,
-                logger,
-                keep_running,
-                variables: HashMap::new(),
-            },
-            commands: Arc::new(cmdmat),
-        };
+    fn fuzzing_result_does_not_crash() {
+        let mut gsh = make_new_gameshell();
         let input = "y\u{000b}1111-31492546713013106(\u{00cc}\u{00a7}121B)1\u{00f0}\u{0094}\u{00a0}\u{0080}02291\0";
         assert_eq![
-            EvalRes::Err("Unrecognized mapping: Ì§121B".into()),
+            Feedback::Err("Unrecognized mapping: Ì§121B".into()),
             gsh.interpret_single(input).unwrap()
         ];
-
-        // cleanup
-        Ok(())
     }
 
     #[test]
-    fn check_variable_statements() -> io::Result<()> {
-        // given
-        let mut logger = fast_logger::Logger::spawn_void();
-        logger.set_log_level(0);
-        let keep_running = Arc::new(AtomicBool::new(true));
-        let mut cmdmat = cmdmat::Mapping::default();
-        cmdmat.register_many(SPEC).unwrap();
-        let mut gsh = GameShell {
-            gshctx: GameShellContext {
-                config_change: None,
-                logger,
-                keep_running,
-                variables: HashMap::new(),
-            },
-            commands: Arc::new(cmdmat),
-        };
+    fn check_variable_statements() {
+        let mut gsh = make_new_gameshell();
 
         assert_eq![
-            EvalRes::Ok("Ok".into()),
+            Feedback::Ok("Ok".into()),
             gsh.interpret_single("set key some-value").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("some-value".into()),
+            Feedback::Ok("some-value".into()),
             gsh.interpret_single("get key").unwrap()
         ];
 
         assert_eq![
-            EvalRes::Err("Unrecognized mapping: extra".into()),
+            Feedback::Err("Unrecognized mapping: extra".into()),
             gsh.interpret_single("set key some-value extra").unwrap()
         ];
 
         assert_eq![
-            EvalRes::Ok("Ok".into()),
+            Feedback::Ok("Ok".into()),
             gsh.interpret_single("set a 123").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("130".into()),
+            Feedback::Ok("130".into()),
             gsh.interpret_single("+ 7 (get a)").unwrap()
         ];
-
-        // cleanup
-        Ok(())
     }
 
     #[test]
-    fn check_idempotent_statements_work() -> io::Result<()> {
-        // given
-        let mut logger = fast_logger::Logger::spawn_void();
-        logger.set_log_level(0);
-        let keep_running = Arc::new(AtomicBool::new(true));
-        let mut cmdmat = cmdmat::Mapping::default();
-        cmdmat.register_many(SPEC).unwrap();
-        let mut gsh = GameShell {
-            gshctx: GameShellContext {
-                config_change: None,
-                logger,
-                keep_running,
-                variables: HashMap::new(),
-            },
-            commands: Arc::new(cmdmat),
-        };
+    fn check_idempotent_statements_work() {
+        let mut gsh = make_new_gameshell();
 
         assert_eq![
-            EvalRes::Err("Unrecognized mapping: hello".into()),
+            Feedback::Err("Unrecognized mapping: hello".into()),
             gsh.interpret_single("hello world").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("some thing\n new ".into()),
+            Feedback::Ok("some thing\n new ".into()),
             gsh.interpret_single("str (#some thing\n new )").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("6".into()),
+            Feedback::Ok("6".into()),
             gsh.interpret_single("+ 1 2 3").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("21".into()),
+            Feedback::Ok("21".into()),
             gsh.interpret_single("+ 1 (+ 8 9) 3").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("21".into()),
+            Feedback::Ok("21".into()),
             gsh.interpret_single("+ 1 (+ 8 (+) 9) 3").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("22".into()),
+            Feedback::Ok("22".into()),
             gsh.interpret_single("+ 1 (+ 8 (+ 1) 9) 3").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("".into()),
+            Feedback::Ok("".into()),
             gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 9) 3\nvoid").unwrap()
         ];
         assert_eq![
-            EvalRes::Err("Unrecognized mapping: 0.6".into()),
+            Feedback::Err("Unrecognized mapping: 0.6".into()),
             gsh.interpret_multiple("+ 1 (+ 8 (+ 1) 0.6 9) (+ 3\n1\n)")
                 .unwrap()
         ];
         assert_eq![
-            EvalRes::Err("Unrecognized mapping: undefined".into()),
+            Feedback::Err("Unrecognized mapping: undefined".into()),
             gsh.interpret_single("+ (undefined)").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("1".into()),
+            Feedback::Ok("1".into()),
             gsh.interpret_single("+ (+ 1)").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("2".into()),
+            Feedback::Ok("2".into()),
             gsh.interpret_single("+ (+ 1 0 0 0 0 0 0 0 0 1)").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("-3".into()),
+            Feedback::Ok("-3".into()),
             gsh.interpret_single("- 3").unwrap()
         ];
-        assert_eq![EvalRes::Ok("0".into()), gsh.interpret_single("-").unwrap()];
+        assert_eq![Feedback::Ok("0".into()), gsh.interpret_single("-").unwrap()];
         assert_eq![
-            EvalRes::Ok("3".into()),
+            Feedback::Ok("3".into()),
             gsh.interpret_single("- 3 0").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("6".into()),
+            Feedback::Ok("6".into()),
             gsh.interpret_single("* 3 2").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("1".into()),
+            Feedback::Ok("1".into()),
             gsh.interpret_single("/ 3 2").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("1".into()),
+            Feedback::Ok("1".into()),
             gsh.interpret_single("% 7 2").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("3".into()),
+            Feedback::Ok("3".into()),
             gsh.interpret_single("^ 1 2").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("0".into()),
+            Feedback::Ok("0".into()),
             gsh.interpret_single("& 1 2").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("6".into()),
+            Feedback::Ok("6".into()),
             gsh.interpret_single("| 4 2").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("<atom>".into()),
+            Feedback::Ok("<atom>".into()),
             gsh.interpret_single("autocomplete log context").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("<u8>".into()),
+            Feedback::Ok("<u8>".into()),
             gsh.interpret_single("autocomplete log context gsh level ")
                 .unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("context <atom>, global, trace <string> (final)".into()),
+            Feedback::Ok("context <atom>, global, trace <string> (final)".into()),
             gsh.interpret_single("autocomplete log").unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("<string> <string>".into()),
+            Feedback::Ok("<string> <string>".into()),
             gsh.interpret_single("autocomplete set").unwrap()
         ];
 
         assert_eq![
-            EvalRes::Err("Finalizer does not exist".into()),
+            Feedback::Err("Finalizer does not exist".into()),
             gsh.interpret_single("log").unwrap()
         ];
         assert_eq![
-            EvalRes::Err("Expected <u8> but got: -1".into()),
+            Feedback::Err("Expected <u8> but got: -1".into()),
             gsh.interpret_single("log context gsh level -1").unwrap()
         ];
         assert_eq![
-            EvalRes::Err("Expected <u8> but got: -1".into()),
+            Feedback::Err("Expected <u8> but got: -1".into()),
             gsh.interpret_single("log context gsh level (+ 1 2 -4)")
                 .unwrap()
         ];
         assert_eq![
-            EvalRes::Err("Unrecognized mapping: xyz".into()),
+            Feedback::Err("Unrecognized mapping: xyz".into()),
             gsh.interpret_single("log context gsh level (+ xyz)")
                 .unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("alphabetagammayotta6Hello World".into()),
+            Feedback::Ok("alphabetagammayotta6Hello World".into()),
             gsh.interpret_single("cat alpha beta (cat gamma yotta) (+ 1 2 3) (#Hello World)")
                 .unwrap()
         ];
         assert_eq![
-            EvalRes::Ok("".into()),
+            Feedback::Ok("".into()),
             gsh.interpret_single("void alpha beta (cat gamma yotta) (+ 1 2 3) (#Hello World)")
                 .unwrap()
         ];
-
-        // cleanup
-        Ok(())
     }
 
     #[test]
-    fn check_integer_overflow() -> io::Result<()> {
-        // given
-        let mut logger = fast_logger::Logger::spawn_void();
-        logger.set_log_level(0);
-        let keep_running = Arc::new(AtomicBool::new(true));
-        let mut cmdmat = cmdmat::Mapping::default();
-        cmdmat.register_many(SPEC).unwrap();
-        let mut gsh = GameShell {
-            gshctx: GameShellContext {
-                config_change: None,
-                logger,
-                keep_running,
-                variables: HashMap::new(),
-            },
-            commands: Arc::new(cmdmat),
-        };
+    fn check_integer_overflow() {
+        let mut gsh = make_new_gameshell();
 
         assert_eq![
-            EvalRes::Err("Addition overflow".into()),
+            Feedback::Err("Addition overflow".into()),
             gsh.interpret_single("+ 2147483647 1").unwrap()
         ];
 
         assert_eq![
-            EvalRes::Err("Addition overflow".into()),
+            Feedback::Err("Addition overflow".into()),
             gsh.interpret_single("+ -2147483648 -1").unwrap()
         ];
 
         assert_eq![
-            EvalRes::Err("Subtraction overflow".into()),
+            Feedback::Err("Subtraction overflow".into()),
             gsh.interpret_single("- -2147483648").unwrap()
         ];
 
         assert_eq![
-            EvalRes::Err("Subtraction overflow".into()),
+            Feedback::Err("Subtraction overflow".into()),
             gsh.interpret_single("- -2147483647 2").unwrap()
         ];
 
         assert_eq![
-            EvalRes::Err("Multiplication overflow".into()),
+            Feedback::Err("Multiplication overflow".into()),
             gsh.interpret_single("* 2147483647 2").unwrap()
         ];
 
         assert_eq![
-            EvalRes::Err("Division by zero".into()),
+            Feedback::Err("Division by zero".into()),
             gsh.interpret_single("/ 1 0").unwrap()
         ];
 
         assert_eq![
-            EvalRes::Err("Division overflow".into()),
+            Feedback::Err("Division overflow".into()),
             gsh.interpret_single("/ -2147483648 -1").unwrap()
         ];
 
         assert_eq![
-            EvalRes::Err("Modulo by zero".into()),
+            Feedback::Err("Modulo by zero".into()),
             gsh.interpret_single("% 1 0").unwrap()
         ];
 
         assert_eq![
-            EvalRes::Err("Modulo overflow".into()),
+            Feedback::Err("Modulo overflow".into()),
             gsh.interpret_single("% -2147483648 -1").unwrap()
         ];
-
-        // cleanup
-        Ok(())
     }
 
-    // ---
+    // // ---
 
     #[bench]
-    fn speed_of_interpreting_a_raw_command(b: &mut Bencher) -> io::Result<()> {
-        // given
-        let mut logger = fast_logger::Logger::spawn_void();
-        logger.set_log_level(0);
-        let keep_running = Arc::new(AtomicBool::new(true));
-        let mut cmdmat = cmdmat::Mapping::default();
-        cmdmat.register_many(SPEC).unwrap();
-        let mut gsh = GameShell {
-            gshctx: GameShellContext {
-                config_change: None,
-                logger,
-                keep_running,
-                variables: HashMap::new(),
-            },
-            commands: Arc::new(cmdmat),
-        };
-
-        // then
+    fn speed_of_interpreting_a_raw_command(b: &mut Bencher) {
+        let mut gsh = make_new_gameshell();
         b.iter(|| black_box(gsh.interpret_single(black_box("void"))));
-
-        // cleanup
-        Ok(())
     }
 
     #[bench]
-    fn speed_of_interpreting_a_nested_command_with_parameters(b: &mut Bencher) -> io::Result<()> {
-        // given
-        let mut logger = fast_logger::Logger::spawn_void();
-        logger.set_log_level(0);
-        let keep_running = Arc::new(AtomicBool::new(true));
-        let mut cmdmat = cmdmat::Mapping::default();
-        cmdmat.register_many(SPEC).unwrap();
-        let mut gsh = GameShell {
-            gshctx: GameShellContext {
-                config_change: None,
-                logger,
-                keep_running,
-                variables: HashMap::new(),
-            },
-            commands: Arc::new(cmdmat),
-        };
-
-        // then
+    fn speed_of_interpreting_a_nested_command_with_parameters(b: &mut Bencher) {
+        let mut gsh = make_new_gameshell();
         b.iter(|| black_box(gsh.interpret_single(black_box("void (void 123) abc"))));
-
-        // cleanup
-        Ok(())
     }
 
     #[bench]
-    fn speed_of_adding_a_bunch_of_numbers(b: &mut Bencher) -> io::Result<()> {
-        // given
-        let mut logger = fast_logger::Logger::spawn_void();
-        logger.set_log_level(0);
-        let keep_running = Arc::new(AtomicBool::new(true));
-        let mut cmdmat = cmdmat::Mapping::default();
-        cmdmat.register_many(SPEC).unwrap();
-        let mut gsh = GameShell {
-            gshctx: GameShellContext {
-                config_change: None,
-                logger,
-                keep_running,
-                variables: HashMap::new(),
-            },
-            commands: Arc::new(cmdmat),
-        };
-
-        // then
+    fn speed_of_adding_a_bunch_of_numbers(b: &mut Bencher) {
+        let mut gsh = make_new_gameshell();
         b.iter(|| black_box(gsh.interpret_single(black_box("+ 1 2 3 (- 4 5 6) (* 9 9)"))));
-
-        // cleanup
-        Ok(())
     }
 
     #[bench]

@@ -48,6 +48,7 @@ crossbeam-channel = "0.3.8" # needed becauses of laminar
 # Local libraries
 benchmarker = { path = "crates/benchmarker" }
 cmdmat =      { path = "crates/cmdmat" }
+gameshell =   { path = "crates/gameshell" }
 config =      { path = "crates/config" }
 geometry =    { path = "crates/geometry" }
 input =       { path = "crates/input" }

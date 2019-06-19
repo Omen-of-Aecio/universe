@@ -6,6 +6,7 @@ use rand_pcg::Pcg64Mcg;
 use rodio;
 use std::net::TcpStream;
 use std::net::{Ipv4Addr, SocketAddrV4};
+use std::thread::{self, JoinHandle};
 use std::{
     collections::HashMap,
     sync::{atomic::AtomicBool, mpsc, Arc},
@@ -62,6 +63,14 @@ impl Default for Main {
 pub type GshChannelRecv = mpsc::Receiver<Box<dyn Fn(&mut Main) + Send>>;
 pub type GshChannelSend = mpsc::SyncSender<Box<dyn Fn(&mut Main) + Send>>;
 
+pub struct GshSpawn {
+    pub thread_handle: JoinHandle<()>,
+    pub keep_running: Arc<AtomicBool>,
+    pub channel: mpsc::Receiver<Box<dyn Fn(&mut Main) + Send>>,
+    pub port: u16,
+    pub channel_send: mpsc::SyncSender<Box<dyn Fn(&mut Main) + Send>>,
+}
+
 #[derive(Default)]
 pub struct Threads {
     pub game_shell: Option<std::thread::JoinHandle<()>>,
@@ -73,20 +82,6 @@ pub struct Threads {
 }
 
 // ---
-
-#[derive(Clone)]
-pub struct GameShell<T: Send + Sync> {
-    pub gshctx: GameShellContext,
-    pub commands: T,
-}
-
-#[derive(Clone)]
-pub struct GameShellContext {
-    pub config_change: Option<GshChannelSend>,
-    pub logger: Logger<Log>,
-    pub keep_running: Arc<AtomicBool>,
-    pub variables: HashMap<String, String>,
-}
 
 pub struct Client {}
 

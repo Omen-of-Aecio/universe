@@ -39,7 +39,7 @@ pub fn collect_input(client: &mut Logic, windowing: &mut VxDraw) {
                     client.input.register_mouse_input(state, button);
                 }
                 WindowEvent::CursorMoved { position, .. } => {
-                    let pos: (i32, i32) = position.to_physical(1.6666).into();
+                    let pos: (i32, i32) = position.into();
                     client.input.position_mouse(pos.0, pos.1);
                 }
                 _ => {}
@@ -79,7 +79,7 @@ fn move_camera_according_to_input(s: &mut Logic) {
 
     if s.cam_mode == CameraMode::FollowPlayer {
         if let Some(player) = s.players.get_mut(0) {
-            s.cam.center -= (s.cam.center - player.position) / 10.0;
+            s.cam.center -= (s.cam.center - player.position - Vec2 { x: 5.0, y: 5.0 }) / 10.0;
         }
     }
 }

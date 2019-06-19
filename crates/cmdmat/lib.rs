@@ -243,6 +243,7 @@ pub struct MappingEntry<'a, A, D, C> {
     pub literal: &'a str,
     pub decider: Option<&'a Decider<A, D>>,
     pub finalizer: Option<Finalizer<A, C>>,
+    pub submap: &'a HashMap<&'a str, Mapping<'a, A, D, C>>,
 }
 
 // ---
@@ -364,6 +365,7 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
             literal: *k,
             decider: v.decider,
             finalizer: v.finalizer,
+            submap: &v.map,
         })
     }
 
@@ -409,6 +411,18 @@ impl<'a, A, D, C> Mapping<'a, A, D, C> {
             }
         }
         Err(LookError::UnknownMapping(input[0].to_string()))
+    }
+
+    pub fn decider(&self) -> &Option<&'a Decider<A, D>> {
+        &self.decider
+    }
+
+    pub fn finalizer(&self) -> &Option<Finalizer<A, C>> {
+        &self.finalizer
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&&'a str, &Mapping<'a, A, D, C>)> {
+        self.map.iter()
     }
 }
 

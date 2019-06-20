@@ -54,6 +54,17 @@ pub struct GameShellContext {
     pub variables: HashMap<String, String>,
 }
 
+impl Default for GameShellContext {
+    fn default() -> Self {
+        Self {
+            config_change: None,
+            logger: Logger::spawn_void(),
+            keep_running: Arc::new(AtomicBool::new(true)),
+            variables: HashMap::new(),
+        }
+    }
+}
+
 pub fn make_new_gameshell() -> Evaluator<'static, GameShellContext> {
     let gsh_spawn = spawn_with_any_port(Logger::spawn_void());
     let mut gsh = Evaluator::new(GameShellContext {

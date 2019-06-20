@@ -235,61 +235,40 @@ pub fn cat(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String
 }
 
 pub fn do_get(gsh: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
-    let key;
-    match commands[0] {
-        Type::String(ref string) => {
-            key = string.clone();
+    if let [Type::String(key)] = commands {
+        if let Some(string) = gsh.variables.get(key) {
+            Ok(string.clone())
+        } else {
+            Err(format!["Variable not exist: {}", key])
         }
-        _ => {
-            return Err("F".into());
-        }
-    }
-    if let Some(string) = gsh.variables.get(&key) {
-        Ok(string.clone())
     } else {
-        Err(format!["Variable not exist: {}", key])
+        Err("Expected string".into())
     }
 }
 
 pub fn do_set(gsh: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
-    let (key, value);
-    match commands[0] {
-        Type::String(ref string) => {
-            key = string.clone();
-        }
-        _ => {
-            return Err("F".into());
-        }
+    if let [Type::String(key), Type::String(value)] = commands {
+        gsh.variables.insert(key.clone(), value.clone());
+        Ok("Ok".into())
+    } else {
+        Err("Expected String String".into())
     }
-    match commands[1] {
-        Type::String(ref string) => {
-            value = string.clone();
-        }
-        _ => {
-            return Err("F".into());
-        }
-    }
-    gsh.variables.insert(key, value);
-    Ok("Ok".into())
 }
 
 pub fn create_string(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
-    if commands.len() != 1 {
+    if let [Type::String(command)] = commands {
+        Ok(command.clone())
+    } else {
         return Err("Did not get command".into());
-    }
-    match commands[0] {
-        Type::String(ref cmd) => Ok(cmd.clone()),
-        _ => Err("Error: Not a command".into()),
     }
 }
 
 pub fn log(s: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
-    match commands[0] {
-        Type::U8(level) => {
-            s.logger.set_log_level(level);
-            Ok("Ok: Changed log level".into())
-        }
-        _ => Err("Usage: log level <u8>".into()),
+    if let [Type::U8(level)] = commands {
+        s.logger.set_log_level(*level);
+        Ok("Ok: Changed log level".into())
+    } else {
+        Err("Usage: log level <u8>".into())
     }
 }
 
@@ -346,18 +325,16 @@ pub fn get_fps(s: &mut GameShellContext, _: &[Type]) -> Result<String, String> {
 
 pub fn set_fps(s: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
     if let Some(ref mut chan) = s.config_change {
-        if let Type::F32(value) = commands[0] {
-            if value < 0.0 {
-                return Err("Fps value is negative".into());
-            }
+        if let [Type::F32(fps)] = commands {
+            let fps = *fps;
             match chan.send(Box::new(move |main: &mut Main| {
-                main.logic.config.client.fps = value;
+                main.logic.config.client.fps = fps;
             })) {
                 Ok(()) => Ok("Changed fps".into()),
                 _ => Err("Unable to send message to main".into()),
             }
         } else {
-            Err("Did not get f32".into())
+            return Err("Fps value is negative".into());
         }
     } else {
         Err("Unable to contact main".into())
@@ -382,25 +359,48 @@ pub fn enable_gravity(s: &mut GameShellContext, commands: &[Type]) -> Result<Str
 }
 
 pub fn log_context(s: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
-    let ctx;
-    match commands[0] {
-        Type::Atom(ref context) => {
-            ctx = match &context[..] {
-                "cli" => "cli",
-                "trace" => "trace",
-                "gsh" => "gsh",
-                "benchmark" => "benchmark",
-                "logger" => "logger",
-                _ => return Err("Invalid logging context".into()),
-            };
-        }
-        _ => return Err("Usage: log context <atom> level <u8>".into()),
+    if let [Type::Atom(context), Type::U8(level)] = commands {
+        let ctx = match &context[..] {
+            "cli" => "cli",
+            "trace" => "trace",
+            "gsh" => "gsh",
+            "benchmark" => "benchmark",
+            "logger" => "logger",
+            _ => return Err("Invalid logging context".into()),
+        };
+        s.logger.set_context_specific_log_level(ctx, *level);
+        Ok("Ok: Changed log level".into())
+    } else {
+        Err("Usage: log context <atom> level <u8>".into())
     }
-    match commands[1] {
-        Type::U8(level) => {
-            s.logger.set_context_specific_log_level(ctx, level);
-            Ok("Ok: Changed log level".into())
-        }
-        _ => Err("Usage: log context <atom> level <u8>".into()),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gameshell::types::*;
+
+    #[quickcheck_macros::quickcheck]
+    fn log_context_quickcheck(commands: Vec<Type>) {
+        let _ = log_context(&mut GameShellContext::default(), &commands[..]);
+        let _ = set_fps(&mut GameShellContext::default(), &commands[..]);
+
+        let _ = add(&mut GameShellContext::default(), &commands[..]);
+        let _ = sub(&mut GameShellContext::default(), &commands[..]);
+        let _ = mul(&mut GameShellContext::default(), &commands[..]);
+        let _ = div(&mut GameShellContext::default(), &commands[..]);
+        let _ = modulo(&mut GameShellContext::default(), &commands[..]);
+        let _ = xor(&mut GameShellContext::default(), &commands[..]);
+        let _ = band(&mut GameShellContext::default(), &commands[..]);
+        let _ = bor(&mut GameShellContext::default(), &commands[..]);
+
+        let _ = cat(&mut GameShellContext::default(), &commands[..]);
+        let _ = do_get(&mut GameShellContext::default(), &commands[..]);
+        let _ = do_set(&mut GameShellContext::default(), &commands[..]);
+        let _ = create_string(&mut GameShellContext::default(), &commands[..]);
+        let _ = log(&mut GameShellContext::default(), &commands[..]);
+        let _ = log_trace(&mut GameShellContext::default(), &commands[..]);
+        let _ = set_gravity(&mut GameShellContext::default(), &commands[..]);
+        let _ = enable_gravity(&mut GameShellContext::default(), &commands[..]);
     }
 }

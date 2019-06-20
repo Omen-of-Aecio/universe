@@ -590,21 +590,7 @@ fn apply_physics_to_players(s: &mut Logic, logger: &mut Logger<Log>) {
     }
 }
 
-pub fn tick_logic(s: &mut Main) {
-    toggle_camera_mode(&mut s.logic);
-
-    apply_physics_to_players(&mut s.logic, &mut s.logger);
-    move_camera_according_to_input(&mut s.logic);
-    update_bullets_uv(&mut s.logic);
-    std::thread::sleep(std::time::Duration::new(0, 8_000_000));
-
-    set_gravity(&mut s.logic);
-    update_bullets_position(&mut s.logic, s.graphics.as_mut().map(|x| &mut x.windowing));
-
-    if let Some(Ok(msg)) = s.threads.game_shell_channel.as_mut().map(|x| x.try_recv()) {
-        (msg)(s);
-    }
-
+fn handle_mouse_scroll(s: &mut Main) {
     let wheel = s.logic.input.get_mouse_wheel();
     match wheel {
         x if x == 0.0 => {}
@@ -629,7 +615,25 @@ pub fn tick_logic(s: &mut Main) {
         _ => {}
     }
 
-    s.network.socket.manual_poll(Instant::now());
+}
+
+pub fn tick_logic(s: &mut Main) {
+    toggle_camera_mode(&mut s.logic);
+
+    apply_physics_to_players(&mut s.logic, &mut s.logger);
+    move_camera_according_to_input(&mut s.logic);
+    update_bullets_uv(&mut s.logic);
+    std::thread::sleep(std::time::Duration::new(0, 8_000_000));
+
+    set_gravity(&mut s.logic);
+    update_bullets_position(&mut s.logic, s.graphics.as_mut().map(|x| &mut x.windowing));
+
+    if let Some(Ok(msg)) = s.threads.game_shell_channel.as_mut().map(|x| x.try_recv()) {
+        (msg)(s);
+    }
+
+    handle_mouse_scroll(s);
+    s.network.socket.manual_poll(s.time);
 
     match s.network.recv.try_recv() {
         Ok(event) => {

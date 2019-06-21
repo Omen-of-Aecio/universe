@@ -614,7 +614,6 @@ fn handle_mouse_scroll(s: &mut Main) {
         }
         _ => {}
     }
-
 }
 
 pub fn tick_logic(s: &mut Main) {

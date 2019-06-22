@@ -351,7 +351,7 @@ fn update_graphics(s: &mut Main) {
 
 fn draw_graphics(s: &mut Main) {
     if let Some(ref mut graphics) = s.graphics {
-        let persp = vxdraw::utils::gen_perspective(&graphics.windowing);
+        let persp = graphics.windowing.perspective_projection();
         let scale = Matrix4::from_scale(s.logic.cam.zoom);
         let center = s.logic.cam.center;
         // let lookat = Matrix4::look_at(Point3::new(center.x, center.y, -1.0), Point3::new(center.x, center.y, 0.0), Vector3::new(0.0, 0.0, -1.0));

@@ -14,7 +14,7 @@ static FIREBALLS: &dyntex::ImgData =
 static WEAPONS: &dyntex::ImgData =
     &dyntex::ImgData::PNGBytes(include_bytes!["../../assets/images/weapons.png"]);
 
-fn initialize_grid(s: &mut Grid<u8>) {
+fn initialize_grid(s: &mut Grid<(u8, u8, u8, u8)>) {
     s.resize(1000, 1000);
 }
 
@@ -115,7 +115,7 @@ fn accelerate_player_according_to_input(s: &Input, conf: &Config, on_ground: boo
 
 /// Returns true if collision happened on y axis
 fn check_for_collision_and_move_player_according_to_movement_vector(
-    grid: &Grid<u8>,
+    grid: &Grid<(u8, u8, u8, u8)>,
     player: &mut PlayerData,
     movement: Vec2,
     _logger: &mut Logger<Log>,
@@ -143,7 +143,7 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
     };
     for i in 1..=10 {
         collision_y = collision_test(&[tl, tr, br, bl], Some(0.5), ymove / i as f32, grid, |x| {
-            *x > 0
+            x.1 > 0
         });
         if collision_y.is_none() {
             player.position += ymove / i as f32;
@@ -174,7 +174,7 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
     };
     for i in 1..=10 {
         collision_x = collision_test(&[tl, tr, br, bl], Some(0.5), xmove / i as f32, grid, |x| {
-            *x > 0
+            x.1 > 0
         });
         if collision_x.is_none() {
             player.position += xmove / i as f32;
@@ -196,9 +196,9 @@ fn set_gravity(s: &mut Logic) {
     }
 }
 
-fn create_black_square_around_player(s: &mut Grid<u8>) {
+fn create_black_square_around_player(s: &mut Grid<(u8, u8, u8, u8)>) {
     for (i, j) in Boxit::with_center((100, 100), (500, 300)) {
-        s.set(i, j, 0);
+        s.set(i, j, (0, 0, 0, 0));
     }
 }
 
@@ -236,12 +236,20 @@ pub fn maybe_initialize_graphics(s: &mut Main) {
     );
     s.logic.grid.resize(1000, 1000);
 
-    strtex.fill_with_perlin_noise(&tex, [1.0, 2.0, 4.0]);
+    strtex.fill_with_perlin_noise(
+        &tex,
+        [1.0, 2.0, 4.0],
+        &[
+            Color::Rgba(255, 255, 0, 255),
+            Color::Rgba(255, 1, 255, 255),
+            Color::Rgba(255, 0, 0, 255),
+        ],
+    );
     let grid = &mut s.logic.grid;
     strtex.read(&tex, |x, pitch| {
         for j in 0..1000 {
             for i in 0..1000 {
-                grid.set(i, j, x[i + j * pitch].0);
+                grid.set(i, j, x[i + j * pitch]);
             }
         }
     });
@@ -527,7 +535,7 @@ fn update_bullets_uv(s: &mut Logic) {
 fn update_bullets_position(s: &mut Logic, mut windowing: Option<&mut VxDraw>) {
     let mut bullets_to_remove = vec![];
     for (idx, b) in s.bullets.iter_mut().enumerate() {
-        let collision = collision_test(&[b.position], None, b.direction, &s.grid, |x| *x == 255);
+        let collision = collision_test(&[b.position], None, b.direction, &s.grid, |x| x.1 > 0);
         if let Some((xi, yi)) = collision {
             bullets_to_remove.push(idx);
             let area = b.destruction;
@@ -535,7 +543,7 @@ fn update_bullets_position(s: &mut Logic, mut windowing: Option<&mut VxDraw>) {
                 for j in -area..=area {
                     let pos = (xi as i32 + i, yi as i32 + j);
                     let pos = (pos.0 as usize, pos.1 as usize);
-                    s.grid.set(pos.0, pos.1, 0);
+                    s.grid.set(pos.0, pos.1, (0, 0, 0, 0));
                     s.changed_tiles.push((pos.0, pos.1));
                 }
             }

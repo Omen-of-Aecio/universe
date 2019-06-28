@@ -172,8 +172,10 @@ pub trait Evaluate<T: Default> {
         let mut lparen_stack = 0;
         let mut result = T::default();
         let mut idx = 0;
+        let mut seen_non_ws = false;
         for ch in code.chars() {
-            if ch == '\n' && lparen_stack == 0 {
+            if ch == '\n' && lparen_stack == 0 && seen_non_ws {
+                seen_non_ws = false;
                 result = self.interpret_single(&code[old_idx..idx])?;
                 old_idx = idx + 1;
             } else if ch == '(' {
@@ -183,10 +185,12 @@ pub trait Evaluate<T: Default> {
                     return Err(ParseError::PrematureRightParenthesis);
                 }
                 lparen_stack -= 1;
+            } else if !ch.is_whitespace() {
+                seen_non_ws = true;
             }
             idx += ch.len_utf8();
         }
-        if idx != old_idx {
+        if idx != old_idx && seen_non_ws {
             result = self.interpret_single(&code[old_idx..idx])?;
         }
         Ok(result)
@@ -458,6 +462,28 @@ mod tests {
         eval.interpret_single(line).unwrap();
         assert_eq![1, eval.invoked];
         eval.interpret_multiple(line).unwrap();
+        assert_eq![1, eval.invoked];
+    }
+
+    #[test]
+    fn interpret_whitespace() {
+        struct Eval {
+            pub invoked: usize,
+        }
+        impl Evaluate<()> for Eval {
+            fn evaluate<'a>(&mut self, data: &[Data<'a>]) {
+                assert_eq![0, data.len()];
+                self.invoked += 1;
+            }
+        }
+        let mut eval = Eval { invoked: 0 };
+
+        let line = " ";
+        eval.interpret_single(line).unwrap();
+        assert_eq![1, eval.invoked];
+        eval.interpret_multiple(line).unwrap();
+        assert_eq![1, eval.invoked];
+        eval.interpret_multiple(" \n").unwrap();
         assert_eq![1, eval.invoked];
     }
 

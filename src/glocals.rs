@@ -30,7 +30,7 @@ pub struct Main {
     pub graphics: Option<Graphics>,
     pub logger: Logger<Log>,
     pub logic: Logic,
-    pub network: Socket2,
+    pub network: Socket,
     pub random: Pcg64Mcg,
     pub threads: Threads,
     pub time: Instant,
@@ -169,27 +169,9 @@ pub struct Vertex {
     pub pos: [f32; 2],
 }
 
-use crossbeam_channel::{Receiver, Sender};
 // Not sure where to put this. Helper for laminar::Socket
-fn random_port_socket() -> Socket2 {
+fn random_port_socket() -> Socket {
     let loopback = Ipv4Addr::new(127, 0, 0, 1);
     let socket = SocketAddrV4::new(loopback, 0);
-    Socket::bind(socket)
-        .map(|s| {
-            let port = s.0.get_port();
-            Socket2 {
-                socket: s.0,
-                send: s.1,
-                recv: s.2,
-                port,
-            }
-        })
-        .unwrap() // TODO laminar error not compatible with failure?
-}
-/// Temporary wrapper around Socket, until we can get all these from laminar::Socket hopefully
-pub struct Socket2 {
-    pub socket: Socket,
-    pub send: Sender<Packet>,
-    pub recv: Receiver<SocketEvent>,
-    pub port: u16,
+    Socket::bind(socket).unwrap() // TODO laminar error not compatible with failure?
 }

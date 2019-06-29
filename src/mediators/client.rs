@@ -387,7 +387,7 @@ pub fn entry_point_client(s: &mut Main) {
     initialize_grid(&mut s.logic.grid);
     create_black_square_around_player(&mut s.logic.grid);
 
-    let port = s.network.port;
+    let port = s.network.local_addr().unwrap().port();
     info![s.logger, "main", "Listening on port"; "port" => port];
 
     loop {
@@ -640,10 +640,10 @@ pub fn tick_logic(s: &mut Main) {
     }
 
     handle_mouse_scroll(s);
-    s.network.socket.manual_poll(s.time);
+    s.network.manual_poll(s.time);
 
-    match s.network.recv.try_recv() {
-        Ok(event) => {
+    match s.network.recv() {
+        Some(event) => {
             info![s.logger, "main", "Got a message from the network"; "content" => format!("{:?}", event)];
         }
         _ => {}

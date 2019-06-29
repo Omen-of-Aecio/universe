@@ -25,7 +25,6 @@ fn parse_arguments(s: &mut Main) {
         eprintln!("\nSent message to {:?}\n", address);
         use laminar::Packet;
         s.network
-            .send
             .send(Packet::reliable_unordered(address, vec![65, 66, 67, 68]))
             .expect("Unable to send message");
     }

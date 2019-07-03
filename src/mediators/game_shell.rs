@@ -1,6 +1,5 @@
 use self::command_handlers::*;
-use crate::glocals::GshChannelSend;
-use crate::glocals::{GshSpawn, Log, Main};
+use crate::glocals::*;
 use cmdmat::Spec;
 use fast_logger::{self, Logger};
 use gameshell::{

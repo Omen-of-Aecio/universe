@@ -11,7 +11,7 @@ path = "src/lib.rs"
 
 [dependencies]
 arrayvec = "0.4"
-bincode = "1.0.1"
+bincode = "1.1.4"
 byteorder = "1.2.7"
 cgmath = "0.17"
 chrono = "0.4.6"
@@ -42,7 +42,9 @@ time = "0.1.40"
 toml = "0.4.9"
 winit = "0.19.0"
 laminar = { git = "https://github.com/amethyst/laminar.git" }
-crossbeam-channel = "0.3.8" # needed becauses of laminar
+crossbeam-channel = "0.3.8" # For laminar
+enum_derive = "0.1.7"
+bimap = "0.3.1"
 
 # Local libraries
 benchmarker = { path = "crates/benchmarker" }

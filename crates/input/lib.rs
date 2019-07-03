@@ -9,6 +9,7 @@ pub struct Input {
     key_toggled: Keys,
 
     left_mouse_button: bool,
+    left_mouse_toggled: bool,
     mouse: (i32, i32),
     mouse_in_previous_frame: (i32, i32),
     mouse_wheel: f32,
@@ -27,6 +28,7 @@ impl Input {
         for i in 0..NUM_KEYS {
             self.key_toggled.0[i] = false;
         }
+        self.left_mouse_toggled = false;
         self.mouse_wheel = 0.0;
         self.mouse_in_previous_frame.0 = self.mouse.0;
         self.mouse_in_previous_frame.1 = self.mouse.1;
@@ -67,11 +69,15 @@ impl Input {
     }
 
     pub fn register_mouse_input(&mut self, state: ElementState, button: MouseButton) {
+        let old = self.left_mouse_button;
         if let MouseButton::Left = button {
             self.left_mouse_button = match state {
                 ElementState::Pressed => true,
                 ElementState::Released => false,
             };
+        }
+        if old != self.left_mouse_button {
+            self.left_mouse_toggled = true;
         }
     }
 
@@ -88,6 +94,9 @@ impl Input {
     pub fn is_key_toggled_down(&self, keycode: VirtualKeyCode) -> bool {
         self.is_key_down(keycode) && self.is_key_toggled(keycode)
     }
+    pub fn is_key_toggled_up(&self, keycode: VirtualKeyCode) -> bool {
+        !self.is_key_down(keycode) && self.is_key_toggled(keycode)
+    }
 
     pub fn get_mouse_pos(&self) -> (f32, f32) {
         (self.mouse.0 as f32, self.mouse.1 as f32)
@@ -95,6 +104,9 @@ impl Input {
 
     pub fn is_left_mouse_button_down(&self) -> bool {
         self.left_mouse_button
+    }
+    pub fn is_left_mouse_button_toggled(&self) -> bool {
+        self.left_mouse_toggled
     }
 
     pub fn get_mouse_moved(&self) -> (f32, f32) {

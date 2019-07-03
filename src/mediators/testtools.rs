@@ -1,7 +1,12 @@
-use crate::glocals::*;
+use crate::{
+    game::{Client, Main},
+    glocals::*,
+};
 use std::net::TcpStream;
 
 pub fn spawn_gameshell(s: &mut Main) {
+    // TODO
+    /*
     let game_shell = crate::mediators::game_shell::spawn_with_any_port(s.logger.clone());
     s.threads.game_shell = Some(game_shell.thread_handle);
     s.threads.game_shell_keep_running = Some(game_shell.keep_running);
@@ -11,9 +16,10 @@ pub fn spawn_gameshell(s: &mut Main) {
     // std::thread::sleep(std::time::Duration::new(1, 0));
     s.threads.game_shell_connection =
         Some(TcpStream::connect("127.0.0.1:".to_string() + &game_shell.port.to_string()).unwrap());
+    */
 }
 
-pub fn gsh(s: &mut Main, input: &str) -> String {
+pub fn gsh(s: &mut Client, input: &str) -> String {
     use std::io::{Read, Write};
     use std::str::from_utf8;
     let conn = s.threads.game_shell_connection.as_mut().unwrap();
@@ -32,6 +38,8 @@ pub fn gsh(s: &mut Main, input: &str) -> String {
 /// Gsh runs in its own thread, meaning that for main to see some results, it needs to run a
 /// function on main to access gsh data from some channel.
 pub fn gsh_synchronous(s: &mut Main, input: &str, tween: fn(&mut Main)) -> String {
+    // TODO
+    /*
     use std::io::{Read, Write};
     use std::str::from_utf8;
     {
@@ -75,4 +83,6 @@ pub fn gsh_synchronous(s: &mut Main, input: &str, tween: fn(&mut Main)) -> Strin
         .unwrap();
 
     from_utf8(&buffer[..count]).unwrap().to_string()
+    */
+    "".into()
 }

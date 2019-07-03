@@ -1,4 +1,5 @@
 use super::*;
+use crate::game::Client;
 use gameshell::types::Type;
 
 use fast_logger::{debug, InDebug};
@@ -292,7 +293,7 @@ pub fn log_trace(s: &mut GameShellContext, commands: &[Type]) -> Result<String, 
 pub fn set_gravity(s: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
     if let Some(ref mut chan) = s.config_change {
         if let Type::F32(value) = commands[0] {
-            match chan.send(Box::new(move |main: &mut Main| {
+            match chan.send(Box::new(move |main: &mut Client| {
                 main.logic.config.world.gravity = value;
             })) {
                 Ok(()) => Ok("Set gravity value".into()),
@@ -309,7 +310,7 @@ pub fn set_gravity(s: &mut GameShellContext, commands: &[Type]) -> Result<String
 pub fn get_fps(s: &mut GameShellContext, _: &[Type]) -> Result<String, String> {
     if let Some(ref mut chan) = s.config_change {
         let (tx, rx) = mpsc::sync_channel(0);
-        let result = chan.send(Box::new(move |main: &mut Main| {
+        let result = chan.send(Box::new(move |main: &mut Client| {
             let send_status = tx.send(main.logic.config.client.fps);
             debug![main.logger, "main", "Message reply"; "status" => InDebug(&send_status)];
         }));
@@ -327,7 +328,7 @@ pub fn set_fps(s: &mut GameShellContext, commands: &[Type]) -> Result<String, St
     if let Some(ref mut chan) = s.config_change {
         if let [Type::F32(fps)] = commands {
             let fps = *fps;
-            match chan.send(Box::new(move |main: &mut Main| {
+            match chan.send(Box::new(move |main: &mut Client| {
                 main.logic.config.client.fps = fps;
             })) {
                 Ok(()) => Ok("Changed fps".into()),
@@ -344,7 +345,7 @@ pub fn set_fps(s: &mut GameShellContext, commands: &[Type]) -> Result<String, St
 pub fn enable_gravity(s: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
     if let Some(ref mut chan) = s.config_change {
         if let Type::Bool(value) = commands[0] {
-            match chan.send(Box::new(move |main: &mut Main| {
+            match chan.send(Box::new(move |main: &mut Client| {
                 main.logic.config.world.gravity_on = value;
             })) {
                 Ok(()) => Ok("Enabled/disabled gravity".into()),

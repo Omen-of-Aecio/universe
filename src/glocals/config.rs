@@ -1,5 +1,4 @@
 use config::config;
-use serde_derive::{Deserialize, Serialize};
 
 // enum Key { A, B, C};
 // impl ConfigValue for Key {
@@ -11,7 +10,7 @@ use serde_derive::{Deserialize, Serialize};
 // }
 
 config! {
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
 #[serde(default)]
 struct Config {
     world: World {

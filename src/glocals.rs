@@ -126,7 +126,7 @@ pub struct Logic {
     pub should_exit: bool,
     pub input: input::Input,
 
-    pub grid: Grid<(u8, u8, u8, u8)>,
+    pub grid: Grid<u8>,
     pub config: Config,
     pub players: Vec<PlayerData>,
 

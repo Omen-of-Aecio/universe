@@ -1,4 +1,4 @@
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct Grid<T> {
     grid_data: Vec<T>,
     height: usize,

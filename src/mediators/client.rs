@@ -321,22 +321,26 @@ fn update_graphics(s: &mut Main) {
         }
 
         {
-            let angle = -(Vec2::from(s.logic.input.get_mouse_pos())
-                - Vec2::from(graphics.windowing.get_window_size_in_pixels_float()) / 2.0)
-                .angle();
-            if let Some(Some(sprite)) = s.logic.players.get_mut(0).map(|x| &mut x.weapon_sprite) {
-                if angle > std::f32::consts::PI / 2.0 || angle < -std::f32::consts::PI / 2.0 {
-                    graphics
-                        .windowing
-                        .dyntex()
-                        .set_uv(sprite, (0.0, 1.0), (1.0, 0.0));
-                } else {
-                    graphics
-                        .windowing
-                        .dyntex()
-                        .set_uv(sprite, (0.0, 0.0), (1.0, 1.0));
+            if let Some(player) = s.logic.players.get_mut(0) {
+                let mouse_in_world = graphics
+                    .windowing
+                    .to_world_coords(s.logic.input.get_mouse_pos());
+                let angle = -(Vec2::from(mouse_in_world) - player.position).angle();
+
+                if let Some(ref mut sprite) = player.weapon_sprite {
+                    if angle > std::f32::consts::PI / 2.0 || angle < -std::f32::consts::PI / 2.0 {
+                        graphics
+                            .windowing
+                            .dyntex()
+                            .set_uv(sprite, (0.0, 1.0), (1.0, 0.0));
+                    } else {
+                        graphics
+                            .windowing
+                            .dyntex()
+                            .set_uv(sprite, (0.0, 0.0), (1.0, 1.0));
+                    }
+                    graphics.windowing.dyntex().set_rotation(sprite, Rad(angle));
                 }
-                graphics.windowing.dyntex().set_rotation(sprite, Rad(angle));
             }
         }
 

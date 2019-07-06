@@ -459,9 +459,14 @@ fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>, random: &mut ran
 
         for _ in 0..bullet_count {
             let direction = if let Some(ref mut graphics) = graphics {
-                (Vec2::from(s.input.get_mouse_pos())
-                    - Vec2::from(graphics.windowing.get_window_size_in_pixels_float()) / 2.0)
-                    .rotate(random.gen_range(-spread, spread))
+                if let Some(player) = s.players.get(0) {
+                    let mouse_in_world =
+                        graphics.windowing.to_world_coords(s.input.get_mouse_pos());
+                    let angle = (Vec2::from(mouse_in_world) - player.position);
+                    angle.rotate(random.gen_range(-spread, spread))
+                } else {
+                    Vec2 { x: 1.0, y: 0.0 }
+                }
             } else {
                 Vec2 { x: 1.0, y: 0.0 }
             };

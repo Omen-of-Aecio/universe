@@ -14,6 +14,8 @@ static FIREBALLS: &dyntex::ImgData =
 static WEAPONS: &dyntex::ImgData =
     &dyntex::ImgData::PNGBytes(include_bytes!["../../assets/images/weapons.png"]);
 
+static PLAYER_CENTER: Vec2 = Vec2 { x: 5.0, y: 5.0 };
+
 fn initialize_grid(s: &mut Grid<u8>) {
     s.resize(1000, 1000);
 }
@@ -325,7 +327,7 @@ fn update_graphics(s: &mut Main) {
                 let mouse_in_world = graphics
                     .windowing
                     .to_world_coords(s.logic.input.get_mouse_pos());
-                let angle = -(Vec2::from(mouse_in_world) - player.position).angle();
+                let angle = -(Vec2::from(mouse_in_world) - player.position - PLAYER_CENTER).angle();
 
                 if let Some(ref mut sprite) = player.weapon_sprite {
                     if angle > std::f32::consts::PI / 2.0 || angle < -std::f32::consts::PI / 2.0 {
@@ -398,10 +400,9 @@ pub fn entry_point_client(s: &mut Main) {
 fn upload_player_position(s: &mut Logic, windowing: &mut VxDraw, handle: &vxdraw::quads::Handle) {
     if let Some(ref mut player) = s.players.get(0) {
         if let Some(ref gun_handle) = player.weapon_sprite {
-            windowing.dyntex().set_translation(
-                gun_handle,
-                (player.position + Vec2 { x: 5.0, y: 5.0 }).into(),
-            );
+            windowing
+                .dyntex()
+                .set_translation(gun_handle, (player.position + PLAYER_CENTER).into());
         }
         windowing
             .quads()
@@ -462,7 +463,7 @@ fn fire_bullets(s: &mut Logic, graphics: &mut Option<Graphics>, random: &mut ran
                 if let Some(player) = s.players.get(0) {
                     let mouse_in_world =
                         graphics.windowing.to_world_coords(s.input.get_mouse_pos());
-                    let angle = (Vec2::from(mouse_in_world) - player.position);
+                    let angle = (Vec2::from(mouse_in_world) - player.position - PLAYER_CENTER);
                     angle.rotate(random.gen_range(-spread, spread))
                 } else {
                     Vec2 { x: 1.0, y: 0.0 }

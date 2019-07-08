@@ -7,7 +7,11 @@ use failure::Error;
 #[derive(Serialize, Deserialize)]
 pub enum ClientMessage {
     Join,
-    Input(Vec<InputCommand>),
+    /// `mouse_pos` is the position of mouse in world space
+    Input {
+        commands: Vec<InputCommand>,
+        mouse_pos: (f32, f32),
+    },
 }
 impl ClientMessage {
     pub fn serialize(&self) -> Vec<u8> {

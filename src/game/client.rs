@@ -12,6 +12,8 @@ use input::Input;
 use std::time::Instant;
 use winit::{VirtualKeyCode as Key, *};
 
+static PLAYER_CENTER: Vec2 = Vec2 { x: 5.0, y: 5.0 };
+
 pub struct Client {
     pub audio: Option<rodio::Sink>,
     pub graphics: Option<Graphics>,
@@ -233,86 +235,98 @@ impl Client {
         match self.server {
             Some(addr) => {
                 self.network
-                    .send(Packet::unreliable(
+                    .send(Packet::reliable_ordered(
                         addr,
-                        ClientMessage::Input(self.collect_input()).serialize(),
+                        self.collect_input().serialize(),
+                        None,
                     ))
                     .unwrap();
             }
             None => {}
         }
     }
-    fn collect_input(&self) -> Vec<InputCommand> {
-        let mut result = Vec::new();
+    fn collect_input(&self) -> ClientMessage {
+        let mut commands = Vec::new();
         if self.input.is_key_toggled_down(Key::Down) {
-            result.push(InputCommand {
+            commands.push(InputCommand {
                 is_pressed: true,
                 key: InputKey::Down,
             });
         } else if self.input.is_key_toggled_up(Key::Down) {
-            result.push(InputCommand {
+            commands.push(InputCommand {
                 is_pressed: false,
                 key: InputKey::Down,
             });
         }
         if self.input.is_key_toggled_down(Key::Up) {
-            result.push(InputCommand {
+            commands.push(InputCommand {
                 is_pressed: true,
                 key: InputKey::Up,
             });
         } else if self.input.is_key_toggled_up(Key::Up) {
-            result.push(InputCommand {
+            commands.push(InputCommand {
                 is_pressed: false,
                 key: InputKey::Up,
             });
         }
         if self.input.is_key_toggled_down(Key::Left) {
-            result.push(InputCommand {
+            commands.push(InputCommand {
                 is_pressed: true,
                 key: InputKey::Left,
             });
         } else if self.input.is_key_toggled_up(Key::Left) {
-            result.push(InputCommand {
+            commands.push(InputCommand {
                 is_pressed: false,
                 key: InputKey::Left,
             });
         }
         if self.input.is_key_toggled_down(Key::Right) {
-            result.push(InputCommand {
+            commands.push(InputCommand {
                 is_pressed: true,
                 key: InputKey::Right,
             });
         } else if self.input.is_key_toggled_up(Key::Right) {
-            result.push(InputCommand {
+            commands.push(InputCommand {
                 is_pressed: false,
                 key: InputKey::Right,
             });
         }
         if self.input.is_key_toggled_down(Key::LShift) {
-            result.push(InputCommand {
+            commands.push(InputCommand {
                 is_pressed: true,
                 key: InputKey::LShift,
             });
         } else if self.input.is_key_toggled_up(Key::LShift) {
-            result.push(InputCommand {
+            commands.push(InputCommand {
                 is_pressed: false,
                 key: InputKey::LShift,
             });
         }
         if self.input.is_left_mouse_button_toggled() {
             if self.input.is_left_mouse_button_down() {
-                result.push(InputCommand {
+                commands.push(InputCommand {
                     is_pressed: true,
                     key: InputKey::LeftMouse,
                 });
             } else {
-                result.push(InputCommand {
+                commands.push(InputCommand {
                     is_pressed: false,
                     key: InputKey::LeftMouse,
                 });
             }
         }
-        result
+
+        let mouse_pos = match self.graphics {
+            Some(ref graphics) => graphics
+                .windowing
+                .to_world_coords(self.input.get_mouse_pos()),
+            None => (0.0, 0.0),
+        };
+
+        ClientMessage::Input {
+            commands,
+            mouse_pos,
+        }
     }
 
     fn maybe_initialize_graphics(&mut self) {
@@ -505,22 +519,24 @@ fn update_graphics(s: &mut Client) {
         }
 
         {
-            let angle = -(Vec2::from(s.input.get_mouse_pos())
-                - Vec2::from(graphics.windowing.get_window_size_in_pixels_float()) / 2.0)
-                .angle();
-            if let Some(Some(sprite)) = s.logic.players.get_mut(0).map(|x| &mut x.weapon_sprite) {
-                if angle > std::f32::consts::PI / 2.0 || angle < -std::f32::consts::PI / 2.0 {
-                    graphics
-                        .windowing
-                        .dyntex()
-                        .set_uv(sprite, (0.0, 1.0), (1.0, 0.0));
-                } else {
-                    graphics
-                        .windowing
-                        .dyntex()
-                        .set_uv(sprite, (0.0, 0.0), (1.0, 1.0));
+            if let Some(player) = s.logic.players.get_mut(0) {
+                let mouse_in_world = graphics.windowing.to_world_coords(s.input.get_mouse_pos());
+                let angle = -(Vec2::from(mouse_in_world) - player.position - PLAYER_CENTER).angle();
+
+                if let Some(ref mut sprite) = player.weapon_sprite {
+                    if angle > std::f32::consts::PI / 2.0 || angle < -std::f32::consts::PI / 2.0 {
+                        graphics
+                            .windowing
+                            .dyntex()
+                            .set_uv(sprite, (0.0, 1.0), (1.0, 0.0));
+                    } else {
+                        graphics
+                            .windowing
+                            .dyntex()
+                            .set_uv(sprite, (0.0, 0.0), (1.0, 1.0));
+                    }
+                    graphics.windowing.dyntex().set_rotation(sprite, Rad(angle));
                 }
-                graphics.windowing.dyntex().set_rotation(sprite, Rad(angle));
             }
         }
 
@@ -551,10 +567,9 @@ fn upload_player_position(
 ) {
     if let Some(ref mut player) = s.players.get(0) {
         if let Some(ref gun_handle) = player.weapon_sprite {
-            windowing.dyntex().set_translation(
-                gun_handle,
-                (player.position + Vec2 { x: 5.0, y: 5.0 }).into(),
-            );
+            windowing
+                .dyntex()
+                .set_translation(gun_handle, (player.position + PLAYER_CENTER).into());
         }
         windowing
             .quads()

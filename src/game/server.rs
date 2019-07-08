@@ -1,11 +1,10 @@
 use crate::game::*;
 use crate::mediators::does_line_collide_with_grid::*;
 use bimap::BiMap;
-use fast_logger::Logger;
+use fast_logger::{InDebug, Logger};
 use geometry::{grid2d::Grid, vec::Vec2};
 use laminar::{Packet, SocketEvent};
 use rand_pcg::Pcg64Mcg;
-use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::time::Instant;
 
@@ -67,7 +66,10 @@ impl Server {
                                         ];
                                     });
                             }
-                            ClientMessage::Input(commands) => {
+                            ClientMessage::Input {
+                                commands,
+                                mouse_pos,
+                            } => {
                                 let id = self.connections.get_by_right(&pkt.addr());
                                 match id {
                                     Some(id) => {
@@ -79,6 +81,7 @@ impl Server {
                                                 for cmd in commands {
                                                     player.input.apply_command(cmd);
                                                 }
+                                                player.input.mouse_pos = mouse_pos;
                                             });
                                     }
                                     None => {
@@ -148,8 +151,8 @@ impl ServerLogic {
             let on_ground = check_for_collision_and_move_player_according_to_movement_vector(
                 &self.grid, player, logger,
             );
-            player.velocity +=
-                accelerate_player_according_to_input(&player.input, &self.config, on_ground);
+            let acc = accelerate_player_according_to_input(&player.input, &self.config, on_ground);
+            player.velocity += acc;
             player.velocity = player.velocity.clamp(Vec2 {
                 x: self.config.player.max_vel,
                 y: self.config.player.max_vel,
@@ -207,17 +210,23 @@ impl std::ops::DerefMut for ServerPlayer {
 
 /// Indexed by InputKey
 #[derive(Debug)]
-pub struct UserInput(Vec<bool>);
+pub struct UserInput {
+    keys: Vec<bool>,
+    pub mouse_pos: (f32, f32),
+}
 
 impl UserInput {
     pub fn new() -> UserInput {
-        UserInput(vec![false; InputKey::LeftMouse as usize + 1])
+        UserInput {
+            keys: vec![false; InputKey::LeftMouse as usize + 1],
+            mouse_pos: (0.0, 0.0),
+        }
     }
     pub fn apply_command(&mut self, cmd: InputCommand) {
-        self.0[cmd.key as usize] = cmd.is_pressed;
+        self.keys[cmd.key as usize] = cmd.is_pressed;
     }
     pub fn is_down(&self, key: InputKey) -> bool {
-        self.0[key as usize]
+        self.keys[key as usize]
     }
 }
 

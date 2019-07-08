@@ -4,6 +4,7 @@ use bimap::BiMap;
 use fast_logger::{InDebug, Logger};
 use geometry::{grid2d::Grid, vec::Vec2};
 use laminar::{Packet, SocketEvent};
+use rand::Rng;
 use rand_pcg::Pcg64Mcg;
 use std::net::SocketAddr;
 use std::time::Instant;
@@ -34,11 +35,14 @@ impl Server {
     }
     pub fn tick_logic(&mut self) {
         self.update_network();
-        self.logic.update_players(&mut self.logger);
+        self.logic
+            .update_players(&mut self.random, &mut self.logger);
         self.logic.update_bullets();
 
         std::thread::sleep(std::time::Duration::new(0, 8_000_000));
     }
+
+    fn fire_bullet(&mut self) {}
     fn update_network(&mut self) {
         // Handle incoming messages
         loop {
@@ -142,8 +146,9 @@ impl ServerLogic {
         id
     }
 
-    pub fn update_players(&mut self, logger: &mut Logger<Log>) {
+    pub fn update_players(&mut self, random: &mut Pcg64Mcg, logger: &mut Logger<Log>) {
         for player in &mut self.players {
+            // Physics
             if self.config.world.gravity_on {
                 player.velocity += Vec2::new(0.0, self.config.world.gravity);
             }
@@ -153,6 +158,7 @@ impl ServerLogic {
             );
             let acc = accelerate_player_according_to_input(&player.input, &self.config, on_ground);
             player.velocity += acc;
+
             player.velocity = player.velocity.clamp(Vec2 {
                 x: self.config.player.max_vel,
                 y: self.config.player.max_vel,
@@ -162,8 +168,27 @@ impl ServerLogic {
             } else {
                 player.velocity.x *= self.config.world.air_fri_x;
             }
-
             player.velocity.y *= self.config.world.air_fri_y;
+
+            // Firing weapons
+            if player.input.is_down(InputKey::LeftMouse) {
+                let stats = player.curr_weapon.get_stats();
+                for _ in 0..stats.bullet_count {
+                    let angle =
+                        Vec2::from(player.input.mouse_pos) - player.position - Vec2::new(5.0, 5.0);
+                    let direction = angle.rotate(random.gen_range(-stats.spread, stats.spread));
+
+                    let position = player.position + Vec2::new(5.0, 5.0);
+                    let id = self.bullet_id;
+                    self.bullet_id += 1;
+                    self.bullets.push(Bullet {
+                        direction: direction.normalize() * stats.speed,
+                        position,
+                        id,
+                        ty: player.curr_weapon,
+                    });
+                }
+            }
         }
     }
 
@@ -172,7 +197,7 @@ impl ServerLogic {
             let collision =
                 collision_test(&[b.position], None, b.direction, &self.grid, |x| x.1 > 0);
             if let Some((xi, yi)) = collision {
-                let area = b.destruction;
+                let area = b.ty.get_stats().destruction;
                 for i in -area..=area {
                     for j in -area..=area {
                         let pos = (xi as i32 + i, yi as i32 + j);

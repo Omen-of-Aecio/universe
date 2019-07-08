@@ -51,10 +51,13 @@ impl Main {
 pub struct Bullet {
     pub direction: Vec2,
     pub position: Vec2,
-    pub destruction: i32,
-    // TODO: destruction, width and height are functions of the Weapon
     pub id: u32,
     pub ty: Weapon,
+}
+impl Bullet {
+    pub fn get_stats(&self) -> WeaponStats {
+        self.ty.get_stats()
+    }
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
@@ -81,16 +84,61 @@ impl PlayerData {
     }
 }
 
-#[derive(PartialEq, Debug, Serialize, Deserialize, Clone)]
+#[derive(PartialEq, Debug, Serialize, Deserialize, Clone, Copy)]
 pub enum Weapon {
     Hellfire,
     Ak47,
+}
+
+impl Weapon {
+    pub fn get_stats(&self) -> WeaponStats {
+        match *self {
+            Weapon::Hellfire => WeaponStats {
+                width: 10,
+                height: 6,
+                animation_block_begin: (0.0, 0.0),
+                animation_block_end: (1.0, 53.0 / 60.0),
+                sprite_width: 6.8,
+                sprite_height: 0.9,
+                destruction: 3,
+                bullet_count: 1,
+                spread: 0.3,
+                speed: 1.0,
+            },
+            Weapon::Ak47 => {
+                (WeaponStats {
+                    width: 1,
+                    height: 1,
+                    animation_block_begin: (0.0, 54.0 / 60.0),
+                    animation_block_end: (4.0 / 679.0, 58.0 / 60.0),
+                    sprite_width: 0.5,
+                    sprite_height: 0.5,
+                    destruction: 1,
+                    bullet_count: 1,
+                    spread: 0.1,
+                    speed: 2.0,
+                })
+            }
+        }
+    }
 }
 
 impl Default for Weapon {
     fn default() -> Self {
         Weapon::Hellfire
     }
+}
+pub struct WeaponStats {
+    pub width: u32,
+    pub height: u32,
+    pub animation_block_begin: (f32, f32),
+    pub animation_block_end: (f32, f32),
+    pub sprite_width: f32,
+    pub sprite_height: f32,
+    pub destruction: i32,
+    pub bullet_count: u8,
+    pub spread: f32,
+    pub speed: f32,
 }
 
 #[derive(Copy, Clone)]

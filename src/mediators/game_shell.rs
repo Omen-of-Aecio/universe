@@ -1,7 +1,7 @@
 use self::command_handlers::*;
 use crate::glocals::*;
-use cmdmat::Spec;
 use fast_logger::{self, Logger};
+use gameshell::Spec;
 use gameshell::{
     decision::Decision, predicates::*, types::Type, Evaluator, GameShell, IncConsumer,
 };

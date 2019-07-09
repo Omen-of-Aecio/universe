@@ -45,6 +45,7 @@ laminar = { git = "https://github.com/amethyst/laminar.git" }
 crossbeam-channel = "0.3.8" # For laminar
 enum_derive = "0.1.7"
 bimap = "0.3.1"
+indexmap = "1.0.2"
 
 # Local libraries
 benchmarker = { path = "crates/benchmarker" }

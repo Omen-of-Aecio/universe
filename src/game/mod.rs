@@ -129,8 +129,8 @@ impl Default for Weapon {
     }
 }
 pub struct WeaponStats {
-    pub width: u32,
-    pub height: u32,
+    pub width: usize,
+    pub height: usize,
     pub animation_block_begin: (f32, f32),
     pub animation_block_end: (f32, f32),
     pub sprite_width: f32,

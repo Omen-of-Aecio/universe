@@ -42,7 +42,6 @@ impl Server {
         std::thread::sleep(std::time::Duration::new(0, 8_000_000));
     }
 
-    fn fire_bullet(&mut self) {}
     fn update_network(&mut self) {
         // Handle incoming messages
         loop {

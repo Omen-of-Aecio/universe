@@ -1,5 +1,6 @@
 use super::*;
 use geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
+use indexmap::IndexMap;
 use input;
 use laminar::{Packet, Socket, SocketEvent};
 use rand_pcg::Pcg64Mcg;
@@ -33,10 +34,10 @@ pub struct ClientLogic {
 
     pub grid: Grid<(u8, u8, u8, u8)>,
     pub config: Config,
-    pub players: Vec<ClientPlayer>,
+    pub players: IndexMap<Id, ClientPlayer>,
+    pub bullets: IndexMap<Id, ClientBullet>,
     pub self_id: Id,
 
-    pub bullets: Vec<ClientBullet>,
     pub cam: Camera,
     pub you: u32,
 
@@ -75,10 +76,6 @@ pub struct ClientBullet {
     pub handle: vxdraw::dyntex::Handle,
 
     pub animation_sequence: usize,
-    pub animation_block_begin: (f32, f32),
-    pub animation_block_end: (f32, f32),
-    pub height: usize,
-    pub width: usize,
     pub current_uv_begin: (f32, f32),
     pub current_uv_end: (f32, f32),
 }
@@ -147,7 +144,7 @@ impl Client {
 
     fn get_me(&mut self) -> Option<&mut ClientPlayer> {
         let id = self.logic.self_id;
-        self.logic.players.iter_mut().find(|p| p.id == id)
+        self.logic.players.values_mut().find(|p| p.id == id)
     }
     /// Sends a Join request to the server at `addr`.
     /// Note that completion of the handshake takes place in `self.tick_logic()`.
@@ -169,9 +166,6 @@ impl Client {
         self.input.prepare_for_next_frame();
         if let Some(ref mut graphics) = self.graphics {
             process_input(&mut self.input, &mut graphics.windowing);
-        }
-        if let Some(_srv) = self.server {
-            // TODO send input
         }
         update_bullets_uv(&mut self.logic);
         std::thread::sleep(std::time::Duration::new(0, 8_000_000));
@@ -207,23 +201,76 @@ impl Client {
                             ServerMessage::Welcome { your_id } => {
                                 self.server = Some(pkt.addr());
                                 self.logic.self_id = your_id;
-                                info![self.logger, "server", "Received Welcome message!"];
+                                info![self.logger, "client", "Received Welcome message!"];
                             }
                             ServerMessage::State { players, bullets } => {
-                                self.logic.players = players
-                                    .into_iter()
-                                    .map(|p| ClientPlayer {
-                                        inner: p,
-                                        weapon_sprite: None,
-                                    })
-                                    .collect();
-                                // TODO: Something with bullets
+                                for player in players {
+                                    if self.logic.players.contains_key(&player.id) {
+                                        // Update existing player
+                                        if let Some(p) = self.logic.players.get_mut(&player.id) {
+                                            p.inner = player;
+                                        }
+                                    } else {
+                                        // Create new player
+                                        let id = player.id;
+                                        let new = ClientPlayer {
+                                            inner: player,
+                                            weapon_sprite: None,
+                                        };
+                                        self.logic.players.insert(id, new);
+                                    }
+                                }
+                                for bullet in bullets {
+                                    if self.logic.bullets.contains_key(&bullet.id) {
+                                        // Update existing bullet
+                                        if let Some(b) = self.logic.bullets.get_mut(&bullet.id) {
+                                            b.inner = bullet;
+                                        }
+                                    } else {
+                                        // Create new bullet
+
+                                        let handle = if let Some(ref mut graphics) = self.graphics {
+                                            let stats = bullet.get_stats();
+                                            Some(
+                                                graphics.windowing.dyntex().add(
+                                                    &graphics.bullets_texture,
+                                                    vxdraw::dyntex::Sprite::new()
+                                                        .width(stats.sprite_width)
+                                                        .height(stats.sprite_height)
+                                                        .scale(3.0)
+                                                        .origin((
+                                                            -stats.sprite_width / 2.0,
+                                                            stats.sprite_height / 2.0,
+                                                        ))
+                                                        .rotation(Rad(-bullet.direction.angle()
+                                                            + std::f32::consts::PI)),
+                                                ),
+                                            )
+                                        } else {
+                                            None
+                                        };
+
+                                        let id = bullet.id;
+                                        let new = ClientBullet {
+                                            inner: bullet,
+                                            handle: handle.unwrap(), // TODO: make optional here aswell?
+
+                                            animation_sequence: 0,
+                                            current_uv_begin: (0.0, 0.0),
+                                            current_uv_end: (0.0, 0.0),
+                                        };
+                                        self.logic.bullets.insert(id, new);
+                                    }
+                                }
+                            }
+                            ServerMessage::DeltaState { removed: _ } => {
+                                // TODO
                             }
                         }
                     } else {
                         error![
                             self.logger,
-                            "server", "Failed to deserialize an incoming message"
+                            "client", "Failed to deserialize an incoming message"
                         ];
                     }
                 }
@@ -233,17 +280,14 @@ impl Client {
             }
         }
         // Send input to server
-        match self.server {
-            Some(addr) => {
-                self.network
-                    .send(Packet::reliable_ordered(
-                        addr,
-                        self.collect_input().serialize(),
-                        None,
-                    ))
-                    .unwrap();
-            }
-            None => {}
+        if let Some(addr) = self.server {
+            self.network
+                .send(Packet::reliable_ordered(
+                    addr,
+                    self.collect_input().serialize(),
+                    None,
+                ))
+                .unwrap();
         }
     }
     fn collect_input(&self) -> ClientMessage {
@@ -474,7 +518,7 @@ fn move_camera_according_to_input(s: &mut Client) {
     }
 
     if s.logic.cam_mode == CameraMode::FollowPlayer {
-        if let Some(player) = s.logic.players.get_mut(0) {
+        if let Some(player) = s.logic.players.get_mut(&s.logic.self_id) {
             s.logic.cam.center -=
                 (s.logic.cam.center - player.position - Vec2 { x: 5.0, y: 5.0 }) / 10.0;
         }
@@ -508,11 +552,11 @@ fn update_graphics(s: &mut Client) {
         graphics.windowing.dyntex().set_uvs(
             s.logic
                 .bullets
-                .iter()
+                .values()
                 .map(|b| (&b.handle, b.current_uv_begin, b.current_uv_end)),
         );
 
-        for b in s.logic.bullets.iter() {
+        for b in s.logic.bullets.values() {
             graphics
                 .windowing
                 .dyntex()
@@ -520,7 +564,7 @@ fn update_graphics(s: &mut Client) {
         }
 
         {
-            if let Some(player) = s.logic.players.get_mut(0) {
+            if let Some(player) = s.logic.players.get_mut(&s.logic.self_id) {
                 let mouse_in_world = graphics.windowing.to_world_coords(s.input.get_mouse_pos());
                 let angle = -(Vec2::from(mouse_in_world) - player.position - PLAYER_CENTER).angle();
 
@@ -566,7 +610,7 @@ fn upload_player_position(
     windowing: &mut VxDraw,
     handle: &vxdraw::quads::Handle,
 ) {
-    if let Some(ref mut player) = s.players.get(0) {
+    if let Some(ref mut player) = s.players.get(&s.self_id) {
         if let Some(ref gun_handle) = player.weapon_sprite {
             windowing
                 .dyntex()
@@ -581,25 +625,26 @@ fn upload_player_position(
     }
 }
 fn update_bullets_uv(s: &mut ClientLogic) {
-    for b in s.bullets.iter_mut() {
-        let width_elem = b.animation_sequence % b.width;
-        let height_elem = b.animation_sequence / b.width;
+    for b in s.bullets.values_mut() {
+        let stats = b.get_stats();
+        let width_elem = b.animation_sequence % stats.width;
+        let height_elem = b.animation_sequence / stats.width;
         let uv_begin = (
-            width_elem as f32 / b.width as f32,
-            height_elem as f32 / b.height as f32,
+            width_elem as f32 / stats.width as f32,
+            height_elem as f32 / stats.height as f32,
         );
         let uv_end = (
-            (width_elem + 1) as f32 / b.width as f32,
-            (height_elem + 1) as f32 / b.height as f32,
+            (width_elem + 1) as f32 / stats.width as f32,
+            (height_elem + 1) as f32 / stats.height as f32,
         );
         b.animation_sequence += 1;
-        if b.animation_sequence >= b.width * b.height {
+        if b.animation_sequence >= stats.width * stats.height {
             b.animation_sequence = 0;
         }
-        let current_uv_begin = (Vec2::from(uv_begin) * Vec2::from(b.animation_block_end)
-            + Vec2::from(b.animation_block_begin))
+        let current_uv_begin = (Vec2::from(uv_begin) * Vec2::from(stats.animation_block_end)
+            + Vec2::from(stats.animation_block_begin))
         .into();
-        let current_uv_end = (Vec2::from(uv_end) * Vec2::from(b.animation_block_end)).into();
+        let current_uv_end = (Vec2::from(uv_end) * Vec2::from(stats.animation_block_end)).into();
         b.current_uv_begin = current_uv_begin;
         b.current_uv_end = current_uv_end;
     }

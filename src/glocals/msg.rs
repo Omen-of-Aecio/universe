@@ -3,7 +3,7 @@ use bincode;
 use failure::Error;
 
 /// Message sent between from client to server
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ClientMessage {
     Join,
     /// `mouse_pos` is the position of mouse in world space
@@ -22,14 +22,22 @@ impl ClientMessage {
 }
 
 /// Message sent between from server to client
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ServerMessage {
     Welcome {
         your_id: Id,
     },
+    /// Full state, sent unreliably.
+    /// Could potentially also be used for a part of the state. In any case, the client
+    /// is not supposed to e.g. delete a player or bullet that is not present in such state.
+    /// Deletion of entities happens via `ServerMessage::DeltaState`
     State {
         players: Vec<PlayerData>,
         bullets: Vec<Bullet>,
+    },
+    /// Part of state update that is represented by a _change_, and thus sent _reliably_.
+    DeltaState {
+        removed: Vec<(Id, EntityType)>,
     },
 }
 impl ServerMessage {
@@ -40,8 +48,13 @@ impl ServerMessage {
         Ok(bincode::deserialize(bytes)?)
     }
 }
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
+pub enum EntityType {
+    Player,
+    Bullet,
+}
 
-#[derive(Serialize, Deserialize, Copy, Clone)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub enum InputKey {
     Up = 0,
     Down,
@@ -52,7 +65,7 @@ pub enum InputKey {
 }
 /// Command that client sends to server that stems from user input.
 /// Should all be sent reliably.
-#[derive(Serialize, Deserialize, Copy, Clone)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct InputCommand {
     pub is_pressed: bool,
     pub key: InputKey,

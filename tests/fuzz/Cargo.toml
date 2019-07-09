@@ -8,5 +8,5 @@ edition = "2018"
 fast-logger = "0.1"
 geometry = { path = "../../crates/geometry" }
 honggfuzz = "0.5"
-metac = { path = "../../crates/gameshell/crates/metac" }
+gameshell = { path = "../../crates/gameshell" }
 universe = { path = "../../" }

@@ -1,5 +1,5 @@
-use honggfuzz::fuzz;
 use gameshell::Evaluate;
+use honggfuzz::fuzz;
 use universe::mediators::game_shell::make_new_gameshell;
 
 fn main() {

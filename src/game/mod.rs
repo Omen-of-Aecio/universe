@@ -170,11 +170,11 @@ pub fn create_black_square_around_player(s: &mut Grid<(u8, u8, u8, u8)>) {
 
 pub fn accelerate_player_according_to_input(
     inp: &UserInput,
-    conf: &Config,
+    conf: &WorldConfig,
     on_ground: bool,
 ) -> Vec2 {
     let dy = if inp.is_down(InputKey::Up) {
-        if conf.world.gravity_on {
+        if conf.gravity_on {
             if on_ground {
                 -conf.player.jump_acc
             } else {

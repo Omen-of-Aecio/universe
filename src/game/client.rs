@@ -20,6 +20,7 @@ pub struct Client {
     pub graphics: Option<Graphics>,
     pub logger: Logger<Log>,
     pub logic: ClientLogic,
+    pub config: ClientConfig,
     pub network: Socket,
     pub random: Pcg64Mcg,
     pub threads: Threads,
@@ -33,7 +34,7 @@ pub struct ClientLogic {
     pub should_exit: bool,
 
     pub grid: Grid<(u8, u8, u8, u8)>,
-    pub config: Config,
+    pub config: WorldConfig,
     pub players: IndexMap<Id, ClientPlayer>,
     pub bullets: IndexMap<Id, ClientBullet>,
     pub self_id: Id,
@@ -130,6 +131,7 @@ impl Client {
             time: Instant::now(),
             input: Input::default(),
             server: None,
+            config: Default::default(),
         };
 
         s.logic.cam.zoom = 0.01;
@@ -140,6 +142,12 @@ impl Client {
         let port = s.network.local_addr().unwrap().port();
         info![s.logger, "client", "Listening on port"; "port" => port];
         s
+    }
+    /// Assigns `config.client` to `self.config` and `config.world` to `self.logic.config`.
+    pub fn apply_config(&mut self, config: Config) {
+        let (s, w) = (config.client, config.world);
+        self.config = s;
+        self.logic.config = w;
     }
 
     fn get_me(&mut self) -> Option<&mut ClientPlayer> {
@@ -527,7 +535,7 @@ fn move_camera_according_to_input(s: &mut Client) {
 
 fn set_gravity(s: &mut Client) {
     if s.input.is_key_toggled_down(Key::G) {
-        s.logic.config.world.gravity_on = !s.logic.config.world.gravity_on;
+        s.logic.config.gravity_on = !s.logic.config.gravity_on;
         // TODO actually send this to server or something
     }
 }

@@ -294,7 +294,7 @@ pub fn set_gravity(s: &mut GameShellContext, commands: &[Type]) -> Result<String
     if let Some(ref mut chan) = s.config_change {
         if let Type::F32(value) = commands[0] {
             match chan.send(Box::new(move |main: &mut Client| {
-                main.logic.config.world.gravity = value;
+                main.logic.config.gravity = value;
             })) {
                 Ok(()) => Ok("Set gravity value".into()),
                 Err(_) => Err("Unable to send message to main".into()),
@@ -311,7 +311,7 @@ pub fn get_fps(s: &mut GameShellContext, _: &[Type]) -> Result<String, String> {
     if let Some(ref mut chan) = s.config_change {
         let (tx, rx) = mpsc::sync_channel(0);
         let result = chan.send(Box::new(move |main: &mut Client| {
-            let send_status = tx.send(main.logic.config.client.fps);
+            let send_status = tx.send(main.config.fps);
             debug![main.logger, "main", "Message reply"; "status" => InDebug(&send_status)];
         }));
         let fps = rx.recv().unwrap();
@@ -329,7 +329,7 @@ pub fn set_fps(s: &mut GameShellContext, commands: &[Type]) -> Result<String, St
         if let [Type::F32(fps)] = commands {
             let fps = *fps;
             match chan.send(Box::new(move |main: &mut Client| {
-                main.logic.config.client.fps = fps;
+                main.config.fps = fps;
             })) {
                 Ok(()) => Ok("Changed fps".into()),
                 _ => Err("Unable to send message to main".into()),
@@ -346,7 +346,7 @@ pub fn enable_gravity(s: &mut GameShellContext, commands: &[Type]) -> Result<Str
     if let Some(ref mut chan) = s.config_change {
         if let Type::Bool(value) = commands[0] {
             match chan.send(Box::new(move |main: &mut Client| {
-                main.logic.config.world.gravity_on = value;
+                main.logic.config.gravity_on = value;
             })) {
                 Ok(()) => Ok("Enabled/disabled gravity".into()),
                 _ => Err("Unable to send message to main".into()),

@@ -9,7 +9,7 @@ pub mod config;
 pub mod log;
 pub mod msg;
 
-pub use self::config::Config;
+pub use self::config::*;
 pub use log::Log;
 pub use msg::*;
 

@@ -56,7 +56,7 @@ fn main() {
         let address: SocketAddr = address.parse().expect("Not a valid ip:port argument");
 
         let mut cli = Client::new(logger.clone());
-        cli.logic.config = config.clone();
+        cli.apply_config(config.clone());
 
         eprintln!("\nSending message to {:?}\n", address);
         cli.network
@@ -66,9 +66,9 @@ fn main() {
     } else {
         // Run client + server
         let mut cli = Client::new(logger.clone());
-        cli.logic.config = config.clone();
+        cli.apply_config(config.clone());
         let mut srv = Server::new(logger.clone());
-        srv.logic.config = config.clone();
+        srv.apply_config(config.clone());
         let mut main = Main::new(Some(cli), Some(srv), logger.clone());
         main.entry_point();
     }

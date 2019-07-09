@@ -14,6 +14,7 @@ pub struct Server {
     pub logic: ServerLogic,
     pub random: Pcg64Mcg,
     pub time: Instant,
+    pub config: ServerConfig,
     // Communication
     pub network: Socket,
     pub connections: BiMap<Id, SocketAddr>,
@@ -25,6 +26,7 @@ impl Server {
             logic: ServerLogic::default(),
             random: Pcg64Mcg::new(0),
             time: Instant::now(),
+            config: Default::default(),
             //
             network: random_port_socket(),
             connections: BiMap::new(),
@@ -32,6 +34,12 @@ impl Server {
         initialize_grid(&mut s.logic.grid);
         create_black_square_around_player(&mut s.logic.grid);
         s
+    }
+    /// Assigns `config.server` to `self.config` and `config.world` to `self.logic.config`.
+    pub fn apply_config(&mut self, config: Config) {
+        let (s, w) = (config.server, config.world);
+        self.config = s;
+        self.logic.config = w;
     }
     pub fn tick_logic(&mut self) {
         self.update_network();
@@ -127,14 +135,20 @@ impl Server {
 #[derive(Default, Debug)]
 pub struct ServerLogic {
     pub grid: Grid<(u8, u8, u8, u8)>,
-    pub config: Config,
     pub players: Vec<ServerPlayer>,
     pub bullets: Vec<Bullet>,
+    pub config: WorldConfig,
     // ID counters
     player_id: Id,
     bullet_id: Id,
 }
 impl ServerLogic {
+    pub fn new(config: WorldConfig) -> Self {
+        ServerLogic {
+            config,
+            ..Default::default()
+        }
+    }
     pub fn add_player(&mut self) -> Id {
         let id = self.player_id;
         self.player_id += 1;
@@ -149,8 +163,8 @@ impl ServerLogic {
     pub fn update_players(&mut self, random: &mut Pcg64Mcg, logger: &mut Logger<Log>) {
         for player in &mut self.players {
             // Physics
-            if self.config.world.gravity_on {
-                player.velocity += Vec2::new(0.0, self.config.world.gravity);
+            if self.config.gravity_on {
+                player.velocity += Vec2::new(0.0, self.config.gravity);
             }
 
             let on_ground = check_for_collision_and_move_player_according_to_movement_vector(
@@ -164,11 +178,11 @@ impl ServerLogic {
                 y: self.config.player.max_vel,
             });
             if on_ground {
-                player.velocity.x *= self.config.world.ground_fri;
+                player.velocity.x *= self.config.ground_fri;
             } else {
-                player.velocity.x *= self.config.world.air_fri_x;
+                player.velocity.x *= self.config.air_fri_x;
             }
-            player.velocity.y *= self.config.world.air_fri_y;
+            player.velocity.y *= self.config.air_fri_y;
 
             // Firing weapons
             if player.input.is_down(InputKey::LeftMouse) {

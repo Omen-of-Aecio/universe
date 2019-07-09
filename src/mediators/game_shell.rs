@@ -203,8 +203,8 @@ fn game_shell_thread(mut s: GameShellContext, listener: TcpListener) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gameshell::Evaluate;
     use gameshell::Feedback;
-    use metac::Evaluate;
     use std::io::{self, Read, Write};
     use test::{black_box, Bencher};
 

@@ -1,4 +1,4 @@
-use metac::{PartialParse, PartialParseOp};
+use gameshell::{PartialParse, PartialParseOp};
 use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;

@@ -47,7 +47,7 @@ impl Main {
 
 // ---
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Bullet {
     pub direction: Vec2,
     pub position: Vec2,

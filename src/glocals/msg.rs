@@ -1,5 +1,4 @@
-use crate::game::Id;
-use crate::game::PlayerData;
+use crate::game::{Bullet, Id, PlayerData};
 use bincode;
 use failure::Error;
 
@@ -25,8 +24,13 @@ impl ClientMessage {
 /// Message sent between from server to client
 #[derive(Serialize, Deserialize)]
 pub enum ServerMessage {
-    Welcome { your_id: Id },
-    State { players: Vec<PlayerData> },
+    Welcome {
+        your_id: Id,
+    },
+    State {
+        players: Vec<PlayerData>,
+        bullets: Vec<Bullet>,
+    },
 }
 impl ServerMessage {
     pub fn serialize(&self) -> Vec<u8> {

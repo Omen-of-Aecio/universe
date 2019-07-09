@@ -209,7 +209,7 @@ impl Client {
                                 self.logic.self_id = your_id;
                                 info![self.logger, "server", "Received Welcome message!"];
                             }
-                            ServerMessage::State { players } => {
+                            ServerMessage::State { players, bullets } => {
                                 self.logic.players = players
                                     .into_iter()
                                     .map(|p| ClientPlayer {
@@ -217,6 +217,7 @@ impl Client {
                                         weapon_sprite: None,
                                     })
                                     .collect();
+                                // TODO: Something with bullets
                             }
                         }
                     } else {

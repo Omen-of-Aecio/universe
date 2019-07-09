@@ -1,7 +1,7 @@
 use crate::game::*;
 use crate::mediators::does_line_collide_with_grid::*;
 use bimap::BiMap;
-use fast_logger::{InDebug, Logger};
+use fast_logger::Logger;
 use geometry::{grid2d::Grid, vec::Vec2};
 use laminar::{Packet, SocketEvent};
 use rand::Rng;
@@ -117,6 +117,7 @@ impl Server {
                     *cli_addr,
                     ServerMessage::State {
                         players: players.clone(),
+                        bullets: self.logic.bullets.clone(),
                     }
                     .serialize(),
                 ))

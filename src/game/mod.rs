@@ -14,6 +14,7 @@ pub mod server;
 pub use server::*;
 
 pub type Id = u32;
+pub use fast_logger::InDebug;
 
 pub struct Main {
     pub cli: Option<Client>,
@@ -147,11 +148,10 @@ pub struct Vertex {
     pub pos: [f32; 2],
 }
 
-// Not sure where to put this. Helper for laminar::Socket
-pub fn random_port_socket() -> Socket {
+pub fn random_port_socket(cfg: laminar::Config) -> Socket {
     let loopback = Ipv4Addr::new(127, 0, 0, 1);
     let socket = SocketAddrV4::new(loopback, 0);
-    Socket::bind(socket).unwrap() // TODO laminar error not compatible with failure?
+    Socket::bind_with_config(socket, cfg).unwrap() // TODO laminar error not compatible with failure?
 }
 
 static FIREBALLS: &dyntex::ImgData =

@@ -36,7 +36,10 @@ struct Config {
         // right: String,
     }
     server: ServerConfig {
-        srv_tick_ms: f32,
+        // Ticks between sending full state
+        ticks_per_full_state: u32,
+        // TODO: max bandwidth perhaps. If limit is reached, ticks per send will just have to
+        // increase.
     }
     client: ClientConfig {
         snapshot_rate: f32,

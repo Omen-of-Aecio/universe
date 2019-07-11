@@ -21,6 +21,8 @@ pub struct Server {
 }
 impl Server {
     pub fn new(logger: Logger<Log>) -> Server {
+        let mut cfg = laminar::Config::default();
+        cfg.receive_buffer_max_size = cfg.max_packet_size;
         let mut s = Server {
             logger: logger,
             logic: ServerLogic::default(),
@@ -28,7 +30,7 @@ impl Server {
             time: Instant::now(),
             config: Default::default(),
             //
-            network: random_port_socket(),
+            network: random_port_socket(cfg),
             connections: BiMap::new(),
         };
         initialize_grid(&mut s.logic.grid);
@@ -118,18 +120,23 @@ impl Server {
         }
         // Send state updates
         let players: Vec<_> = self.logic.players.iter().map(|p| p.inner.clone()).collect();
+        let data = ServerMessage::State {
+            players: players.clone(),
+            bullets: self.logic.bullets.clone(),
+        }
+        .serialize();
         for cli_addr in self.connections.right_values() {
             self.network
-                .send(Packet::unreliable(
-                    *cli_addr,
-                    ServerMessage::State {
-                        players: players.clone(),
-                        bullets: self.logic.bullets.clone(),
-                    }
-                    .serialize(),
-                ))
+                .send(Packet::unreliable(*cli_addr, data.clone()))
                 .unwrap();
         }
+    }
+    /// Returns a Vec of `ServerMessage::State`, which altogether encode the entire state
+    fn prepare_packets(&self, max_pkt_size: usize) -> Vec<ServerMessage> {
+        // std::mem::size_of::<PlayerData>()
+        // std::mem::size_of::<Bullet>()
+        // TODO
+        unimplemented!()
     }
 }
 #[derive(Default, Debug)]
@@ -273,7 +280,7 @@ impl UserInput {
 fn check_for_collision_and_move_player_according_to_movement_vector(
     grid: &Grid<(u8, u8, u8, u8)>,
     player: &mut PlayerData,
-    _logger: &mut Logger<Log>,
+    logger: &mut Logger<Log>,
 ) -> bool {
     let movement = player.velocity.clone();
     let tl = Vec2 {
@@ -339,9 +346,11 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
     }
     if collision_x.is_some() {
         player.velocity.x = 0.0;
+        unimplemented!()
     }
     if collision_y.is_some() {
         player.velocity.y = 0.0;
+        unimplemented!()
     }
     collision_y.is_some()
 }

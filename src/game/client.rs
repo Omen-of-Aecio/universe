@@ -103,13 +103,6 @@ pub struct Graphics {
     pub windowing: vxdraw::VxDraw,
 }
 
-// Not sure where to put this. Helper for laminar::Socket
-fn random_port_socket() -> Socket {
-    let loopback = Ipv4Addr::new(127, 0, 0, 1);
-    let socket = SocketAddrV4::new(loopback, 0);
-    Socket::bind(socket).unwrap() // TODO laminar error not compatible with failure?
-}
-
 // ---
 
 impl Default for CameraMode {
@@ -126,12 +119,14 @@ pub enum GraphicsSettings {
 
 impl Client {
     pub fn new(logger: Logger<Log>, graphics: GraphicsSettings) -> Client {
+        let mut cfg = laminar::Config::default();
+        cfg.receive_buffer_max_size = cfg.max_packet_size;
         let mut s = Client {
             audio: None,
             graphics: None,
             logger: logger,
             logic: ClientLogic::default(),
-            network: random_port_socket(),
+            network: random_port_socket(cfg),
             random: Pcg64Mcg::new(0),
             threads: Threads::default(),
             time: Instant::now(),
@@ -223,6 +218,7 @@ impl Client {
                             }
                             ServerMessage::State { players, bullets } => {
                                 for player in players {
+                                    // info![self.logger, "client", "Player info"];
                                     if self.logic.players.contains_key(&player.id) {
                                         // Update existing player
                                         if let Some(p) = self.logic.players.get_mut(&player.id) {

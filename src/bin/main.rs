@@ -1,4 +1,4 @@
-use crate::game::{Client, Main, Server};
+use crate::game::{Client, GraphicsSettings, Main, Server};
 use clap::{App, Arg, ArgMatches};
 use failure::Error;
 use laminar::Packet;
@@ -55,7 +55,7 @@ fn main() {
     if let Some(address) = matches.value_of("connect") {
         let address: SocketAddr = address.parse().expect("Not a valid ip:port argument");
 
-        let mut cli = Client::new(logger.clone());
+        let mut cli = Client::new(logger.clone(), GraphicsSettings::EnableGraphics);
         cli.apply_config(config.clone());
 
         eprintln!("\nSending message to {:?}\n", address);
@@ -65,7 +65,7 @@ fn main() {
         unimplemented!();
     } else {
         // Run client + server
-        let mut cli = Client::new(logger.clone());
+        let mut cli = Client::new(logger.clone(), GraphicsSettings::EnableGraphics);
         cli.apply_config(config.clone());
         let mut srv = Server::new(logger.clone());
         srv.apply_config(config.clone());

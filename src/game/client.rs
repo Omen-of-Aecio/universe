@@ -118,8 +118,14 @@ impl Default for CameraMode {
     }
 }
 
+#[derive(PartialEq)]
+pub enum GraphicsSettings {
+    EnableGraphics,
+    DisableGraphics,
+}
+
 impl Client {
-    pub fn new(logger: Logger<Log>) -> Client {
+    pub fn new(logger: Logger<Log>, graphics: GraphicsSettings) -> Client {
         let mut s = Client {
             audio: None,
             graphics: None,
@@ -135,7 +141,9 @@ impl Client {
         };
 
         s.logic.cam.zoom = 0.01;
-        s.maybe_initialize_graphics();
+        if graphics == GraphicsSettings::EnableGraphics {
+            s.maybe_initialize_graphics();
+        }
         initialize_grid(&mut s.logic.grid);
         create_black_square_around_player(&mut s.logic.grid);
 

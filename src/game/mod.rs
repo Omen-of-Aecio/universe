@@ -310,8 +310,76 @@ fn fire_bullets(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::game::Client;
+    use crate::mediators::testtools::*;
+    use fast_logger::Logger;
+
     #[test]
     fn basic_setup_and_teardown() {
         crate::game::Server::new(fast_logger::Logger::spawn_void());
+    }
+
+    #[test]
+    fn basic_setup_gsh() {
+        let mut main = Client::new(Logger::spawn_void(), GraphicsSettings::DisableGraphics);
+        spawn_gameshell(&mut main);
+        assert![main.threads.game_shell_channel.is_some()];
+        assert_eq!["6", gsh(&mut main, "+ 1 2 3")];
+    }
+
+    #[test]
+    fn gsh_change_gravity() {
+        let mut cli = Client::new(Logger::spawn_void(), GraphicsSettings::DisableGraphics);
+        spawn_gameshell(&mut cli);
+        assert_eq![
+            "Set gravity value",
+            gsh(&mut cli, "config gravity set y 1.23")
+        ];
+        cli.tick_logic();
+        assert_eq![1.23, cli.logic.config.gravity];
+    }
+
+    #[test]
+    fn gsh_change_gravity_synchronous() {
+        let mut cli = Client::new(Logger::spawn_void(), GraphicsSettings::DisableGraphics);
+        let mut main = Main::new(Some(cli), None, Logger::spawn_void());
+        spawn_gameshell(main.cli.as_mut().unwrap());
+        assert_eq![
+            "Set gravity value",
+            gsh_synchronous(&mut main, "config gravity set y 1.23", |main| main
+                .cli
+                .as_mut()
+                .unwrap()
+                .tick_logic())
+        ];
+        assert_eq![1.23, main.cli.as_mut().unwrap().logic.config.gravity];
+    }
+
+    #[test]
+    fn gsh_get_fps() {
+        let mut cli = Client::new(Logger::spawn_void(), GraphicsSettings::DisableGraphics);
+        spawn_gameshell(&mut cli);
+        let mut main = Main::new(Some(cli), None, Logger::spawn_void());
+        assert_eq![
+            "0",
+            gsh_synchronous(&mut main, "config fps get", |main| main
+                .cli
+                .as_mut()
+                .unwrap()
+                .tick_logic())
+        ];
+
+        gsh(main.cli.as_mut().unwrap(), "config fps set 1.23");
+        main.cli.as_mut().unwrap().tick_logic();
+
+        assert_eq![
+            "1.23",
+            gsh_synchronous(&mut main, "config fps get", |main| main
+                .cli
+                .as_mut()
+                .unwrap()
+                .tick_logic())
+        ];
     }
 }

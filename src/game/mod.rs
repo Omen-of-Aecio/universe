@@ -19,6 +19,7 @@ pub struct Main {
     pub cli: Option<Client>,
     pub srv: Option<Server>,
 }
+
 impl Main {
     pub fn new(mut cli: Option<Client>, srv: Option<Server>, mut logger: Logger<Log>) -> Main {
         if let (Some(cli), Some(srv)) = (&mut cli, &srv) {
@@ -311,13 +312,13 @@ fn fire_bullets(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::Client;
+    use crate::game::{Client, Server};
     use crate::mediators::testtools::*;
     use fast_logger::Logger;
 
     #[test]
     fn basic_setup_and_teardown() {
-        crate::game::Server::new(fast_logger::Logger::spawn_void());
+        Server::new(Logger::spawn_void());
     }
 
     #[test]
@@ -381,5 +382,20 @@ mod tests {
                 .unwrap()
                 .tick_logic())
         ];
+    }
+
+    // ---
+
+    #[test]
+    fn client_and_server() {
+        let lgr = Logger::spawn_void();
+        let mut srv = Server::new(lgr.clone());
+        let mut cli = Client::new(lgr.clone(), GraphicsSettings::DisableGraphics);
+        cli.connect_to_server(srv.network.local_addr().unwrap());
+
+        srv.tick_logic();
+        cli.tick_logic();
+
+        Main::new(Some(cli), Some(srv), lgr.clone());
     }
 }

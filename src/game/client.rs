@@ -162,6 +162,7 @@ impl Client {
         let id = self.logic.self_id;
         self.logic.players.get_mut(&id)
     }
+
     /// Sends a Join request to the server at `addr`.
     /// Note that completion of the handshake takes place in `self.tick_logic()`.
     pub fn connect_to_server(&mut self, addr: SocketAddr) -> Result<(), Error> {
@@ -205,6 +206,7 @@ impl Client {
 
         draw_graphics(self);
     }
+
     fn update_network(&mut self) {
         // Process incoming messages
         loop {
@@ -306,6 +308,7 @@ impl Client {
                 .unwrap();
         }
     }
+
     fn collect_input(&self) -> ClientMessage {
         let mut commands = Vec::new();
         if self.input.is_key_toggled_down(Key::Down) {

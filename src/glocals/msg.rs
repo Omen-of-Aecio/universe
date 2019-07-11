@@ -26,6 +26,9 @@ impl ClientMessage {
 pub enum ServerMessage {
     Welcome {
         your_id: Id,
+        world_width: usize,
+        world_height: usize,
+        world_seed: [f32; 3],
     },
     /// Full state, sent unreliably.
     /// Could potentially also be used for a part of the state. In any case, the client
@@ -36,9 +39,7 @@ pub enum ServerMessage {
         bullets: Vec<Bullet>,
     },
     /// Part of state update that is represented by a _change_, and thus sent _reliably_.
-    DeltaState {
-        removed: Vec<(Id, EntityType)>,
-    },
+    DeltaState { removed: Vec<(Id, EntityType)> },
 }
 impl ServerMessage {
     pub fn serialize(&self) -> Vec<u8> {

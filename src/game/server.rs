@@ -1,13 +1,56 @@
 use crate::game::*;
 use crate::mediators::does_line_collide_with_grid::*;
 use bimap::BiMap;
-use fast_logger::Logger;
+use cgmath::*;
+use fast_logger::{GenericLogger, Logger};
 use geometry::{grid2d::Grid, vec::Vec2};
 use laminar::{Packet, SocketEvent};
 use rand::Rng;
 use rand_pcg::Pcg64Mcg;
 use std::net::SocketAddr;
 use std::time::Instant;
+
+const WORLD_WIDTH: usize = 1000;
+const WORLD_HEIGHT: usize = 1000;
+const WORLD_SEED: [f32; 3] = [0.0, 0.0, 0.0];
+
+fn generate_world(
+    w: usize,
+    h: usize,
+    seed: [f32; 3],
+    mut logger: Logger<Log>,
+) -> Grid<(u8, u8, u8, u8)> {
+    let mut grid = Grid::default();
+    grid.resize(w, h);
+    logger.info("server", "Initializing graphics");
+    let mut windowing = VxDraw::new(logger.clone().to_compatibility(), ShowWindow::Headless1k);
+
+    {
+        static BACKGROUND: &dyntex::ImgData =
+            &dyntex::ImgData::PNGBytes(include_bytes!["../../assets/images/terrabackground.png"]);
+        let background = windowing.dyntex().add_layer(
+            BACKGROUND,
+            &dyntex::LayerOptions::new()
+                .depth(true)
+                .fixed_perspective(Matrix4::identity()),
+        );
+        windowing.dyntex().add(&background, dyntex::Sprite::new());
+    }
+
+    let mut strtex = windowing.strtex();
+
+    let tex = strtex.add_layer(&strtex::LayerOptions::new().width(w).height(h).depth(false));
+
+    strtex.fill_with_perlin_noise(&tex, seed);
+    strtex.read(&tex, |x, pitch| {
+        for j in 0..w {
+            for i in 0..h {
+                grid.set(i, j, x[i + j * pitch]);
+            }
+        }
+    });
+    grid
+}
 
 pub struct Server {
     pub logger: Logger<Log>,
@@ -24,7 +67,7 @@ impl Server {
         let mut cfg = laminar::Config::default();
         cfg.receive_buffer_max_size = cfg.max_packet_size;
         let mut s = Server {
-            logger: logger,
+            logger: logger.clone(),
             logic: ServerLogic::default(),
             random: Pcg64Mcg::new(0),
             time: Instant::now(),
@@ -33,8 +76,9 @@ impl Server {
             network: random_port_socket(cfg),
             connections: BiMap::new(),
         };
-        initialize_grid(&mut s.logic.grid);
+        s.logic.grid = generate_world(WORLD_WIDTH, WORLD_HEIGHT, WORLD_SEED, logger.clone());
         create_black_square_around_player(&mut s.logic.grid);
+
         s
     }
     /// Assigns `config.server` to `self.config` and `config.world` to `self.logic.config`.
@@ -70,7 +114,13 @@ impl Server {
                                 self.network
                                     .send(Packet::reliable_unordered(
                                         pkt.addr(),
-                                        ServerMessage::Welcome { your_id: id }.serialize(),
+                                        ServerMessage::Welcome {
+                                            your_id: id,
+                                            world_width: WORLD_WIDTH,
+                                            world_height: WORLD_HEIGHT,
+                                            world_seed: WORLD_SEED,
+                                        }
+                                        .serialize(),
                                     ))
                                     .unwrap_or_else(|_| {
                                         error![
@@ -346,11 +396,9 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
     }
     if collision_x.is_some() {
         player.velocity.x = 0.0;
-        unimplemented!()
     }
     if collision_y.is_some() {
         player.velocity.y = 0.0;
-        unimplemented!()
     }
     collision_y.is_some()
 }

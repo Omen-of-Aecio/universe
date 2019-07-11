@@ -139,8 +139,6 @@ impl Client {
         if graphics == GraphicsSettings::EnableGraphics {
             s.maybe_initialize_graphics();
         }
-        initialize_grid(&mut s.logic.grid);
-        create_black_square_around_player(&mut s.logic.grid);
 
         let port = s.network.local_addr().unwrap().port();
         info![s.logger, "client", "Listening on port"; "port" => port];
@@ -211,7 +209,12 @@ impl Client {
                     let msg = ServerMessage::deserialize(pkt.payload());
                     if let Ok(msg) = msg {
                         match msg {
-                            ServerMessage::Welcome { your_id } => {
+                            ServerMessage::Welcome {
+                                your_id,
+                                world_width,
+                                world_height,
+                                world_seed,
+                            } => {
                                 self.server = Some(pkt.addr());
                                 self.logic.self_id = your_id;
                                 info![self.logger, "client", "Received Welcome message!"];
@@ -416,7 +419,7 @@ impl Client {
         );
         self.logic.grid.resize(1000, 1000);
 
-        strtex.fill_with_perlin_noise(&tex, [0.0, 0.0, 0.0]);
+        strtex.fill_with_perlin_noise(&tex, [0.0, 0.0, 0.0]); // TODO should get seed from server and wait with creating the world.
         let grid = &mut self.logic.grid;
         strtex.read(&tex, |x, pitch| {
             for j in 0..1000 {

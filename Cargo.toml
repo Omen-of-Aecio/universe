@@ -54,7 +54,6 @@ config =      { path = "crates/config" }
 geometry =    { path = "crates/geometry" }
 input =       { path = "crates/input" }
 ketimer =     { path = "crates/ketimer"  }
-udp_ack =     { path = "crates/udp_ack" }
 vxdraw =      { path = "crates/vxdraw" }
 
 [dev-dependencies]

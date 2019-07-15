@@ -157,9 +157,9 @@ pub fn random_port_socket(cfg: laminar::Config) -> Socket {
 }
 
 static FIREBALLS: &dyntex::ImgData =
-    &dyntex::ImgData::PNGBytes(include_bytes!["../../assets/images/bullets.png"]);
+    &dyntex::ImgData::PNGBytes(include_bytes!["../assets/images/bullets.png"]);
 static WEAPONS: &dyntex::ImgData =
-    &dyntex::ImgData::PNGBytes(include_bytes!["../../assets/images/weapons.png"]);
+    &dyntex::ImgData::PNGBytes(include_bytes!["../assets/images/weapons.png"]);
 
 pub fn initialize_grid(s: &mut Grid<(u8, u8, u8, u8)>) {
     s.resize(1000, 1000);

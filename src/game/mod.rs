@@ -326,7 +326,6 @@ mod tests {
     #[test]
     fn basic_setup_gsh() {
         let mut main = Client::new(Logger::spawn_void(), GraphicsSettings::DisableGraphics);
-        spawn_gameshell(&mut main);
         assert![main.threads.game_shell_channel.is_some()];
         assert_eq!["6", gsh(&mut main, "+ 1 2 3")];
     }
@@ -334,7 +333,6 @@ mod tests {
     #[test]
     fn gsh_change_gravity() {
         let mut cli = Client::new(Logger::spawn_void(), GraphicsSettings::DisableGraphics);
-        spawn_gameshell(&mut cli);
         assert_eq![
             "Set gravity value",
             gsh(&mut cli, "config gravity set y 1.23")
@@ -347,7 +345,6 @@ mod tests {
     fn gsh_change_gravity_synchronous() {
         let mut cli = Client::new(Logger::spawn_void(), GraphicsSettings::DisableGraphics);
         let mut main = Main::new(Some(cli), None, Logger::spawn_void());
-        spawn_gameshell(main.cli.as_mut().unwrap());
         assert_eq![
             "Set gravity value",
             gsh_synchronous(&mut main, "config gravity set y 1.23", |main| main
@@ -362,7 +359,6 @@ mod tests {
     #[test]
     fn gsh_get_fps() {
         let mut cli = Client::new(Logger::spawn_void(), GraphicsSettings::DisableGraphics);
-        spawn_gameshell(&mut cli);
         let mut main = Main::new(Some(cli), None, Logger::spawn_void());
         assert_eq![
             "0",

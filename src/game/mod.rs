@@ -56,6 +56,7 @@ pub struct Bullet {
     pub id: u32,
     pub ty: Weapon,
 }
+
 impl Bullet {
     pub fn get_stats(&self) -> WeaponStats {
         self.ty.get_stats()
@@ -73,6 +74,7 @@ pub struct PlayerData {
     /// player resides.
     pub reality: u32,
 }
+
 impl PlayerData {
     pub fn new(id: Id, reality: u32, position: Vec2) -> PlayerData {
         PlayerData {

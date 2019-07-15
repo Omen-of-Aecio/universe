@@ -1,4 +1,5 @@
 use super::*;
+use crate::mediators::testtools::*;
 use geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
 use indexmap::IndexMap;
 use input;
@@ -59,12 +60,14 @@ pub struct ClientPlayer {
     inner: PlayerData,
     pub weapon_sprite: Option<vxdraw::dyntex::Handle>,
 }
+
 impl std::ops::Deref for ClientPlayer {
     type Target = PlayerData;
     fn deref(&self) -> &PlayerData {
         &self.inner
     }
 }
+
 impl std::ops::DerefMut for ClientPlayer {
     fn deref_mut(&mut self) -> &mut PlayerData {
         &mut self.inner
@@ -80,6 +83,7 @@ pub struct ClientBullet {
     pub current_uv_begin: (f32, f32),
     pub current_uv_end: (f32, f32),
 }
+
 impl std::ops::Deref for ClientBullet {
     type Target = Bullet;
     fn deref(&self) -> &Bullet {
@@ -134,6 +138,8 @@ impl Client {
             server: None,
             config: Default::default(),
         };
+
+        spawn_gameshell(&mut s);
 
         s.logic.cam.zoom = 0.01;
         if graphics == GraphicsSettings::EnableGraphics {

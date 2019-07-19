@@ -14,6 +14,7 @@ pub mod server;
 pub use server::*;
 
 pub type Id = u32;
+pub type Reality = u8;
 pub use fast_logger::InDebug;
 
 pub struct Main {
@@ -161,13 +162,13 @@ static FIREBALLS: &dyntex::ImgData =
 static WEAPONS: &dyntex::ImgData =
     &dyntex::ImgData::PNGBytes(include_bytes!["../assets/images/weapons.png"]);
 
-pub fn initialize_grid(s: &mut Grid<(u8, u8, u8, u8)>) {
+pub fn initialize_grid(s: &mut Grid<Reality>) {
     s.resize(1000, 1000);
 }
 
-pub fn create_black_square_around_player(s: &mut Grid<(u8, u8, u8, u8)>) {
+pub fn create_black_square_around_player(s: &mut Grid<Reality>) {
     for (i, j) in Boxit::with_center((100, 100), (500, 300)) {
-        s.set(i, j, (0, 0, 0, 0));
+        s.set(i, j, 0);
     }
 }
 

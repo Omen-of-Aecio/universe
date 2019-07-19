@@ -34,7 +34,7 @@ pub struct Client {
 pub struct ClientLogic {
     pub should_exit: bool,
 
-    pub grid: Grid<(u8, u8, u8, u8)>,
+    pub grid: Grid<Reality>,
     pub config: WorldConfig,
     pub players: IndexMap<Id, ClientPlayer>,
     pub bullets: IndexMap<Id, ClientBullet>,
@@ -430,7 +430,7 @@ impl Client {
         strtex.read(&tex, |x, pitch| {
             for j in 0..1000 {
                 for i in 0..1000 {
-                    grid.set(i, j, x[i + j * pitch]);
+                    grid.set(i, j, x[i + j * pitch].0);
                 }
             }
         });

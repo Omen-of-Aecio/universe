@@ -14,12 +14,7 @@ const WORLD_WIDTH: usize = 1000;
 const WORLD_HEIGHT: usize = 1000;
 const WORLD_SEED: [f32; 3] = [0.0, 0.0, 0.0];
 
-fn generate_world(
-    w: usize,
-    h: usize,
-    seed: [f32; 3],
-    mut logger: Logger<Log>,
-) -> Grid<(u8, u8, u8, u8)> {
+fn generate_world(w: usize, h: usize, seed: [f32; 3], mut logger: Logger<Log>) -> Grid<Reality> {
     let mut grid = Grid::default();
     grid.resize(w, h);
     logger.info("server", "Initializing graphics");
@@ -45,7 +40,7 @@ fn generate_world(
     strtex.read(&tex, |x, pitch| {
         for j in 0..w {
             for i in 0..h {
-                grid.set(i, j, x[i + j * pitch]);
+                grid.set(i, j, x[i + j * pitch].0);
             }
         }
     });
@@ -194,7 +189,7 @@ impl Server {
 
 #[derive(Default, Debug)]
 pub struct ServerLogic {
-    pub grid: Grid<(u8, u8, u8, u8)>,
+    pub grid: Grid<Reality>,
     pub players: Vec<ServerPlayer>,
     pub bullets: Vec<Bullet>,
     pub config: WorldConfig,
@@ -271,14 +266,14 @@ impl ServerLogic {
     pub fn update_bullets(&mut self) {
         for b in self.bullets.iter_mut() {
             let collision =
-                collision_test(&[b.position], None, b.direction, &self.grid, |x| x.1 > 0);
+                collision_test(&[b.position], None, b.direction, &self.grid, |x| *x > 0);
             if let Some((xi, yi)) = collision {
                 let area = b.ty.get_stats().destruction;
                 for i in -area..=area {
                     for j in -area..=area {
                         let pos = (xi as i32 + i, yi as i32 + j);
                         let pos = (pos.0 as usize, pos.1 as usize);
-                        self.grid.set(pos.0, pos.1, (0, 0, 0, 0));
+                        self.grid.set(pos.0, pos.1, 0);
                         // self.changed_tiles.push((pos.0, pos.1));
                         // TODO: Need to update changed_tiles on client (based on what chunks it
                         // receives prolly)
@@ -333,7 +328,7 @@ impl UserInput {
 
 /// Returns true if collision happened on y axis
 fn check_for_collision_and_move_player_according_to_movement_vector(
-    grid: &Grid<(u8, u8, u8, u8)>,
+    grid: &Grid<Reality>,
     player: &mut PlayerData,
     logger: &mut Logger<Log>,
 ) -> bool {
@@ -361,7 +356,7 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
     };
     for i in 1..=10 {
         collision_y = collision_test(&[tl, tr, br, bl], Some(0.5), ymove / i as f32, grid, |x| {
-            x.1 > 0
+            *x > 0
         });
         if collision_y.is_none() {
             player.position += ymove / i as f32;
@@ -392,7 +387,7 @@ fn check_for_collision_and_move_player_according_to_movement_vector(
     };
     for i in 1..=10 {
         collision_x = collision_test(&[tl, tr, br, bl], Some(0.5), xmove / i as f32, grid, |x| {
-            x.1 > 0
+            *x > 0
         });
         if collision_x.is_none() {
             player.position += xmove / i as f32;

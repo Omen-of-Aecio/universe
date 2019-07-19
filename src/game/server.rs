@@ -62,6 +62,7 @@ pub struct Server {
     pub network: Socket,
     pub connections: BiMap<Id, SocketAddr>,
 }
+
 impl Server {
     pub fn new(logger: Logger<Log>) -> Server {
         let mut cfg = laminar::Config::default();
@@ -87,6 +88,7 @@ impl Server {
         self.config = s;
         self.logic.config = w;
     }
+
     pub fn tick_logic(&mut self) {
         self.update_network();
         self.logic
@@ -189,6 +191,7 @@ impl Server {
         unimplemented!()
     }
 }
+
 #[derive(Default, Debug)]
 pub struct ServerLogic {
     pub grid: Grid<(u8, u8, u8, u8)>,
@@ -199,6 +202,7 @@ pub struct ServerLogic {
     player_id: Id,
     bullet_id: Id,
 }
+
 impl ServerLogic {
     pub fn new(config: WorldConfig) -> Self {
         ServerLogic {
@@ -206,6 +210,7 @@ impl ServerLogic {
             ..Default::default()
         }
     }
+
     pub fn add_player(&mut self) -> Id {
         let id = self.player_id;
         self.player_id += 1;

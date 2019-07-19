@@ -177,12 +177,12 @@ impl Client {
 
     pub fn tick_logic(&mut self) {
         self.update_network();
-
         toggle_camera_mode(self);
         self.input.prepare_for_next_frame();
         if let Some(ref mut graphics) = self.graphics {
             process_input(&mut self.input, &mut graphics.windowing);
         }
+        move_camera_according_to_input(self);
         update_bullets_uv(&mut self.logic);
         std::thread::sleep(std::time::Duration::new(0, 8_000_000));
 

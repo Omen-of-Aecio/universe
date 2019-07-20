@@ -44,7 +44,7 @@ fn wait_for_threads_to_exit(s: Client) {
 // ---
 
 fn main() {
-    let mut logger = Logger::spawn();
+    let mut logger = Logger::spawn("main");
     logger.set_colorize(true);
     logger.set_context_specific_log_level("benchmark", 0);
     logger.set_log_level(196);
@@ -59,7 +59,7 @@ fn main() {
         let mut cli = Client::new(logger.clone(), GraphicsSettings::EnableGraphics);
         cli.apply_config(config.clone());
 
-        debug![logger, "main", "Sending message to"; "address" => address];
+        debug![logger, "Sending message to"; "address" => address];
         cli.network
             .send(Packet::reliable_unordered(address, vec![65, 66, 67, 68]))
             .expect("Unable to send message");

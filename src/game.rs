@@ -26,7 +26,7 @@ impl Main {
     pub fn new(mut cli: Option<Client>, srv: Option<Server>, mut logger: Logger<Log>) -> Main {
         if let (Some(cli), Some(srv)) = (&mut cli, &srv) {
             if let Err(e) = cli.connect_to_server(srv.network.local_addr().unwrap()) {
-                info![logger, "main", "Failed to connect to server"; "err" => e];
+                info![logger, "Failed to connect to server"; "err" => e];
             }
         }
         Main { cli, srv }

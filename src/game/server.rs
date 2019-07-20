@@ -17,8 +17,13 @@ const WORLD_SEED: [f32; 3] = [0.0, 0.0, 0.0];
 fn generate_world(w: usize, h: usize, seed: [f32; 3], mut logger: Logger<Log>) -> Grid<Reality> {
     let mut grid = Grid::default();
     grid.resize(w, h);
-    logger.info("server", "Initializing graphics");
-    let mut windowing = VxDraw::new(logger.clone().to_compatibility(), ShowWindow::Headless1k);
+    logger.info("Initializing graphics");
+    let mut windowing = VxDraw::new(
+        logger
+            .clone_with_context("vxdraw-server")
+            .to_compatibility(),
+        ShowWindow::Headless1k,
+    );
 
     {
         static BACKGROUND: &dyntex::ImgData =
@@ -103,7 +108,7 @@ impl Server {
                     if let Ok(msg) = msg {
                         match msg {
                             ClientMessage::Join => {
-                                info![self.logger, "server", "Received Join message"];
+                                info![self.logger, "Received Join message"];
                                 let id = self.logic.add_player();
 
                                 self.connections.insert(id, pkt.addr());
@@ -120,10 +125,7 @@ impl Server {
                                         .serialize(),
                                     ))
                                     .unwrap_or_else(|_| {
-                                        error![
-                                            self.logger,
-                                            "server", "Failed to send Welcome packet"
-                                        ];
+                                        error![self.logger, "Failed to send Welcome packet"];
                                     });
                             }
                             ClientMessage::Input {
@@ -147,17 +149,14 @@ impl Server {
                                     None => {
                                         error![
                                             self.logger,
-                                            "server", "Unregistered client sent Input message"
+                                            "Unregistered client sent Input message"
                                         ];
                                     }
                                 }
                             }
                         }
                     } else {
-                        error![
-                            self.logger,
-                            "server", "Failed to deserialize an incoming message"
-                        ];
+                        error![self.logger, "Failed to deserialize an incoming message"];
                     }
                 }
                 Some(SocketEvent::Connect(_addr)) => {}

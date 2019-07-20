@@ -286,7 +286,7 @@ pub fn log_trace(s: &mut GameShellContext, commands: &[Type]) -> Result<String, 
             _ => return Err("Error".into()),
         }
     }
-    s.logger.trace("user", Log::Dynamic(sum));
+    s.logger.trace(Log::Dynamic(sum));
     Ok("Ok".into())
 }
 
@@ -312,7 +312,7 @@ pub fn get_fps(s: &mut GameShellContext, _: &[Type]) -> Result<String, String> {
         let (tx, rx) = mpsc::sync_channel(0);
         let result = chan.send(Box::new(move |main: &mut Client| {
             let send_status = tx.send(main.config.fps);
-            debug![main.logger, "main", "Message reply"; "status" => InDebug(&send_status)];
+            debug![main.logger, "Message reply"; "status" => InDebug(&send_status)];
         }));
         let fps = rx.recv().unwrap();
         match result {

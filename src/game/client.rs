@@ -147,7 +147,7 @@ impl Client {
         }
 
         let port = s.network.local_addr().unwrap().port();
-        info![s.logger, "client", "Listening on port"; "port" => port];
+        info![s.logger, "Listening on port"; "port" => port];
         s
     }
     /// Assigns `config.client` to `self.config` and `config.world` to `self.logic.config`.
@@ -171,7 +171,7 @@ impl Client {
                 ClientMessage::Join.serialize(),
             ))
             .unwrap(); /* TODO!! ? operator doesn't work here */
-        info![self.logger, "client", "Sent Join"];
+        info![self.logger, "Sent Join"];
         Ok(())
     }
 
@@ -223,7 +223,7 @@ impl Client {
                             } => {
                                 self.server = Some(pkt.addr());
                                 self.logic.self_id = your_id;
-                                info![self.logger, "client", "Received Welcome message!"];
+                                info![self.logger, "Received Welcome message!"];
                             }
                             ServerMessage::State { players, bullets } => {
                                 for player in players {
@@ -291,10 +291,7 @@ impl Client {
                             }
                         }
                     } else {
-                        error![
-                            self.logger,
-                            "client", "Failed to deserialize an incoming message"
-                        ];
+                        error![self.logger, "Failed to deserialize an incoming message"];
                     }
                 }
                 Some(SocketEvent::Connect(_addr)) => {}
@@ -399,8 +396,13 @@ impl Client {
     }
 
     fn maybe_initialize_graphics(&mut self) {
-        self.logger.info("cli", "Initializing graphics");
-        let mut windowing = VxDraw::new(self.logger.clone().to_compatibility(), ShowWindow::Enable);
+        self.logger.info("Initializing graphics");
+        let mut windowing = VxDraw::new(
+            self.logger
+                .clone_with_context("vxdraw-client")
+                .to_compatibility(),
+            ShowWindow::Enable,
+        );
 
         {
             static BACKGROUND: &dyntex::ImgData = &dyntex::ImgData::PNGBytes(include_bytes![

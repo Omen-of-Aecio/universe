@@ -1,6 +1,7 @@
 use crate::game::{Client, GraphicsSettings, Main, Server};
 use clap::{App, Arg, ArgMatches};
 use failure::Error;
+use fast_logger::{debug, Logger};
 use laminar::Packet;
 use std::net::SocketAddr;
 use std::net::TcpStream;
@@ -43,7 +44,7 @@ fn wait_for_threads_to_exit(s: Client) {
 // ---
 
 fn main() {
-    let mut logger = fast_logger::Logger::spawn();
+    let mut logger = Logger::spawn();
     logger.set_colorize(true);
     logger.set_context_specific_log_level("benchmark", 0);
     logger.set_log_level(196);
@@ -58,7 +59,7 @@ fn main() {
         let mut cli = Client::new(logger.clone(), GraphicsSettings::EnableGraphics);
         cli.apply_config(config.clone());
 
-        eprintln!("\nSending message to {:?}\n", address);
+        debug![logger, "main", "Sending message to"; "address" => address];
         cli.network
             .send(Packet::reliable_unordered(address, vec![65, 66, 67, 68]))
             .expect("Unable to send message");

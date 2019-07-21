@@ -9,7 +9,7 @@ use rodio;
 use std::net::SocketAddr;
 
 use cgmath::*;
-use fast_logger::{info, GenericLogger, Logger};
+use fast_logger::{info, warn, GenericLogger, Logger};
 use input::Input;
 use std::time::Instant;
 use winit::{VirtualKeyCode as Key, *};
@@ -51,7 +51,6 @@ pub struct ClientLogic {
 
     pub cam_mode: CameraMode,
 
-    pub changed_tiles: Vec<(usize, usize)>,
     pub bullets_added: Vec<Vec2>,
 }
 
@@ -286,8 +285,44 @@ impl Client {
                                     }
                                 }
                             }
-                            ServerMessage::DeltaState { removed: _ } => {
-                                // TODO
+                            ServerMessage::DeltaState {
+                                removed,
+                                grid_changes,
+                            } => {
+                                // TODO removed
+                                for (id, ty) in removed {
+                                    match ty {
+                                        EntityType::Bullet => {
+                                            match self.logic.bullets.remove(&id) {
+                                                Some(removed_bullet) => {
+                                                    if let Some(ref mut gfx) = self.graphics {
+                                                        gfx.windowing
+                                                            .dyntex()
+                                                            .remove(removed_bullet.handle);
+                                                    }
+                                                }
+                                                None => {
+                                                    warn![self.logger, "Remove nonexistent bullet"]
+                                                }
+                                            }
+                                        }
+                                        EntityType::Player => unimplemented!(),
+                                    }
+                                }
+
+                                if let Some(ref mut graphics) = self.graphics {
+                                    // info![self.logger, "Received DeltaState"; "changes" => grid_changes.len()];
+                                    graphics.windowing.strtex().set_pixels(
+                                        &graphics.grid,
+                                        grid_changes.iter().map(|pos| {
+                                            (pos.0 as u32, pos.1 as u32, Color::Rgba(0, 0, 0, 255))
+                                        }),
+                                    );
+                                }
+                                // TODO update grid
+                                for (x, y, v) in grid_changes {
+                                    self.logic.grid.set(x as usize, y as usize, v);
+                                }
                             }
                         }
                     } else {
@@ -567,14 +602,6 @@ fn toggle_camera_mode(s: &mut Client) {
 }
 fn update_graphics(s: &mut Client) {
     if let Some(ref mut graphics) = s.graphics {
-        let changeset = &s.logic.changed_tiles;
-        graphics.windowing.strtex().set_pixels(
-            &graphics.grid,
-            changeset
-                .iter()
-                .map(|pos| (pos.0 as u32, pos.1 as u32, Color::Rgba(0, 0, 0, 255))),
-        );
-
         graphics.windowing.dyntex().set_uvs(
             s.logic
                 .bullets
@@ -617,7 +644,6 @@ fn update_graphics(s: &mut Client) {
             &graphics.player_quads[0],
         );
     }
-    s.logic.changed_tiles.clear();
 }
 fn draw_graphics(s: &mut Client) {
     if let Some(ref mut graphics) = s.graphics {

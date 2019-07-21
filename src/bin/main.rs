@@ -56,7 +56,10 @@ fn main() {
     if let Some(address) = matches.value_of("connect") {
         let address: SocketAddr = address.parse().expect("Not a valid ip:port argument");
 
-        let mut cli = Client::new(logger.clone(), GraphicsSettings::EnableGraphics);
+        let mut cli = Client::new(
+            logger.clone_with_context("client"),
+            GraphicsSettings::EnableGraphics,
+        );
         cli.apply_config(config.clone());
 
         debug![logger, "Sending message to"; "address" => address];
@@ -66,9 +69,12 @@ fn main() {
         unimplemented!();
     } else {
         // Run client + server
-        let mut cli = Client::new(logger.clone(), GraphicsSettings::EnableGraphics);
+        let mut cli = Client::new(
+            logger.clone_with_context("client"),
+            GraphicsSettings::EnableGraphics,
+        );
         cli.apply_config(config.clone());
-        let mut srv = Server::new(logger.clone());
+        let mut srv = Server::new(logger.clone_with_context("server"));
         srv.apply_config(config.clone());
         let mut main = Main::new(Some(cli), Some(srv), logger.clone());
         main.entry_point();

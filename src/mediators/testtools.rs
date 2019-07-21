@@ -1,7 +1,4 @@
-use crate::{
-    game::{Client, Main},
-    glocals::*,
-};
+use crate::game::{Client, Main};
 use std::net::TcpStream;
 
 pub fn spawn_gameshell(s: &mut Client) {

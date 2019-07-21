@@ -39,7 +39,10 @@ pub enum ServerMessage {
         bullets: Vec<Bullet>,
     },
     /// Part of state update that is represented by a _change_, and thus sent _reliably_.
-    DeltaState { removed: Vec<(Id, EntityType)> },
+    DeltaState {
+        removed: Vec<(Id, EntityType)>,
+        grid_changes: Vec<(u32, u32, u8)>,
+    },
 }
 impl ServerMessage {
     pub fn serialize(&self) -> Vec<u8> {

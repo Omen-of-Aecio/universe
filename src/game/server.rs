@@ -166,16 +166,28 @@ impl Server {
         }
         // Send state updates
         let players: Vec<_> = self.logic.players.iter().map(|p| p.inner.clone()).collect();
-        let data = ServerMessage::State {
+        let state_data = ServerMessage::State {
             players: players.clone(),
             bullets: self.logic.bullets.clone(),
         }
         .serialize();
+        let delta_data = ServerMessage::DeltaState {
+            removed: self.logic.removed.clone(),
+            grid_changes: self.logic.grid_changes.clone(),
+        }
+        .serialize();
         for cli_addr in self.connections.right_values() {
             self.network
-                .send(Packet::unreliable(*cli_addr, data.clone()))
+                .send(Packet::unreliable(*cli_addr, state_data.clone()))
+                .unwrap();
+            self.network
+                .send(Packet::reliable_unordered(*cli_addr, delta_data.clone()))
                 .unwrap();
         }
+
+        // Cleanup / reset state
+        self.logic.grid_changes = Vec::new();
+        self.logic.removed = Vec::new();
     }
     /// Returns a Vec of `ServerMessage::State`, which altogether encode the entire state
     fn prepare_packets(&self, max_pkt_size: usize) -> Vec<ServerMessage> {
@@ -195,6 +207,9 @@ pub struct ServerLogic {
     // ID counters
     player_id: Id,
     bullet_id: Id,
+    //
+    grid_changes: Vec<(u32, u32, Reality)>,
+    removed: Vec<(Id, EntityType)>,
 }
 
 impl ServerLogic {
@@ -263,24 +278,41 @@ impl ServerLogic {
     }
 
     pub fn update_bullets(&mut self) {
-        for b in self.bullets.iter_mut() {
+        let mut to_remove = Vec::new();
+        for (idx, b) in self.bullets.iter_mut().enumerate() {
             let collision =
                 collision_test(&[b.position], None, b.direction, &self.grid, |x| *x > 0);
             if let Some((xi, yi)) = collision {
+                to_remove.push(idx);
                 let area = b.ty.get_stats().destruction;
                 for i in -area..=area {
                     for j in -area..=area {
                         let pos = (xi as i32 + i, yi as i32 + j);
                         let pos = (pos.0 as usize, pos.1 as usize);
                         self.grid.set(pos.0, pos.1, 0);
-                        // self.changed_tiles.push((pos.0, pos.1));
-                        // TODO: Need to update changed_tiles on client (based on what chunks it
-                        // receives prolly)
+                        self.grid_changes.push((pos.0 as u32, pos.1 as u32, 0));
                     }
                 }
             } else {
                 b.position += b.direction;
             }
+        }
+
+        // Remove bullets
+        use std::cmp::Ordering;
+        to_remove.sort_by(|x, y| {
+            if *x < *y {
+                Ordering::Greater
+            } else if *x == *y {
+                Ordering::Equal
+            } else {
+                Ordering::Less
+            }
+        });
+
+        for idx in to_remove {
+            let bullet = self.bullets.swap_remove(idx);
+            self.removed.push((bullet.id, EntityType::Bullet));
         }
     }
 }

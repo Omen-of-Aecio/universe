@@ -1,11 +1,13 @@
 use crate::game::{Client, GraphicsSettings, Main, Server};
 use clap::{App, Arg, ArgMatches};
-use failure::Error;
+use failure;
 use fast_logger::{debug, Logger};
+use file_rotate::{FileRotate, RotationMode};
 use laminar::Packet;
 use std::net::SocketAddr;
 use std::net::TcpStream;
 use std::sync::atomic::Ordering;
+use std::{error::Error, fmt, fs, io};
 use universe::{glocals::*, *};
 
 // ---
@@ -25,7 +27,7 @@ fn parse_arguments() -> ArgMatches<'static> {
         .get_matches()
 }
 
-fn read_config(path: &str) -> Result<Config, Error> {
+fn read_config(path: &str) -> Result<Config, failure::Error> {
     let contents = std::fs::read_to_string(path)?;
     Ok(toml::from_str(&contents)?)
 }
@@ -43,8 +45,13 @@ fn wait_for_threads_to_exit(s: Client) {
 
 // ---
 
-fn main() {
-    let mut logger = Logger::spawn("main");
+fn main() -> io::Result<()> {
+    fs::create_dir("logs")?;
+    let writer = OrWriter {
+        left: FileRotate::new("logs/log", RotationMode::Lines(10_000), 3),
+        right: io::stdout(),
+    };
+    let mut logger = Logger::spawn_with_writer("main", writer);
     logger.set_colorize(true);
     logger.set_context_specific_log_level("benchmark", 0);
     logger.set_log_level(196);
@@ -78,5 +85,63 @@ fn main() {
         srv.apply_config(config.clone());
         let mut main = Main::new(Some(cli), Some(srv), logger.clone());
         main.entry_point();
+    }
+
+    Ok(())
+}
+
+#[derive(Debug)]
+struct DualError {
+    left: Option<io::Error>,
+    right: Option<io::Error>,
+}
+
+impl Error for DualError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
+    }
+}
+
+impl fmt::Display for DualError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(ref err) = self.left {
+            write![f, "{}", err]?;
+        }
+        if let Some(ref err) = self.right {
+            if self.left.is_some() {
+                write![f, "\n"]?;
+            }
+            write![f, "{}", err]?;
+        }
+        Ok(())
+    }
+}
+
+/// Writes input
+struct OrWriter<L: io::Write, R: io::Write> {
+    left: L,
+    right: R,
+}
+
+impl<L: io::Write, R: io::Write> io::Write for OrWriter<L, R> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let left_result = self.left.write_all(buf);
+        let right_result = self.right.write_all(buf);
+
+        if left_result.is_err() || right_result.is_err() {
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                Box::new(DualError {
+                    left: left_result.err(),
+                    right: right_result.err(),
+                }),
+            ))
+        } else {
+            Ok(buf.len())
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }

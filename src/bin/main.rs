@@ -46,7 +46,7 @@ fn wait_for_threads_to_exit(s: Client) {
 // ---
 
 fn main() -> io::Result<()> {
-    fs::create_dir("logs")?;
+    let _ = fs::create_dir("logs");
     let writer = OrWriter {
         left: FileRotate::new("logs/log", RotationMode::Lines(10_000), 3),
         right: io::stdout(),

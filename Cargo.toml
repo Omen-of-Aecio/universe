@@ -72,7 +72,7 @@ slog-term = "2.3"
 slog = "2.3"
 
 [features]
-default = ["vulkan"]
+default = ["vulkan", "gameshell/with-quickcheck"]
 dev = []
 dx12 = ["gfx-backend-dx12"]
 gl = ["gfx-backend-gl", "glutin"]

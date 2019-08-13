@@ -88,7 +88,7 @@ fn spawn_with_listener(logger: Logger<Log>, listener: TcpListener, port: u16) ->
                 game_shell_thread(
                     GameShellContext {
                         config_change: Some(tx_clone),
-                        logger,
+                        logger: logger.clone_with_context("gsh"),
                         keep_running,
                         variables: HashMap::new(),
                     },

@@ -165,10 +165,7 @@ impl Client {
     /// Note that completion of the handshake takes place in `self.tick_logic()`.
     pub fn connect_to_server(&mut self, addr: SocketAddr) -> Result<(), Error> {
         self.network
-            .send(Packet::reliable_unordered(
-                addr,
-                ClientMessage::Join.serialize(),
-            ))
+            .send(Packet::unreliable(addr, ClientMessage::Join.serialize()))
             .unwrap(); /* TODO!! ? operator doesn't work here */
         info![self.logger, "Sent Join"];
         Ok(())
@@ -301,9 +298,7 @@ impl Client {
                                                             .remove(removed_bullet.handle);
                                                     }
                                                 }
-                                                None => {
-                                                    warn![self.logger, "Remove nonexistent bullet"]
-                                                }
+                                                None => warn![self.logger, "Remove nonexistent bullet"; "id" => id],
                                             }
                                         }
                                         EntityType::Player => unimplemented!(),

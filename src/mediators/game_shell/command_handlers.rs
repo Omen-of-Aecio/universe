@@ -8,10 +8,10 @@ pub fn void(_: &mut GameShellContext, _: &[Type]) -> Result<String, String> {
     Ok("".into())
 }
 
-pub fn add(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
+pub fn add(_: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
     let mut sum: i32 = 0;
-    for cmd in commands {
-        match cmd {
+    for arg in args {
+        match arg {
             Type::I32(x) => {
                 sum = if let Some(num) = sum.checked_add(*x) {
                     num
@@ -27,12 +27,12 @@ pub fn add(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String
     Ok(sum.to_string())
 }
 
-pub fn sub(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
+pub fn sub(_: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
     let mut sum = 0;
-    if let Some(cmd) = commands.iter().next() {
-        match cmd {
+    if let Some(arg) = args.iter().next() {
+        match arg {
             Type::I32(x) => {
-                sum = if commands.len() == 1 {
+                sum = if args.len() == 1 {
                     if let Some(num) = x.checked_neg() {
                         num
                     } else {
@@ -47,8 +47,8 @@ pub fn sub(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String
             }
         }
     }
-    for cmd in commands.iter().skip(1) {
-        match cmd {
+    for arg in args.iter().skip(1) {
+        match arg {
             Type::I32(x) => {
                 sum = if let Some(num) = sum.checked_sub(*x) {
                     num
@@ -64,10 +64,10 @@ pub fn sub(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String
     Ok(sum.to_string())
 }
 
-pub fn mul(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
+pub fn mul(_: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
     let mut sum: i32 = 1;
-    for cmd in commands {
-        match cmd {
+    for arg in args {
+        match arg {
             Type::I32(x) => {
                 sum = if let Some(num) = sum.checked_mul(*x) {
                     num
@@ -83,10 +83,10 @@ pub fn mul(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String
     Ok(sum.to_string())
 }
 
-pub fn div(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
+pub fn div(_: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
     let mut sum: i32 = 0;
-    if let Some(cmd) = commands.iter().next() {
-        match cmd {
+    if let Some(arg) = args.iter().next() {
+        match arg {
             Type::I32(x) => {
                 sum = *x;
             }
@@ -95,8 +95,8 @@ pub fn div(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String
             }
         }
     }
-    for cmd in commands.iter().skip(1) {
-        match cmd {
+    for arg in args.iter().skip(1) {
+        match arg {
             Type::I32(x) => {
                 sum = if let Some(num) = sum.checked_div(*x) {
                     num
@@ -114,10 +114,10 @@ pub fn div(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String
     Ok(sum.to_string())
 }
 
-pub fn modulo(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
+pub fn modulo(_: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
     let mut sum = 0;
-    if let Some(cmd) = commands.iter().next() {
-        match cmd {
+    if let Some(arg) = args.iter().next() {
+        match arg {
             Type::I32(x) => {
                 sum = *x;
             }
@@ -126,8 +126,8 @@ pub fn modulo(_: &mut GameShellContext, commands: &[Type]) -> Result<String, Str
             }
         }
     }
-    for cmd in commands.iter().skip(1) {
-        match cmd {
+    for arg in args.iter().skip(1) {
+        match arg {
             Type::I32(x) => {
                 sum = if let Some(num) = sum.checked_rem(*x) {
                     num
@@ -145,10 +145,10 @@ pub fn modulo(_: &mut GameShellContext, commands: &[Type]) -> Result<String, Str
     Ok(sum.to_string())
 }
 
-pub fn xor(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
+pub fn xor(_: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
     let mut sum = 0;
-    if let Some(cmd) = commands.iter().next() {
-        match cmd {
+    if let Some(arg) = args.iter().next() {
+        match arg {
             Type::I32(x) => {
                 sum = *x;
             }
@@ -157,8 +157,8 @@ pub fn xor(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String
             }
         }
     }
-    for cmd in commands.iter().skip(1) {
-        match cmd {
+    for arg in args.iter().skip(1) {
+        match arg {
             Type::I32(x) => {
                 sum ^= x;
             }
@@ -170,10 +170,10 @@ pub fn xor(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String
     Ok(sum.to_string())
 }
 
-pub fn band(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
+pub fn band(_: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
     let mut sum = 0;
-    if let Some(cmd) = commands.iter().next() {
-        match cmd {
+    if let Some(arg) = args.iter().next() {
+        match arg {
             Type::I32(x) => {
                 sum = *x;
             }
@@ -182,8 +182,8 @@ pub fn band(_: &mut GameShellContext, commands: &[Type]) -> Result<String, Strin
             }
         }
     }
-    for cmd in commands.iter().skip(1) {
-        match cmd {
+    for arg in args.iter().skip(1) {
+        match arg {
             Type::I32(x) => {
                 sum &= x;
             }
@@ -195,10 +195,10 @@ pub fn band(_: &mut GameShellContext, commands: &[Type]) -> Result<String, Strin
     Ok(sum.to_string())
 }
 
-pub fn bor(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
+pub fn bor(_: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
     let mut sum = 0;
-    if let Some(cmd) = commands.iter().next() {
-        match cmd {
+    if let Some(arg) = args.iter().next() {
+        match arg {
             Type::I32(x) => {
                 sum = *x;
             }
@@ -207,8 +207,8 @@ pub fn bor(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String
             }
         }
     }
-    for cmd in commands.iter().skip(1) {
-        match cmd {
+    for arg in args.iter().skip(1) {
+        match arg {
             Type::I32(x) => {
                 sum |= x;
             }
@@ -220,10 +220,10 @@ pub fn bor(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String
     Ok(sum.to_string())
 }
 
-pub fn cat(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
+pub fn cat(_: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
     let mut string = String::new();
-    for cmd in commands {
-        match cmd {
+    for arg in args {
+        match arg {
             Type::String(res) => {
                 string += res;
             }
@@ -235,8 +235,8 @@ pub fn cat(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String
     Ok(string)
 }
 
-pub fn do_get(gsh: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
-    if let [Type::String(key)] = commands {
+pub fn do_get(gsh: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
+    if let [Type::String(key)] = args {
         if let Some(string) = gsh.variables.get(key) {
             Ok(string.clone())
         } else {
@@ -247,8 +247,8 @@ pub fn do_get(gsh: &mut GameShellContext, commands: &[Type]) -> Result<String, S
     }
 }
 
-pub fn do_set(gsh: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
-    if let [Type::String(key), Type::String(value)] = commands {
+pub fn do_set(gsh: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
+    if let [Type::String(key), Type::String(value)] = args {
         gsh.variables.insert(key.clone(), value.clone());
         Ok("Ok".into())
     } else {
@@ -256,16 +256,16 @@ pub fn do_set(gsh: &mut GameShellContext, commands: &[Type]) -> Result<String, S
     }
 }
 
-pub fn create_string(_: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
-    if let [Type::String(command)] = commands {
+pub fn create_string(_: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
+    if let [Type::String(command)] = args {
         Ok(command.clone())
     } else {
         return Err("Did not get command".into());
     }
 }
 
-pub fn log(s: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
-    if let [Type::U8(level)] = commands {
+pub fn log(s: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
+    if let [Type::U8(level)] = args {
         s.logger.set_log_level(*level);
         Ok("Ok: Changed log level".into())
     } else {
@@ -273,12 +273,12 @@ pub fn log(s: &mut GameShellContext, commands: &[Type]) -> Result<String, String
     }
 }
 
-pub fn log_trace(s: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
+pub fn log_trace(s: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
     let mut sum = String::new();
-    for (idx, cmd) in commands.iter().enumerate() {
-        match cmd {
+    for (idx, arg) in args.iter().enumerate() {
+        match arg {
             Type::String(ref string) => {
-                if idx + 1 < commands.len() && idx != 0 {
+                if idx + 1 < args.len() && idx != 0 {
                     sum.push(' ');
                 }
                 sum += string;
@@ -290,9 +290,9 @@ pub fn log_trace(s: &mut GameShellContext, commands: &[Type]) -> Result<String, 
     Ok("Ok".into())
 }
 
-pub fn set_gravity(s: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
+pub fn set_gravity(s: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
     if let Some(ref mut chan) = s.config_change {
-        if let Type::F32(value) = commands[0] {
+        if let Type::F32(value) = args[0] {
             match chan.send(Box::new(move |main: &mut Client| {
                 main.logic.config.gravity = value;
             })) {
@@ -324,9 +324,9 @@ pub fn get_fps(s: &mut GameShellContext, _: &[Type]) -> Result<String, String> {
     }
 }
 
-pub fn set_fps(s: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
+pub fn set_fps(s: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
     if let Some(ref mut chan) = s.config_change {
-        if let [Type::F32(fps)] = commands {
+        if let [Type::F32(fps)] = args {
             let fps = *fps;
             match chan.send(Box::new(move |main: &mut Client| {
                 main.config.fps = fps;
@@ -342,9 +342,9 @@ pub fn set_fps(s: &mut GameShellContext, commands: &[Type]) -> Result<String, St
     }
 }
 
-pub fn enable_gravity(s: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
+pub fn enable_gravity(s: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
     if let Some(ref mut chan) = s.config_change {
-        if let Type::Bool(value) = commands[0] {
+        if let Type::Bool(value) = args[0] {
             match chan.send(Box::new(move |main: &mut Client| {
                 main.logic.config.gravity_on = value;
             })) {
@@ -359,8 +359,8 @@ pub fn enable_gravity(s: &mut GameShellContext, commands: &[Type]) -> Result<Str
     }
 }
 
-pub fn log_context(s: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
-    if let [Type::Atom(context), Type::U8(level)] = commands {
+pub fn log_context(s: &mut GameShellContext, args: &[Type]) -> Result<String, String> {
+    if let [Type::Atom(context), Type::U8(level)] = args {
         if s.logger.set_context_specific_log_level(context, *level) {
             Ok("Ok: Changed log level".into())
         } else {
@@ -377,26 +377,26 @@ mod tests {
     use gameshell::types::*;
 
     #[quickcheck_macros::quickcheck]
-    fn log_context_quickcheck(commands: Vec<Type>) {
-        let _ = log_context(&mut GameShellContext::default(), &commands[..]);
-        let _ = set_fps(&mut GameShellContext::default(), &commands[..]);
+    fn log_context_quickcheck(args: Vec<Type>) {
+        let _ = log_context(&mut GameShellContext::default(), &args[..]);
+        let _ = set_fps(&mut GameShellContext::default(), &args[..]);
 
-        let _ = add(&mut GameShellContext::default(), &commands[..]);
-        let _ = sub(&mut GameShellContext::default(), &commands[..]);
-        let _ = mul(&mut GameShellContext::default(), &commands[..]);
-        let _ = div(&mut GameShellContext::default(), &commands[..]);
-        let _ = modulo(&mut GameShellContext::default(), &commands[..]);
-        let _ = xor(&mut GameShellContext::default(), &commands[..]);
-        let _ = band(&mut GameShellContext::default(), &commands[..]);
-        let _ = bor(&mut GameShellContext::default(), &commands[..]);
+        let _ = add(&mut GameShellContext::default(), &args[..]);
+        let _ = sub(&mut GameShellContext::default(), &args[..]);
+        let _ = mul(&mut GameShellContext::default(), &args[..]);
+        let _ = div(&mut GameShellContext::default(), &args[..]);
+        let _ = modulo(&mut GameShellContext::default(), &args[..]);
+        let _ = xor(&mut GameShellContext::default(), &args[..]);
+        let _ = band(&mut GameShellContext::default(), &args[..]);
+        let _ = bor(&mut GameShellContext::default(), &args[..]);
 
-        let _ = cat(&mut GameShellContext::default(), &commands[..]);
-        let _ = do_get(&mut GameShellContext::default(), &commands[..]);
-        let _ = do_set(&mut GameShellContext::default(), &commands[..]);
-        let _ = create_string(&mut GameShellContext::default(), &commands[..]);
-        let _ = log(&mut GameShellContext::default(), &commands[..]);
-        let _ = log_trace(&mut GameShellContext::default(), &commands[..]);
-        let _ = set_gravity(&mut GameShellContext::default(), &commands[..]);
-        let _ = enable_gravity(&mut GameShellContext::default(), &commands[..]);
+        let _ = cat(&mut GameShellContext::default(), &args[..]);
+        let _ = do_get(&mut GameShellContext::default(), &args[..]);
+        let _ = do_set(&mut GameShellContext::default(), &args[..]);
+        let _ = create_string(&mut GameShellContext::default(), &args[..]);
+        let _ = log(&mut GameShellContext::default(), &args[..]);
+        let _ = log_trace(&mut GameShellContext::default(), &args[..]);
+        let _ = set_gravity(&mut GameShellContext::default(), &args[..]);
+        let _ = enable_gravity(&mut GameShellContext::default(), &args[..]);
     }
 }

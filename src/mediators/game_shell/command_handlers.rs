@@ -361,19 +361,11 @@ pub fn enable_gravity(s: &mut GameShellContext, commands: &[Type]) -> Result<Str
 
 pub fn log_context(s: &mut GameShellContext, commands: &[Type]) -> Result<String, String> {
     if let [Type::Atom(context), Type::U8(level)] = commands {
-        let ctx = match &context[..] {
-            "benchmark" => "benchmark",
-            "cli" => "cli",
-            "client" => "client",
-            "gsh" => "gsh",
-            "logger" => "logger",
-            "server" => "server",
-            "trace" => "trace",
-            "vxdraw-client" => "vxdraw-client",
-            _ => return Err("Invalid logging context".into()),
-        };
-        s.logger.set_context_specific_log_level(ctx, *level);
-        Ok("Ok: Changed log level".into())
+        if s.logger.set_context_specific_log_level(context, *level) {
+            Ok("Ok: Changed log level".into())
+        } else {
+            Err("Invalid logging context".into())
+        }
     } else {
         Err("Usage: log context <atom> level <u8>".into())
     }

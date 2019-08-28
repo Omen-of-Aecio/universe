@@ -382,6 +382,11 @@ mod tests {
                 .unwrap()
         ];
         assert_eq![
+            Feedback::Err("Invalid logging context".into()),
+            gsh.interpret_single("log context gsh level 123")
+                .unwrap()
+        ];
+        assert_eq![
             Feedback::Ok("alphabetagammayotta6Hello World".into()),
             gsh.interpret_single("cat alpha beta (cat gamma yotta) (+ 1 2 3) (#Hello World)")
                 .unwrap()

@@ -122,5 +122,4 @@ mod tests {
         assert![Some(&false) == grid.get(5, 11)];
         assert![Some(&false) == grid.get(6, 11)];
     }
-
 }

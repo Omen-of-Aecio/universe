@@ -94,7 +94,7 @@ mkdir -p _build/crates
 has_failed=0
 
 set +e
-RUST_BACKTRACE=1 cargo test --verbose --all >& _build/main.test_result
+RUST_BACKTRACE=1 cargo test --verbose --all --features "${RUN_ON_TRAVIS:-gui-tests}" >& _build/main.test_result
 if [ "$?" -ne 0 ]; then
     echo "FAIL: main"
     cat _build/main.test_result

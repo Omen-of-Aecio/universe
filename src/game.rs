@@ -320,6 +320,7 @@ mod tests {
     use fast_logger::Logger;
 
     #[test]
+    #[cfg(feature = "gui-tests")]
     fn basic_setup_and_teardown() {
         Server::new(Logger::spawn_void());
     }
@@ -386,6 +387,7 @@ mod tests {
     // ---
 
     #[test]
+    #[cfg(feature = "gui-tests")]
     fn client_and_server() {
         let lgr = Logger::spawn_void();
         let mut srv = Server::new(lgr.clone());

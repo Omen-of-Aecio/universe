@@ -11,4 +11,4 @@ DIR="${DIR##*/}"
 
 ./.pre-commit
 
-cargo clippy -- -D all
+cargo clippy -- -D warnings

@@ -30,4 +30,4 @@ before-cache:
     - rm -rf $HOME/.cargo/registry
 script:
   - export PATH="$PATH:/usr/bin"
-  - travis_wait 50 ./scripts/run-all --filter 'run-vulkan-validation|run-all-benchmarks|run-fuzzing-tests|crates/vxdraw'
+  - travis_wait 50 xvfb-run --server-args="-screen 0 1920x1080x24" ./scripts/run-all --filter 'run-vulkan-validation|run-all-benchmarks|run-fuzzing-tests|crates/vxdraw'

@@ -32,15 +32,18 @@ fn read_config(path: &str) -> Result<Config, failure::Error> {
     Ok(toml::from_str(&contents)?)
 }
 
-fn wait_for_threads_to_exit(s: Client) {
-    if let Some(x) = s.threads.game_shell_keep_running {
+fn wait_for_threads_to_exit(s: &mut Client) {
+    if let Some(ref x) = &s.threads.game_shell_keep_running {
         x.store(false, Ordering::Relaxed);
     }
 
     let tcp = TcpStream::connect("127.0.0.1:32931");
     std::mem::drop(tcp);
 
-    s.threads.game_shell.map(std::thread::JoinHandle::join);
+    s.threads
+        .game_shell
+        .take()
+        .map(std::thread::JoinHandle::join);
 }
 
 // ---
@@ -85,6 +88,10 @@ fn main() -> io::Result<()> {
         srv.apply_config(config.clone());
         let mut main = Main::new(Some(cli), Some(srv), logger.clone());
         main.entry_point();
+
+        if let Some(ref mut cli) = main.cli.take() {
+            wait_for_threads_to_exit(cli);
+        }
     }
 
     Ok(())
@@ -109,7 +116,7 @@ impl fmt::Display for DualError {
         }
         if let Some(ref err) = self.right {
             if self.left.is_some() {
-                write![f, "\n"]?;
+                writeln![f]?;
             }
             write![f, "{}", err]?;
         }

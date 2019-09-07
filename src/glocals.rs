@@ -24,6 +24,8 @@ pub struct GshSpawn {
     pub channel_send: mpsc::SyncSender<Box<dyn Fn(&mut Client) + Send>>,
 }
 
+type ClientFn = Box<dyn Fn(&mut Client) + Send>;
+
 #[derive(Default)]
 pub struct Threads {
     // TODO name
@@ -31,6 +33,6 @@ pub struct Threads {
     pub game_shell_keep_running: Option<Arc<AtomicBool>>,
     pub game_shell_port: Option<u16>,
     pub game_shell_channel: Option<GshChannelRecv>,
-    pub game_shell_channel_send: Option<mpsc::SyncSender<Box<dyn Fn(&mut Client) + Send>>>,
+    pub game_shell_channel_send: Option<mpsc::SyncSender<ClientFn>>,
     pub game_shell_connection: Option<TcpStream>,
 }

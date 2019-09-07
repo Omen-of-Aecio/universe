@@ -118,8 +118,7 @@ pub fn collision_test<T: Clone + Default>(
                 .filter_map(|i| {
                     let i = i as f32;
                     let point = project_dir.scale_uni(min + i * dist_between_points);
-                    let a = furthest_line_shape_intersection(vertices, point, dir);
-                    a
+                    furthest_line_shape_intersection(vertices, point, dir)
                 })
                 .collect();
             points

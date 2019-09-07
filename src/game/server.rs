@@ -133,16 +133,17 @@ impl Server {
                                 let id = self.connections.get_by_right(&pkt.addr());
                                 match id {
                                     Some(id) => {
-                                        self.logic
+                                        if let Some(player) = self
+                                            .logic
                                             .players
                                             .iter_mut()
                                             .find(|player| player.id == *id)
-                                            .map(|player| {
-                                                for cmd in commands {
-                                                    player.input.apply_command(cmd);
-                                                }
-                                                player.input.mouse_pos = mouse_pos;
-                                            });
+                                        {
+                                            for cmd in commands {
+                                                player.input.apply_command(cmd);
+                                            }
+                                            player.input.mouse_pos = mouse_pos;
+                                        }
                                     }
                                     None => {
                                         error![
@@ -187,13 +188,6 @@ impl Server {
         self.logic.grid_changes = Vec::new();
         self.logic.removed = Vec::new();
     }
-    /// Returns a Vec of `ServerMessage::State`, which altogether encode the entire state
-    fn prepare_packets(&self, max_pkt_size: usize) -> Vec<ServerMessage> {
-        // std::mem::size_of::<PlayerData>()
-        // std::mem::size_of::<Bullet>()
-        // TODO
-        unimplemented!()
-    }
 }
 
 #[derive(Default, Debug)]
@@ -223,7 +217,7 @@ impl ServerLogic {
         self.player_id += 1;
         let player = ServerPlayer {
             inner: PlayerData::new(id, 0, Vec2::null_vec()),
-            input: UserInput::new(),
+            input: UserInput::default(),
         };
         self.players.push(player);
         id
@@ -340,13 +334,15 @@ pub struct UserInput {
     pub mouse_pos: (f32, f32),
 }
 
-impl UserInput {
-    pub fn new() -> UserInput {
-        UserInput {
+impl Default for UserInput {
+    fn default() -> Self {
+        Self {
             keys: vec![false; InputKey::LeftMouse as usize + 1],
             mouse_pos: (0.0, 0.0),
         }
     }
+}
+impl UserInput {
     pub fn apply_command(&mut self, cmd: InputCommand) {
         self.keys[cmd.key as usize] = cmd.is_pressed;
     }
@@ -359,9 +355,9 @@ impl UserInput {
 fn check_for_collision_and_move_player_according_to_movement_vector(
     grid: &Grid<Reality>,
     player: &mut PlayerData,
-    logger: &mut Logger<Log>,
+    _logger: &mut Logger<Log>,
 ) -> bool {
-    let movement = player.velocity.clone();
+    let movement = player.velocity;
     let tl = Vec2 {
         x: player.position.x + 0.01,
         y: player.position.y + 0.01,

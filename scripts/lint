@@ -10,3 +10,5 @@ DIR="${DIR%/*}"
 DIR="${DIR##*/}"
 
 ./.pre-commit
+
+cargo clippy -- -D all

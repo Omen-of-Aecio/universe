@@ -96,8 +96,8 @@ pub enum Weapon {
 }
 
 impl Weapon {
-    pub fn get_stats(&self) -> WeaponStats {
-        match *self {
+    pub fn get_stats(self) -> WeaponStats {
+        match self {
             Weapon::Hellfire => WeaponStats {
                 width: 10,
                 height: 6,

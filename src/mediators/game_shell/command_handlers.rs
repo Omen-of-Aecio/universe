@@ -260,7 +260,7 @@ pub fn create_string(_: &mut GameShellContext, args: &[Type]) -> Result<String, 
     if let [Type::String(command)] = args {
         Ok(command.clone())
     } else {
-        return Err("Did not get command".into());
+        Err("Did not get command".into())
     }
 }
 
@@ -335,7 +335,7 @@ pub fn set_fps(s: &mut GameShellContext, args: &[Type]) -> Result<String, String
                 _ => Err("Unable to send message to main".into()),
             }
         } else {
-            return Err("Fps value is negative".into());
+            Err("Fps value is negative".into())
         }
     } else {
         Err("Unable to contact main".into())

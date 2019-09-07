@@ -127,7 +127,7 @@ impl Client {
         let mut s = Client {
             audio: None,
             graphics: None,
-            logger: logger,
+            logger,
             logic: ClientLogic::default(),
             network: random_port_socket(cfg),
             random: Pcg64Mcg::new(0),
@@ -154,11 +154,6 @@ impl Client {
         let (s, w) = (config.client, config.world);
         self.config = s;
         self.logic.config = w;
-    }
-
-    fn get_me(&mut self) -> Option<&mut ClientPlayer> {
-        let id = self.logic.self_id;
-        self.logic.players.get_mut(&id)
     }
 
     /// Sends a Join request to the server at `addr`.
@@ -211,12 +206,7 @@ impl Client {
                     let msg = ServerMessage::deserialize(pkt.payload());
                     if let Ok(msg) = msg {
                         match msg {
-                            ServerMessage::Welcome {
-                                your_id,
-                                world_width,
-                                world_height,
-                                world_seed,
-                            } => {
+                            ServerMessage::Welcome { your_id, .. } => {
                                 self.server = Some(pkt.addr());
                                 self.logic.self_id = your_id;
                                 info![self.logger, "Received Welcome message!"];

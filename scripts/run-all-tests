@@ -94,7 +94,7 @@ mkdir -p _build/crates
 has_failed=0
 
 set +e
-cargo test --verbose --all >& _build/main.test_result
+RUST_BACKTRACE=1 cargo test --verbose --all >& _build/main.test_result
 if [ "$?" -ne 0 ]; then
     echo "FAIL: main"
     cat _build/main.test_result
@@ -118,7 +118,7 @@ for library in crates/*; do
 (
     cd "$library"
     set +e
-    cargo test --verbose --all >& ../../_build/"$library.test_result"
+    RUST_BACKTRACE=1 cargo test --verbose --all >& ../../_build/"$library.test_result"
     if [ "$?" -ne 0 ]; then
         echo "FAIL: $library"
         cat ../../_build/"$library.test_result"

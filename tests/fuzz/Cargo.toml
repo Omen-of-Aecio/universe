@@ -5,7 +5,6 @@ authors = ["Erlend Hofstad Langseth <3rlendhl@gmail.com>", "Kevin Robert Straver
 edition = "2018"
 
 [dependencies]
-fast-logger = "0.1"
 geometry = { path = "../../crates/geometry" }
 honggfuzz = "0.5"
 gameshell = { path = "../../crates/gameshell" }

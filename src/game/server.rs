@@ -19,9 +19,7 @@ fn generate_world(w: usize, h: usize, seed: [f32; 3], mut logger: Logger<Log>) -
     grid.resize(w, h);
     logger.info("Initializing graphics");
     let mut windowing = VxDraw::new(
-        logger
-            .clone_with_context("vxdraw-server")
-            .to_compatibility(),
+        logger.clone_add_context("vxdraw").to_compatibility(),
         ShowWindow::Headless1k,
     );
 

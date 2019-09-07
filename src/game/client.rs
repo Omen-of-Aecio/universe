@@ -428,9 +428,7 @@ impl Client {
     fn maybe_initialize_graphics(&mut self) {
         self.logger.info("Initializing graphics");
         let mut windowing = VxDraw::new(
-            self.logger
-                .clone_with_context("vxdraw-client")
-                .to_compatibility(),
+            self.logger.clone_add_context("vxdraw").to_compatibility(),
             ShowWindow::Enable,
         );
 

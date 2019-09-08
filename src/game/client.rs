@@ -9,7 +9,7 @@ use rodio;
 use std::net::SocketAddr;
 
 use cgmath::*;
-use fast_logger::{info, warn, GenericLogger, Logger};
+use fast_logger::{debug, info, warn, GenericLogger, Logger};
 use input::Input;
 use std::time::Instant;
 use winit::{VirtualKeyCode as Key, *};
@@ -122,7 +122,8 @@ pub enum GraphicsSettings {
 }
 
 impl Client {
-    pub fn new(logger: Logger<Log>, graphics: GraphicsSettings) -> Client {
+    pub fn new(mut logger: Logger<Log>, graphics: GraphicsSettings) -> Client {
+        logger.set_this_log_level(192);
         let mut cfg = laminar::Config::default();
         cfg.receive_buffer_max_size = cfg.max_packet_size;
         let mut s = Client {
@@ -168,18 +169,33 @@ impl Client {
     }
 
     pub fn tick_logic(&mut self) {
-        self.update_network();
         toggle_camera_mode(self);
         self.input.prepare_for_next_frame();
         if let Some(ref mut graphics) = self.graphics {
             process_input(&mut self.input, &mut graphics.windowing);
         }
+        self.update_network();
         move_camera_according_to_input(self);
 
+        let mut user_input = UserInput::default();
+        match self.collect_input() {
+            ClientMessage::Input {
+                commands,
+                mouse_pos,
+            } => {
+                for cmd in commands {
+                    user_input.apply_command(cmd);
+                }
+            }
+            _ => panic!["collect input should never return anything but ::Input"],
+        }
+
         if let Some(player) = self.logic.players.get_mut(&self.logic.you) {
+            let input = player.input.clone();
+            info![self.logger, "Current input state"; "input" => InDebug(&input)];
             update_player(
                 &mut player.inner,
-                &mut player.input,
+                &user_input,
                 &self.logic.config,
                 &mut self.random,
                 &self.logic.grid,
@@ -220,14 +236,17 @@ impl Client {
                     if let Ok(msg) = msg {
                         match msg {
                             ServerMessage::Welcome { your_id, .. } => {
+                                info![self.logger, "Received Welcome message!"; "assigned id" => your_id];
                                 self.server = Some(pkt.addr());
                                 self.logic.self_id = your_id;
-                                info![self.logger, "Received Welcome message!"];
                             }
                             ServerMessage::State { players, bullets } => {
+                                debug![self.logger, "Received state update"; "players" => InDebug(&players), "bullets" => InDebug(&bullets); clone players, bullets];
                                 for player in players {
-                                    // info![self.logger, "client", "Player info"];
                                     if self.logic.players.contains_key(&player.id) {
+                                        if self.logic.you == player.id {
+                                            continue;
+                                        }
                                         // Update existing player
                                         if let Some(p) = self.logic.players.get_mut(&player.id) {
                                             p.inner = player;
@@ -290,6 +309,7 @@ impl Client {
                                 removed,
                                 grid_changes,
                             } => {
+                                debug![self.logger, "Received deltastate"; "removed" => InDebug(&removed), "grid changes" => InDebug(&grid_changes); clone removed, grid_changes];
                                 // TODO removed
                                 for (id, ty) in removed {
                                     match ty {
@@ -347,7 +367,7 @@ impl Client {
 
     fn collect_input(&self) -> ClientMessage {
         let mut commands = Vec::new();
-        if self.input.is_key_toggled_down(Key::Down) {
+        if self.input.is_key_down(Key::Down) {
             commands.push(InputCommand {
                 is_pressed: true,
                 key: InputKey::Down,
@@ -358,7 +378,7 @@ impl Client {
                 key: InputKey::Down,
             });
         }
-        if self.input.is_key_toggled_down(Key::Up) {
+        if self.input.is_key_down(Key::Up) {
             commands.push(InputCommand {
                 is_pressed: true,
                 key: InputKey::Up,
@@ -369,7 +389,7 @@ impl Client {
                 key: InputKey::Up,
             });
         }
-        if self.input.is_key_toggled_down(Key::Left) {
+        if self.input.is_key_down(Key::Left) {
             commands.push(InputCommand {
                 is_pressed: true,
                 key: InputKey::Left,
@@ -380,7 +400,8 @@ impl Client {
                 key: InputKey::Left,
             });
         }
-        if self.input.is_key_toggled_down(Key::Right) {
+        if self.input.is_key_down(Key::Right) {
+            dbg!("ok lets do this");
             commands.push(InputCommand {
                 is_pressed: true,
                 key: InputKey::Right,
@@ -391,7 +412,7 @@ impl Client {
                 key: InputKey::Right,
             });
         }
-        if self.input.is_key_toggled_down(Key::LShift) {
+        if self.input.is_key_down(Key::LShift) {
             commands.push(InputCommand {
                 is_pressed: true,
                 key: InputKey::LShift,
@@ -435,6 +456,8 @@ impl Client {
             self.logger.clone_add_context("vxdraw").to_compatibility(),
             ShowWindow::Enable,
         );
+        self.logger
+            .set_context_specific_log_level("client-vxdraw", 196);
 
         {
             static BACKGROUND: &dyntex::ImgData = &dyntex::ImgData::PNGBytes(include_bytes![

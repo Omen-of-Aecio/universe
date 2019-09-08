@@ -170,17 +170,21 @@ impl Server {
             bullets: self.logic.bullets.clone(),
         }
         .serialize();
+
         let delta_data = ServerMessage::DeltaState {
             removed: self.logic.removed.clone(),
             grid_changes: self.logic.grid_changes.clone(),
         }
         .serialize();
+
         for cli_addr in self.connections.right_values() {
             self.network
-                .send(Packet::unreliable(*cli_addr, state_data.clone()))
-                .unwrap();
-            self.network
                 .send(Packet::reliable_unordered(*cli_addr, delta_data.clone()))
+                .unwrap();
+        }
+        for cli_addr in self.connections.right_values() {
+            self.network
+                .send(Packet::reliable_unordered(*cli_addr, state_data.clone()))
                 .unwrap();
         }
 
@@ -227,7 +231,7 @@ impl ServerLogic {
         for player in &mut self.players {
             update_player(
                 &mut player.inner,
-                &mut player.input,
+                &player.input,
                 &self.config,
                 random,
                 &self.grid,

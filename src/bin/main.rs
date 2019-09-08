@@ -57,7 +57,7 @@ fn main() -> io::Result<()> {
     let mut logger = Logger::spawn_with_writer("main", writer);
     logger.set_colorize(true);
     logger.set_context_specific_log_level("benchmark", 0);
-    logger.set_log_level(196);
+    logger.set_log_level(255);
 
     let config = read_config("config.toml").unwrap();
 

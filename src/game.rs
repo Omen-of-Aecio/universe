@@ -17,7 +17,7 @@ pub use server::*;
 
 pub type Id = u32;
 pub type Reality = u8;
-pub use fast_logger::InDebug;
+pub use fast_logger::{InDebug, InDebugPretty};
 
 pub struct Main {
     pub cli: Option<Client>,
@@ -51,7 +51,7 @@ impl Main {
 }
 
 /// Indexed by InputKey
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct UserInput {
     keys: Vec<bool>,
     pub mouse_pos: (f32, f32),
@@ -339,7 +339,7 @@ fn fire_bullets(
 
 fn update_player(
     player: &mut PlayerData,
-    player_input: &mut UserInput,
+    player_input: &UserInput,
     config: &WorldConfig,
     random: &mut Pcg64Mcg,
     grid: &Grid<Reality>,
@@ -352,6 +352,7 @@ fn update_player(
 
     let on_ground =
         check_for_collision_and_move_player_according_to_movement_vector(grid, player, logger);
+
     let acc = accelerate_player_according_to_input(player_input, config, on_ground);
     player.velocity += acc;
 

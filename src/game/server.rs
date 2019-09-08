@@ -225,27 +225,14 @@ impl ServerLogic {
 
     pub fn update_players(&mut self, random: &mut Pcg64Mcg, logger: &mut Logger<Log>) {
         for player in &mut self.players {
-            // Physics
-            if self.config.gravity_on {
-                player.velocity += Vec2::new(0.0, self.config.gravity);
-            }
-
-            let on_ground = check_for_collision_and_move_player_according_to_movement_vector(
-                &self.grid, player, logger,
+            update_player(
+                &mut player.inner,
+                &mut player.input,
+                &self.config,
+                random,
+                &self.grid,
+                logger,
             );
-            let acc = accelerate_player_according_to_input(&player.input, &self.config, on_ground);
-            player.velocity += acc;
-
-            player.velocity = player.velocity.clamp(Vec2 {
-                x: self.config.player.max_vel,
-                y: self.config.player.max_vel,
-            });
-            if on_ground {
-                player.velocity.x *= self.config.ground_fri;
-            } else {
-                player.velocity.x *= self.config.air_fri_x;
-            }
-            player.velocity.y *= self.config.air_fri_y;
 
             // Firing weapons
             if player.input.is_down(InputKey::LeftMouse) {
@@ -324,30 +311,6 @@ impl std::ops::Deref for ServerPlayer {
 impl std::ops::DerefMut for ServerPlayer {
     fn deref_mut(&mut self) -> &mut PlayerData {
         &mut self.inner
-    }
-}
-
-/// Indexed by InputKey
-#[derive(Debug)]
-pub struct UserInput {
-    keys: Vec<bool>,
-    pub mouse_pos: (f32, f32),
-}
-
-impl Default for UserInput {
-    fn default() -> Self {
-        Self {
-            keys: vec![false; InputKey::LeftMouse as usize + 1],
-            mouse_pos: (0.0, 0.0),
-        }
-    }
-}
-impl UserInput {
-    pub fn apply_command(&mut self, cmd: InputCommand) {
-        self.keys[cmd.key as usize] = cmd.is_pressed;
-    }
-    pub fn is_down(&self, key: InputKey) -> bool {
-        self.keys[key as usize]
     }
 }
 

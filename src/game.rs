@@ -1,9 +1,11 @@
 use crate::glocals::*;
+use crate::mediators::does_line_collide_with_grid::*;
 pub use failure::Error;
 use fast_logger::{error, info, Logger};
 use geometry::vec::Vec2;
 use geometry::{boxit::Boxit, grid2d::Grid};
 use laminar::Socket;
+use rand_pcg::Pcg64Mcg;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::{time::Instant, vec::Vec};
 use vxdraw::{self, *};
@@ -48,6 +50,29 @@ impl Main {
     }
 }
 
+/// Indexed by InputKey
+#[derive(Debug)]
+pub struct UserInput {
+    keys: Vec<bool>,
+    pub mouse_pos: (f32, f32),
+}
+
+impl Default for UserInput {
+    fn default() -> Self {
+        Self {
+            keys: vec![false; InputKey::LeftMouse as usize + 1],
+            mouse_pos: (0.0, 0.0),
+        }
+    }
+}
+impl UserInput {
+    pub fn apply_command(&mut self, cmd: InputCommand) {
+        self.keys[cmd.key as usize] = cmd.is_pressed;
+    }
+    pub fn is_down(&self, key: InputKey) -> bool {
+        self.keys[key as usize]
+    }
+}
 // ---
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -311,6 +336,113 @@ fn fire_bullets(
     }
 }
 */
+
+fn update_player(
+    player: &mut PlayerData,
+    player_input: &mut UserInput,
+    config: &WorldConfig,
+    random: &mut Pcg64Mcg,
+    grid: &Grid<Reality>,
+    logger: &mut Logger<Log>,
+) {
+    // Physics
+    if config.gravity_on {
+        player.velocity += Vec2::new(0.0, config.gravity);
+    }
+
+    let on_ground =
+        check_for_collision_and_move_player_according_to_movement_vector(grid, player, logger);
+    let acc = accelerate_player_according_to_input(player_input, config, on_ground);
+    player.velocity += acc;
+
+    player.velocity = player.velocity.clamp(Vec2 {
+        x: config.player.max_vel,
+        y: config.player.max_vel,
+    });
+    if on_ground {
+        player.velocity.x *= config.ground_fri;
+    } else {
+        player.velocity.x *= config.air_fri_x;
+    }
+    player.velocity.y *= config.air_fri_y;
+}
+
+/// Returns true if collision happened on y axis
+fn check_for_collision_and_move_player_according_to_movement_vector(
+    grid: &Grid<Reality>,
+    player: &mut PlayerData,
+    _logger: &mut Logger<Log>,
+) -> bool {
+    let movement = player.velocity;
+    let tl = Vec2 {
+        x: player.position.x + 0.01,
+        y: player.position.y + 0.01,
+    };
+    let tr = Vec2 {
+        x: player.position.x + 9.99,
+        y: player.position.y + 0.01,
+    };
+    let bl = Vec2 {
+        x: player.position.x + 0.01,
+        y: player.position.y + 9.99,
+    };
+    let br = Vec2 {
+        x: player.position.x + 9.99,
+        y: player.position.y + 9.99,
+    };
+    let mut collision_y = None;
+    let ymove = Vec2 {
+        x: 0.0,
+        y: movement.y,
+    };
+    for i in 1..=10 {
+        collision_y = collision_test(&[tl, tr, br, bl], Some(0.5), ymove / i as f32, grid, |x| {
+            *x > 0
+        });
+        if collision_y.is_none() {
+            player.position += ymove / i as f32;
+            break;
+        }
+    }
+
+    let tl = Vec2 {
+        x: player.position.x + 0.01,
+        y: player.position.y + 0.01,
+    };
+    let tr = Vec2 {
+        x: player.position.x + 9.99,
+        y: player.position.y + 0.01,
+    };
+    let bl = Vec2 {
+        x: player.position.x + 0.01,
+        y: player.position.y + 9.99,
+    };
+    let br = Vec2 {
+        x: player.position.x + 9.99,
+        y: player.position.y + 9.99,
+    };
+    let mut collision_x = None;
+    let xmove = Vec2 {
+        x: movement.x,
+        y: 0.0,
+    };
+    for i in 1..=10 {
+        collision_x = collision_test(&[tl, tr, br, bl], Some(0.5), xmove / i as f32, grid, |x| {
+            *x > 0
+        });
+        if collision_x.is_none() {
+            player.position += xmove / i as f32;
+            break;
+        }
+    }
+    if collision_x.is_some() {
+        player.velocity.x = 0.0;
+    }
+    if collision_y.is_some() {
+        player.velocity.y = 0.0;
+    }
+    collision_y.is_some()
+}
 
 #[cfg(test)]
 mod tests {

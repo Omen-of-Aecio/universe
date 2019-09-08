@@ -56,7 +56,8 @@ pub struct ClientLogic {
 
 #[derive(Default)]
 pub struct ClientPlayer {
-    inner: PlayerData,
+    pub inner: PlayerData,
+    pub input: UserInput,
     pub weapon_sprite: Option<vxdraw::dyntex::Handle>,
 }
 
@@ -174,6 +175,18 @@ impl Client {
             process_input(&mut self.input, &mut graphics.windowing);
         }
         move_camera_according_to_input(self);
+
+        if let Some(player) = self.logic.players.get_mut(&self.logic.you) {
+            update_player(
+                &mut player.inner,
+                &mut player.input,
+                &self.logic.config,
+                &mut self.random,
+                &self.logic.grid,
+                &mut self.logger,
+            );
+        }
+
         update_bullets_uv(&mut self.logic);
         std::thread::sleep(std::time::Duration::new(0, 8_000_000));
 
@@ -224,6 +237,7 @@ impl Client {
                                         let id = player.id;
                                         let new = ClientPlayer {
                                             inner: player,
+                                            input: UserInput::default(),
                                             weapon_sprite: None,
                                         };
                                         self.logic.players.insert(id, new);

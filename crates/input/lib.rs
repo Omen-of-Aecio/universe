@@ -1,6 +1,6 @@
 use winit::*;
 
-const NUM_KEYS: usize = 150;
+const NUM_KEYS: usize = 161;
 struct Keys([bool; NUM_KEYS]);
 
 #[derive(Default)]
@@ -19,7 +19,7 @@ pub struct Input {
 
 impl Default for Keys {
     fn default() -> Keys {
-        Keys([false; 150])
+        Keys([false; NUM_KEYS])
     }
 }
 
@@ -149,5 +149,13 @@ mod tests {
         assert_eq![false, input.get_ctrl()];
         input.set_ctrl();
         assert_eq![true, input.get_ctrl()];
+        input.prepare_for_next_frame();
+        assert_eq![false, input.get_ctrl()];
+    }
+
+    #[test]
+    fn ensure_boundaries_ok() {
+        let mut input = Input::default();
+        input.register_key_down(VirtualKeyCode::Cut);
     }
 }

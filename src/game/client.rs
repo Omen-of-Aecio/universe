@@ -516,7 +516,7 @@ impl Client {
 
         let weapons_texture = dyntex.add_layer(WEAPONS, &vxdraw::dyntex::LayerOptions::new());
         let text_layer = windowing.text().add_layer(
-            include_bytes!["../../crates/vxdraw/fonts/DejaVuSans.ttf"],
+            include_bytes!["../../assets/fonts/DejaVuSans.ttf"],
             vxdraw::text::LayerOptions::new(),
         );
         let basic_text = windowing.text().add(

@@ -11,15 +11,19 @@ path = "src/lib.rs"
 
 [dependencies]
 arrayvec = "0.4"
+bimap = "0.3.1"
 bincode = "1.1.4"
 byteorder = "1.2.7"
 cgmath = "0.17"
 chrono = "0.4.6"
 clap = "2.33.0"
+crossbeam-channel = "0.3.8" # For laminar
 either = "1.5.0"
 failure = "0.1.1"
-file-rotate = "0.1"
 fast-logger = "0.5.1"
+file-rotate = "0.1"
+indexmap = "1.0.2"
+laminar = { git = "https://github.com/amethyst/laminar.git" }
 rand = "0.6.1"
 rand_pcg = "0.1.2"
 rodio = "0.8.1"
@@ -28,11 +32,8 @@ serde = "1.0"
 serde_derive = "1.0"
 time = "0.1.40"
 toml = "0.4.9"
+vxdraw = "0.2.0"
 winit = "0.19.0"
-laminar = { git = "https://github.com/amethyst/laminar.git" }
-crossbeam-channel = "0.3.8" # For laminar
-bimap = "0.3.1"
-indexmap = "1.0.2"
 
 # Local libraries
 # benchmarker = { path = "crates/benchmarker" }
@@ -41,7 +42,6 @@ config =      { path = "crates/config" }
 geometry =    { path = "crates/geometry" }
 input =       { path = "crates/input" }
 # ketimer =     { path = "crates/ketimer"  }
-vxdraw =      { path = "crates/vxdraw" }
 
 [dev-dependencies]
 gameshell =   { path = "crates/gameshell", features = ["with-quickcheck"] }

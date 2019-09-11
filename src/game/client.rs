@@ -540,8 +540,8 @@ impl Client {
 }
 
 pub fn process_input(s: &mut Input, windowing: &mut VxDraw) {
-    for event in windowing.collect_input() {
-        if let Event::WindowEvent { event, .. } = event {
+    windowing.events_loop().poll_events(|evt| {
+        if let Event::WindowEvent { event, .. } = evt {
             match event {
                 WindowEvent::KeyboardInput { input, .. } => {
                     s.register_key(&input);
@@ -566,7 +566,7 @@ pub fn process_input(s: &mut Input, windowing: &mut VxDraw) {
                 _ => {}
             }
         }
-    }
+    });
 }
 
 fn move_camera_according_to_input(s: &mut Client) {

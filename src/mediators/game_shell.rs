@@ -164,7 +164,8 @@ fn connection_loop(mut s: GameShellContext, stream: TcpStream) -> io::Result<()>
     s.logger.debug("Acquired new stream");
     let mut gsh = GameShell::new(s, stream.try_clone().unwrap(), stream);
     gsh.register_many(SPEC).unwrap();
-    gsh.run(2048);
+    let buffer = &mut [0u8; 2048];
+    gsh.run(buffer);
     Ok(())
 }
 

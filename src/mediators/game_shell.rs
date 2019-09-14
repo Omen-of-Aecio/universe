@@ -2,9 +2,7 @@ use self::command_handlers::*;
 use crate::glocals::*;
 use fast_logger::{self, Logger};
 use gameshell::Spec;
-use gameshell::{
-    decision::Decision, predicates::*, types::Type, Evaluator, GameShell, IncConsumer,
-};
+use gameshell::{predicates::*, types::Type, Evaluator, GameShell, IncConsumer};
 use std::collections::HashMap;
 use std::io;
 use std::net::{Ipv4Addr, SocketAddrV4};
@@ -20,7 +18,7 @@ mod command_handlers;
 // ---
 
 #[rustfmt::skip]
-const SPEC: &[Spec<Type, Decision, GameShellContext>] = &[
+const SPEC: &[Spec<Type, String, GameShellContext>] = &[
     (&[("%", MANY_I32)], modulo),
     (&[("&", MANY_I32)], band),
     (&[("*", MANY_I32)], mul),

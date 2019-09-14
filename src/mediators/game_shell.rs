@@ -367,11 +367,11 @@ mod tests {
             gsh.interpret_single("log").unwrap()
         ];
         assert_eq![
-            Feedback::Err("Expected <u8> but got: -1".into()),
+            Feedback::Err("Expected <u8>. Decider: got string: -1".into()),
             gsh.interpret_single("log context gsh level -1").unwrap()
         ];
         assert_eq![
-            Feedback::Err("Expected <u8> but got: -1".into()),
+            Feedback::Err("Expected <u8>. Decider: got string: -1".into()),
             gsh.interpret_single("log context gsh level (+ 1 2 -4)")
                 .unwrap()
         ];

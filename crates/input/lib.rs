@@ -158,18 +158,79 @@ mod tests {
     use super::*;
 
     #[test]
-    fn setting_ctrl_key() {
+    fn tri_state_switch_pressed_released_pressed() {
         let mut input = Input::default();
-        assert_eq![false, input.get_ctrl()];
-        input.set_ctrl();
-        assert_eq![true, input.get_ctrl()];
-        input.prepare_for_next_frame();
-        assert_eq![false, input.get_ctrl()];
+
+        input.register_key(&KeyboardInput {
+            scancode: 0,
+            state: ElementState::Pressed,
+            virtual_keycode: Some(VirtualKeyCode::A),
+            modifiers: ModifiersState::default(),
+        });
+
+        input.register_key(&KeyboardInput {
+            scancode: 0,
+            state: ElementState::Released,
+            virtual_keycode: Some(VirtualKeyCode::A),
+            modifiers: ModifiersState::default(),
+        });
+
+        input.register_key(&KeyboardInput {
+            scancode: 0,
+            state: ElementState::Pressed,
+            virtual_keycode: Some(VirtualKeyCode::A),
+            modifiers: ModifiersState::default(),
+        });
+
+        assert_eq![true, input.is_key_toggled_down(VirtualKeyCode::A)];
+        assert_eq![false, input.is_key_toggled_up(VirtualKeyCode::A)];
+        assert_eq![true, input.is_key_down(VirtualKeyCode::A)];
     }
 
     #[test]
+    fn tri_state_switch_released_pressed_released() {
+        let mut input = Input::default();
+
+        input.register_key(&KeyboardInput {
+            scancode: 0,
+            state: ElementState::Released,
+            virtual_keycode: Some(VirtualKeyCode::A),
+            modifiers: ModifiersState::default(),
+        });
+
+        input.register_key(&KeyboardInput {
+            scancode: 0,
+            state: ElementState::Pressed,
+            virtual_keycode: Some(VirtualKeyCode::A),
+            modifiers: ModifiersState::default(),
+        });
+
+        input.register_key(&KeyboardInput {
+            scancode: 0,
+            state: ElementState::Released,
+            virtual_keycode: Some(VirtualKeyCode::A),
+            modifiers: ModifiersState::default(),
+        });
+
+        assert_eq![false, input.is_key_toggled_down(VirtualKeyCode::A)];
+        assert_eq![true, input.is_key_toggled_up(VirtualKeyCode::A)];
+        assert_eq![false, input.is_key_down(VirtualKeyCode::A)];
+    }
+    #[test]
     fn ensure_boundaries_ok() {
         let mut input = Input::default();
-        input.register_key_down(VirtualKeyCode::Cut);
+        input.register_key(&KeyboardInput {
+            scancode: 0,
+            state: ElementState::Pressed,
+            virtual_keycode: Some(VirtualKeyCode::Cut),
+            modifiers: ModifiersState::default(),
+        });
+
+        input.register_key(&KeyboardInput {
+            scancode: 0,
+            state: ElementState::Pressed,
+            virtual_keycode: None,
+            modifiers: ModifiersState::default(),
+        });
     }
 }

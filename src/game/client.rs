@@ -437,8 +437,8 @@ impl Client {
                 key: InputKey::LShift,
             });
         }
-        if self.input.is_left_mouse_button_toggled() {
-            if self.input.is_left_mouse_button_down() {
+        if self.input.is_mouse_button_toggled(MouseButton::Left) {
+            if self.input.is_mouse_button_down(MouseButton::Left) {
                 commands.push(InputCommand {
                     is_pressed: true,
                     key: InputKey::LeftMouse,
@@ -567,8 +567,14 @@ pub fn process_input(s: &mut Input, events: &mut winit::EventsLoop) {
                         s.register_mouse_wheel(v);
                     }
                 }
-                WindowEvent::MouseInput { state, button, .. } => {
-                    s.register_mouse_input(state, button);
+                WindowEvent::MouseInput {
+                    state,
+                    button,
+                    modifiers,
+                    ..
+                } => {
+                    let input = input::MouseInput { state, modifiers };
+                    s.register_mouse_input(input, button);
                 }
                 WindowEvent::CursorMoved { position, .. } => {
                     let pos: (i32, i32) = position.into();

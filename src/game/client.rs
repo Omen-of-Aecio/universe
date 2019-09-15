@@ -329,7 +329,9 @@ impl Client {
                                                             .remove(removed_bullet.handle);
                                                     }
                                                 }
-                                                None => warn![self.logger, "Remove nonexistent bullet"; "id" => id],
+                                                None => {
+                                                    warn![self.logger, "Remove nonexistent bullet"; "id" => id]
+                                                }
                                             }
                                         }
                                         EntityType::Player => unimplemented!(),

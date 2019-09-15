@@ -1,9 +1,10 @@
 use self::command_handlers::*;
 use crate::glocals::*;
-use fast_logger::{self, Logger};
+use fast_logger::{self, error, Logger};
 use gameshell::Spec;
-use gameshell::{predicates::*, types::Type, Evaluator, GameShell, IncConsumer};
+use gameshell::{predicates::*, types::Type, Evaluate, Evaluator, GameShell, IncConsumer};
 use std::collections::HashMap;
+use std::fs::File;
 use std::io;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::net::{TcpListener, TcpStream};
@@ -169,6 +170,21 @@ fn connection_loop(mut s: GameShellContext, stream: TcpStream) -> io::Result<()>
 
 fn game_shell_thread(mut s: GameShellContext, listener: TcpListener) {
     s.logger.info("Started GameShell server");
+    {
+        if let Ok(gshrc) = File::open("gshrc") {
+            let mut output = Vec::<u8>::new();
+            let mut gsh = GameShell::new(s.clone(), gshrc, &mut output);
+            gsh.register_many(SPEC).unwrap();
+            let buffer = &mut [0u8; 2048];
+            gsh.run(buffer);
+            if let Ok(string) = std::str::from_utf8(&output) {
+                let string = string.to_string();
+                error![s.logger, "{}", string];
+            }
+        } else {
+            s.logger.error("Unable to read rc file");
+        }
+    }
     'outer_loop: loop {
         for stream in listener.incoming() {
             if !s.keep_running.load(Ordering::Acquire) {
@@ -446,7 +462,56 @@ mod tests {
         ];
     }
 
-    // // ---
+    #[test]
+    fn spawning_gameshell_reads_rc() {
+        use std::sync::Mutex;
+        struct Store {
+            pub store: Arc<Mutex<Vec<u8>>>,
+        }
+        impl io::Write for Store {
+            fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+                let mut vector = self.store.lock().unwrap();
+                vector.extend(buf);
+                Ok(buf.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let stored = Arc::new(Mutex::new(vec![]));
+        let store = Store {
+            store: stored.clone(),
+        };
+
+        let logger = fast_logger::Logger::spawn_with_writer("gsh", store);
+
+        let (listener, port) = bind_to_any_tcp_port();
+        let gshspawn = spawn_with_listener(logger.clone(), listener, port);
+
+        gshspawn.keep_running.store(false, Ordering::Release);
+        let _ = TcpStream::connect("127.0.0.1:".to_string() + port.to_string().as_ref()).unwrap();
+
+        std::mem::drop(logger);
+        gshspawn.thread_handle.join();
+
+        fn remove_time(line: &str) -> String {
+            use regex::Regex;
+            let regex = Regex::new(
+                r"^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2} \d+ \d{2}:\d{2}:\d{2}.\d{9}(\+|-)\d{4}: (.*)",
+            )
+            .unwrap();
+            regex.captures_iter(&line).next().unwrap()[3].to_string()
+        }
+
+        let string = &stored.lock().unwrap()[..];
+        let result = std::str::from_utf8(string).unwrap();
+        let mut lines = result.lines().map(remove_time);
+        assert_eq!["128 gsh: Started GameShell server", &lines.next().unwrap()];
+        assert_eq!["255 gsh: Reading gshrc file", &lines.next().unwrap()];
+    }
+
+    // ---
 
     #[bench]
     fn speed_of_interpreting_a_raw_command(b: &mut Bencher) {

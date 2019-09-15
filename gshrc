@@ -1,0 +1,3 @@
+log context gsh level 255
+log global level 255
+log trace (#Reading gshrc file)

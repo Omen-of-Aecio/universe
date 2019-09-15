@@ -578,7 +578,7 @@ pub fn process_input(s: &mut Input, events: &mut winit::EventsLoop) {
                 }
                 WindowEvent::CursorMoved { position, .. } => {
                     let pos: (i32, i32) = position.into();
-                    s.position_mouse(pos.0, pos.1);
+                    s.register_mouse_position(pos.0, pos.1);
                 }
                 _ => {}
             }
@@ -655,7 +655,9 @@ fn update_graphics(s: &mut Client) {
 
         {
             if let Some(player) = s.logic.players.get_mut(&s.logic.self_id) {
-                let mouse_in_world = graphics.windowing.to_world_coords(s.input.get_mouse_pos());
+                let mouse_in_world = graphics
+                    .windowing
+                    .to_world_coords(s.input.get_mouse_position());
                 let angle = -(Vec2::from(mouse_in_world) - player.position - PLAYER_CENTER).angle();
 
                 if let Some(ref mut sprite) = player.weapon_sprite {

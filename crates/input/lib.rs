@@ -59,16 +59,17 @@ pub struct Input {
     mouse_buttons_now: MouseButtons,
     mouse_buttons_before: MouseButtons,
 
-    mouse: (i32, i32),
-    mouse_in_previous_frame: (i32, i32),
+    mouse_now: (i32, i32),
+    mouse_before: (i32, i32),
+
     mouse_wheel: f32,
 }
 
 impl Input {
     pub fn prepare_for_next_frame(&mut self) {
         self.mouse_wheel = 0.0;
-        self.mouse_in_previous_frame.0 = self.mouse.0;
-        self.mouse_in_previous_frame.1 = self.mouse.1;
+        self.mouse_before.0 = self.mouse_now.0;
+        self.mouse_before.1 = self.mouse_now.1;
     }
 
     // ---
@@ -119,22 +120,14 @@ impl Input {
         self.mouse_buttons_now.0[index] = state;
     }
 
-    pub fn position_mouse(&mut self, x: i32, y: i32) {
-        self.mouse.0 = x;
-        self.mouse.1 = y;
-    }
-
-    pub fn register_mouse_wheel(&mut self, y: f32) {
-        self.mouse_wheel = y;
-    }
-
-    pub fn get_mouse_pos(&self) -> (f32, f32) {
-        (self.mouse.0 as f32, self.mouse.1 as f32)
-    }
-
     pub fn is_mouse_button_down(&self, button: MouseButton) -> bool {
         let index = mouse_button_to_index(button);
         self.mouse_buttons_now.0[index].state == ElementState::Pressed
+    }
+
+    pub fn is_mouse_button_up(&self, button: MouseButton) -> bool {
+        let index = mouse_button_to_index(button);
+        self.mouse_buttons_now.0[index].state == ElementState::Released
     }
 
     pub fn is_mouse_button_toggled(&self, button: MouseButton) -> bool {
@@ -142,10 +135,38 @@ impl Input {
         self.mouse_buttons_before.0[index].state != self.mouse_buttons_now.0[index].state
     }
 
+    pub fn is_mouse_button_toggled_down(&self, button: MouseButton) -> bool {
+        self.is_mouse_button_toggled(button) && self.is_mouse_button_down(button)
+    }
+
+    pub fn is_mouse_button_toggled_up(&self, button: MouseButton) -> bool {
+        self.is_mouse_button_toggled(button) && self.is_mouse_button_up(button)
+    }
+
+    pub fn mouse_button_modifiers_state(&self, button: MouseButton) -> ModifiersState {
+        let index = mouse_button_to_index(button);
+        self.mouse_buttons_now.0[index].modifiers
+    }
+
+    // ---
+
+    pub fn register_mouse_position(&mut self, x: i32, y: i32) {
+        self.mouse_now.0 = x;
+        self.mouse_now.1 = y;
+    }
+
+    pub fn register_mouse_wheel(&mut self, y: f32) {
+        self.mouse_wheel += y;
+    }
+
+    pub fn get_mouse_position(&self) -> (f32, f32) {
+        (self.mouse_now.0 as f32, self.mouse_now.1 as f32)
+    }
+
     pub fn get_mouse_moved(&self) -> (f32, f32) {
         (
-            (self.mouse.0 - self.mouse_in_previous_frame.0) as f32,
-            (self.mouse.1 - self.mouse_in_previous_frame.1) as f32,
+            (self.mouse_now.0 - self.mouse_before.0) as f32,
+            (self.mouse_now.1 - self.mouse_before.1) as f32,
         )
     }
 
@@ -266,6 +287,119 @@ mod tests {
     }
 
     #[test]
+    fn tri_state_mouse_input() {
+        let mut input = Input::default();
+
+        input.register_mouse_input(
+            MouseInput {
+                state: ElementState::Pressed,
+                modifiers: ModifiersState::default(),
+            },
+            MouseButton::Left,
+        );
+
+        input.register_mouse_input(
+            MouseInput {
+                state: ElementState::Released,
+                modifiers: ModifiersState::default(),
+            },
+            MouseButton::Left,
+        );
+
+        input.register_mouse_input(
+            MouseInput {
+                state: ElementState::Pressed,
+                modifiers: ModifiersState::default(),
+            },
+            MouseButton::Left,
+        );
+
+        assert_eq![true, input.is_mouse_button_toggled(MouseButton::Left)];
+        assert_eq![true, input.is_mouse_button_down(MouseButton::Left)];
+        assert_eq![false, input.is_mouse_button_up(MouseButton::Left)];
+        assert_eq![true, input.is_mouse_button_toggled_down(MouseButton::Left)];
+        assert_eq![false, input.is_mouse_button_toggled_up(MouseButton::Left)];
+        assert_eq![
+            ModifiersState::default(),
+            input.mouse_button_modifiers_state(MouseButton::Left)
+        ];
+    }
+
+    #[test]
+    fn tri_state_mouse_modifiers() {
+        let mut input = Input::default();
+
+        input.register_mouse_input(
+            MouseInput {
+                state: ElementState::Pressed,
+                modifiers: ModifiersState::default(),
+            },
+            MouseButton::Left,
+        );
+
+        input.register_mouse_input(
+            MouseInput {
+                state: ElementState::Released,
+                modifiers: ModifiersState {
+                    alt: true,
+                    ..ModifiersState::default()
+                },
+            },
+            MouseButton::Left,
+        );
+
+        input.register_mouse_input(
+            MouseInput {
+                state: ElementState::Pressed,
+                modifiers: ModifiersState {
+                    logo: true,
+                    ..ModifiersState::default()
+                },
+            },
+            MouseButton::Left,
+        );
+
+        assert_eq![
+            true,
+            input.mouse_button_modifiers_state(MouseButton::Left).logo
+        ];
+        assert_eq![
+            false,
+            input.mouse_button_modifiers_state(MouseButton::Left).alt
+        ];
+    }
+
+    #[test]
+    fn only_consider_last_mouse_pos() {
+        let mut input = Input::default();
+        input.register_mouse_position(1, 1);
+        input.register_mouse_position(8, 9);
+        input.register_mouse_position(123, 456);
+        input.register_mouse_position(3, 6);
+
+        assert_eq![(3.0, 6.0), input.get_mouse_position()];
+        assert_eq![(3.0, 6.0), input.get_mouse_moved()];
+
+        input.prepare_for_next_frame();
+
+        assert_eq![(3.0, 6.0), input.get_mouse_position()];
+        assert_eq![(0.0, 0.0), input.get_mouse_moved()];
+    }
+
+    #[test]
+    fn accumulate_mouse_wheel_deltas() {
+        let mut input = Input::default();
+        input.register_mouse_wheel(0.1);
+        input.register_mouse_wheel(0.8);
+        input.register_mouse_wheel(0.3);
+        assert_eq![1.2, input.get_mouse_wheel()];
+
+        input.prepare_for_next_frame();
+
+        assert_eq![0.0, input.get_mouse_wheel()];
+    }
+
+    #[test]
     fn ensure_boundaries_ok() {
         let mut input = Input::default();
         input.register_key(&KeyboardInput {
@@ -281,5 +415,13 @@ mod tests {
             virtual_keycode: None,
             modifiers: ModifiersState::default(),
         });
+
+        input.register_mouse_input(
+            MouseInput {
+                state: ElementState::Pressed,
+                modifiers: ModifiersState::default(),
+            },
+            MouseButton::Other(255),
+        );
     }
 }

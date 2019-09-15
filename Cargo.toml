@@ -22,6 +22,7 @@ either = "1.5.0"
 failure = "0.1.1"
 fast-logger = "0.5.1"
 file-rotate = "0.1"
+gameshell = "0.1.0"
 indexmap = "1.0.2"
 laminar = { git = "https://github.com/amethyst/laminar.git" }
 rand = "0.6.1"
@@ -38,14 +39,13 @@ winit = "0.19.0"
 
 # Local libraries
 # benchmarker = { path = "crates/benchmarker" }
-gameshell =   { path = "crates/gameshell" }
 config =      { path = "crates/config" }
 geometry =    { path = "crates/geometry" }
 input =       { path = "crates/input" }
 # ketimer =     { path = "crates/ketimer"  }
 
 [dev-dependencies]
-gameshell =   { path = "crates/gameshell", features = ["with-quickcheck"] }
+gameshell = { version = "0.1.0", features = ["with-quickcheck"] }
 itertools = "0.8"
 quickcheck = "0.8"
 quickcheck_macros = "0.8"

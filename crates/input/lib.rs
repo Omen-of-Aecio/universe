@@ -71,6 +71,8 @@ impl Input {
         self.mouse_in_previous_frame.1 = self.mouse.1;
     }
 
+    // ---
+
     pub fn register_key(&mut self, input: &KeyboardInput) {
         match *input {
             KeyboardInput {
@@ -85,6 +87,32 @@ impl Input {
         }
     }
 
+    pub fn is_key_down(&self, keycode: VirtualKeyCode) -> bool {
+        self.keys_now.0[keycode as usize].state == ElementState::Pressed
+    }
+
+    pub fn is_key_up(&self, keycode: VirtualKeyCode) -> bool {
+        self.keys_now.0[keycode as usize].state == ElementState::Released
+    }
+
+    pub fn is_key_toggled(&self, keycode: VirtualKeyCode) -> bool {
+        self.keys_before.0[keycode as usize].state != self.keys_now.0[keycode as usize].state
+    }
+
+    pub fn is_key_toggled_down(&self, keycode: VirtualKeyCode) -> bool {
+        self.is_key_down(keycode) && self.is_key_toggled(keycode)
+    }
+
+    pub fn is_key_toggled_up(&self, keycode: VirtualKeyCode) -> bool {
+        !self.is_key_down(keycode) && self.is_key_toggled(keycode)
+    }
+
+    pub fn key_modifiers_state(&self, keycode: VirtualKeyCode) -> ModifiersState {
+        self.keys_now.0[keycode as usize].modifiers
+    }
+
+    // ---
+
     pub fn register_mouse_input(&mut self, state: MouseInput, button: MouseButton) {
         let index = mouse_button_to_index(button);
         self.mouse_buttons_before.0[index] = self.mouse_buttons_now.0[index];
@@ -98,24 +126,6 @@ impl Input {
 
     pub fn register_mouse_wheel(&mut self, y: f32) {
         self.mouse_wheel = y;
-    }
-
-    // ---
-
-    pub fn is_key_down(&self, keycode: VirtualKeyCode) -> bool {
-        self.keys_now.0[keycode as usize].state == ElementState::Pressed
-    }
-
-    pub fn is_key_toggled(&self, keycode: VirtualKeyCode) -> bool {
-        self.keys_before.0[keycode as usize].state != self.keys_now.0[keycode as usize].state
-    }
-
-    pub fn is_key_toggled_down(&self, keycode: VirtualKeyCode) -> bool {
-        self.is_key_down(keycode) && self.is_key_toggled(keycode)
-    }
-
-    pub fn is_key_toggled_up(&self, keycode: VirtualKeyCode) -> bool {
-        !self.is_key_down(keycode) && self.is_key_toggled(keycode)
     }
 
     pub fn get_mouse_pos(&self) -> (f32, f32) {
@@ -216,6 +226,45 @@ mod tests {
         assert_eq![true, input.is_key_toggled_up(VirtualKeyCode::A)];
         assert_eq![false, input.is_key_down(VirtualKeyCode::A)];
     }
+
+    #[test]
+    fn tri_state_modifiers() {
+        let mut input = Input::default();
+
+        input.register_key(&KeyboardInput {
+            scancode: 0,
+            state: ElementState::Pressed,
+            virtual_keycode: Some(VirtualKeyCode::A),
+            modifiers: ModifiersState::default(),
+        });
+
+        input.register_key(&KeyboardInput {
+            scancode: 0,
+            state: ElementState::Released,
+            virtual_keycode: Some(VirtualKeyCode::A),
+            modifiers: ModifiersState {
+                ctrl: true,
+                ..ModifiersState::default()
+            },
+        });
+
+        input.register_key(&KeyboardInput {
+            scancode: 0,
+            state: ElementState::Pressed,
+            virtual_keycode: Some(VirtualKeyCode::A),
+            modifiers: ModifiersState {
+                shift: true,
+                ..ModifiersState::default()
+            },
+        });
+
+        assert_eq![true, input.is_key_toggled_down(VirtualKeyCode::A)];
+        assert_eq![false, input.is_key_toggled_up(VirtualKeyCode::A)];
+        assert_eq![true, input.is_key_down(VirtualKeyCode::A)];
+        assert_eq![false, input.key_modifiers_state(VirtualKeyCode::A).ctrl];
+        assert_eq![true, input.key_modifiers_state(VirtualKeyCode::A).shift];
+    }
+
     #[test]
     fn ensure_boundaries_ok() {
         let mut input = Input::default();

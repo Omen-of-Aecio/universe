@@ -244,12 +244,19 @@ impl Client {
                                 debug![self.logger, "Received state update"; "players" => InDebug(&players), "bullets" => InDebug(&bullets); clone players, bullets];
                                 for player in players {
                                     if self.logic.players.contains_key(&player.id) {
-                                        if self.logic.you == player.id {
-                                            continue;
-                                        }
                                         // Update existing player
                                         if let Some(p) = self.logic.players.get_mut(&player.id) {
-                                            p.inner = player;
+                                            if self.logic.you == player.id {
+                                                if (p.inner.position - player.position)
+                                                    .length_squared()
+                                                    > 10.0
+                                                {
+                                                    p.inner = player;
+                                                }
+                                                continue;
+                                            } else {
+                                                p.inner = player;
+                                            }
                                         }
                                     } else {
                                         // Create new player

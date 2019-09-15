@@ -565,9 +565,6 @@ pub fn process_input(s: &mut Input, events: &mut winit::EventsLoop) {
                 } => {
                     if let winit::MouseScrollDelta::LineDelta(_, v) = delta {
                         s.register_mouse_wheel(v);
-                        if modifiers.ctrl {
-                            s.set_ctrl();
-                        }
                     }
                 }
                 WindowEvent::MouseInput { state, button, .. } => {
@@ -596,7 +593,7 @@ fn move_camera_according_to_input(s: &mut Client) {
     if s.input.is_key_down(Key::S) {
         s.logic.cam.center.y += 5.0;
     }
-    if s.input.get_ctrl() {
+    if s.input.is_key_down(Key::LControl) {
         match s.input.get_mouse_wheel() {
             x if x > 0.0 => {
                 if s.logic.cam.zoom < 5.0 {

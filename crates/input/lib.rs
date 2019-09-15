@@ -1,61 +1,56 @@
 use winit::*;
 
 const NUM_KEYS: usize = 161;
-struct Keys([bool; NUM_KEYS]);
+struct Keys([KeyboardInput; NUM_KEYS]);
 
 #[derive(Default)]
 pub struct Input {
-    key_down: Keys,
-    key_toggled: Keys,
+    keys_now: Keys,
+    keys_before: Keys,
 
     left_mouse_button: bool,
     left_mouse_toggled: bool,
     mouse: (i32, i32),
     mouse_in_previous_frame: (i32, i32),
     mouse_wheel: f32,
-
-    ctrl: bool,
 }
 
 impl Default for Keys {
     fn default() -> Keys {
-        Keys([false; NUM_KEYS])
+        let default = KeyboardInput {
+            scancode: 0,
+            state: ElementState::Released,
+            virtual_keycode: None,
+            modifiers: ModifiersState {
+                shift: false,
+                ctrl: false,
+                alt: false,
+                logo: false,
+            },
+        };
+        Keys([default; NUM_KEYS])
     }
 }
 
 impl Input {
     pub fn prepare_for_next_frame(&mut self) {
-        for i in 0..NUM_KEYS {
-            self.key_toggled.0[i] = false;
-        }
         self.left_mouse_toggled = false;
         self.mouse_wheel = 0.0;
         self.mouse_in_previous_frame.0 = self.mouse.0;
         self.mouse_in_previous_frame.1 = self.mouse.1;
-        self.ctrl = false;
-    }
-
-    pub fn set_ctrl(&mut self) {
-        self.ctrl = true;
-    }
-
-    pub fn get_ctrl(&self) -> bool {
-        self.ctrl
     }
 
     pub fn register_key(&mut self, input: &KeyboardInput) {
         match *input {
             KeyboardInput {
-                state: ElementState::Pressed,
                 virtual_keycode: Some(keycode),
                 ..
-            } => self.register_key_down(keycode),
-            KeyboardInput {
-                state: ElementState::Released,
-                virtual_keycode: Some(keycode),
-                ..
-            } => self.register_key_up(keycode),
-            _ => (), // Do nothing. Should probably log the error.
+            } => {
+                let keycode = keycode as usize;
+                self.keys_before.0[keycode] = self.keys_now.0[keycode];
+                self.keys_now.0[keycode] = *input;
+            }
+            _ => {}
         }
     }
 
@@ -84,16 +79,17 @@ impl Input {
     // ---
 
     pub fn is_key_down(&self, keycode: VirtualKeyCode) -> bool {
-        self.key_down.0[keycode as usize]
+        self.keys_now.0[keycode as usize].state == ElementState::Pressed
     }
 
     pub fn is_key_toggled(&self, keycode: VirtualKeyCode) -> bool {
-        self.key_toggled.0[keycode as usize]
+        self.keys_before.0[keycode as usize].state != self.keys_now.0[keycode as usize].state
     }
 
     pub fn is_key_toggled_down(&self, keycode: VirtualKeyCode) -> bool {
         self.is_key_down(keycode) && self.is_key_toggled(keycode)
     }
+
     pub fn is_key_toggled_up(&self, keycode: VirtualKeyCode) -> bool {
         !self.is_key_down(keycode) && self.is_key_toggled(keycode)
     }
@@ -118,24 +114,6 @@ impl Input {
 
     pub fn get_mouse_wheel(&self) -> f32 {
         self.mouse_wheel
-    }
-
-    // ---
-
-    pub fn register_key_down(&mut self, keycode: VirtualKeyCode) {
-        let keycode = keycode as usize;
-        if !self.key_down.0[keycode] {
-            self.key_toggled.0[keycode] = true;
-        }
-        self.key_down.0[keycode] = true;
-    }
-
-    pub fn register_key_up(&mut self, keycode: VirtualKeyCode) {
-        let keycode = keycode as usize;
-        if self.key_down.0[keycode] {
-            self.key_toggled.0[keycode] = true;
-        }
-        self.key_down.0[keycode] = false;
     }
 }
 

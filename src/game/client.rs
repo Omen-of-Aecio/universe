@@ -18,16 +18,17 @@ static PLAYER_CENTER: Vec2 = Vec2 { x: 5.0, y: 5.0 };
 
 pub struct Client {
     pub audio: Option<rodio::Sink>,
+    pub config: ClientConfig,
+    pub events: Option<winit::EventsLoop>,
     pub graphics: Option<Graphics>,
+    pub input: input::Input,
     pub logger: Logger<Log>,
     pub logic: ClientLogic,
-    pub config: ClientConfig,
     pub network: Socket,
     pub random: Pcg64Mcg,
+    pub server: Option<SocketAddr>,
     pub threads: Threads,
     pub time: Instant,
-    pub input: input::Input,
-    pub server: Option<SocketAddr>,
 }
 
 #[derive(Default)]
@@ -128,16 +129,17 @@ impl Client {
         cfg.receive_buffer_max_size = cfg.max_packet_size;
         let mut s = Client {
             audio: None,
+            config: Default::default(),
+            events: None,
             graphics: None,
+            input: Input::default(),
             logger,
             logic: ClientLogic::default(),
             network: random_port_socket(cfg),
             random: Pcg64Mcg::new(0),
+            server: None,
             threads: Threads::default(),
             time: Instant::now(),
-            input: Input::default(),
-            server: None,
-            config: Default::default(),
         };
 
         spawn_gameshell(&mut s);
@@ -145,6 +147,9 @@ impl Client {
         s.logic.cam.zoom = 0.01;
         if graphics == GraphicsSettings::EnableGraphics {
             s.maybe_initialize_graphics();
+            if let Some(ref mut graphics) = s.graphics {
+                s.events = graphics.windowing.events_loop();
+            }
         }
 
         let port = s.network.local_addr().unwrap().port();
@@ -171,8 +176,8 @@ impl Client {
     pub fn tick_logic(&mut self) {
         toggle_camera_mode(self);
         self.input.prepare_for_next_frame();
-        if let Some(ref mut graphics) = self.graphics {
-            process_input(&mut self.input, &mut graphics.windowing);
+        if let Some(ref mut events) = self.events {
+            process_input(&mut self.input, events);
         }
         self.update_network();
         move_camera_according_to_input(self);
@@ -321,7 +326,7 @@ impl Client {
                                 for (id, ty) in removed {
                                     match ty {
                                         EntityType::Bullet => {
-                                            match self.logic.bullets.remove(&id) {
+                                            match self.logic.bullets.swap_remove(&id) {
                                                 Some(removed_bullet) => {
                                                     if let Some(ref mut gfx) = self.graphics {
                                                         gfx.windowing
@@ -548,8 +553,8 @@ impl Client {
     }
 }
 
-pub fn process_input(s: &mut Input, windowing: &mut VxDraw) {
-    windowing.events_loop().poll_events(|evt| {
+pub fn process_input(s: &mut Input, events: &mut winit::EventsLoop) {
+    events.poll_events(|evt| {
         if let Event::WindowEvent { event, .. } = evt {
             match event {
                 WindowEvent::KeyboardInput { input, .. } => {

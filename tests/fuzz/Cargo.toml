@@ -7,5 +7,5 @@ edition = "2018"
 [dependencies]
 geometry = { path = "../../crates/geometry" }
 honggfuzz = "0.5"
-gameshell = { path = "../../crates/gameshell" }
+gameshell = "0.1.0"
 universe = { path = "../../" }

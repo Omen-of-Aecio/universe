@@ -33,7 +33,7 @@ for TARGET in tests/fuzz/src/bin/*; do
     set +e
     HFUZZ_BUILD_ARGS="" \
     HFUZZ_RUN_ARGS="-N1000000 --exit_upon_crash ${HFUZZ_INPUT_ARGS:+-v} ${HFUZZ_INPUT_ARGS:-}" \
-    cargo hfuzz run "$FILE" >& ../../_build/hfuzz/"$FILE"
+    cargo hfuzz run "$FILE" |& tee ../../_build/hfuzz/"$FILE"
     if [ "$?" -ne 0 ]; then
         builderr="$((builderr + 1))"
     fi

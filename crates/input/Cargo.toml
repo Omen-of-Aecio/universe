@@ -1,6 +1,6 @@
 [package]
 name = "input"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Erlend Hofstad Langseth <3rlendhl@gmail.com>", "Kevin Robert Stravers <macocio@gmail.com>"]
 edition = "2018"
 

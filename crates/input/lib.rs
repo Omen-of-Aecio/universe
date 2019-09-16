@@ -1,3 +1,33 @@
+//! Input event accumulator for [winit].
+//!
+//! Used to accumulate events and distribute them throughout an application. This implementation
+//! uses a 2-window for keyboard and mouse buttons so it can capture an inter-frame toggle while
+//! enforcing a single action per frame.
+//! ```
+//! use winit::*;
+//! use input::Input;
+//!
+//! let mut input = Input::default();
+//!
+//! input.register_key(&KeyboardInput {
+//!     scancode: 0,
+//!     state: ElementState::Pressed,
+//!     virtual_keycode: Some(VirtualKeyCode::A),
+//!     modifiers: ModifiersState::default(),
+//! });
+//!
+//! assert![input.is_key_toggled_down(VirtualKeyCode::A)];
+//!
+//! input.register_mouse_position(1, 2);
+//! ```
+#![deny(
+    missing_docs,
+    trivial_casts,
+    trivial_numeric_casts,
+    unsafe_code,
+    unused_import_braces,
+    unused_qualifications
+)]
 use winit::*;
 
 const NUM_KEYS: usize = 161;
@@ -5,14 +35,12 @@ const NUM_MOUSE_BUTTONS: usize = 256 + 3;
 
 // ---
 
-struct Keys([KeyboardInput; NUM_KEYS]);
+struct Keys([KeyInput; NUM_KEYS]);
 
 impl Default for Keys {
     fn default() -> Self {
-        let default = KeyboardInput {
-            scancode: 0,
+        let default = KeyInput {
             state: ElementState::Released,
-            virtual_keycode: None,
             modifiers: ModifiersState {
                 shift: false,
                 ctrl: false,
@@ -45,12 +73,40 @@ impl Default for MouseButtons {
 
 // ---
 
+/// Keyboard input as a buttonstate and modifier state
 #[derive(Clone, Copy)]
-pub struct MouseInput {
+pub struct KeyInput {
+    /// State of the button
     pub state: ElementState,
+    /// Modifiers pressed while this event occurred
     pub modifiers: ModifiersState,
 }
 
+/// Mouse input as a buttonstate and a modifier state
+#[derive(Clone, Copy)]
+pub struct MouseInput {
+    /// State of the button
+    pub state: ElementState,
+    /// Modifiers pressed while this event occurred
+    pub modifiers: ModifiersState,
+}
+
+// ---
+
+impl From<KeyboardInput> for KeyInput {
+    fn from(input: KeyboardInput) -> Self {
+        KeyInput {
+            state: input.state,
+            modifiers: input.modifiers,
+        }
+    }
+}
+
+/// 2-window for accumulating [winit] input events.
+///
+/// This struct accumulates input events and allows them to be used throughout the program. Its
+/// main purpose is to resolve issues of multiple keypresses per-frame as well as accumulating
+/// mouse events such as position and mousewheel events.
 #[derive(Default)]
 pub struct Input {
     keys_now: Keys,
@@ -66,6 +122,7 @@ pub struct Input {
 }
 
 impl Input {
+    /// Clear delta-based inputs such as mouse-wheel, and overwrite the previous mouse position
     pub fn prepare_for_next_frame(&mut self) {
         self.mouse_wheel = 0.0;
         self.mouse_before.0 = self.mouse_now.0;
@@ -74,6 +131,7 @@ impl Input {
 
     // ---
 
+    /// Register a keyboard input
     pub fn register_key(&mut self, input: &KeyboardInput) {
         match *input {
             KeyboardInput {
@@ -82,67 +140,80 @@ impl Input {
             } => {
                 let keycode = keycode as usize;
                 self.keys_before.0[keycode] = self.keys_now.0[keycode];
-                self.keys_now.0[keycode] = *input;
+                self.keys_now.0[keycode] = KeyInput::from(*input);
             }
             _ => {}
         }
     }
 
+    /// Check if a key is pressed
     pub fn is_key_down(&self, keycode: VirtualKeyCode) -> bool {
         self.keys_now.0[keycode as usize].state == ElementState::Pressed
     }
 
+    /// Check if a key is up (released)
     pub fn is_key_up(&self, keycode: VirtualKeyCode) -> bool {
         self.keys_now.0[keycode as usize].state == ElementState::Released
     }
 
+    /// Check if a key has been toggled
     pub fn is_key_toggled(&self, keycode: VirtualKeyCode) -> bool {
         self.keys_before.0[keycode as usize].state != self.keys_now.0[keycode as usize].state
     }
 
+    /// Check if a key has been toggled and is pressed
     pub fn is_key_toggled_down(&self, keycode: VirtualKeyCode) -> bool {
         self.is_key_down(keycode) && self.is_key_toggled(keycode)
     }
 
+    /// Check if a key has been toggled and is released
     pub fn is_key_toggled_up(&self, keycode: VirtualKeyCode) -> bool {
         !self.is_key_down(keycode) && self.is_key_toggled(keycode)
     }
 
+    /// Get a key's modifiers state
     pub fn key_modifiers_state(&self, keycode: VirtualKeyCode) -> ModifiersState {
         self.keys_now.0[keycode as usize].modifiers
     }
 
     // ---
 
+    /// Register a mouse button event
     pub fn register_mouse_input(&mut self, state: MouseInput, button: MouseButton) {
         let index = mouse_button_to_index(button);
         self.mouse_buttons_before.0[index] = self.mouse_buttons_now.0[index];
         self.mouse_buttons_now.0[index] = state;
     }
 
+    /// Check if a mouse button is pressed
     pub fn is_mouse_button_down(&self, button: MouseButton) -> bool {
         let index = mouse_button_to_index(button);
         self.mouse_buttons_now.0[index].state == ElementState::Pressed
     }
 
+    /// Check if a mouse button is released (up)
     pub fn is_mouse_button_up(&self, button: MouseButton) -> bool {
         let index = mouse_button_to_index(button);
         self.mouse_buttons_now.0[index].state == ElementState::Released
     }
 
+    /// Check if a mouse button is toggled
     pub fn is_mouse_button_toggled(&self, button: MouseButton) -> bool {
         let index = mouse_button_to_index(button);
         self.mouse_buttons_before.0[index].state != self.mouse_buttons_now.0[index].state
     }
 
+    /// Check if a mouse button is toggled and is pressed
     pub fn is_mouse_button_toggled_down(&self, button: MouseButton) -> bool {
         self.is_mouse_button_toggled(button) && self.is_mouse_button_down(button)
     }
 
+    /// Check if a mouse button is toggled and is released
     pub fn is_mouse_button_toggled_up(&self, button: MouseButton) -> bool {
         self.is_mouse_button_toggled(button) && self.is_mouse_button_up(button)
     }
 
+    /// Get a mouse button's modifiers state
     pub fn mouse_button_modifiers_state(&self, button: MouseButton) -> ModifiersState {
         let index = mouse_button_to_index(button);
         self.mouse_buttons_now.0[index].modifiers
@@ -150,19 +221,23 @@ impl Input {
 
     // ---
 
+    /// Register the position of the mouse
     pub fn register_mouse_position(&mut self, x: i32, y: i32) {
         self.mouse_now.0 = x;
         self.mouse_now.1 = y;
     }
 
+    /// Register a scroll wheel event
     pub fn register_mouse_wheel(&mut self, y: f32) {
         self.mouse_wheel += y;
     }
 
+    /// Get the current mouse position
     pub fn get_mouse_position(&self) -> (f32, f32) {
         (self.mouse_now.0 as f32, self.mouse_now.1 as f32)
     }
 
+    /// Get the mouse movement since last frame
     pub fn get_mouse_moved(&self) -> (f32, f32) {
         (
             (self.mouse_now.0 - self.mouse_before.0) as f32,
@@ -170,6 +245,7 @@ impl Input {
         )
     }
 
+    /// Get the current mouse wheel value
     pub fn get_mouse_wheel(&self) -> f32 {
         self.mouse_wheel
     }

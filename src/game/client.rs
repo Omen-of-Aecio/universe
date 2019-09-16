@@ -454,7 +454,7 @@ impl Client {
         let mouse_pos = match self.graphics {
             Some(ref graphics) => graphics
                 .windowing
-                .to_world_coords(self.input.get_mouse_pos()),
+                .to_world_coords(self.input.get_mouse_position()),
             None => (0.0, 0.0),
         };
 

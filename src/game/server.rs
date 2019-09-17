@@ -126,10 +126,7 @@ impl Server {
                                         error![self.logger, "Failed to send Welcome packet"];
                                     });
                             }
-                            ClientMessage::Input {
-                                commands,
-                                mouse_pos,
-                            } => {
+                            ClientMessage::Input(commands) => {
                                 let id = self.connections.get_by_right(&pkt.addr());
                                 match id {
                                     Some(id) => {
@@ -140,9 +137,39 @@ impl Server {
                                             .find(|player| player.id == *id)
                                         {
                                             for cmd in commands {
-                                                player.input.apply_command(cmd);
+                                                match cmd {
+                                                    InputCommand::Keyboard {
+                                                        state,
+                                                        virtual_keycode,
+                                                        modifiers,
+                                                    } => {
+                                                        player.input.register_key(
+                                                            &winit::KeyboardInput {
+                                                                scancode: 0,
+                                                                state,
+                                                                virtual_keycode: Some(
+                                                                    virtual_keycode,
+                                                                ),
+                                                                modifiers,
+                                                            },
+                                                        );
+                                                    }
+                                                    InputCommand::Mouse {
+                                                        position,
+                                                        state,
+                                                        button,
+                                                        modifiers,
+                                                    } => {
+                                                        player.input.register_mouse_position(
+                                                            position.0, position.1,
+                                                        );
+                                                        player.input.register_mouse_input(
+                                                            input::MouseInput { state, modifiers },
+                                                            button,
+                                                        );
+                                                    }
+                                                }
                                             }
-                                            player.input.mouse_pos = mouse_pos;
                                         }
                                     }
                                     None => {
@@ -221,7 +248,7 @@ impl ServerLogic {
         self.player_id += 1;
         let player = ServerPlayer {
             inner: PlayerData::new(id, 0, Vec2::null_vec()),
-            input: UserInput::default(),
+            input: input::Input::default(),
         };
         self.players.push(player);
         id
@@ -239,11 +266,12 @@ impl ServerLogic {
             );
 
             // Firing weapons
-            if player.input.is_down(InputKey::LeftMouse) {
+            if player.input.is_mouse_button_down(winit::MouseButton::Left) {
                 let stats = player.curr_weapon.get_stats();
                 for _ in 0..stats.bullet_count {
-                    let angle =
-                        Vec2::from(player.input.mouse_pos) - player.position - Vec2::new(5.0, 5.0);
+                    let angle = Vec2::from(player.input.get_mouse_position())
+                        - player.position
+                        - Vec2::new(5.0, 5.0);
                     let direction = angle.rotate(random.gen_range(-stats.spread, stats.spread));
 
                     let position = player.position + Vec2::new(5.0, 5.0);
@@ -303,7 +331,7 @@ impl ServerLogic {
 #[derive(Debug)]
 pub struct ServerPlayer {
     inner: PlayerData,
-    pub input: UserInput,
+    pub input: input::Input,
 }
 
 impl std::ops::Deref for ServerPlayer {

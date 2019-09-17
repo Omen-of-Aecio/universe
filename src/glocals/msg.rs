@@ -1,16 +1,13 @@
 use crate::game::{Bullet, Id, PlayerData};
 use bincode;
 use failure::Error;
+use std::convert::TryFrom;
 
 /// Message sent between from client to server
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ClientMessage {
     Join,
-    /// `mouse_pos` is the position of mouse in world space
-    Input {
-        commands: Vec<InputCommand>,
-        mouse_pos: (f32, f32),
-    },
+    Input(Vec<InputCommand>),
 }
 impl ClientMessage {
     pub fn serialize(&self) -> Vec<u8> {
@@ -58,19 +55,39 @@ pub enum EntityType {
     Bullet,
 }
 
-#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
-pub enum InputKey {
-    Up = 0,
-    Down,
-    Left,
-    Right,
-    LShift,
-    LeftMouse, // IMPORTANT: LeftMouse has to be the very last (used to count variants)
+// ---
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub enum InputCommand {
+    Keyboard {
+        state: winit::ElementState,
+        virtual_keycode: winit::VirtualKeyCode,
+        modifiers: winit::ModifiersState,
+    },
+    Mouse {
+        position: (f32, f32),
+        state: winit::ElementState,
+        button: winit::MouseButton,
+        modifiers: winit::ModifiersState,
+    },
 }
-/// Command that client sends to server that stems from user input.
-/// Should all be sent reliably.
-#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
-pub struct InputCommand {
-    pub is_pressed: bool,
-    pub key: InputKey,
+
+impl TryFrom<winit::KeyboardInput> for InputCommand {
+    type Error = ();
+
+    fn try_from(key: winit::KeyboardInput) -> Result<Self, Self::Error> {
+        match key {
+            winit::KeyboardInput {
+                state,
+                virtual_keycode: Some(virtual_keycode),
+                modifiers,
+                ..
+            } => Ok(Self::Keyboard {
+                state,
+                virtual_keycode: virtual_keycode,
+                modifiers,
+            }),
+            _ => Err(()),
+        }
+    }
 }

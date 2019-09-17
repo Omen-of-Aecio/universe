@@ -12,7 +12,7 @@ use cgmath::*;
 use fast_logger::{debug, info, warn, GenericLogger, Logger};
 use input::Input;
 use std::time::Instant;
-use winit::{VirtualKeyCode as Key, *};
+use winit::{ElementState, VirtualKeyCode as Key, *};
 
 static PLAYER_CENTER: Vec2 = Vec2 { x: 5.0, y: 5.0 };
 
@@ -58,7 +58,7 @@ pub struct ClientLogic {
 #[derive(Default)]
 pub struct ClientPlayer {
     pub inner: PlayerData,
-    pub input: UserInput,
+    pub input: input::Input,
     pub weapon_sprite: Option<vxdraw::dyntex::Handle>,
 }
 
@@ -175,32 +175,16 @@ impl Client {
 
     pub fn tick_logic(&mut self) {
         toggle_camera_mode(self);
-        self.input.prepare_for_next_frame();
         if let Some(ref mut events) = self.events {
             process_input(&mut self.input, events);
         }
         self.update_network();
         move_camera_according_to_input(self);
 
-        let mut user_input = UserInput::default();
-        match self.collect_input() {
-            ClientMessage::Input {
-                commands,
-                mouse_pos,
-            } => {
-                for cmd in commands {
-                    user_input.apply_command(cmd);
-                }
-            }
-            _ => panic!["collect input should never return anything but ::Input"],
-        }
-
         if let Some(player) = self.logic.players.get_mut(&self.logic.you) {
-            let input = player.input.clone();
-            info![self.logger, "Current input state"; "input" => InDebug(&input)];
             update_player(
                 &mut player.inner,
-                &user_input,
+                &self.input,
                 &self.logic.config,
                 &mut self.random,
                 &self.logic.grid,
@@ -268,7 +252,7 @@ impl Client {
                                         let id = player.id;
                                         let new = ClientPlayer {
                                             inner: player,
-                                            input: UserInput::default(),
+                                            input: input::Input::default(),
                                             weapon_sprite: None,
                                         };
                                         self.logic.players.insert(id, new);
@@ -381,74 +365,85 @@ impl Client {
 
     fn collect_input(&self) -> ClientMessage {
         let mut commands = Vec::new();
-        if self.input.is_key_down(Key::Down) {
-            commands.push(InputCommand {
-                is_pressed: true,
-                key: InputKey::Down,
+        if self.input.is_key_toggled_down(Key::Down) {
+            commands.push(InputCommand::Keyboard {
+                state: ElementState::Pressed,
+                virtual_keycode: VirtualKeyCode::Down,
+                modifiers: self.input.key_modifiers_state(Key::Down),
             });
         } else if self.input.is_key_toggled_up(Key::Down) {
-            commands.push(InputCommand {
-                is_pressed: false,
-                key: InputKey::Down,
+            commands.push(InputCommand::Keyboard {
+                state: ElementState::Released,
+                virtual_keycode: VirtualKeyCode::Down,
+                modifiers: self.input.key_modifiers_state(Key::Down),
             });
         }
-        if self.input.is_key_down(Key::Up) {
-            commands.push(InputCommand {
-                is_pressed: true,
-                key: InputKey::Up,
+        if self.input.is_key_toggled_down(Key::Up) {
+            commands.push(InputCommand::Keyboard {
+                state: ElementState::Pressed,
+                virtual_keycode: VirtualKeyCode::Up,
+                modifiers: self.input.key_modifiers_state(Key::Up),
             });
         } else if self.input.is_key_toggled_up(Key::Up) {
-            commands.push(InputCommand {
-                is_pressed: false,
-                key: InputKey::Up,
+            commands.push(InputCommand::Keyboard {
+                state: ElementState::Released,
+                virtual_keycode: VirtualKeyCode::Up,
+                modifiers: self.input.key_modifiers_state(Key::Up),
             });
         }
-        if self.input.is_key_down(Key::Left) {
-            commands.push(InputCommand {
-                is_pressed: true,
-                key: InputKey::Left,
+        if self.input.is_key_toggled_down(Key::Left) {
+            commands.push(InputCommand::Keyboard {
+                state: ElementState::Pressed,
+                virtual_keycode: VirtualKeyCode::Left,
+                modifiers: self.input.key_modifiers_state(Key::Left),
             });
         } else if self.input.is_key_toggled_up(Key::Left) {
-            commands.push(InputCommand {
-                is_pressed: false,
-                key: InputKey::Left,
+            commands.push(InputCommand::Keyboard {
+                state: ElementState::Released,
+                virtual_keycode: VirtualKeyCode::Left,
+                modifiers: self.input.key_modifiers_state(Key::Left),
             });
         }
-        if self.input.is_key_down(Key::Right) {
-            dbg!("ok lets do this");
-            commands.push(InputCommand {
-                is_pressed: true,
-                key: InputKey::Right,
+        if self.input.is_key_toggled_down(Key::Right) {
+            commands.push(InputCommand::Keyboard {
+                state: ElementState::Pressed,
+                virtual_keycode: VirtualKeyCode::Right,
+                modifiers: self.input.key_modifiers_state(Key::Right),
             });
         } else if self.input.is_key_toggled_up(Key::Right) {
-            commands.push(InputCommand {
-                is_pressed: false,
-                key: InputKey::Right,
+            commands.push(InputCommand::Keyboard {
+                state: ElementState::Released,
+                virtual_keycode: VirtualKeyCode::Right,
+                modifiers: self.input.key_modifiers_state(Key::Right),
             });
         }
-        if self.input.is_key_down(Key::LShift) {
-            commands.push(InputCommand {
-                is_pressed: true,
-                key: InputKey::LShift,
+        if self.input.is_key_toggled_down(Key::LShift) {
+            commands.push(InputCommand::Keyboard {
+                state: ElementState::Pressed,
+                virtual_keycode: VirtualKeyCode::LShift,
+                modifiers: self.input.key_modifiers_state(Key::LShift),
             });
         } else if self.input.is_key_toggled_up(Key::LShift) {
-            commands.push(InputCommand {
-                is_pressed: false,
-                key: InputKey::LShift,
+            commands.push(InputCommand::Keyboard {
+                state: ElementState::Released,
+                virtual_keycode: VirtualKeyCode::LShift,
+                modifiers: self.input.key_modifiers_state(Key::LShift),
             });
         }
-        if self.input.is_mouse_button_toggled(MouseButton::Left) {
-            if self.input.is_mouse_button_down(MouseButton::Left) {
-                commands.push(InputCommand {
-                    is_pressed: true,
-                    key: InputKey::LeftMouse,
-                });
-            } else {
-                commands.push(InputCommand {
-                    is_pressed: false,
-                    key: InputKey::LeftMouse,
-                });
-            }
+        if self.input.is_mouse_button_toggled_down(MouseButton::Left) {
+            commands.push(InputCommand::Mouse {
+                position: self.input.get_mouse_position(),
+                state: ElementState::Pressed,
+                button: MouseButton::Left,
+                modifiers: self.input.mouse_button_modifiers_state(MouseButton::Left),
+            });
+        } else if self.input.is_mouse_button_toggled_up(MouseButton::Left) {
+            commands.push(InputCommand::Mouse {
+                position: self.input.get_mouse_position(),
+                state: ElementState::Released,
+                button: MouseButton::Left,
+                modifiers: self.input.mouse_button_modifiers_state(MouseButton::Left),
+            });
         }
 
         let mouse_pos = match self.graphics {
@@ -458,20 +453,14 @@ impl Client {
             None => (0.0, 0.0),
         };
 
-        ClientMessage::Input {
-            commands,
-            mouse_pos,
-        }
+        ClientMessage::Input(commands)
     }
 
     fn maybe_initialize_graphics(&mut self) {
         self.logger.info("Initializing graphics");
-        let mut windowing = VxDraw::new(
-            self.logger.clone_add_context("vxdraw").to_compatibility(),
-            ShowWindow::Enable,
-        );
-        self.logger
-            .set_context_specific_log_level("client-vxdraw", 196);
+        let mut vxdraw_logger = self.logger.clone_add_context("vxdraw");
+        vxdraw_logger.set_this_log_level(196);
+        let mut windowing = VxDraw::new(vxdraw_logger.to_compatibility(), ShowWindow::Enable);
 
         {
             static BACKGROUND: &dyntex::ImgData = &dyntex::ImgData::PNGBytes(include_bytes![
@@ -554,6 +543,7 @@ impl Client {
 }
 
 pub fn process_input(s: &mut Input, events: &mut winit::EventsLoop) {
+    s.prepare_for_next_frame();
     events.poll_events(|evt| {
         if let Event::WindowEvent { event, .. } = evt {
             match event {
@@ -578,7 +568,7 @@ pub fn process_input(s: &mut Input, events: &mut winit::EventsLoop) {
                 }
                 WindowEvent::CursorMoved { position, .. } => {
                     let pos: (i32, i32) = position.into();
-                    s.register_mouse_position(pos.0, pos.1);
+                    s.register_mouse_position(pos.0 as f32, pos.1 as f32);
                 }
                 _ => {}
             }

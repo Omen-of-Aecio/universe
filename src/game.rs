@@ -50,29 +50,6 @@ impl Main {
     }
 }
 
-/// Indexed by InputKey
-#[derive(Clone, Debug)]
-pub struct UserInput {
-    keys: Vec<bool>,
-    pub mouse_pos: (f32, f32),
-}
-
-impl Default for UserInput {
-    fn default() -> Self {
-        Self {
-            keys: vec![false; InputKey::LeftMouse as usize + 1],
-            mouse_pos: (0.0, 0.0),
-        }
-    }
-}
-impl UserInput {
-    pub fn apply_command(&mut self, cmd: InputCommand) {
-        self.keys[cmd.key as usize] = cmd.is_pressed;
-    }
-    pub fn is_down(&self, key: InputKey) -> bool {
-        self.keys[key as usize]
-    }
-}
 // ---
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -198,11 +175,11 @@ pub fn create_black_square_around_player(s: &mut Grid<Reality>) {
 }
 
 pub fn accelerate_player_according_to_input(
-    inp: &UserInput,
+    inp: &input::Input,
     conf: &WorldConfig,
     on_ground: bool,
 ) -> Vec2 {
-    let dy = if inp.is_down(InputKey::Up) {
+    let dy = if inp.is_key_down(winit::VirtualKeyCode::Up) {
         if conf.gravity_on {
             if on_ground {
                 -conf.player.jump_acc
@@ -212,14 +189,14 @@ pub fn accelerate_player_according_to_input(
         } else {
             -conf.player.acc
         }
-    } else if inp.is_down(InputKey::Down) {
+    } else if inp.is_key_down(winit::VirtualKeyCode::Down) {
         conf.player.acc
     } else {
         0.0
     };
-    let dx = if inp.is_down(InputKey::Left) {
+    let dx = if inp.is_key_down(winit::VirtualKeyCode::Left) {
         -conf.player.acc
-    } else if inp.is_down(InputKey::Right) {
+    } else if inp.is_key_down(winit::VirtualKeyCode::Right) {
         conf.player.acc
     } else {
         0.0
@@ -227,7 +204,7 @@ pub fn accelerate_player_according_to_input(
     Vec2 {
         x: dx as f32,
         y: dy as f32,
-    } / if inp.is_down(InputKey::LShift) {
+    } / if inp.is_key_down(winit::VirtualKeyCode::LShift) {
         3.0
     } else {
         1.0
@@ -339,7 +316,7 @@ fn fire_bullets(
 
 fn update_player(
     player: &mut PlayerData,
-    player_input: &UserInput,
+    player_input: &input::Input,
     config: &WorldConfig,
     random: &mut Pcg64Mcg,
     grid: &Grid<Reality>,

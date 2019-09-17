@@ -28,6 +28,7 @@
     unused_import_braces,
     unused_qualifications
 )]
+use std::fmt;
 use winit::*;
 
 const NUM_KEYS: usize = 161;
@@ -36,6 +37,15 @@ const NUM_MOUSE_BUTTONS: usize = 256 + 3;
 // ---
 
 struct Keys([KeyInput; NUM_KEYS]);
+
+impl fmt::Debug for Keys {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for idx in 0..self.0.len() - 1 {
+            write![f, "{:?}", self.0[idx]]?;
+        }
+        write![f, "{:?}", self.0.last()]
+    }
+}
 
 impl Default for Keys {
     fn default() -> Self {
@@ -56,6 +66,15 @@ impl Default for Keys {
 
 struct MouseButtons([MouseInput; NUM_MOUSE_BUTTONS]);
 
+impl fmt::Debug for MouseButtons {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for idx in 0..self.0.len() - 1 {
+            write![f, "{:?}", self.0[idx]]?;
+        }
+        write![f, "{:?}", self.0.last()]
+    }
+}
+
 impl Default for MouseButtons {
     fn default() -> Self {
         let default = MouseInput {
@@ -74,7 +93,7 @@ impl Default for MouseButtons {
 // ---
 
 /// Keyboard input as a buttonstate and modifier state
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct KeyInput {
     /// State of the button
     pub state: ElementState,
@@ -83,7 +102,7 @@ pub struct KeyInput {
 }
 
 /// Mouse input as a buttonstate and a modifier state
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct MouseInput {
     /// State of the button
     pub state: ElementState,
@@ -107,7 +126,7 @@ impl From<KeyboardInput> for KeyInput {
 /// This struct accumulates input events and allows them to be used throughout the program. Its
 /// main purpose is to resolve issues of multiple keypresses per-frame as well as accumulating
 /// mouse events such as position and mousewheel events.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Input {
     keys_now: Keys,
     keys_before: Keys,
@@ -115,8 +134,8 @@ pub struct Input {
     mouse_buttons_now: MouseButtons,
     mouse_buttons_before: MouseButtons,
 
-    mouse_now: (i32, i32),
-    mouse_before: (i32, i32),
+    mouse_now: (f32, f32),
+    mouse_before: (f32, f32),
 
     mouse_wheel: f32,
 }
@@ -222,7 +241,7 @@ impl Input {
     // ---
 
     /// Register the position of the mouse
-    pub fn register_mouse_position(&mut self, x: i32, y: i32) {
+    pub fn register_mouse_position(&mut self, x: f32, y: f32) {
         self.mouse_now.0 = x;
         self.mouse_now.1 = y;
     }
@@ -234,14 +253,14 @@ impl Input {
 
     /// Get the current mouse position
     pub fn get_mouse_position(&self) -> (f32, f32) {
-        (self.mouse_now.0 as f32, self.mouse_now.1 as f32)
+        (self.mouse_now.0, self.mouse_now.1)
     }
 
     /// Get the mouse movement since last frame
     pub fn get_mouse_moved(&self) -> (f32, f32) {
         (
-            (self.mouse_now.0 - self.mouse_before.0) as f32,
-            (self.mouse_now.1 - self.mouse_before.1) as f32,
+            (self.mouse_now.0 - self.mouse_before.0),
+            (self.mouse_now.1 - self.mouse_before.1),
         )
     }
 

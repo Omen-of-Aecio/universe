@@ -24,7 +24,7 @@ fast-logger = "0.5.1"
 file-rotate = "0.1"
 gameshell = "0.1.0"
 indexmap = "1.0.2"
-laminar = { git = "https://github.com/amethyst/laminar.git" }
+laminar = "0.3.1"
 rand = "0.6.1"
 rand_pcg = "0.1.2"
 rodio = "0.8.1"
@@ -34,7 +34,7 @@ serde_derive = "1.0"
 time = "0.1.40"
 toml = "0.4.9"
 vxdraw = "0.2.2"
-winit = "0.19.0"
+winit = { version = "0.19.0", features = ["serde"] }
 
 # Local libraries
 # benchmarker = { path = "crates/benchmarker" }

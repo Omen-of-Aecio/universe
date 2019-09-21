@@ -211,7 +211,11 @@ impl Server {
         }
         for cli_addr in self.connections.right_values() {
             self.network
-                .send(Packet::reliable_unordered(*cli_addr, state_data.clone()))
+                .send(Packet::unreliable_sequenced(
+                    *cli_addr,
+                    state_data.clone(),
+                    None,
+                ))
                 .unwrap();
         }
 

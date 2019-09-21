@@ -57,7 +57,10 @@ gui-tests = []
 
 [profile.release]
 debug = true
-opt-level = 3
+opt-level = 'z'
+codegen-units = 1
+lto = true
+panic = 'abort'
 
 [profile.dev]
 codegen-units = 4

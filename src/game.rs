@@ -1,5 +1,5 @@
 use crate::glocals::*;
-use crate::mediators::does_line_collide_with_grid::*;
+use crate::mediators::collision::*;
 pub use failure::Error;
 use fast_logger::{error, info, Logger};
 use geometry::vec::Vec2;

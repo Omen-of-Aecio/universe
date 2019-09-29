@@ -1,5 +1,4 @@
 use crate::game::*;
-use crate::mediators::does_line_collide_with_grid::*;
 use bimap::BiMap;
 use cgmath::*;
 use fast_logger::{GenericLogger, Logger};

@@ -21,10 +21,12 @@
 //! input.register_mouse_position(1, 2);
 //! ```
 #![deny(
+    missing_copy_implementations,
     missing_docs,
     trivial_casts,
     trivial_numeric_casts,
     unsafe_code,
+    unstable_features,
     unused_import_braces,
     unused_qualifications
 )]
@@ -92,13 +94,17 @@ impl Default for MouseButtons {
 
 // ---
 
+/// Position of the mouse
+#[derive(Clone, Copy)]
+pub struct MousePosition(i32, i32);
+
 /// Keyboard input as a buttonstate and modifier state
 #[derive(Clone, Copy, Debug)]
 pub struct KeyInput {
-    /// State of the button
-    pub state: ElementState,
     /// Modifiers pressed while this event occurred
     pub modifiers: ModifiersState,
+    /// State of the button
+    pub state: ElementState,
 }
 
 /// Mouse input as a buttonstate and a modifier state
@@ -152,16 +158,14 @@ impl Input {
 
     /// Register a keyboard input
     pub fn register_key(&mut self, input: &KeyboardInput) {
-        match *input {
-            KeyboardInput {
-                virtual_keycode: Some(keycode),
-                ..
-            } => {
-                let keycode = keycode as usize;
-                self.keys_before.0[keycode] = self.keys_now.0[keycode];
-                self.keys_now.0[keycode] = KeyInput::from(*input);
-            }
-            _ => {}
+        if let KeyboardInput {
+            virtual_keycode: Some(keycode),
+            ..
+        } = input
+        {
+            let keycode = *keycode as usize;
+            self.keys_before.0[keycode] = self.keys_now.0[keycode];
+            self.keys_now.0[keycode] = KeyInput::from(*input);
         }
     }
 

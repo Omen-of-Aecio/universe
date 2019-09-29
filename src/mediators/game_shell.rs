@@ -2,7 +2,7 @@ use self::command_handlers::*;
 use crate::glocals::*;
 use fast_logger::{self, error, Logger};
 use gameshell::Spec;
-use gameshell::{predicates::*, types::Type, Evaluate, Evaluator, GameShell, IncConsumer};
+use gameshell::{predicates::*, types::Type, Evaluator, GameShell, IncConsumer};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io;

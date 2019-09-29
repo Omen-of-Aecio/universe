@@ -18,7 +18,7 @@
 //!
 //! assert![input.is_key_toggled_down(VirtualKeyCode::A)];
 //!
-//! input.register_mouse_position(1, 2);
+//! input.register_mouse_position(1f32, 2f32);
 //! ```
 #![deny(
     missing_copy_implementations,
@@ -471,10 +471,10 @@ mod tests {
     #[test]
     fn only_consider_last_mouse_pos() {
         let mut input = Input::default();
-        input.register_mouse_position(1, 1);
-        input.register_mouse_position(8, 9);
-        input.register_mouse_position(123, 456);
-        input.register_mouse_position(3, 6);
+        input.register_mouse_position(1f32, 1f32);
+        input.register_mouse_position(8f32, 9f32);
+        input.register_mouse_position(123f32, 456f32);
+        input.register_mouse_position(3f32, 6f32);
 
         assert_eq![(3.0, 6.0), input.get_mouse_position()];
         assert_eq![(3.0, 6.0), input.get_mouse_moved()];

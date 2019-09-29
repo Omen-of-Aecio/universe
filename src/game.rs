@@ -175,7 +175,7 @@ pub fn create_black_square_around_player(s: &mut Grid<Reality>) {
 }
 
 pub fn accelerate_player_according_to_input(
-    inp: &input::Input,
+    inp: &winput::Input,
     conf: &WorldConfig,
     on_ground: bool,
 ) -> Vec2 {
@@ -316,7 +316,7 @@ fn fire_bullets(
 
 fn update_player(
     player: &mut PlayerData,
-    player_input: &input::Input,
+    player_input: &winput::Input,
     config: &WorldConfig,
     random: &mut Pcg64Mcg,
     grid: &Grid<Reality>,

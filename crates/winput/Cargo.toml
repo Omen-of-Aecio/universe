@@ -1,11 +1,11 @@
 [package]
-name = "input"
+name = "winput"
 version = "0.4.0"
 authors = ["Erlend Hofstad Langseth <3rlendhl@gmail.com>", "Kevin Robert Stravers <macocio@gmail.com>"]
 edition = "2018"
 
 [lib]
-name = "input"
+name = "winput"
 path = "lib.rs"
 
 [dependencies]

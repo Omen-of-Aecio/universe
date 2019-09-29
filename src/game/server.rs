@@ -163,7 +163,7 @@ impl Server {
                                                             position.0, position.1,
                                                         );
                                                         player.input.register_mouse_input(
-                                                            input::MouseInput { state, modifiers },
+                                                            winput::MouseInput { state, modifiers },
                                                             button,
                                                         );
                                                     }
@@ -251,7 +251,7 @@ impl ServerLogic {
         self.player_id += 1;
         let player = ServerPlayer {
             inner: PlayerData::new(id, 0, Vec2::null_vec()),
-            input: input::Input::default(),
+            input: winput::Input::default(),
         };
         self.players.push(player);
         id
@@ -334,7 +334,7 @@ impl ServerLogic {
 #[derive(Debug)]
 pub struct ServerPlayer {
     inner: PlayerData,
-    pub input: input::Input,
+    pub input: winput::Input,
 }
 
 impl std::ops::Deref for ServerPlayer {

@@ -5,7 +5,7 @@
 //! enforcing a single action per frame.
 //! ```
 //! use winit::*;
-//! use input::Input;
+//! use winput::Input;
 //!
 //! let mut input = Input::default();
 //!

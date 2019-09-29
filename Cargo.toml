@@ -37,11 +37,9 @@ vxdraw = "0.2.2"
 winit = { version = "0.19.0", features = ["serde"] }
 
 # Local libraries
-# benchmarker = { path = "crates/benchmarker" }
-config =      { path = "crates/config" }
-geometry =    { path = "crates/geometry" }
-input =       { path = "crates/input" }
-# ketimer =     { path = "crates/ketimer"  }
+config = { path = "crates/config" }
+geometry = { path = "crates/geometry" }
+winput = { path = "crates/winput" }
 
 [dev-dependencies]
 gameshell = { version = "0.1.0", features = ["with-quickcheck"] }

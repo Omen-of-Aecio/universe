@@ -2,17 +2,17 @@ use super::*;
 use crate::mediators::testtools::*;
 use geometry::{cam::Camera, grid2d::Grid, vec::Vec2};
 use indexmap::IndexMap;
-use input;
 use laminar::{Packet, Socket, SocketEvent};
 use rand_pcg::Pcg64Mcg;
 use rodio;
 use std::net::SocketAddr;
+use winput;
 
 use cgmath::*;
 use fast_logger::{debug, info, warn, GenericLogger, Logger};
-use input::Input;
 use std::time::Instant;
 use winit::{ElementState, VirtualKeyCode as Key, *};
+use winput::Input;
 
 static PLAYER_CENTER: Vec2 = Vec2 { x: 5.0, y: 5.0 };
 
@@ -21,7 +21,7 @@ pub struct Client {
     pub config: ClientConfig,
     pub events: Option<winit::EventsLoop>,
     pub graphics: Option<Graphics>,
-    pub input: input::Input,
+    pub input: Input,
     pub logger: Logger<Log>,
     pub logic: ClientLogic,
     pub network: Socket,
@@ -58,7 +58,7 @@ pub struct ClientLogic {
 #[derive(Default)]
 pub struct ClientPlayer {
     pub inner: PlayerData,
-    pub input: input::Input,
+    pub input: Input,
     pub weapon_sprite: Option<vxdraw::dyntex::Handle>,
 }
 
@@ -252,7 +252,7 @@ impl Client {
                                         let id = player.id;
                                         let new = ClientPlayer {
                                             inner: player,
-                                            input: input::Input::default(),
+                                            input: Input::default(),
                                             weapon_sprite: None,
                                         };
                                         self.logic.players.insert(id, new);
@@ -563,7 +563,7 @@ pub fn process_input(s: &mut Input, events: &mut winit::EventsLoop) {
                     modifiers,
                     ..
                 } => {
-                    let input = input::MouseInput { state, modifiers };
+                    let input = winput::MouseInput { state, modifiers };
                     s.register_mouse_input(input, button);
                 }
                 WindowEvent::CursorMoved { position, .. } => {
